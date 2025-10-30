@@ -1,0 +1,54 @@
+[workspace]
+resolver = "3"
+members = ["maplibre-style-spec"]
+
+[workspace.package]
+edition = "2024"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/CommanderStorm/maplibre-optimiser"
+rust-version = "1.92"
+homepage = "https://martin.maplibre.org/"
+
+[workspace.lints.rust]
+unused_qualifications = "warn"
+unsafe_code = "forbid"
+
+[workspace.lints.clippy]
+# Restrictions
+# unimplemented = "warn"
+# panic_in_result_fn = "warn"
+# panic = "warn"
+# todo = "warn"
+# Pedantics without being too noisy
+pedantic = { level = "warn", priority = -1 }
+derive_partial_eq_without_eq = "allow"
+enum_variant_names = "allow"
+implicit_hasher = "allow"
+missing_errors_doc = "allow"
+missing_panics_doc = "allow"
+module_name_repetitions = "allow"
+struct_field_names = "allow"
+
+[workspace.dependencies]
+anyhow = "1.0"
+clap = { version = "4", features = ["derive", "unstable-markdown", "wrap_help"] }
+criterion = { version = "0.5", features = ["async_futures", "async_tokio", "html_reports"] }
+image = "0.25.8"
+insta = "1"
+maplibre_native = "0.4.1"
+rstest = "0.26.1"
+rustls = "0.23.31"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+serde_with = "3"
+thiserror = "2"
+
+[profile.dev.package]
+# See https://docs.rs/insta/latest/insta/#optional-faster-runs
+insta.opt-level = 3
+similar.opt-level = 3
+
+[profile.release]
+# Make release binaries a bit smaller
+lto = true
+codegen-units = 1
