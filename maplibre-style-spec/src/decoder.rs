@@ -21,6 +21,7 @@ pub enum TopLevelItem {
 
 #[derive(Debug, PartialEq, Clone, Deserialize)]
 #[serde(tag = "type", rename_all = "camelCase")]
+#[serde(deny_unknown_fields)]
 pub enum ParsedItem {
     Number(Value),
     Enum(Value),
@@ -56,14 +57,8 @@ pub enum ParsedItem {
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct Expression {
     interpolated: bool,
     parameters: Vec<String>,
-}
-
-#[derive(Debug, PartialEq, Eq, Clone, Deserialize)]
-#[serde(untagged)]
-pub enum ExplicitOrImplicitValues {
-    Detailed(HashMap<String, Value>),
-    Basic(Vec<Value>),
 }
