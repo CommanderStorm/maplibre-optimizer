@@ -24,36 +24,35 @@ pub enum TopLevelItem {
 #[serde(deny_unknown_fields)]
 pub enum ParsedItem {
     Number {
-        doc: String,
+        #[serde(flatten)]
+        common: CommonFields,
         default: Option<Number>,
-        expression: Option<Expression>,
-        #[serde(rename = "property-type")]
-        property_type: Option<String>,
-        #[serde(rename = "sdk-support")]
-        sdk_support: Option<Value>,
         maximum: Option<Number>,
         minimum: Option<Number>,
-        transition: Option<bool>,
         units: Option<String>,
         example: Option<Number>,
         period: Option<Number>,
-        requires: Option<Vec<Requirement>>,
     },
     Enum {
-        doc: String,
+        #[serde(flatten)]
+        common: CommonFields,
         default: Option<Value>,
-        expression: Option<Expression>,
-        #[serde(rename = "property-type")]
-        property_type: Option<String>,
-        #[serde(rename = "sdk-support")]
-        sdk_support: Option<Value>,
         values: EnumValues,
-        transition: Option<bool>,
         example: Option<Value>,
         required: Option<bool>,
-        requires: Option<Vec<Requirement>>,
     },
-    Array(Value),
+    Array {
+        #[serde(flatten)]
+        common: CommonFields,
+        default: Option<Vec<Value>>,
+        example: Option<Vec<Value>>,
+        value: ArrayValue,
+        // if value is an enum
+        values: Option<EnumValues>,
+        required: Option<bool>,
+        units: Option<String>,
+        length: Option<usize>,
+    },
     Color(Value),
     String(Value),
     Boolean(Value),
@@ -84,6 +83,18 @@ pub enum ParsedItem {
     Expression(Value),
 }
 
+#[derive(Debug, PartialEq, Clone, Deserialize)]
+pub struct CommonFields {
+    doc: String,
+    expression: Option<Expression>,
+    #[serde(rename = "property-type")]
+    property_type: Option<String>,
+    #[serde(rename = "sdk-support")]
+    sdk_support: Option<Value>,
+    transition: Option<bool>,
+    requires: Option<Vec<Requirement>>,
+}
+
 #[derive(Debug, PartialEq, Eq, Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Expression {
@@ -108,4 +119,25 @@ pub struct EnumValue {
 pub enum EnumValues {
     Simple(Vec<Value>),
     Complex(HashMap<String, EnumValue>),
+}
+
+#[derive(Debug, PartialEq, Clone, Deserialize)]
+#[serde(untagged)]
+pub enum ArrayValue {
+    Simple(SimpleArrayValue),
+    Complex(Box<ParsedItem>),
+}
+
+#[derive(Debug, PartialEq, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum SimpleArrayValue {
+    String,
+    Number,
+    #[serde(rename = "*")]
+    Star,
+    FontFaces,
+    #[serde(rename = "function_stop")]
+    FunctionStop,
+    Layer,
+    Color,
 }
