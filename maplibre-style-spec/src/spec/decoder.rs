@@ -23,7 +23,7 @@ pub struct StyleReference {
 #[derive(Debug, PartialEq, Clone, Deserialize)]
 #[serde(untagged)]
 pub enum TopLevelItem {
-    Item(ParsedItem),
+    Item(Box<ParsedItem>),
     Group(HashMap<String, ParsedItem>),
     OneOf(Vec<String>),
 }
@@ -277,7 +277,7 @@ pub enum EnumValues {
 #[serde(untagged)]
 pub enum ArrayValue {
     Simple(SimpleArrayValue),
-    Either(Vec<Box<ArrayValue>>),
+    Either(Vec<ArrayValue>),
     Complex(Box<ParsedItem>),
 }
 
