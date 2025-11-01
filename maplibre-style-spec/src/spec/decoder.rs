@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use serde::Deserialize;
-use serde_json::Value;
+use serde_json::{Number, Value};
 
 #[derive(Debug, PartialEq, Clone, Deserialize)]
 pub struct StyleReference {
@@ -23,7 +23,22 @@ pub enum TopLevelItem {
 #[serde(tag = "type", rename_all = "camelCase")]
 #[serde(deny_unknown_fields)]
 pub enum ParsedItem {
-    Number(Value),
+    Number {
+        doc: String,
+        default: Option<Number>,
+        expression: Option<Expression>,
+        #[serde(rename = "property-type")]
+        property_type: Option<String>,
+        #[serde(rename = "sdk-support")]
+        sdk_support: Option<Value>,
+        maximum: Option<Number>,
+        minimum: Option<Number>,
+        transition: Option<bool>,
+        units: Option<String>,
+        example: Option<Number>,
+        period: Option<Number>,
+        requires: Option<Vec<Requirement>>,
+    },
     Enum(Value),
     Array(Value),
     Color(Value),
@@ -61,4 +76,11 @@ pub enum ParsedItem {
 pub struct Expression {
     interpolated: bool,
     parameters: Vec<String>,
+}
+
+#[derive(Debug, PartialEq, Eq, Clone, Deserialize)]
+#[serde(untagged)]
+pub enum Requirement {
+    Exists(String),
+    Equals(HashMap<String, Value>),
 }
