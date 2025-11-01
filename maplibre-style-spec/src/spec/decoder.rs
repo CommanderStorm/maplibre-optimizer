@@ -39,7 +39,6 @@ pub enum ParsedItem {
         default: Option<Value>,
         values: EnumValues,
         example: Option<Value>,
-        required: Option<bool>,
     },
     Array {
         #[serde(flatten)]
@@ -53,15 +52,34 @@ pub enum ParsedItem {
         minimum: Option<Number>,
         maximum: Option<Number>,
 
-        required: Option<bool>,
         units: Option<String>,
         length: Option<usize>,
     },
-    Color(Value),
-    String(Value),
-    Boolean(Value),
+    Color {
+        #[serde(flatten)]
+        common: CommonFields,
+        default: Option<Value>,
+        overridable: Option<bool>,
+        example: Option<Value>,
+    },
+    String {
+        #[serde(flatten)]
+        common: CommonFields,
+        example: Option<String>,
+        overridable: Option<bool>,
+        default: Option<String>,
+    },
+    Boolean {
+        #[serde(flatten)]
+        common: CommonFields,
+        default: Option<bool>,
+    },
     #[serde(rename = "*")]
-    Star(Value),
+    Star {
+        doc: String,
+        example: Option<Value>,
+        required: Option<bool>,
+    },
     #[serde(rename = "property-type")]
     PropertyType {
         doc: String,
@@ -76,25 +94,91 @@ pub enum ParsedItem {
     PromoteId {
         doc: String,
     },
-    NumberArray(Value),
-    ColorArray(Value),
-    VariableAnchorOffsetCollection(Value),
-    Transition(Value),
-    Terrain(Value),
-    State(Value),
-    Sprite(Value),
-    Sources(Value),
-    Source(Value),
-    Sky(Value),
-    ProjectionDefinition(Value),
-    Projection(Value),
-    Paint(Value),
-    Padding(Value),
-    Light(Value),
-    Layout(Value),
-    Formatted(Value),
-    Filter(Value),
-    Expression(Value),
+    NumberArray {
+        #[serde(flatten)]
+        common: CommonFields,
+
+        default: Option<Number>,
+        minimum: Option<Number>,
+        maximum: Option<Number>,
+    },
+    ColorArray {
+        #[serde(flatten)]
+        common: CommonFields,
+
+        default: Option<String>,
+    },
+    VariableAnchorOffsetCollection {
+        #[serde(flatten)]
+        common: CommonFields,
+    },
+    Transition {
+        doc: String,
+        example: Value,
+    },
+    Terrain {
+        doc: String,
+        example: Value,
+    },
+    State {
+        #[serde(flatten)]
+        common: CommonFields,
+        default: Value,
+        example: Value,
+    },
+    Sprite {
+        doc: String,
+        example: Value,
+    },
+    Sources {
+        doc: String,
+        example: Value,
+        required: bool,
+    },
+    Source {
+        doc: String,
+    },
+    Sky {
+        doc: String,
+        example: Value,
+    },
+    ProjectionDefinition {
+        #[serde(flatten)]
+        common: CommonFields,
+        default: String,
+    },
+    Projection {
+        doc: String,
+        example: Value,
+    },
+    Paint {
+        doc: String,
+    },
+    Padding {
+        #[serde(flatten)]
+        common: CommonFields,
+        units: String,
+        default: Vec<Number>,
+    },
+    Light {
+        doc: String,
+        example: Value,
+    },
+    Layout {
+        doc: String,
+    },
+    Formatted {
+        #[serde(flatten)]
+        common: CommonFields,
+        tokens: bool,
+        default: String,
+    },
+    Filter {
+        doc: String,
+    },
+    Expression {
+        doc: String,
+    },
 }
 
 #[derive(Debug, PartialEq, Clone, Deserialize)]
@@ -107,6 +191,7 @@ pub struct CommonFields {
     sdk_support: Option<Value>,
     transition: Option<bool>,
     requires: Option<Vec<Requirement>>,
+    required: Option<bool>,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Deserialize)]
