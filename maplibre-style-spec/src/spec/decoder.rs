@@ -39,7 +39,20 @@ pub enum ParsedItem {
         period: Option<Number>,
         requires: Option<Vec<Requirement>>,
     },
-    Enum(Value),
+    Enum {
+        doc: String,
+        default: Option<Value>,
+        expression: Option<Expression>,
+        #[serde(rename = "property-type")]
+        property_type: Option<String>,
+        #[serde(rename = "sdk-support")]
+        sdk_support: Option<Value>,
+        values: EnumValues,
+        transition: Option<bool>,
+        example: Option<Value>,
+        required: Option<bool>,
+        requires: Option<Vec<Requirement>>,
+    },
     Array(Value),
     Color(Value),
     String(Value),
@@ -83,4 +96,16 @@ pub struct Expression {
 pub enum Requirement {
     Exists(String),
     Equals(HashMap<String, Value>),
+}
+
+#[derive(Debug, PartialEq, Eq, Clone, Deserialize)]
+pub struct EnumValue {
+    doc: String,
+}
+
+#[derive(Debug, PartialEq, Eq, Clone, Deserialize)]
+#[serde(untagged)]
+pub enum EnumValues {
+    Simple(Vec<Value>),
+    Complex(HashMap<String, EnumValue>),
 }
