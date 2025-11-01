@@ -45,10 +45,14 @@ pub enum ParsedItem {
         #[serde(flatten)]
         common: CommonFields,
         default: Option<Vec<Value>>,
-        example: Option<Vec<Value>>,
+        example: Option<Value>,
         value: ArrayValue,
         // if value is an enum
         values: Option<EnumValues>,
+        // if value is a number
+        minimum: Option<Number>,
+        maximum: Option<Number>,
+
         required: Option<bool>,
         units: Option<String>,
         length: Option<usize>,
@@ -67,7 +71,7 @@ pub enum ParsedItem {
     ResolvedImage {
         #[serde(flatten)]
         common: CommonFields,
-        tokens: bool,
+        tokens: Option<bool>,
     },
     PromoteId {
         doc: String,
@@ -135,6 +139,7 @@ pub enum EnumValues {
 #[serde(untagged)]
 pub enum ArrayValue {
     Simple(SimpleArrayValue),
+    Either(Vec<Box<ArrayValue>>),
     Complex(Box<ParsedItem>),
 }
 
@@ -149,5 +154,6 @@ pub enum SimpleArrayValue {
     #[serde(rename = "function_stop")]
     FunctionStop,
     Layer,
+    Enum,
     Color,
 }

@@ -2,6 +2,34 @@ use maplibre_style_spec::spec::decoder::{StyleReference, TopLevelItem};
 use serde_json::Value;
 use std::{collections::HashMap, path::PathBuf};
 
+// objects produced by errors here are too large to review
+// to produce better error messages, we need to remove keys that don't cause errors
+fn minimise_object(check_still_produces_error: fn(Value) -> bool, value: Value) -> Value {
+    let values_to_try_to_remove = if let Value::Object(o) = value.clone() {
+        o.keys().cloned().collect::<Vec<_>>()
+    } else {
+        vec![]
+    };
+    let mut minimized = value.clone();
+    for outer_key in values_to_try_to_remove {
+        let outer_val = minimized
+            .as_object_mut()
+            .unwrap()
+            .remove(&outer_key)
+            .unwrap();
+        if !check_still_produces_error(minimized.clone()) {
+            // current object must be causing the mishap
+            minimized.as_object_mut().unwrap().clear();
+            let _ = minimized
+                .as_object_mut()
+                .unwrap()
+                .insert(outer_key.clone(), outer_val.clone());
+            return minimized;
+        }
+    }
+    minimized
+}
+
 #[test]
 fn test_decode_top_level() {
     let v8_path = PathBuf::from("tests/upstream/src/reference/v8.json");
@@ -15,21 +43,10 @@ fn test_decode_top_level() {
             if !value.is_object() {
                 panic!("Failed to parse {key} {e:?}.\n\nWas {value:#?}.");
             }
-            // objects produced by errors here are too large to review
-            // to produce better error messages, we need to remove keys that don't cause errors
-            let values_to_try_to_remove = if let Value::Object(o) = value.clone() {
-                o.keys().cloned().collect::<Vec<_>>()
-            } else {
-                vec![]
-            };
-            let mut minimized = value.clone();
-            for key in values_to_try_to_remove {
-                let mut value_without_key = minimized.clone();
-                value_without_key.as_object_mut().unwrap().remove(&key);
-                if let Err(_) = serde_json::from_value::<TopLevelItem>(value_without_key.clone()) {
-                    minimized = value_without_key;
-                }
-            }
+            let minimized = minimise_object(
+                |val| serde_json::from_value::<TopLevelItem>(val).is_err(),
+                value.clone(),
+            );
 
             panic!("Failed to parse {key} {e:?}.\n\nWas {minimized:#?}.");
         }
