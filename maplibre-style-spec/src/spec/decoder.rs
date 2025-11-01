@@ -25,26 +25,23 @@ pub enum TopLevelItem {
 pub enum ParsedItem {
     Number {
         #[serde(flatten)]
-        common: CommonFields,
+        common: Fields,
         default: Option<Number>,
         maximum: Option<Number>,
         minimum: Option<Number>,
-        units: Option<String>,
-        example: Option<Number>,
         period: Option<Number>,
     },
     Enum {
         #[serde(flatten)]
-        common: CommonFields,
+        common: Fields,
+
         default: Option<Value>,
         values: EnumValues,
-        example: Option<Value>,
     },
     Array {
         #[serde(flatten)]
-        common: CommonFields,
+        common: Fields,
         default: Option<Vec<Value>>,
-        example: Option<Value>,
         value: ArrayValue,
         // if value is an enum
         values: Option<EnumValues>,
@@ -52,51 +49,38 @@ pub enum ParsedItem {
         minimum: Option<Number>,
         maximum: Option<Number>,
 
-        units: Option<String>,
         length: Option<usize>,
     },
     Color {
         #[serde(flatten)]
-        common: CommonFields,
+        common: Fields,
         default: Option<Value>,
-        overridable: Option<bool>,
-        example: Option<Value>,
     },
     String {
         #[serde(flatten)]
-        common: CommonFields,
-        example: Option<String>,
-        overridable: Option<bool>,
+        common: Fields,
         default: Option<String>,
     },
     Boolean {
         #[serde(flatten)]
-        common: CommonFields,
+        common: Fields,
         default: Option<bool>,
     },
     #[serde(rename = "*")]
-    Star {
-        doc: String,
-        example: Option<Value>,
-        required: Option<bool>,
-    },
+    Star(Fields),
     #[serde(rename = "property-type")]
-    PropertyType {
-        doc: String,
-        required: Option<bool>,
-        example: Option<Value>,
-    },
+    PropertyType(Fields),
     ResolvedImage {
         #[serde(flatten)]
-        common: CommonFields,
+        common: Fields,
+
+        /// can autocomplete fields from layers
         tokens: Option<bool>,
     },
-    PromoteId {
-        doc: String,
-    },
+    PromoteId(Fields),
     NumberArray {
         #[serde(flatten)]
-        common: CommonFields,
+        common: Fields,
 
         default: Option<Number>,
         minimum: Option<Number>,
@@ -104,94 +88,67 @@ pub enum ParsedItem {
     },
     ColorArray {
         #[serde(flatten)]
-        common: CommonFields,
+        common: Fields,
 
         default: Option<String>,
     },
-    VariableAnchorOffsetCollection {
-        #[serde(flatten)]
-        common: CommonFields,
-    },
-    Transition {
-        doc: String,
-        example: Value,
-    },
-    Terrain {
-        doc: String,
-        example: Value,
-    },
+    VariableAnchorOffsetCollection(Fields),
+    Transition(Fields),
+    Terrain(Fields),
     State {
         #[serde(flatten)]
-        common: CommonFields,
+        common: Fields,
         default: Value,
-        example: Value,
     },
-    Sprite {
-        doc: String,
-        example: Value,
-    },
-    Sources {
-        doc: String,
-        example: Value,
-        required: bool,
-    },
-    Source {
-        doc: String,
-    },
-    Sky {
-        doc: String,
-        example: Value,
-    },
+    Sprite(Fields),
+    Sources(Fields),
+    Source(Fields),
+    Sky(Fields),
     ProjectionDefinition {
         #[serde(flatten)]
-        common: CommonFields,
+        common: Fields,
         default: String,
     },
-    Projection {
-        doc: String,
-        example: Value,
-    },
-    Paint {
-        doc: String,
-    },
+    Projection(Fields),
+    Paint(Fields),
     Padding {
         #[serde(flatten)]
-        common: CommonFields,
-        units: String,
+        common: Fields,
         default: Vec<Number>,
     },
-    Light {
-        doc: String,
-        example: Value,
-    },
-    Layout {
-        doc: String,
-    },
+    Light(Fields),
+    Layout(Fields),
     Formatted {
         #[serde(flatten)]
-        common: CommonFields,
+        common: Fields,
+        /// can autocomplete fields from layers
         tokens: bool,
         default: String,
     },
-    Filter {
-        doc: String,
-    },
-    Expression {
-        doc: String,
-    },
+    Filter(Fields),
+    Expression(Fields),
 }
 
 #[derive(Debug, PartialEq, Clone, Deserialize)]
-pub struct CommonFields {
+pub struct Fields {
+    // metadata fields
     doc: String,
+    example: Option<Value>,
+    units: Option<String>,
+
+    // data fields
     expression: Option<Expression>,
     #[serde(rename = "property-type")]
     property_type: Option<String>,
     #[serde(rename = "sdk-support")]
     sdk_support: Option<Value>,
+
+    // behaviour fields
     transition: Option<bool>,
-    requires: Option<Vec<Requirement>>,
     required: Option<bool>,
+    overridable: Option<bool>,
+
+    requires: Option<Vec<Requirement>>,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Deserialize)]
