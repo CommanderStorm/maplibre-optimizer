@@ -1,17 +1,14 @@
 {
-  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "extends": [
-    "config:recommended",
-    "group:recommended",
-    "group:allNonMajor",
-    "customManagers:biomeVersions"
-  ],
-  "timezone": "Europe/Berlin",
-  "schedule": [
-    "before 5am every weekday",
-    "every weekend"
-  ],
-  "vulnerabilityAlerts": {
-    "enabled": true
-  }
+	"$schema": "https://docs.renovatebot.com/renovate-schema.json",
+	"extends": [
+		"config:recommended",
+		"group:recommended",
+		"group:allNonMajor",
+		"customManagers:biomeVersions"
+	],
+	"timezone": "Europe/Berlin",
+	"schedule": ["before 5am every weekday", "every weekend"],
+	"vulnerabilityAlerts": {
+		"enabled": true
+	}
 }
