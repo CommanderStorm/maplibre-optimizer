@@ -5,5 +5,13 @@
     "group:recommended",
     "group:allNonMajor",
     "customManagers:biomeVersions"
-  ]
+  ],
+  "timezone": "Europe/Berlin",
+  "schedule": [
+    "before 5am every weekday",
+    "every weekend"
+  ],
+  "vulnerabilityAlerts": {
+    "enabled": true
+  }
 }
