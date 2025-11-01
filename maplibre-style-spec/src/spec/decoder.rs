@@ -59,9 +59,19 @@ pub enum ParsedItem {
     #[serde(rename = "*")]
     Star(Value),
     #[serde(rename = "property-type")]
-    PropertyType(Value),
-    ResolvedImage(Value),
-    PromoteId(Value),
+    PropertyType {
+        doc: String,
+        required: Option<bool>,
+        example: Option<Value>,
+    },
+    ResolvedImage {
+        #[serde(flatten)]
+        common: CommonFields,
+        tokens: bool,
+    },
+    PromoteId {
+        doc: String,
+    },
     NumberArray(Value),
     ColorArray(Value),
     VariableAnchorOffsetCollection(Value),
