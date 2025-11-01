@@ -132,30 +132,30 @@ pub enum ParsedItem {
 #[derive(Debug, PartialEq, Clone, Deserialize)]
 pub struct Fields {
     // metadata fields
-    doc: String,
-    example: Option<Value>,
-    units: Option<String>,
+    pub doc: String,
+    pub example: Option<Value>,
+    pub units: Option<String>,
 
     // data fields
-    expression: Option<Expression>,
+    pub expression: Option<Expression>,
     #[serde(rename = "property-type")]
-    property_type: Option<String>,
+    pub property_type: Option<String>,
     #[serde(rename = "sdk-support")]
-    sdk_support: Option<Value>,
+    pub sdk_support: Option<Value>,
 
     // behaviour fields
-    transition: Option<bool>,
-    required: Option<bool>,
-    overridable: Option<bool>,
+    pub transition: Option<bool>,
+    pub required: Option<bool>,
+    pub overridable: Option<bool>,
 
-    requires: Option<Vec<Requirement>>,
+    pub requires: Option<Vec<Requirement>>,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Expression {
-    interpolated: bool,
-    parameters: Vec<String>,
+    pub interpolated: bool,
+    pub parameters: Vec<String>,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Deserialize)]
