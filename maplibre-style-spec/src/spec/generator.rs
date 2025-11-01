@@ -31,7 +31,7 @@ fn generate_spec(scope: &mut Scope, root: &HashMap<String, ParsedItem>) {
 
 fn generate_top_level_item(scope: &mut Scope, item: TopLevelItem, name: String) {
     match item {
-        TopLevelItem::Item(item) => generate_parsed_item(scope, item, name),
+        TopLevelItem::Item(item) => generate_parsed_item(scope, &item, name),
         TopLevelItem::Group(_items) => {
             scope
                 .new_struct(&name)
@@ -42,7 +42,7 @@ fn generate_top_level_item(scope: &mut Scope, item: TopLevelItem, name: String) 
     }
 }
 
-fn generate_parsed_item(scope: &mut Scope, item: ParsedItem, name: String) {
+fn generate_parsed_item(scope: &mut Scope, item: &ParsedItem, name: String) {
     match item {
         ParsedItem::Number {
             common,
@@ -89,8 +89,8 @@ fn generate_parsed_item(scope: &mut Scope, item: ParsedItem, name: String) {
         ParsedItem::NumberArray {
             common,
             default,
-            minimum,
-            maximum,
+            minimum: _minimum,
+            maximum: _maximum,
         } => todo!(),
         ParsedItem::ColorArray { common, default } => todo!(),
         ParsedItem::VariableAnchorOffsetCollection(fields) => todo!(),
@@ -109,7 +109,7 @@ fn generate_parsed_item(scope: &mut Scope, item: ParsedItem, name: String) {
         ParsedItem::Layout(fields) => todo!(),
         ParsedItem::Formatted {
             common,
-            tokens,
+            tokens: _tokens,
             default,
         } => todo!(),
         ParsedItem::Filter(fields) => todo!(),

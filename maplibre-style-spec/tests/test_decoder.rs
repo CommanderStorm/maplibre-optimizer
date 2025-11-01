@@ -32,10 +32,8 @@ fn minimise_object(check_still_produces_error: fn(Value) -> bool, value: Value) 
 
 #[test]
 fn test_decode_top_level() {
-    let v8_path = PathBuf::from("tests/upstream/src/reference/v8.json");
-
-    let content = std::fs::read_to_string(v8_path).unwrap();
-    let mut style: HashMap<String, Value> = serde_json::from_str(&content).unwrap();
+    let content = include_str!("upstream/src/reference/v8.json");
+    let mut style: HashMap<String, Value> = serde_json::from_str(content).unwrap();
     assert_eq!(style.remove("$version"), Some(Value::Number(8.into())));
 
     for (key, value) in style {
@@ -55,9 +53,9 @@ fn test_decode_top_level() {
 
 #[test]
 fn test_decode_whole_reference() {
-    let v8_path = PathBuf::from("tests/upstream/src/reference/v8.json");
-
-    let content = std::fs::read_to_string(v8_path).unwrap();
-    let style: StyleReference = serde_json::from_str(&content).unwrap();
+    let content = include_str!("upstream/src/reference/v8.json");
+    let style: StyleReference = serde_json::from_str(content).unwrap();
     assert_eq!(style.version, 8);
+    assert!(style.root.len() > 0);
+    assert!(style.fields.len() > 0)
 }

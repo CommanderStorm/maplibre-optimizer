@@ -8,5 +8,9 @@ codegen.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 
+[[bin]]
+name = "generate_spec"
+path = "src/bin/generate_spec.rs"
+
 [dev-dependencies]
 insta.workspace = true

@@ -112,6 +112,10 @@ fmt-toml *args: (cargo-install 'cargo-sort')
 git *args:
     git {{args}}
 
+# Generate a new spec file
+gen:
+    cargo run --bin generate_spec
+
 # Run cargo fmt and cargo clippy
 lint: fmt clippy
 
