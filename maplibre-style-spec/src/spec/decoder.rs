@@ -5,8 +5,17 @@ use serde_json::{Number, Value};
 
 #[derive(Debug, PartialEq, Clone, Deserialize)]
 pub struct StyleReference {
+    /// version of the REFERENCE
+    ///
+    /// version of the style spec style is defined in $root
     #[serde(rename = "$version")]
     pub version: u8,
+
+    /// defines the layout of the style spec
+    #[serde(rename = "$root")]
+    pub root: HashMap<String, ParsedItem>,
+
+    /// definitions of the items referenced in the root
     #[serde(flatten)]
     pub fields: HashMap<String, TopLevelItem>,
 }
@@ -14,7 +23,7 @@ pub struct StyleReference {
 #[derive(Debug, PartialEq, Clone, Deserialize)]
 #[serde(untagged)]
 pub enum TopLevelItem {
-    Item(ParsedItem),
+    Item(Box<ParsedItem>),
     Group(HashMap<String, ParsedItem>),
     OneOf(Vec<String>),
 }
@@ -129,6 +138,93 @@ pub enum ParsedItem {
     Expression(Fields),
 }
 
+impl ParsedItem {
+    pub fn doc(&self) -> &str {
+        match self {
+            ParsedItem::Number {
+                common,
+                default: _default,
+                maximum: _maximum,
+                minimum: _minimum,
+                period: _period,
+            } => &common.doc,
+            ParsedItem::Enum {
+                common,
+                default: _default,
+                values: _values,
+            } => &common.doc,
+            ParsedItem::Array {
+                common,
+                default: _default,
+                value: _value,
+                values: _values,
+                minimum: _minimum,
+                maximum: _maximum,
+                length: _length,
+            } => &common.doc,
+            ParsedItem::Color {
+                common,
+                default: _default,
+            } => &common.doc,
+            ParsedItem::String {
+                common,
+                default: _default,
+            } => &common.doc,
+            ParsedItem::Boolean {
+                common,
+                default: _default,
+            } => &common.doc,
+            ParsedItem::Star(common) => &common.doc,
+            ParsedItem::PropertyType(common) => &common.doc,
+            ParsedItem::ResolvedImage {
+                common,
+                tokens: _tokens,
+            } => &common.doc,
+            ParsedItem::PromoteId(common) => &common.doc,
+            ParsedItem::NumberArray {
+                common,
+                default: _default,
+                minimum: _minimum,
+                maximum: _maximum,
+            } => &common.doc,
+            ParsedItem::ColorArray {
+                common,
+                default: _default,
+            } => &common.doc,
+            ParsedItem::VariableAnchorOffsetCollection(common) => &common.doc,
+            ParsedItem::Transition(common) => &common.doc,
+            ParsedItem::Terrain(common) => &common.doc,
+            ParsedItem::State {
+                common,
+                default: _default,
+            } => &common.doc,
+            ParsedItem::Sprite(common) => &common.doc,
+            ParsedItem::Sources(common) => &common.doc,
+            ParsedItem::Source(common) => &common.doc,
+            ParsedItem::Sky(common) => &common.doc,
+            ParsedItem::ProjectionDefinition {
+                common,
+                default: _default,
+            } => &common.doc,
+            ParsedItem::Projection(common) => &common.doc,
+            ParsedItem::Paint(common) => &common.doc,
+            ParsedItem::Padding {
+                common,
+                default: _default,
+            } => &common.doc,
+            ParsedItem::Light(common) => &common.doc,
+            ParsedItem::Layout(common) => &common.doc,
+            ParsedItem::Formatted {
+                common,
+                tokens: _tokens,
+                default: _default,
+            } => &common.doc,
+            ParsedItem::Filter(common) => &common.doc,
+            ParsedItem::Expression(common) => &common.doc,
+        }
+    }
+}
+
 #[derive(Default, Debug, PartialEq, Clone, Deserialize)]
 pub struct Fields {
     // metadata fields
@@ -181,7 +277,7 @@ pub enum EnumValues {
 #[serde(untagged)]
 pub enum ArrayValue {
     Simple(SimpleArrayValue),
-    Either(Vec<Box<ArrayValue>>),
+    Either(Vec<ArrayValue>),
     Complex(Box<ParsedItem>),
 }
 
