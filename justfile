@@ -33,7 +33,7 @@ bless-insta *args:  (cargo-install 'cargo-insta')
 
 # Quick compile without building a binary
 check: (cargo-install 'cargo-hack')
-    cargo hack --exclude-features _tiles check --all-targets --each-feature --workspace
+    cargo hack check --all-targets --each-feature --workspace
 
 # Test documentation generation
 check-doc:  (docs '')
