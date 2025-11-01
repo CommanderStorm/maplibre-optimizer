@@ -129,7 +129,7 @@ pub enum ParsedItem {
     Expression(Fields),
 }
 
-#[derive(Debug, PartialEq, Clone, Deserialize)]
+#[derive(Default, Debug, PartialEq, Clone, Deserialize)]
 pub struct Fields {
     // metadata fields
     pub doc: String,
@@ -151,7 +151,7 @@ pub struct Fields {
     pub requires: Option<Vec<Requirement>>,
 }
 
-#[derive(Debug, PartialEq, Eq, Clone, Deserialize)]
+#[derive(Default, Debug, PartialEq, Eq, Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Expression {
     pub interpolated: bool,
