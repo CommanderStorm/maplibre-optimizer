@@ -53,8 +53,7 @@ fn generate_top_level_item(scope: &mut Scope, item: TopLevelItem, name: String) 
             let enu = scope
                 .new_enum(&name)
                 .vis("pub")
-                .derive("serde::Deserialise, PartialEq, Debug, Clone")
-                ;
+                .derive("serde::Deserialise, PartialEq, Debug, Clone");
             for key in items {
                 enu.new_variant(to_upper_camel_case(&key))
                     .annotation(format!("#[serde(rename=\"{key}\")]"))
@@ -259,13 +258,35 @@ mod tests {
             "$root": {},
             "names": {
               "name_one": {
-                "type": "string",
-                "default": "default_name"
+                "type": "number",
+                "doc": "A number between 0 and 10.",
+                "default": 1.0
               }
             }
         });
         let reference: StyleReference = serde_json::from_value(reference).unwrap();
-        insta::assert_snapshot!(generate_spec_scope(reference), @"");
+        let spec = generate_spec_scope(reference);
+        insta::assert_snapshot!(&spec, @r"
+        /// This is a Maplibre Style Specification
+        #[derive(serde::Deserialise, PartialEq, Debug, Clone)]
+        pub struct MaplibreStyleSpecification;
+
+        #[derive(serde::Deserialise, PartialEq, Debug, Clone)]
+        pub struct Names {
+            /// A number between 0 and 10.
+            pub name_one: NameOne,
+        }
+
+        /// A number between 0 and 10.
+        #[derive(serde::Deserialise, PartialEq, Debug, Clone)]
+        pub struct NameOne(serde_json::Number);
+
+        impl Default for NameOne {
+            fn default() {
+                1.0
+            }
+        }
+        ");
     }
 
     #[test]
@@ -277,20 +298,42 @@ mod tests {
               "type": "number",
               "doc": "A number between 0 and 20.",
               "default": 1.0,
-              "default": 2.0,
               "minimum": 0.0,
               "maximum": 10.0
             },
             "number_two": {
               "type": "number",
-              "doc": "A number between 0 and 20.",
-              "default": 2.0,
-              "minimum": 0.0,
-              "maximum": 20.0
+              "doc": "Another number"
             },
             "numbers": ["number_one", "number_two"]
         });
         let reference: StyleReference = serde_json::from_value(reference).unwrap();
-        insta::assert_snapshot!(generate_spec_scope(reference), @"");
+        insta::assert_snapshot!(generate_spec_scope(reference), @r#"
+        /// This is a Maplibre Style Specification
+        #[derive(serde::Deserialise, PartialEq, Debug, Clone)]
+        pub struct MaplibreStyleSpecification;
+
+        #[derive(serde::Deserialise, PartialEq, Debug, Clone)]
+        pub enum Numbers {
+            #[serde(rename="number_one")]
+            NumberOne(NumberOne),
+            #[serde(rename="number_two")]
+            NumberTwo(NumberTwo),
+        }
+
+        /// Another number
+        #[derive(serde::Deserialise, PartialEq, Debug, Clone)]
+        pub struct NumberTwo(serde_json::Number);
+
+        /// A number between 0 and 20.
+        #[derive(serde::Deserialise, PartialEq, Debug, Clone)]
+        pub struct NumberOne(serde_json::Number);
+
+        impl Default for NumberOne {
+            fn default() {
+                1.0
+            }
+        }
+        "#);
     }
 }

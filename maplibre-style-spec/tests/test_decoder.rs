@@ -57,6 +57,6 @@ fn test_decode_whole_reference() {
     let content = include_str!("upstream/src/reference/v8.json");
     let style: StyleReference = serde_json::from_str(content).unwrap();
     assert_eq!(style.version, 8);
-    assert!(style.root.len() > 0);
-    assert!(style.fields.len() > 0)
+    assert!(!style.root.is_empty());
+    assert!(!style.fields.is_empty())
 }

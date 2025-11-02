@@ -7,7 +7,7 @@ fn main() {
     let json_content = include_str!("../../tests/upstream/src/reference/v8.json");
 
     let reference: StyleReference =
-        serde_json::from_str(&json_content).expect("Failed to parse v8.json into StyleReference");
+        serde_json::from_str(json_content).expect("Failed to parse v8.json into StyleReference");
 
     let generated_code = generate_spec_scope(reference);
 
