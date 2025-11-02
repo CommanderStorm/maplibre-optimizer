@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use codegen::Scope;
 
-use crate::spec::decoder::{ParsedItem, StyleReference, TopLevelItem};
+use crate::spec::decoder::{EnumValues, ParsedItem, StyleReference, TopLevelItem};
 
 pub fn generate_spec_scope(reference: StyleReference) -> String {
     let mut scope = Scope::new();
@@ -32,16 +32,40 @@ fn generate_spec(scope: &mut Scope, root: &HashMap<String, ParsedItem>) {
 fn generate_top_level_item(scope: &mut Scope, item: TopLevelItem, name: String) {
     match item {
         TopLevelItem::Item(item) => generate_parsed_item(scope, &item, name),
-        TopLevelItem::Group(_items) => {
-            scope
-                .new_struct(&name)
-                .vis("pub")
-                .derive("serde::Deserialise, PartialEq, Debug, Clone");
+        TopLevelItem::Group(items) => {
+            {
+                let group = scope
+                    .new_struct(&name)
+                    .vis("pub")
+                    .derive("serde::Deserialise, PartialEq, Debug, Clone");
+                for (key, item) in &items {
+                    group
+                        .new_field(key, to_upper_camel_case(key))
+                        .doc(item.doc())
+                        .vis("pub");
+                }
+            }
+            for (key, item) in items {
+                generate_parsed_item(scope, &item, to_upper_camel_case(&key));
+            }
         }
-        TopLevelItem::OneOf(_items) => todo!(),
+        TopLevelItem::OneOf(items) => {
+            let enu = scope
+                .new_enum(&name)
+                .vis("pub")
+                .derive("serde::Deserialise, PartialEq, Debug, Clone")
+                ;
+            for key in items {
+                enu.new_variant(to_upper_camel_case(&key))
+                    .annotation(format!("#[serde(rename=\"{key}\")]"))
+                    .tuple(&to_upper_camel_case(&key));
+                // todo: is this correct or does this need an untagged variant?
+            }
+        }
     }
 }
 
+#[allow(unused_variables)]
 fn generate_parsed_item(scope: &mut Scope, item: &ParsedItem, name: String) {
     match item {
         ParsedItem::Number {
@@ -69,7 +93,58 @@ fn generate_parsed_item(scope: &mut Scope, item: &ParsedItem, name: String) {
             common,
             default,
             values,
-        } => todo!(),
+        } => {
+            match values {
+                EnumValues::Simple(values) => {
+                    let enu = scope
+                        .new_enum(&name)
+                        .doc(&common.doc)
+                        .vis("pub")
+                        .derive("serde::Deserialise, PartialEq, Eq, Debug, Clone, Copy");
+                    for value in values {
+                        enu.new_variant(to_upper_camel_case(value))
+                            .annotation(format!("serde(rename=\"{value}\")"));
+                    }
+                }
+                EnumValues::Numeric(values) => {
+                    scope
+                        .new_struct(&name)
+                        .doc(&common.doc)
+                        .vis("pub")
+                        .derive("serde::Deserialise, PartialEq, Eq, Debug, Clone, Copy")
+                        .tuple_field("u8");
+                    assert!(values.len() <= u8::MAX as usize);
+                    assert!(
+                        values
+                            .iter()
+                            .all(|v| v.as_u64().is_some_and(|v| v <= u8::MAX as u64))
+                    );
+                    // todo: contribute proper repr(u8) variant support
+                }
+                EnumValues::Complex(values) => {
+                    let enu = scope
+                        .new_enum(&name)
+                        .doc(&common.doc)
+                        .vis("pub")
+                        .derive("serde::Deserialise, PartialEq, Eq, Debug, Clone, Copy");
+                    for (key, value) in values {
+                        enu.new_variant(to_upper_camel_case(key))
+                            .annotation(format!("#[serde(rename=\"{key}\")]"))
+                            .annotation(format!("/// {}", value.doc));
+                        // todo: this is sort of a hack, but it works for now
+                        // upstream a proprer .doc() method
+                    }
+                }
+            }
+
+            if let Some(default) = default {
+                scope
+                    .new_impl(&name)
+                    .impl_trait("Default")
+                    .new_fn("default")
+                    .line(default);
+            }
+        }
         ParsedItem::Array {
             common,
             default,
@@ -162,11 +237,11 @@ mod tests {
         let reference: StyleReference = serde_json::from_value(reference).unwrap();
         insta::assert_snapshot!(generate_spec_scope(reference), @r"
         /// This is a Maplibre Style Specification
-        #[derive(serde::Deserialise)]
+        #[derive(serde::Deserialise, PartialEq, Debug, Clone)]
         pub struct MaplibreStyleSpecification;
 
         /// A number between 0 and 10.
-        #[derive(serde::Deserialize)]
+        #[derive(serde::Deserialise, PartialEq, Debug, Clone)]
         pub struct NumberOne(serde_json::Number);
 
         impl Default for NumberOne {

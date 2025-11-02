@@ -263,13 +263,14 @@ pub enum Requirement {
 
 #[derive(Debug, PartialEq, Eq, Clone, Deserialize)]
 pub struct EnumValue {
-    doc: String,
+    pub doc: String,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Deserialize)]
 #[serde(untagged)]
 pub enum EnumValues {
-    Simple(Vec<Value>),
+    Simple(Vec<String>),
+    Numeric(Vec<Number>),
     Complex(HashMap<String, EnumValue>),
 }
 

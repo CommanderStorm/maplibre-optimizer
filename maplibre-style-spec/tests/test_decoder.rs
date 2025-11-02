@@ -1,6 +1,7 @@
+use std::collections::HashMap;
+
 use maplibre_style_spec::spec::decoder::{StyleReference, TopLevelItem};
 use serde_json::Value;
-use std::{collections::HashMap, path::PathBuf};
 
 // objects produced by errors here are too large to review
 // to produce better error messages, we need to remove keys that don't cause errors
