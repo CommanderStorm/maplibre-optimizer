@@ -72,375 +72,375 @@ struct Expression(serde_json::Value);
 
 #[derive(serde::Deserialize, PartialEq, Eq, Debug, Clone, Copy)]
 pub enum ExpressionName {
-    #[serde(rename="!")]
     /// Logical negation. Returns `true` if the input is `false`, and `false` if the input is `true`.
-
-     - [Create and style clusters](https://maplibre.org/maplibre-gl-js/docs/examples/create-and-style-clusters/)
+    /// 
+    ///  - [Create and style clusters](https://maplibre.org/maplibre-gl-js/docs/examples/create-and-style-clusters/)
+    #[serde(rename="!")]
     Not,
-    #[serde(rename="!=")]
     /// Returns `true` if the input values are not equal, `false` otherwise. The comparison is strictly typed: values of different runtime types are always considered unequal. Cases where the types are known to be different at parse time are considered invalid and will produce a parse error. Accepts an optional `collator` argument to control locale-dependent string comparisons.
-
-     - [Display HTML clusters with custom properties](https://maplibre.org/maplibre-gl-js/docs/examples/display-html-clusters-with-custom-properties/)
-    Notequal,
-    #[serde(rename="%")]
+    /// 
+    ///  - [Display HTML clusters with custom properties](https://maplibre.org/maplibre-gl-js/docs/examples/display-html-clusters-with-custom-properties/)
+    #[serde(rename="!=")]
+    NotEqual,
     /// Returns the remainder after integer division of the first input by the second.
+    #[serde(rename="%")]
     Percentage,
-    #[serde(rename="*")]
     /// Returns the product of the inputs.
+    #[serde(rename="*")]
     Star,
-    #[serde(rename="+")]
     /// Returns the sum of the inputs.
+    #[serde(rename="+")]
     Plus,
-    #[serde(rename="-")]
     /// For two inputs, returns the result of subtracting the second input from the first. For a single input, returns the result of subtracting it from 0.
+    #[serde(rename="-")]
     Minus,
-    #[serde(rename="/")]
     /// Returns the result of floating point division of the first input by the second.
-
-     - [Visualize population density](https://maplibre.org/maplibre-gl-js/docs/examples/visualize-population-density/)
+    /// 
+    ///  - [Visualize population density](https://maplibre.org/maplibre-gl-js/docs/examples/visualize-population-density/)
+    #[serde(rename="/")]
     Slash,
-    #[serde(rename="<")]
     /// Returns `true` if the first input is strictly less than the second, `false` otherwise. The arguments are required to be either both strings or both numbers; if during evaluation they are not, expression evaluation produces an error. Cases where this constraint is known not to hold at parse time are considered in valid and will produce a parse error. Accepts an optional `collator` argument to control locale-dependent string comparisons.
-
-     - [Display HTML clusters with custom properties](https://maplibre.org/maplibre-gl-js/docs/examples/display-html-clusters-with-custom-properties/)
+    /// 
+    ///  - [Display HTML clusters with custom properties](https://maplibre.org/maplibre-gl-js/docs/examples/display-html-clusters-with-custom-properties/)
+    #[serde(rename="<")]
     Less,
-    #[serde(rename="<=")]
     /// Returns `true` if the first input is less than or equal to the second, `false` otherwise. The arguments are required to be either both strings or both numbers; if during evaluation they are not, expression evaluation produces an error. Cases where this constraint is known not to hold at parse time are considered in valid and will produce a parse error. Accepts an optional `collator` argument to control locale-dependent string comparisons.
+    #[serde(rename="<=")]
     Lessequal,
-    #[serde(rename="==")]
     /// Returns `true` if the input values are equal, `false` otherwise. The comparison is strictly typed: values of different runtime types are always considered unequal. Cases where the types are known to be different at parse time are considered invalid and will produce a parse error. Accepts an optional `collator` argument to control locale-dependent string comparisons.
-
-     - [Add multiple geometries from one GeoJSON source](https://maplibre.org/maplibre-gl-js/docs/examples/multiple-geometries/)
-
-     - [Create a time slider](https://maplibre.org/maplibre-gl-js/docs/examples/timeline-animation/)
-
-     - [Display buildings in 3D](https://maplibre.org/maplibre-gl-js/docs/examples/display-buildings-in-3d/)
-
-     - [Filter symbols by toggling a list](https://maplibre.org/maplibre-gl-js/docs/examples/filter-symbols-by-toggling-a-list/)
+    /// 
+    ///  - [Add multiple geometries from one GeoJSON source](https://maplibre.org/maplibre-gl-js/docs/examples/multiple-geometries/)
+    /// 
+    ///  - [Create a time slider](https://maplibre.org/maplibre-gl-js/docs/examples/timeline-animation/)
+    /// 
+    ///  - [Display buildings in 3D](https://maplibre.org/maplibre-gl-js/docs/examples/display-buildings-in-3d/)
+    /// 
+    ///  - [Filter symbols by toggling a list](https://maplibre.org/maplibre-gl-js/docs/examples/filter-symbols-by-toggling-a-list/)
+    #[serde(rename="==")]
     Equal,
-    #[serde(rename=">")]
     /// Returns `true` if the first input is strictly greater than the second, `false` otherwise. The arguments are required to be either both strings or both numbers; if during evaluation they are not, expression evaluation produces an error. Cases where this constraint is known not to hold at parse time are considered in valid and will produce a parse error. Accepts an optional `collator` argument to control locale-dependent string comparisons.
+    #[serde(rename=">")]
     Greater,
-    #[serde(rename=">=")]
     /// Returns `true` if the first input is greater than or equal to the second, `false` otherwise. The arguments are required to be either both strings or both numbers; if during evaluation they are not, expression evaluation produces an error. Cases where this constraint is known not to hold at parse time are considered in valid and will produce a parse error. Accepts an optional `collator` argument to control locale-dependent string comparisons.
-
-     - [Display HTML clusters with custom properties](https://maplibre.org/maplibre-gl-js/docs/examples/display-html-clusters-with-custom-properties/)
+    /// 
+    ///  - [Display HTML clusters with custom properties](https://maplibre.org/maplibre-gl-js/docs/examples/display-html-clusters-with-custom-properties/)
+    #[serde(rename=">=")]
     Greaterequal,
-    #[serde(rename="^")]
     /// Returns the result of raising the first input to the power specified by the second.
+    #[serde(rename="^")]
     Power,
-    #[serde(rename="abs")]
     /// Returns the absolute value of the input.
+    #[serde(rename="abs")]
     Absolute,
-    #[serde(rename="accumulated")]
     /// Gets the value of a cluster property accumulated so far. Can only be used in the `clusterProperties` option of a clustered GeoJSON source.
+    #[serde(rename="accumulated")]
     Accumulated,
-    #[serde(rename="acos")]
     /// Returns the arccosine of the input.
+    #[serde(rename="acos")]
     Arccosine,
-    #[serde(rename="all")]
     /// Returns `true` if all the inputs are `true`, `false` otherwise. The inputs are evaluated in order, and evaluation is short-circuiting: once an input expression evaluates to `false`, the result is `false` and no further input expressions are evaluated.
-
-     - [Display HTML clusters with custom properties](https://maplibre.org/maplibre-gl-js/docs/examples/display-html-clusters-with-custom-properties/)
+    /// 
+    ///  - [Display HTML clusters with custom properties](https://maplibre.org/maplibre-gl-js/docs/examples/display-html-clusters-with-custom-properties/)
+    #[serde(rename="all")]
     All,
-    #[serde(rename="any")]
     /// Returns `true` if any of the inputs are `true`, `false` otherwise. The inputs are evaluated in order, and evaluation is short-circuiting: once an input expression evaluates to `true`, the result is `true` and no further input expressions are evaluated.
+    #[serde(rename="any")]
     Any,
-    #[serde(rename="array")]
     /// Asserts that the input is an array (optionally with a specific item type and length). If, when the input expression is evaluated, it is not of the asserted type or length, then this assertion will cause the whole expression to be aborted.
+    #[serde(rename="array")]
     Array,
-    #[serde(rename="asin")]
     /// Returns the arcsine of the input.
+    #[serde(rename="asin")]
     Asin,
-    #[serde(rename="at")]
     /// Retrieves an item from an array.
+    #[serde(rename="at")]
     At,
-    #[serde(rename="atan")]
     /// Returns the arctangent of the input.
+    #[serde(rename="atan")]
     Atan,
-    #[serde(rename="boolean")]
     /// Asserts that the input value is a boolean. If multiple values are provided, each one is evaluated in order until a boolean is obtained. If none of the inputs are booleans, the expression is an error.
-
-     - [Create a hover effect](https://maplibre.org/maplibre-gl-js/docs/examples/create-a-hover-effect/)
+    /// 
+    ///  - [Create a hover effect](https://maplibre.org/maplibre-gl-js/docs/examples/create-a-hover-effect/)
+    #[serde(rename="boolean")]
     Boolean,
-    #[serde(rename="case")]
     /// Selects the first output whose corresponding test condition evaluates to true, or the fallback value otherwise.
-
-     - [Create a hover effect](https://maplibre.org/maplibre-gl-js/docs/examples/create-a-hover-effect/)
-
-     - [Display HTML clusters with custom properties](https://maplibre.org/maplibre-gl-js/docs/examples/display-html-clusters-with-custom-properties/)
+    /// 
+    ///  - [Create a hover effect](https://maplibre.org/maplibre-gl-js/docs/examples/create-a-hover-effect/)
+    /// 
+    ///  - [Display HTML clusters with custom properties](https://maplibre.org/maplibre-gl-js/docs/examples/display-html-clusters-with-custom-properties/)
+    #[serde(rename="case")]
     Case,
-    #[serde(rename="ceil")]
     /// Returns the smallest integer that is greater than or equal to the input.
+    #[serde(rename="ceil")]
     Ceil,
-    #[serde(rename="coalesce")]
     /// Evaluates each expression in turn until the first non-null value is obtained, and returns that value.
-
-     - [Use a fallback image](https://maplibre.org/maplibre-gl-js/docs/examples/use-a-fallback-image/)
+    /// 
+    ///  - [Use a fallback image](https://maplibre.org/maplibre-gl-js/docs/examples/use-a-fallback-image/)
+    #[serde(rename="coalesce")]
     Coalesce,
-    #[serde(rename="collator")]
     /// Returns a `collator` for use in locale-dependent comparison operations. The `case-sensitive` and `diacritic-sensitive` options default to `false`. The `locale` argument specifies the IETF language tag of the locale to use. If none is provided, the default locale is used. If the requested locale is not available, the `collator` will use a system-defined fallback locale. Use `resolved-locale` to test the results of locale fallback behavior.
+    #[serde(rename="collator")]
     Collator,
-    #[serde(rename="concat")]
     /// Returns a `string` consisting of the concatenation of the inputs. Each input is converted to a string as if by `to-string`.
-
-     - [Add a generated icon to the map](https://maplibre.org/maplibre-gl-js/docs/examples/add-a-generated-icon-to-the-map/)
-
-     - [Create a time slider](https://maplibre.org/maplibre-gl-js/docs/examples/create-a-time-slider/)
-
-     - [Use a fallback image](https://maplibre.org/maplibre-gl-js/docs/examples/fallback-image/)
-
-     - [Variable label placement](https://maplibre.org/maplibre-gl-js/docs/examples/variable-label-placement/)
+    /// 
+    ///  - [Add a generated icon to the map](https://maplibre.org/maplibre-gl-js/docs/examples/add-a-generated-icon-to-the-map/)
+    /// 
+    ///  - [Create a time slider](https://maplibre.org/maplibre-gl-js/docs/examples/create-a-time-slider/)
+    /// 
+    ///  - [Use a fallback image](https://maplibre.org/maplibre-gl-js/docs/examples/fallback-image/)
+    /// 
+    ///  - [Variable label placement](https://maplibre.org/maplibre-gl-js/docs/examples/variable-label-placement/)
+    #[serde(rename="concat")]
     Concat,
-    #[serde(rename="cos")]
     /// Returns the cosine of the input.
+    #[serde(rename="cos")]
     Cos,
-    #[serde(rename="distance")]
     /// Returns the shortest distance in meters between the evaluated feature and the input geometry. The input value can be a valid GeoJSON of type `Point`, `MultiPoint`, `LineString`, `MultiLineString`, `Polygon`, `MultiPolygon`, `Feature`, or `FeatureCollection`. Distance values returned may vary in precision due to loss in precision from encoding geometries, particularly below zoom level 13.
+    #[serde(rename="distance")]
     Distance,
-    #[serde(rename="downcase")]
     /// Returns the input string converted to lowercase. Follows the Unicode Default Case Conversion algorithm and the locale-insensitive case mappings in the Unicode Character Database.
-
-     - [Change the case of labels](https://maplibre.org/maplibre-gl-js/docs/examples/change-case-of-labels/)
+    /// 
+    ///  - [Change the case of labels](https://maplibre.org/maplibre-gl-js/docs/examples/change-case-of-labels/)
+    #[serde(rename="downcase")]
     Downcase,
-    #[serde(rename="e")]
     /// Returns the mathematical constant e.
+    #[serde(rename="e")]
     E,
-    #[serde(rename="elevation")]
     /// Gets the elevation of a pixel (in meters above the vertical datum reference of the `raster-dem` tiles) from a `raster-dem` source. Can only be used in the `color-relief-color` property of a `color-relief` layer.
+    #[serde(rename="elevation")]
     Elevation,
-    #[serde(rename="feature-state")]
     /// Retrieves a property value from the current feature's state. Returns null if the requested property is not present on the feature's state. A feature's state is not part of the GeoJSON or vector tile data, and must be set programmatically on each feature. When `source.promoteId` is not provided, features are identified by their `id` attribute, which must be an integer or a string that can be cast to an integer. When `source.promoteId` is provided, features are identified by their `promoteId` property, which may be a number, string, or any primitive data type. Note that ["feature-state"] can only be used with paint properties that support data-driven styling.
-
-     - [Create a hover effect](https://maplibre.org/maplibre-gl-js/docs/examples/create-a-hover-effect/)
+    /// 
+    ///  - [Create a hover effect](https://maplibre.org/maplibre-gl-js/docs/examples/create-a-hover-effect/)
+    #[serde(rename="feature-state")]
     FeatureState,
-    #[serde(rename="floor")]
     /// Returns the largest integer that is less than or equal to the input.
+    #[serde(rename="floor")]
     Floor,
-    #[serde(rename="format")]
     /// Returns a `formatted` string for displaying mixed-format text in the `text-field` property. The input may contain a string literal or expression, including an [`'image'`](#image) expression. Strings may be followed by a style override object that supports the following properties:
-
-    - `"text-font"`: Overrides the font stack specified by the root layout property.
-
-    - `"text-color"`: Overrides the color specified by the root paint property.
-
-    - `"font-scale"`: Applies a scaling factor on `text-size` as specified by the root layout property.
-
-    - `"vertical-align"`: Aligns vertically text section or image in relation to the row it belongs to. Possible values are: 
-    	- `"bottom"` *default*: align the bottom of this section with the bottom of other sections.
-    <img alt="Visual representation of bottom alignment" src="https://github.com/user-attachments/assets/0474a2fd-a4b2-417c-9187-7a13a28695bc"/>
-    	- `"center"`: align the center of this section with the center of other sections.
-    <img alt="Visual representation of center alignment" src="https://github.com/user-attachments/assets/92237455-be6d-4c5d-b8f6-8127effc1950"/>
-    	- `"top"`: align the top of this section with the top of other sections.
-    <img alt="Visual representation of top alignment" src="https://github.com/user-attachments/assets/45dccb28-d977-4abb-a006-4ea9792b7c53"/>
-    	- Refer to [the design proposal](https://github.com/maplibre/maplibre-style-spec/issues/832) for more details.
-
-     - [Change the case of labels](https://maplibre.org/maplibre-gl-js/docs/examples/change-case-of-labels/)
-
-     - [Display and style rich text labels](https://maplibre.org/maplibre-gl-js/docs/examples/display-and-style-rich-text-labels/)
+    /// 
+    /// - `"text-font"`: Overrides the font stack specified by the root layout property.
+    /// 
+    /// - `"text-color"`: Overrides the color specified by the root paint property.
+    /// 
+    /// - `"font-scale"`: Applies a scaling factor on `text-size` as specified by the root layout property.
+    /// 
+    /// - `"vertical-align"`: Aligns vertically text section or image in relation to the row it belongs to. Possible values are: 
+    /// 	- `"bottom"` *default*: align the bottom of this section with the bottom of other sections.
+    /// <img alt="Visual representation of bottom alignment" src="https://github.com/user-attachments/assets/0474a2fd-a4b2-417c-9187-7a13a28695bc"/>
+    /// 	- `"center"`: align the center of this section with the center of other sections.
+    /// <img alt="Visual representation of center alignment" src="https://github.com/user-attachments/assets/92237455-be6d-4c5d-b8f6-8127effc1950"/>
+    /// 	- `"top"`: align the top of this section with the top of other sections.
+    /// <img alt="Visual representation of top alignment" src="https://github.com/user-attachments/assets/45dccb28-d977-4abb-a006-4ea9792b7c53"/>
+    /// 	- Refer to [the design proposal](https://github.com/maplibre/maplibre-style-spec/issues/832) for more details.
+    /// 
+    ///  - [Change the case of labels](https://maplibre.org/maplibre-gl-js/docs/examples/change-case-of-labels/)
+    /// 
+    ///  - [Display and style rich text labels](https://maplibre.org/maplibre-gl-js/docs/examples/display-and-style-rich-text-labels/)
+    #[serde(rename="format")]
     Format,
-    #[serde(rename="geometry-type")]
     /// Returns the feature's simple geometry type: `Point`, `LineString`, or `Polygon`. `MultiPoint`, `MultiLineString`, and `MultiPolygon` are returned as `Point`, `LineString`, and `Polygon`, respectively.
+    #[serde(rename="geometry-type")]
     GeometryType,
-    #[serde(rename="get")]
     /// Retrieves a property value from the current feature's properties, or from another object if a second argument is provided. Returns null if the requested property is missing.
-
-     - [Change the case of labels](https://maplibre.org/maplibre-gl-js/docs/examples/change-case-of-labels/)
-
-     - [Display HTML clusters with custom properties](https://maplibre.org/maplibre-gl-js/docs/examples/display-html-clusters-with-custom-properties/)
-
-     - [Extrude polygons for 3D indoor mapping](https://maplibre.org/maplibre-gl-js/docs/examples/extrude-polygons-for-3d-indoor-mapping/)
+    /// 
+    ///  - [Change the case of labels](https://maplibre.org/maplibre-gl-js/docs/examples/change-case-of-labels/)
+    /// 
+    ///  - [Display HTML clusters with custom properties](https://maplibre.org/maplibre-gl-js/docs/examples/display-html-clusters-with-custom-properties/)
+    /// 
+    ///  - [Extrude polygons for 3D indoor mapping](https://maplibre.org/maplibre-gl-js/docs/examples/extrude-polygons-for-3d-indoor-mapping/)
+    #[serde(rename="get")]
     Get,
-    #[serde(rename="global-state")]
     /// Retrieves a property value from global state that can be set with platform-specific APIs. Defaults can be provided using the [`state`](https://maplibre.org/maplibre-style-spec/root/#state) root property. Returns `null` if no value nor default value is set for the retrieved property.
+    #[serde(rename="global-state")]
     GlobalState,
-    #[serde(rename="has")]
     /// Tests for the presence of a property value in the current feature's properties, or from another object if a second argument is provided.
-
-     - [Create and style clusters](https://maplibre.org/maplibre-gl-js/docs/examples/create-and-style-clusters/)
+    /// 
+    ///  - [Create and style clusters](https://maplibre.org/maplibre-gl-js/docs/examples/create-and-style-clusters/)
+    #[serde(rename="has")]
     Has,
-    #[serde(rename="heatmap-density")]
     /// Gets the kernel density estimation of a pixel in a heatmap layer, which is a relative measure of how many data points are crowded around a particular pixel. Can only be used in the `heatmap-color` property.
+    #[serde(rename="heatmap-density")]
     HeatmapDensity,
-    #[serde(rename="id")]
     /// Gets the feature's id, if it has one.
+    #[serde(rename="id")]
     Id,
-    #[serde(rename="image")]
     /// Returns an `image` type for use in `icon-image`, `*-pattern` entries and as a section in the `format` expression. If set, the `image` argument will check that the requested image exists in the style and will return either the resolved image name or `null`, depending on whether or not the image is currently in the style. This validation process is synchronous and requires the image to have been added to the style before requesting it in the `image` argument.
-
-     - [Use a fallback image](https://maplibre.org/maplibre-gl-js/docs/examples/use-a-fallback-image/)
+    /// 
+    ///  - [Use a fallback image](https://maplibre.org/maplibre-gl-js/docs/examples/use-a-fallback-image/)
+    #[serde(rename="image")]
     Image,
-    #[serde(rename="in")]
     /// Determines whether an item exists in an array or a substring exists in a string.
-
-     - [Measure distances](https://maplibre.org/maplibre-gl-js/docs/examples/measure-distances/)
+    /// 
+    ///  - [Measure distances](https://maplibre.org/maplibre-gl-js/docs/examples/measure-distances/)
+    #[serde(rename="in")]
     In,
-    #[serde(rename="index-of")]
     /// Returns the first position at which an item can be found in an array or a substring can be found in a string, or `-1` if the input cannot be found. Accepts an optional index from where to begin the search. In a string, a UTF-16 surrogate pair counts as a single position.
+    #[serde(rename="index-of")]
     IndexOf,
-    #[serde(rename="interpolate")]
     /// Produces continuous, smooth results by interpolating between pairs of input and output values ("stops"). The `input` may be any numeric expression (e.g., `["get", "population"]`). Stop inputs must be numeric literals in strictly ascending order. The output type must be `number`, `array<number>`, `color`, `array<color>`, or `projection`.
-
-    Interpolation types:
-
-    - `["linear"]`, or an expression returning one of those types: Interpolates linearly between the pair of stops just less than and just greater than the input.
-
-    - `["exponential", base]`: Interpolates exponentially between the stops just less than and just greater than the input. `base` controls the rate at which the output increases: higher values make the output increase more towards the high end of the range. With values close to 1 the output increases linearly.
-
-    - `["cubic-bezier", x1, y1, x2, y2]`: Interpolates using the cubic bezier curve defined by the given control points.
-
-     - [Animate map camera around a point](https://maplibre.org/maplibre-gl-js/docs/examples/animate-camera-around-point/)
-
-     - [Change building color based on zoom level](https://maplibre.org/maplibre-gl-js/docs/examples/change-building-color-based-on-zoom-level/)
-
-     - [Create a heatmap layer](https://maplibre.org/maplibre-gl-js/docs/examples/heatmap-layer/)
-
-     - [Visualize population density](https://maplibre.org/maplibre-gl-js/docs/examples/visualize-population-density/)
+    /// 
+    /// Interpolation types:
+    /// 
+    /// - `["linear"]`, or an expression returning one of those types: Interpolates linearly between the pair of stops just less than and just greater than the input.
+    /// 
+    /// - `["exponential", base]`: Interpolates exponentially between the stops just less than and just greater than the input. `base` controls the rate at which the output increases: higher values make the output increase more towards the high end of the range. With values close to 1 the output increases linearly.
+    /// 
+    /// - `["cubic-bezier", x1, y1, x2, y2]`: Interpolates using the cubic bezier curve defined by the given control points.
+    /// 
+    ///  - [Animate map camera around a point](https://maplibre.org/maplibre-gl-js/docs/examples/animate-camera-around-point/)
+    /// 
+    ///  - [Change building color based on zoom level](https://maplibre.org/maplibre-gl-js/docs/examples/change-building-color-based-on-zoom-level/)
+    /// 
+    ///  - [Create a heatmap layer](https://maplibre.org/maplibre-gl-js/docs/examples/heatmap-layer/)
+    /// 
+    ///  - [Visualize population density](https://maplibre.org/maplibre-gl-js/docs/examples/visualize-population-density/)
+    #[serde(rename="interpolate")]
     Interpolate,
-    #[serde(rename="interpolate-hcl")]
     /// Produces continuous, smooth results by interpolating between pairs of input and output values ("stops"). Works like `interpolate`, but the output type must be `color` or `array<color>`, and the interpolation is performed in the Hue-Chroma-Luminance color space.
+    #[serde(rename="interpolate-hcl")]
     InterpolateHcl,
-    #[serde(rename="interpolate-lab")]
     /// Produces continuous, smooth results by interpolating between pairs of input and output values ("stops"). Works like `interpolate`, but the output type must be `color` or `array<color>`, and the interpolation is performed in the CIELAB color space.
+    #[serde(rename="interpolate-lab")]
     InterpolateLab,
-    #[serde(rename="is-supported-script")]
     /// Returns `true` if the input string is expected to render legibly. Returns `false` if the input string contains sections that cannot be rendered without potential loss of meaning (e.g. Indic scripts that require complex text shaping, or right-to-left scripts if the `mapbox-gl-rtl-text` plugin is not in use in MapLibre GL JS).
+    #[serde(rename="is-supported-script")]
     IsSupportedScript,
-    #[serde(rename="length")]
     /// Gets the length of an array or string. In a string, a UTF-16 surrogate pair counts as a single position.
+    #[serde(rename="length")]
     Length,
-    #[serde(rename="let")]
     /// Binds expressions to named variables, which can then be referenced in the result expression using `["var", "variable_name"]`.
-
-     - [Visualize population density](https://maplibre.org/maplibre-gl-js/docs/examples/visualize-population-density/)
+    /// 
+    ///  - [Visualize population density](https://maplibre.org/maplibre-gl-js/docs/examples/visualize-population-density/)
+    #[serde(rename="let")]
     Let,
-    #[serde(rename="line-progress")]
     /// Gets the progress along a gradient line. Can only be used in the `line-gradient` property.
+    #[serde(rename="line-progress")]
     LineProgress,
-    #[serde(rename="literal")]
     /// Provides a literal array or object value.
-
-     - [Display and style rich text labels](https://maplibre.org/maplibre-gl-js/docs/examples/display-and-style-rich-text-labels/)
+    /// 
+    ///  - [Display and style rich text labels](https://maplibre.org/maplibre-gl-js/docs/examples/display-and-style-rich-text-labels/)
+    #[serde(rename="literal")]
     Literal,
-    #[serde(rename="ln")]
     /// Returns the natural logarithm of the input.
+    #[serde(rename="ln")]
     Ln,
-    #[serde(rename="ln2")]
     /// Returns the mathematical constant ln(2).
+    #[serde(rename="ln2")]
     Ln2,
-    #[serde(rename="log10")]
     /// Returns the base-ten logarithm of the input.
+    #[serde(rename="log10")]
     Log10,
-    #[serde(rename="log2")]
     /// Returns the base-two logarithm of the input.
+    #[serde(rename="log2")]
     Log2,
-    #[serde(rename="match")]
     /// Selects the output whose label value matches the input value, or the fallback value if no match is found. The input can be any expression (e.g. `["get", "building_type"]`). Each label must be either:
-
-     - a single literal value; or
-
-     - an array of literal values, whose values must be all strings or all numbers (e.g. `[100, 101]` or `["c", "b"]`). The input matches if any of the values in the array matches, similar to the `"in"` operator.
-
-    Each label must be unique. If the input type does not match the type of the labels, the result will be the fallback value.
+    /// 
+    ///  - a single literal value; or
+    /// 
+    ///  - an array of literal values, whose values must be all strings or all numbers (e.g. `[100, 101]` or `["c", "b"]`). The input matches if any of the values in the array matches, similar to the `"in"` operator.
+    /// 
+    /// Each label must be unique. If the input type does not match the type of the labels, the result will be the fallback value.
+    #[serde(rename="match")]
     Match,
-    #[serde(rename="max")]
     /// Returns the maximum value of the inputs.
+    #[serde(rename="max")]
     Max,
-    #[serde(rename="min")]
     /// Returns the minimum value of the inputs.
+    #[serde(rename="min")]
     Min,
-    #[serde(rename="number")]
     /// Asserts that the input value is a number. If multiple values are provided, each one is evaluated in order until a number is obtained. If none of the inputs are numbers, the expression is an error.
+    #[serde(rename="number")]
     Number,
-    #[serde(rename="number-format")]
     /// Converts the input number into a string representation using the providing formatting rules. If set, the `locale` argument specifies the locale to use, as a BCP 47 language tag. If set, the `currency` argument specifies an ISO 4217 code to use for currency-style formatting. If set, the `min-fraction-digits` and `max-fraction-digits` arguments specify the minimum and maximum number of fractional digits to include.
-
-     - [Display HTML clusters with custom properties](https://maplibre.org/maplibre-gl-js/docs/examples/display-html-clusters-with-custom-properties/)
+    /// 
+    ///  - [Display HTML clusters with custom properties](https://maplibre.org/maplibre-gl-js/docs/examples/display-html-clusters-with-custom-properties/)
+    #[serde(rename="number-format")]
     NumberFormat,
-    #[serde(rename="object")]
     /// Asserts that the input value is an object. If multiple values are provided, each one is evaluated in order until an object is obtained. If none of the inputs are objects, the expression is an error.
+    #[serde(rename="object")]
     Object,
-    #[serde(rename="pi")]
     /// Returns the mathematical constant pi.
+    #[serde(rename="pi")]
     Pi,
-    #[serde(rename="properties")]
     /// Gets the feature properties object.  Note that in some cases, it may be more efficient to use ["get", "property_name"] directly.
+    #[serde(rename="properties")]
     Properties,
-    #[serde(rename="resolved-locale")]
     /// Returns the IETF language tag of the locale being used by the provided `collator`. This can be used to determine the default system locale, or to determine if a requested locale was successfully loaded.
+    #[serde(rename="resolved-locale")]
     ResolvedLocale,
-    #[serde(rename="rgb")]
     /// Creates a color value from red, green, and blue components, which must range between 0 and 255, and an alpha component of 1. If any component is out of range, the expression is an error.
+    #[serde(rename="rgb")]
     Rgb,
-    #[serde(rename="rgba")]
     /// Creates a color value from red, green, blue components, which must range between 0 and 255, and an alpha component which must range between 0 and 1. If any component is out of range, the expression is an error.
+    #[serde(rename="rgba")]
     Rgba,
-    #[serde(rename="round")]
     /// Rounds the input to the nearest integer. Halfway values are rounded away from zero. For example, `["round", -1.5]` evaluates to -2.
+    #[serde(rename="round")]
     Round,
-    #[serde(rename="sin")]
     /// Returns the sine of the input.
+    #[serde(rename="sin")]
     Sin,
-    #[serde(rename="slice")]
     /// Returns a subarray from an array or a substring from a string from a specified start index, or between a start index and an end index if set. The return value is inclusive of the start index but not of the end index. In a string, a UTF-16 surrogate pair counts as a single position.
+    #[serde(rename="slice")]
     Slice,
-    #[serde(rename="sqrt")]
     /// Returns the square root of the input.
+    #[serde(rename="sqrt")]
     Sqrt,
-    #[serde(rename="step")]
     /// Produces discrete, stepped results by evaluating a piecewise-constant function defined by pairs of input and output values ("stops"). The `input` may be any numeric expression (e.g., `["get", "population"]`). Stop inputs must be numeric literals in strictly ascending order.
-
-    Returns the output value of the stop just less than the input, or the first output if the input is less than the first stop.
-
-     - [Create and style clusters](https://maplibre.org/maplibre-gl-js/docs/examples/create-and-style-clusters/)
+    /// 
+    /// Returns the output value of the stop just less than the input, or the first output if the input is less than the first stop.
+    /// 
+    ///  - [Create and style clusters](https://maplibre.org/maplibre-gl-js/docs/examples/create-and-style-clusters/)
+    #[serde(rename="step")]
     Step,
-    #[serde(rename="string")]
     /// Asserts that the input value is a string. If multiple values are provided, each one is evaluated in order until a string is obtained. If none of the inputs are strings, the expression is an error.
+    #[serde(rename="string")]
     String,
-    #[serde(rename="tan")]
     /// Returns the tangent of the input.
+    #[serde(rename="tan")]
     Tan,
-    #[serde(rename="to-boolean")]
     /// Converts the input value to a boolean. The result is `false` when the input is an empty string, 0, `false`, `null`, or `NaN`; otherwise it is `true`.
+    #[serde(rename="to-boolean")]
     ToBoolean,
-    #[serde(rename="to-color")]
     /// Converts the input value to a color. If multiple values are provided, each one is evaluated in order until the first successful conversion is obtained. If none of the inputs can be converted, the expression is an error.
-
-     - [Visualize population density](https://maplibre.org/maplibre-gl-js/docs/examples/visualize-population-density/)
+    /// 
+    ///  - [Visualize population density](https://maplibre.org/maplibre-gl-js/docs/examples/visualize-population-density/)
+    #[serde(rename="to-color")]
     ToColor,
-    #[serde(rename="to-number")]
     /// Converts the input value to a number, if possible. If the input is `null` or `false`, the result is 0. If the input is `true`, the result is 1. If the input is a string, it is converted to a number as specified by the ["ToNumber Applied to the String Type" algorithm](https://tc39.github.io/ecma262/#sec-tonumber-applied-to-the-string-type) of the ECMAScript Language Specification. If multiple values are provided, each one is evaluated in order until the first successful conversion is obtained. If none of the inputs can be converted, the expression is an error.
+    #[serde(rename="to-number")]
     ToNumber,
-    #[serde(rename="to-rgba")]
     /// Returns a four-element array containing the input color's red, green, blue, and alpha components, in that order.
+    #[serde(rename="to-rgba")]
     ToRgba,
-    #[serde(rename="to-string")]
     /// Converts the input value to a string. If the input is `null`, the result is `""`. If the input is a boolean, the result is `"true"` or `"false"`. If the input is a number, it is converted to a string as specified by the ["NumberToString" algorithm](https://tc39.github.io/ecma262/#sec-tostring-applied-to-the-number-type) of the ECMAScript Language Specification. If the input is a color, it is converted to a string of the form `"rgba(r,g,b,a)"`, where `r`, `g`, and `b` are numerals ranging from 0 to 255, and `a` ranges from 0 to 1. Otherwise, the input is converted to a string in the format specified by the [`JSON.stringify`](https://tc39.github.io/ecma262/#sec-json.stringify) function of the ECMAScript Language Specification.
-
-     - [Create a time slider](https://maplibre.org/maplibre-gl-js/docs/examples/create-a-time-slider/)
+    /// 
+    ///  - [Create a time slider](https://maplibre.org/maplibre-gl-js/docs/examples/create-a-time-slider/)
+    #[serde(rename="to-string")]
     ToString,
-    #[serde(rename="typeof")]
     /// Returns a string describing the type of the given value.
+    #[serde(rename="typeof")]
     Typeof,
-    #[serde(rename="upcase")]
     /// Returns the input string converted to uppercase. Follows the Unicode Default Case Conversion algorithm and the locale-insensitive case mappings in the Unicode Character Database.
-
-     - [Change the case of labels](https://maplibre.org/maplibre-gl-js/docs/examples/change-case-of-labels/)
+    /// 
+    ///  - [Change the case of labels](https://maplibre.org/maplibre-gl-js/docs/examples/change-case-of-labels/)
+    #[serde(rename="upcase")]
     Upcase,
-    #[serde(rename="var")]
     /// References variable bound using `let`.
-
-     - [Visualize population density](https://maplibre.org/maplibre-gl-js/docs/examples/visualize-population-density/)
+    /// 
+    ///  - [Visualize population density](https://maplibre.org/maplibre-gl-js/docs/examples/visualize-population-density/)
+    #[serde(rename="var")]
     Var,
-    #[serde(rename="within")]
     /// Returns `true` if the evaluated feature is fully contained inside a boundary of the input geometry, `false` otherwise. The input value can be a valid GeoJSON of type `Polygon`, `MultiPolygon`, `Feature`, or `FeatureCollection`. Supported features for evaluation:
-
-    - `Point`: Returns `false` if a point is on the boundary or falls outside the boundary.
-
-    - `LineString`: Returns `false` if any part of a line falls outside the boundary, the line intersects the boundary, or a line's endpoint is on the boundary.
+    /// 
+    /// - `Point`: Returns `false` if a point is on the boundary or falls outside the boundary.
+    /// 
+    /// - `LineString`: Returns `false` if any part of a line falls outside the boundary, the line intersects the boundary, or a line's endpoint is on the boundary.
+    #[serde(rename="within")]
     Within,
-    #[serde(rename="zoom")]
     /// Gets the current zoom level.  Note that in style layout and paint properties, ["zoom"] may only appear as the input to a top-level "step" or "interpolate" expression.
+    #[serde(rename="zoom")]
     Zoom,
 }
 
@@ -452,44 +452,44 @@ struct Filter(serde_json::Value);
 /// The filter operator.
 #[derive(serde::Deserialize, PartialEq, Eq, Debug, Clone, Copy)]
 pub enum FilterOperator {
-    #[serde(rename="!=")]
     /// `["!=", key, value]` inequality: `feature[key] ≠ value`
-    Notequal,
-    #[serde(rename="!has")]
+    #[serde(rename="!=")]
+    NotEqual,
     /// `["!has", key]` `feature[key]` does not exist
-    Has,
-    #[serde(rename="!in")]
+    #[serde(rename="!has")]
+    NotHas,
     /// `["!in", key, v0, ..., vn]` set exclusion: `feature[key] ∉ {v0, ..., vn}`
-    In,
-    #[serde(rename="<")]
+    #[serde(rename="!in")]
+    NotIn,
     /// `["<", key, value]` less than: `feature[key] < value`
+    #[serde(rename="<")]
     Less,
-    #[serde(rename="<=")]
     /// `["<=", key, value]` less than or equal: `feature[key] ≤ value`
+    #[serde(rename="<=")]
     Lessequal,
-    #[serde(rename="==")]
     /// `["==", key, value]` equality: `feature[key] = value`
+    #[serde(rename="==")]
     Equal,
-    #[serde(rename=">")]
     /// `[">", key, value]` greater than: `feature[key] > value`
+    #[serde(rename=">")]
     Greater,
-    #[serde(rename=">=")]
     /// `[">=", key, value]` greater than or equal: `feature[key] ≥ value`
+    #[serde(rename=">=")]
     Greaterequal,
-    #[serde(rename="all")]
     /// `["all", f0, ..., fn]` logical `AND`: `f0 ∧ ... ∧ fn`
+    #[serde(rename="all")]
     All,
-    #[serde(rename="any")]
     /// `["any", f0, ..., fn]` logical `OR`: `f0 ∨ ... ∨ fn`
+    #[serde(rename="any")]
     Any,
-    #[serde(rename="has")]
     /// `["has", key]` `feature[key]` exists
+    #[serde(rename="has")]
     Has,
-    #[serde(rename="in")]
     /// `["in", key, v0, ..., vn]` set inclusion: `feature[key] ∈ {v0, ..., vn}`
+    #[serde(rename="in")]
     In,
-    #[serde(rename="none")]
     /// `["none", f0, ..., fn]` logical `NOR`: `¬f0 ∧ ... ∧ ¬fn`
+    #[serde(rename="none")]
     None,
 }
 
@@ -544,14 +544,14 @@ impl Default for Base {
 /// The color space in which colors interpolated. Interpolating colors in perceptual color spaces like LAB and HCL tend to produce color ramps that look more consistent and produce colors that can be differentiated more easily than those interpolated in RGB space.
 #[derive(serde::Deserialize, PartialEq, Eq, Debug, Clone, Copy)]
 pub enum Colorspace {
-    #[serde(rename="hcl")]
     /// Use the HCL color space to interpolate color values, interpolating the Hue, Chroma, and Luminance channels individually.
+    #[serde(rename="hcl")]
     Hcl,
-    #[serde(rename="lab")]
     /// Use the LAB color space to interpolate color values.
+    #[serde(rename="lab")]
     Lab,
-    #[serde(rename="rgb")]
     /// Use the RGB color space to interpolate color values
+    #[serde(rename="rgb")]
     Rgb,
 }
 
@@ -600,17 +600,17 @@ struct Stops(serde_json::Value);
 /// The interpolation strategy to use in function evaluation.
 #[derive(serde::Deserialize, PartialEq, Eq, Debug, Clone, Copy)]
 pub enum Type {
-    #[serde(rename="categorical")]
     /// Return the output value of the stop equal to the function input.
+    #[serde(rename="categorical")]
     Categorical,
-    #[serde(rename="exponential")]
     /// Generate an output by interpolating between stops just less than and just greater than the function input.
+    #[serde(rename="exponential")]
     Exponential,
-    #[serde(rename="identity")]
     /// Return the input value as the output value.
+    #[serde(rename="identity")]
     Identity,
-    #[serde(rename="interval")]
     /// Return the output value of the stop just less than the function input.
+    #[serde(rename="interval")]
     Interval,
 }
 
@@ -628,13 +628,11 @@ struct FunctionStop(serde_json::Value);
 /// The geometry type for the filter to select.
 #[derive(serde::Deserialize, PartialEq, Eq, Debug, Clone, Copy)]
 pub enum GeometryType {
-    #[serde(rename="LineString")]
     /// Filter to line geometries.
+    #[serde(rename="LineString")]
     Linestring,
-    #[serde(rename="Point")]
     /// Filter to point geometries.
     Point,
-    #[serde(rename="Polygon")]
     /// Filter to polygon geometries.
     Polygon,
 }
@@ -727,35 +725,35 @@ struct SourceLayer(serde_json::Value);
 /// Rendering type of this layer.
 #[derive(serde::Deserialize, PartialEq, Eq, Debug, Clone, Copy)]
 pub enum Type {
-    #[serde(rename="background")]
     /// The background color or pattern of the map.
+    #[serde(rename="background")]
     Background,
-    #[serde(rename="circle")]
     /// A filled circle.
+    #[serde(rename="circle")]
     Circle,
-    #[serde(rename="color-relief")]
     /// Client-side elevation coloring based on DEM data. The implementation supports Mapbox Terrain RGB, Mapzen Terrarium tiles and custom encodings.
+    #[serde(rename="color-relief")]
     ColorRelief,
-    #[serde(rename="fill")]
     /// A filled polygon with an optional stroked border.
+    #[serde(rename="fill")]
     Fill,
-    #[serde(rename="fill-extrusion")]
     /// An extruded (3D) polygon.
+    #[serde(rename="fill-extrusion")]
     FillExtrusion,
-    #[serde(rename="heatmap")]
     /// A heatmap.
+    #[serde(rename="heatmap")]
     Heatmap,
-    #[serde(rename="hillshade")]
     /// Client-side hillshading visualization based on DEM data. The implementation supports Mapbox Terrain RGB, Mapzen Terrarium tiles and custom encodings.
+    #[serde(rename="hillshade")]
     Hillshade,
-    #[serde(rename="line")]
     /// A stroked line.
+    #[serde(rename="line")]
     Line,
-    #[serde(rename="raster")]
     /// Raster map textures such as satellite imagery.
+    #[serde(rename="raster")]
     Raster,
-    #[serde(rename="symbol")]
     /// An icon or a text label.
+    #[serde(rename="symbol")]
     Symbol,
 }
 
@@ -793,11 +791,11 @@ pub struct LayoutBackground {
 /// Whether this layer is displayed.
 #[derive(serde::Deserialize, PartialEq, Eq, Debug, Clone, Copy)]
 pub enum Visibility {
-    #[serde(rename="none")]
     /// The layer is not shown.
+    #[serde(rename="none")]
     None,
-    #[serde(rename="visible")]
     /// The layer is shown.
+    #[serde(rename="visible")]
     Visible,
 }
 
@@ -824,11 +822,11 @@ pub struct CircleSortKey(serde_json::Number);
 /// Whether this layer is displayed.
 #[derive(serde::Deserialize, PartialEq, Eq, Debug, Clone, Copy)]
 pub enum Visibility {
-    #[serde(rename="none")]
     /// The layer is not shown.
+    #[serde(rename="none")]
     None,
-    #[serde(rename="visible")]
     /// The layer is shown.
+    #[serde(rename="visible")]
     Visible,
 }
 
@@ -848,11 +846,11 @@ pub struct LayoutColorRelief {
 /// Whether this layer is displayed.
 #[derive(serde::Deserialize, PartialEq, Eq, Debug, Clone, Copy)]
 pub enum Visibility {
-    #[serde(rename="none")]
     /// The layer is not shown.
+    #[serde(rename="none")]
     None,
-    #[serde(rename="visible")]
     /// The layer is shown.
+    #[serde(rename="visible")]
     Visible,
 }
 
@@ -879,11 +877,11 @@ pub struct FillSortKey(serde_json::Number);
 /// Whether this layer is displayed.
 #[derive(serde::Deserialize, PartialEq, Eq, Debug, Clone, Copy)]
 pub enum Visibility {
-    #[serde(rename="none")]
     /// The layer is not shown.
+    #[serde(rename="none")]
     None,
-    #[serde(rename="visible")]
     /// The layer is shown.
+    #[serde(rename="visible")]
     Visible,
 }
 
@@ -903,11 +901,11 @@ pub struct LayoutFillExtrusion {
 /// Whether this layer is displayed.
 #[derive(serde::Deserialize, PartialEq, Eq, Debug, Clone, Copy)]
 pub enum Visibility {
-    #[serde(rename="none")]
     /// The layer is not shown.
+    #[serde(rename="none")]
     None,
-    #[serde(rename="visible")]
     /// The layer is shown.
+    #[serde(rename="visible")]
     Visible,
 }
 
@@ -927,11 +925,11 @@ pub struct LayoutHeatmap {
 /// Whether this layer is displayed.
 #[derive(serde::Deserialize, PartialEq, Eq, Debug, Clone, Copy)]
 pub enum Visibility {
-    #[serde(rename="none")]
     /// The layer is not shown.
+    #[serde(rename="none")]
     None,
-    #[serde(rename="visible")]
     /// The layer is shown.
+    #[serde(rename="visible")]
     Visible,
 }
 
@@ -951,11 +949,11 @@ pub struct LayoutHillshade {
 /// Whether this layer is displayed.
 #[derive(serde::Deserialize, PartialEq, Eq, Debug, Clone, Copy)]
 pub enum Visibility {
-    #[serde(rename="none")]
     /// The layer is not shown.
+    #[serde(rename="none")]
     None,
-    #[serde(rename="visible")]
     /// The layer is shown.
+    #[serde(rename="visible")]
     Visible,
 }
 
@@ -990,14 +988,14 @@ pub struct LayoutLine {
 /// The display of line endings.
 #[derive(serde::Deserialize, PartialEq, Eq, Debug, Clone, Copy)]
 pub enum LineCap {
-    #[serde(rename="butt")]
     /// A cap with a squared-off end which is drawn to the exact endpoint of the line.
+    #[serde(rename="butt")]
     Butt,
-    #[serde(rename="round")]
     /// A cap with a rounded end which is drawn beyond the endpoint of the line at a radius of one-half of the line's width and centered on the endpoint of the line.
+    #[serde(rename="round")]
     Round,
-    #[serde(rename="square")]
     /// A cap with a squared-off end which is drawn beyond the endpoint of the line at a distance of one-half of the line's width.
+    #[serde(rename="square")]
     Square,
 }
 
@@ -1010,14 +1008,14 @@ impl Default for LineCap {
 /// The display of lines when joining.
 #[derive(serde::Deserialize, PartialEq, Eq, Debug, Clone, Copy)]
 pub enum LineJoin {
-    #[serde(rename="bevel")]
     /// A join with a squared-off end which is drawn beyond the endpoint of the line at a distance of one-half of the line's width.
+    #[serde(rename="bevel")]
     Bevel,
-    #[serde(rename="miter")]
     /// A join with a sharp, angled corner which is drawn with the outer sides beyond the endpoint of the path until they meet.
+    #[serde(rename="miter")]
     Miter,
-    #[serde(rename="round")]
     /// A join with a rounded end which is drawn beyond the endpoint of the line at a radius of one-half of the line's width and centered on the endpoint of the line.
+    #[serde(rename="round")]
     Round,
 }
 
@@ -1054,11 +1052,11 @@ pub struct LineSortKey(serde_json::Number);
 /// Whether this layer is displayed.
 #[derive(serde::Deserialize, PartialEq, Eq, Debug, Clone, Copy)]
 pub enum Visibility {
-    #[serde(rename="none")]
     /// The layer is not shown.
+    #[serde(rename="none")]
     None,
-    #[serde(rename="visible")]
     /// The layer is shown.
+    #[serde(rename="visible")]
     Visible,
 }
 
@@ -1078,11 +1076,11 @@ pub struct LayoutRaster {
 /// Whether this layer is displayed.
 #[derive(serde::Deserialize, PartialEq, Eq, Debug, Clone, Copy)]
 pub enum Visibility {
-    #[serde(rename="none")]
     /// The layer is not shown.
+    #[serde(rename="none")]
     None,
-    #[serde(rename="visible")]
     /// The layer is shown.
+    #[serde(rename="visible")]
     Visible,
 }
 
@@ -1259,32 +1257,32 @@ impl Default for IconAllowOverlap {
 /// Part of the icon placed closest to the anchor.
 #[derive(serde::Deserialize, PartialEq, Eq, Debug, Clone, Copy)]
 pub enum IconAnchor {
-    #[serde(rename="bottom")]
     /// The bottom of the icon is placed closest to the anchor.
+    #[serde(rename="bottom")]
     Bottom,
-    #[serde(rename="bottom-left")]
     /// The bottom left corner of the icon is placed closest to the anchor.
+    #[serde(rename="bottom-left")]
     BottomLeft,
-    #[serde(rename="bottom-right")]
     /// The bottom right corner of the icon is placed closest to the anchor.
+    #[serde(rename="bottom-right")]
     BottomRight,
-    #[serde(rename="center")]
     /// The center of the icon is placed closest to the anchor.
+    #[serde(rename="center")]
     Center,
-    #[serde(rename="left")]
     /// The left side of the icon is placed closest to the anchor.
+    #[serde(rename="left")]
     Left,
-    #[serde(rename="right")]
     /// The right side of the icon is placed closest to the anchor.
+    #[serde(rename="right")]
     Right,
-    #[serde(rename="top")]
     /// The top of the icon is placed closest to the anchor.
+    #[serde(rename="top")]
     Top,
-    #[serde(rename="top-left")]
     /// The top left corner of the icon is placed closest to the anchor.
+    #[serde(rename="top-left")]
     TopLeft,
-    #[serde(rename="top-right")]
     /// The top right corner of the icon is placed closest to the anchor.
+    #[serde(rename="top-right")]
     TopRight,
 }
 
@@ -1346,14 +1344,14 @@ impl Default for IconOptional {
 /// Allows for control over whether to show an icon when it overlaps other symbols on the map. If `icon-overlap` is not set, `icon-allow-overlap` is used instead.
 #[derive(serde::Deserialize, PartialEq, Eq, Debug, Clone, Copy)]
 pub enum IconOverlap {
-    #[serde(rename="always")]
     /// The icon will be visible even if it collides with any other previously drawn symbol.
+    #[serde(rename="always")]
     Always,
-    #[serde(rename="cooperative")]
     /// If the icon collides with another previously drawn symbol, the overlap mode for that symbol is checked. If the previous symbol was placed using `never` overlap mode, the new icon is hidden. If the previous symbol was placed using `always` or `cooperative` overlap mode, the new icon is visible.
+    #[serde(rename="cooperative")]
     Cooperative,
-    #[serde(rename="never")]
     /// The icon will be hidden if it collides with any other previously drawn symbol.
+    #[serde(rename="never")]
     Never,
 }
 
@@ -1371,14 +1369,14 @@ impl Default for IconPadding {
 /// Orientation of icon when map is pitched.
 #[derive(serde::Deserialize, PartialEq, Eq, Debug, Clone, Copy)]
 pub enum IconPitchAlignment {
-    #[serde(rename="auto")]
     /// Automatically matches the value of `icon-rotation-alignment`.
+    #[serde(rename="auto")]
     Auto,
-    #[serde(rename="map")]
     /// The icon is aligned to the plane of the map.
+    #[serde(rename="map")]
     Map,
-    #[serde(rename="viewport")]
     /// The icon is aligned to the plane of the viewport.
+    #[serde(rename="viewport")]
     Viewport,
 }
 
@@ -1404,14 +1402,14 @@ impl Default for IconRotate {
 /// In combination with `symbol-placement`, determines the rotation behavior of icons.
 #[derive(serde::Deserialize, PartialEq, Eq, Debug, Clone, Copy)]
 pub enum IconRotationAlignment {
-    #[serde(rename="auto")]
     /// When `symbol-placement` is set to `point`, this is equivalent to `viewport`. When `symbol-placement` is set to `line` or `line-center`, this is equivalent to `map`.
+    #[serde(rename="auto")]
     Auto,
-    #[serde(rename="map")]
     /// When `symbol-placement` is set to `point`, aligns icons east-west. When `symbol-placement` is set to `line` or `line-center`, aligns icon x-axes with the line.
+    #[serde(rename="map")]
     Map,
-    #[serde(rename="viewport")]
     /// Produces icons whose x-axes are aligned with the x-axis of the viewport, regardless of the value of `symbol-placement`.
+    #[serde(rename="viewport")]
     Viewport,
 }
 
@@ -1437,17 +1435,17 @@ impl Default for IconSize {
 /// Scales the icon to fit around the associated text.
 #[derive(serde::Deserialize, PartialEq, Eq, Debug, Clone, Copy)]
 pub enum IconTextFit {
-    #[serde(rename="both")]
     /// The icon is scaled in both x- and y-dimensions.
+    #[serde(rename="both")]
     Both,
-    #[serde(rename="height")]
     /// The icon is scaled in the y-dimension to fit the height of the text.
+    #[serde(rename="height")]
     Height,
-    #[serde(rename="none")]
     /// The icon is displayed at its intrinsic aspect ratio.
+    #[serde(rename="none")]
     None,
-    #[serde(rename="width")]
     /// The icon is scaled in the x-dimension to fit the width of the text.
+    #[serde(rename="width")]
     Width,
 }
 
@@ -1482,14 +1480,14 @@ impl Default for SymbolAvoidEdges {
 /// Label placement relative to its geometry.
 #[derive(serde::Deserialize, PartialEq, Eq, Debug, Clone, Copy)]
 pub enum SymbolPlacement {
-    #[serde(rename="line")]
     /// The label is placed along the line of the geometry. Can only be used on `LineString` and `Polygon` geometries.
+    #[serde(rename="line")]
     Line,
-    #[serde(rename="line-center")]
     /// The label is placed at the center of the line of the geometry. Can only be used on `LineString` and `Polygon` geometries. Note that a single feature in a vector tile may contain multiple line geometries.
+    #[serde(rename="line-center")]
     LineCenter,
-    #[serde(rename="point")]
     /// The label is placed at the point where the geometry is located.
+    #[serde(rename="point")]
     Point,
 }
 
@@ -1519,14 +1517,14 @@ impl Default for SymbolSpacing {
 /// Determines whether overlapping symbols in the same layer are rendered in the order that they appear in the data source or by their y-position relative to the viewport. To control the order and prioritization of symbols otherwise, use `symbol-sort-key`.
 #[derive(serde::Deserialize, PartialEq, Eq, Debug, Clone, Copy)]
 pub enum SymbolZOrder {
-    #[serde(rename="auto")]
     /// Sorts symbols by `symbol-sort-key` if set. Otherwise, sorts symbols by their y-position relative to the viewport if `icon-allow-overlap` or `text-allow-overlap` is set to `true` or `icon-ignore-placement` or `text-ignore-placement` is `false`.
+    #[serde(rename="auto")]
     Auto,
-    #[serde(rename="source")]
     /// Sorts symbols by `symbol-sort-key` if set. Otherwise, no sorting is applied; symbols are rendered in the same order as the source data.
+    #[serde(rename="source")]
     Source,
-    #[serde(rename="viewport-y")]
     /// Sorts symbols by their y-position relative to the viewport if `icon-allow-overlap` or `text-allow-overlap` is set to `true` or `icon-ignore-placement` or `text-ignore-placement` is `false`.
+    #[serde(rename="viewport-y")]
     ViewportY,
 }
 
@@ -1550,32 +1548,32 @@ impl Default for TextAllowOverlap {
 /// Part of the text placed closest to the anchor.
 #[derive(serde::Deserialize, PartialEq, Eq, Debug, Clone, Copy)]
 pub enum TextAnchor {
-    #[serde(rename="bottom")]
     /// The bottom of the text is placed closest to the anchor.
+    #[serde(rename="bottom")]
     Bottom,
-    #[serde(rename="bottom-left")]
     /// The bottom left corner of the text is placed closest to the anchor.
+    #[serde(rename="bottom-left")]
     BottomLeft,
-    #[serde(rename="bottom-right")]
     /// The bottom right corner of the text is placed closest to the anchor.
+    #[serde(rename="bottom-right")]
     BottomRight,
-    #[serde(rename="center")]
     /// The center of the text is placed closest to the anchor.
+    #[serde(rename="center")]
     Center,
-    #[serde(rename="left")]
     /// The left side of the text is placed closest to the anchor.
+    #[serde(rename="left")]
     Left,
-    #[serde(rename="right")]
     /// The right side of the text is placed closest to the anchor.
+    #[serde(rename="right")]
     Right,
-    #[serde(rename="top")]
     /// The top of the text is placed closest to the anchor.
+    #[serde(rename="top")]
     Top,
-    #[serde(rename="top-left")]
     /// The top left corner of the text is placed closest to the anchor.
+    #[serde(rename="top-left")]
     TopLeft,
-    #[serde(rename="top-right")]
     /// The top right corner of the text is placed closest to the anchor.
+    #[serde(rename="top-right")]
     TopRight,
 }
 
@@ -1621,17 +1619,17 @@ impl Default for TextIgnorePlacement {
 /// Text justification options.
 #[derive(serde::Deserialize, PartialEq, Eq, Debug, Clone, Copy)]
 pub enum TextJustify {
-    #[serde(rename="auto")]
     /// The text is aligned towards the anchor position.
+    #[serde(rename="auto")]
     Auto,
-    #[serde(rename="center")]
     /// The text is centered.
+    #[serde(rename="center")]
     Center,
-    #[serde(rename="left")]
     /// The text is aligned to the left.
+    #[serde(rename="left")]
     Left,
-    #[serde(rename="right")]
     /// The text is aligned to the right.
+    #[serde(rename="right")]
     Right,
 }
 
@@ -1720,14 +1718,14 @@ impl Default for TextOptional {
 /// Allows for control over whether to show symbol text when it overlaps other symbols on the map. If `text-overlap` is not set, `text-allow-overlap` is used instead
 #[derive(serde::Deserialize, PartialEq, Eq, Debug, Clone, Copy)]
 pub enum TextOverlap {
-    #[serde(rename="always")]
     /// The text will be visible even if it collides with any other previously drawn symbol.
+    #[serde(rename="always")]
     Always,
-    #[serde(rename="cooperative")]
     /// If the text collides with another previously drawn symbol, the overlap mode for that symbol is checked. If the previous symbol was placed using `never` overlap mode, the new text is hidden. If the previous symbol was placed using `always` or `cooperative` overlap mode, the new text is visible.
+    #[serde(rename="cooperative")]
     Cooperative,
-    #[serde(rename="never")]
     /// The text will be hidden if it collides with any other previously drawn symbol.
+    #[serde(rename="never")]
     Never,
 }
 
@@ -1747,14 +1745,14 @@ impl Default for TextPadding {
 /// Orientation of text when map is pitched.
 #[derive(serde::Deserialize, PartialEq, Eq, Debug, Clone, Copy)]
 pub enum TextPitchAlignment {
-    #[serde(rename="auto")]
     /// Automatically matches the value of `text-rotation-alignment`.
+    #[serde(rename="auto")]
     Auto,
-    #[serde(rename="map")]
     /// The text is aligned to the plane of the map.
+    #[serde(rename="map")]
     Map,
-    #[serde(rename="viewport")]
     /// The text is aligned to the plane of the viewport.
+    #[serde(rename="viewport")]
     Viewport,
 }
 
@@ -1790,17 +1788,17 @@ impl Default for TextRotate {
 /// In combination with `symbol-placement`, determines the rotation behavior of the individual glyphs forming the text.
 #[derive(serde::Deserialize, PartialEq, Eq, Debug, Clone, Copy)]
 pub enum TextRotationAlignment {
-    #[serde(rename="auto")]
     /// When `symbol-placement` is set to `point`, this is equivalent to `viewport`. When `symbol-placement` is set to `line` or `line-center`, this is equivalent to `map`.
+    #[serde(rename="auto")]
     Auto,
-    #[serde(rename="map")]
     /// When `symbol-placement` is set to `point`, aligns text east-west. When `symbol-placement` is set to `line` or `line-center`, aligns text x-axes with the line.
+    #[serde(rename="map")]
     Map,
-    #[serde(rename="viewport")]
     /// Produces glyphs whose x-axes are aligned with the x-axis of the viewport, regardless of the value of `symbol-placement`.
+    #[serde(rename="viewport")]
     Viewport,
-    #[serde(rename="viewport-glyph")]
     /// When `symbol-placement` is set to `point`, aligns text to the x-axis of the viewport. When `symbol-placement` is set to `line` or `line-center`, aligns glyphs to the x-axis of the viewport and places them along the line.
+    #[serde(rename="viewport-glyph")]
     ViewportGlyph,
 }
 
@@ -1826,14 +1824,14 @@ impl Default for TextSize {
 /// Specifies how to capitalize text, similar to the CSS `text-transform` property.
 #[derive(serde::Deserialize, PartialEq, Eq, Debug, Clone, Copy)]
 pub enum TextTransform {
-    #[serde(rename="lowercase")]
     /// Forces all letters to be displayed in lowercase.
+    #[serde(rename="lowercase")]
     Lowercase,
-    #[serde(rename="none")]
     /// The text is not altered.
+    #[serde(rename="none")]
     None,
-    #[serde(rename="uppercase")]
     /// Forces all letters to be displayed in uppercase.
+    #[serde(rename="uppercase")]
     Uppercase,
 }
 
@@ -1875,11 +1873,11 @@ struct TextWritingMode(serde_json::Value);
 /// Whether this layer is displayed.
 #[derive(serde::Deserialize, PartialEq, Eq, Debug, Clone, Copy)]
 pub enum Visibility {
-    #[serde(rename="none")]
     /// The layer is not shown.
+    #[serde(rename="none")]
     None,
-    #[serde(rename="visible")]
     /// The layer is shown.
+    #[serde(rename="visible")]
     Visible,
 }
 
@@ -1908,11 +1906,11 @@ pub struct Light {
 /// Whether extruded geometries are lit relative to the map or viewport.
 #[derive(serde::Deserialize, PartialEq, Eq, Debug, Clone, Copy)]
 pub enum Anchor {
-    #[serde(rename="map")]
     /// The position of the light source is aligned to the rotation of the map.
+    #[serde(rename="map")]
     Map,
-    #[serde(rename="viewport")]
     /// The position of the light source is aligned to the rotation of the viewport.
+    #[serde(rename="viewport")]
     Viewport,
 }
 
@@ -2100,11 +2098,11 @@ impl Default for CircleOpacity {
 /// Orientation of circle when map is pitched.
 #[derive(serde::Deserialize, PartialEq, Eq, Debug, Clone, Copy)]
 pub enum CirclePitchAlignment {
-    #[serde(rename="map")]
     /// The circle is aligned to the plane of the map.
+    #[serde(rename="map")]
     Map,
-    #[serde(rename="viewport")]
     /// The circle is aligned to the plane of the viewport.
+    #[serde(rename="viewport")]
     Viewport,
 }
 
@@ -2117,11 +2115,11 @@ impl Default for CirclePitchAlignment {
 /// Controls the scaling behavior of the circle when the map is pitched.
 #[derive(serde::Deserialize, PartialEq, Eq, Debug, Clone, Copy)]
 pub enum CirclePitchScale {
-    #[serde(rename="map")]
     /// Circles are scaled according to their apparent distance to the camera.
+    #[serde(rename="map")]
     Map,
-    #[serde(rename="viewport")]
     /// Circles are not scaled.
+    #[serde(rename="viewport")]
     Viewport,
 }
 
@@ -2196,11 +2194,11 @@ impl Default for CircleTranslate {
 /// Controls the frame of reference for `circle-translate`.
 #[derive(serde::Deserialize, PartialEq, Eq, Debug, Clone, Copy)]
 pub enum CircleTranslateAnchor {
-    #[serde(rename="map")]
     /// The circle is translated relative to the map.
+    #[serde(rename="map")]
     Map,
-    #[serde(rename="viewport")]
     /// The circle is translated relative to the viewport.
+    #[serde(rename="viewport")]
     Viewport,
 }
 
@@ -2324,11 +2322,11 @@ impl Default for FillTranslate {
 /// Controls the frame of reference for `fill-translate`.
 #[derive(serde::Deserialize, PartialEq, Eq, Debug, Clone, Copy)]
 pub enum FillTranslateAnchor {
-    #[serde(rename="map")]
     /// The fill is translated relative to the map.
+    #[serde(rename="map")]
     Map,
-    #[serde(rename="viewport")]
     /// The fill is translated relative to the viewport.
+    #[serde(rename="viewport")]
     Viewport,
 }
 
@@ -2436,11 +2434,11 @@ impl Default for FillExtrusionTranslate {
 /// Controls the frame of reference for `fill-extrusion-translate`.
 #[derive(serde::Deserialize, PartialEq, Eq, Debug, Clone, Copy)]
 pub enum FillExtrusionTranslateAnchor {
-    #[serde(rename="map")]
     /// The fill extrusion is translated relative to the map.
+    #[serde(rename="map")]
     Map,
-    #[serde(rename="viewport")]
     /// The fill extrusion is translated relative to the viewport.
+    #[serde(rename="viewport")]
     Viewport,
 }
 
@@ -2622,11 +2620,11 @@ impl Default for HillshadeIlluminationAltitude {
 /// Direction of light source when map is rotated.
 #[derive(serde::Deserialize, PartialEq, Eq, Debug, Clone, Copy)]
 pub enum HillshadeIlluminationAnchor {
-    #[serde(rename="map")]
     /// The hillshade illumination is relative to the north direction.
+    #[serde(rename="map")]
     Map,
-    #[serde(rename="viewport")]
     /// The hillshade illumination is relative to the top of the viewport.
+    #[serde(rename="viewport")]
     Viewport,
 }
 
@@ -2650,20 +2648,20 @@ impl Default for HillshadeIlluminationDirection {
 /// The hillshade algorithm to use, one of `standard`, `basic`, `combined`, `igor`, or `multidirectional`. ![image](assets/hillshade_methods.png)
 #[derive(serde::Deserialize, PartialEq, Eq, Debug, Clone, Copy)]
 pub enum HillshadeMethod {
-    #[serde(rename="basic")]
     /// Basic hillshade. Uses a simple physics model where the reflected light intensity is proportional to the cosine of the angle between the incident light and the surface normal. Similar to GDAL's `gdaldem` default algorithm.
+    #[serde(rename="basic")]
     Basic,
-    #[serde(rename="combined")]
     /// Hillshade algorithm whose intensity scales with slope. Similar to GDAL's `gdaldem` with `-combined` option.
+    #[serde(rename="combined")]
     Combined,
-    #[serde(rename="igor")]
     /// Hillshade algorithm which tries to minimize effects on other map features beneath. Similar to GDAL's `gdaldem` with `-igor` option.
+    #[serde(rename="igor")]
     Igor,
-    #[serde(rename="multidirectional")]
     /// Hillshade with multiple illumination directions. Uses the basic hillshade model with multiple independent light sources.
+    #[serde(rename="multidirectional")]
     Multidirectional,
-    #[serde(rename="standard")]
     /// The legacy hillshade method.
+    #[serde(rename="standard")]
     Standard,
 }
 
@@ -2811,11 +2809,11 @@ impl Default for LineTranslate {
 /// Controls the frame of reference for `line-translate`.
 #[derive(serde::Deserialize, PartialEq, Eq, Debug, Clone, Copy)]
 pub enum LineTranslateAnchor {
-    #[serde(rename="map")]
     /// The line is translated relative to the map.
+    #[serde(rename="map")]
     Map,
-    #[serde(rename="viewport")]
     /// The line is translated relative to the viewport.
+    #[serde(rename="viewport")]
     Viewport,
 }
 
@@ -2951,11 +2949,11 @@ impl Default for RasterOpacity {
 /// The resampling/interpolation method to use for overscaling, also known as texture magnification filter
 #[derive(serde::Deserialize, PartialEq, Eq, Debug, Clone, Copy)]
 pub enum RasterResampling {
-    #[serde(rename="linear")]
     /// (Bi)linear filtering interpolates pixel values using the weighted average of the four closest original source pixels creating a smooth but blurry look when overscaled
+    #[serde(rename="linear")]
     Linear,
-    #[serde(rename="nearest")]
     /// Nearest neighbor filtering interpolates pixel values using the nearest original source pixel creating a sharp but pixelated look when overscaled
+    #[serde(rename="nearest")]
     Nearest,
 }
 
@@ -3105,11 +3103,11 @@ impl Default for IconTranslate {
 /// Controls the frame of reference for `icon-translate`.
 #[derive(serde::Deserialize, PartialEq, Eq, Debug, Clone, Copy)]
 pub enum IconTranslateAnchor {
-    #[serde(rename="map")]
     /// Icons are translated relative to the map.
+    #[serde(rename="map")]
     Map,
-    #[serde(rename="viewport")]
     /// Icons are translated relative to the viewport.
+    #[serde(rename="viewport")]
     Viewport,
 }
 
@@ -3195,11 +3193,11 @@ impl Default for TextTranslate {
 /// Controls the frame of reference for `text-translate`.
 #[derive(serde::Deserialize, PartialEq, Eq, Debug, Clone, Copy)]
 pub enum TextTranslateAnchor {
-    #[serde(rename="map")]
     /// The text is translated relative to the map.
+    #[serde(rename="map")]
     Map,
-    #[serde(rename="viewport")]
     /// The text is translated relative to the viewport.
+    #[serde(rename="viewport")]
     Viewport,
 }
 
@@ -3614,8 +3612,8 @@ impl Default for Tolerance {
 /// The data type of the GeoJSON source.
 #[derive(serde::Deserialize, PartialEq, Eq, Debug, Clone, Copy)]
 pub enum Type {
-    #[serde(rename="geojson")]
     /// A GeoJSON data source.
+    #[serde(rename="geojson")]
     Geojson,
 }
 
@@ -3640,8 +3638,8 @@ struct Coordinates(serde_json::Value);
 /// The data type of the image source.
 #[derive(serde::Deserialize, PartialEq, Eq, Debug, Clone, Copy)]
 pub enum Type {
-    #[serde(rename="image")]
     /// An image data source.
+    #[serde(rename="image")]
     Image,
 }
 
@@ -3731,11 +3729,11 @@ impl Default for Minzoom {
 /// Influences the y direction of the tile coordinates. The global-mercator (aka Spherical Mercator) profile is assumed.
 #[derive(serde::Deserialize, PartialEq, Eq, Debug, Clone, Copy)]
 pub enum Scheme {
-    #[serde(rename="tms")]
     /// OSGeo spec scheme.
+    #[serde(rename="tms")]
     Tms,
-    #[serde(rename="xyz")]
     /// Slippy map tilenames scheme.
+    #[serde(rename="xyz")]
     Xyz,
 }
 
@@ -3763,8 +3761,8 @@ struct Tiles(serde_json::Value);
 /// The type of the source.
 #[derive(serde::Deserialize, PartialEq, Eq, Debug, Clone, Copy)]
 pub enum Type {
-    #[serde(rename="raster")]
     /// A raster tile source.
+    #[serde(rename="raster")]
     Raster,
 }
 
@@ -3877,14 +3875,14 @@ impl Default for Bounds {
 /// The encoding used by this source. Mapbox Terrain RGB is used by default.
 #[derive(serde::Deserialize, PartialEq, Eq, Debug, Clone, Copy)]
 pub enum Encoding {
-    #[serde(rename="custom")]
     /// Decodes tiles using the redFactor, blueFactor, greenFactor, baseShift parameters.
+    #[serde(rename="custom")]
     Custom,
-    #[serde(rename="mapbox")]
     /// Mapbox Terrain RGB tiles. See https://www.mapbox.com/help/access-elevation-data/#mapbox-terrain-rgb for more info.
+    #[serde(rename="mapbox")]
     Mapbox,
-    #[serde(rename="terrarium")]
     /// Terrarium format PNG tiles. See https://aws.amazon.com/es/public-datasets/terrain/ for more info.
+    #[serde(rename="terrarium")]
     Terrarium,
 }
 
@@ -3952,8 +3950,8 @@ struct Tiles(serde_json::Value);
 /// The type of the source.
 #[derive(serde::Deserialize, PartialEq, Eq, Debug, Clone, Copy)]
 pub enum Type {
-    #[serde(rename="raster-dem")]
     /// A RGB-encoded raster DEM source
+    #[serde(rename="raster-dem")]
     RasterDem,
 }
 
@@ -4037,11 +4035,11 @@ impl Default for Bounds {
 /// The encoding used by this source. Mapbox Vector Tiles encoding is used by default.
 #[derive(serde::Deserialize, PartialEq, Eq, Debug, Clone, Copy)]
 pub enum Encoding {
-    #[serde(rename="mlt")]
     /// MapLibre Vector Tiles. See https://github.com/maplibre/maplibre-tile-spec for more info.
+    #[serde(rename="mlt")]
     Mlt,
-    #[serde(rename="mvt")]
     /// Mapbox Vector Tiles. See http://github.com/mapbox/vector-tile-spec for more info.
+    #[serde(rename="mvt")]
     Mvt,
 }
 
@@ -4079,11 +4077,11 @@ struct Promoteid(serde_json::Value);
 /// Influences the y direction of the tile coordinates. The global-mercator (aka Spherical Mercator) profile is assumed.
 #[derive(serde::Deserialize, PartialEq, Eq, Debug, Clone, Copy)]
 pub enum Scheme {
-    #[serde(rename="tms")]
     /// OSGeo spec scheme.
+    #[serde(rename="tms")]
     Tms,
-    #[serde(rename="xyz")]
     /// Slippy map tilenames scheme.
+    #[serde(rename="xyz")]
     Xyz,
 }
 
@@ -4101,8 +4099,8 @@ struct Tiles(serde_json::Value);
 /// The type of the source.
 #[derive(serde::Deserialize, PartialEq, Eq, Debug, Clone, Copy)]
 pub enum Type {
-    #[serde(rename="vector")]
     /// A vector tile source.
+    #[serde(rename="vector")]
     Vector,
 }
 
@@ -4143,8 +4141,8 @@ struct Coordinates(serde_json::Value);
 /// The data type of the video source.
 #[derive(serde::Deserialize, PartialEq, Eq, Debug, Clone, Copy)]
 pub enum Type {
-    #[serde(rename="video")]
     /// A video data source.
+    #[serde(rename="video")]
     Video,
 }
 

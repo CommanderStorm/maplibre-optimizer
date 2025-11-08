@@ -32,13 +32,13 @@ struct_field_names = "allow"
 [workspace.dependencies]
 anyhow = "1.0"
 clap = { version = "4", features = ["derive", "unstable-markdown", "wrap_help"] }
+codegen = { git = "https://gitlab.com/yovoslav/codegen.git", branch = "master" }
 criterion = { version = "0.7", features = ["async_futures", "async_tokio", "html_reports"] }
 image = "0.25.8"
 insta = "1"
 maplibre_native = "0.4.1"
 rstest = "0.26.1"
 rustls = "0.23.31"
-codegen = "0.2.0"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 serde_with = "3"

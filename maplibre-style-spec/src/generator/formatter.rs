@@ -29,7 +29,7 @@ pub fn to_snake_case(name: &str) -> String {
             if c.is_uppercase() {
                 // Insert underscore before uppercase if previous was lowercase
                 // or previous was not underscore and next is lowercase (e.g., "XMLHttp")
-                if (prev_was_lower || (!prev_was_underscore && has_next_lower(name, i))) && i != 0 {
+                if (prev_was_lower || (!prev_was_underscore && has_next_lower(&name, i))) && i != 0 {
                     result.push('_');
                 }
                 result.push(c.to_ascii_lowercase());
@@ -64,24 +64,26 @@ fn has_next_lower(s: &str, idx: usize) -> bool {
         .unwrap_or(false)
 }
 
-fn prefilter_names(name: &str) -> &str {
-    match name {
-        "!" => "Not",
-        "!=" => "NotEqual",
-        "%" => "Percentage",
-        "*" => "Star",
-        "+" => "Plus",
-        "-" => "Minus",
-        "/" => "Slash",
-        "<" => "Less",
-        "<=" => "LessEqual",
-        ">" => "Greater",
-        ">=" => "GreaterEqual",
-        "="|"==" => "Equal",
-        "abs" => "Absolute",
-        "acos" => "Arccosine",
-        "^" => "Power",
-        name => name,
+fn prefilter_names(name: impl ToString) -> String {
+    let mut name = name.to_string();
+    if name.starts_with("!") {
+        name = format!("not {}", prefilter_names(name[1..].trim_start()));
+    }
+    match name.as_str() {
+        "%" => "Percentage".to_string(),
+        "*" => "Star".to_string(),
+        "+" => "Plus".to_string(),
+        "-" => "Minus".to_string(),
+        "/" => "Slash".to_string(),
+        "<" => "Less".to_string(),
+        "<=" => "LessEqual".to_string(),
+        ">" => "Greater".to_string(),
+        ">=" => "GreaterEqual".to_string(),
+        "="|"==" => "Equal".to_string(),
+        "abs" => "Absolute".to_string(),
+        "acos" => "Arccosine".to_string(),
+        "^" => "Power".to_string(),
+        _ => name,
     }
 }
 
