@@ -48,14 +48,17 @@ fn generate_top_level_item(scope: &mut Scope, item: TopLevelItem, name: &str) {
                     .derive("serde::Deserialize, PartialEq, Debug, Clone");
                 for (key, item) in &items {
                     group
-                        .new_field(to_snake_case(key), to_upper_camel_case(key))
+                        .new_field(
+                            to_snake_case(key),
+                            to_upper_camel_case(&format!("{name} {key}")),
+                        )
                         .annotation(format!("#[serde(rename=\"{key}\")]"))
                         .doc(item.doc())
                         .vis("pub");
                 }
             }
             for (key, item) in items {
-                generate_parsed_item(scope, &item, &to_upper_camel_case(&key));
+                generate_parsed_item(scope, &item, &to_upper_camel_case(&format!("{name} {key}")));
             }
         }
         TopLevelItem::OneOf(items) => {
@@ -65,8 +68,8 @@ fn generate_top_level_item(scope: &mut Scope, item: TopLevelItem, name: &str) {
                 .vis("pub")
                 .derive("serde::Deserialize, PartialEq, Debug, Clone");
             for key in items {
-                enu.new_variant(to_upper_camel_case(&key))
-                    .tuple(to_upper_camel_case(&key));
+                let var = to_upper_camel_case(&key);
+                enu.new_variant(&var).tuple(&var);
             }
         }
     }
@@ -234,14 +237,14 @@ mod tests {
         pub struct Names {
             /// A number between 0 and 10.
             #[serde(rename="name_one")]
-            pub name_one: NameOne,
+            pub name_one: NamesNameOne,
         }
 
         /// A number between 0 and 10.
         #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-        pub struct NameOne(serde_json::Number);
+        pub struct NamesNameOne(serde_json::Number);
 
-        impl Default for NameOne {
+        impl Default for NamesNameOne {
             fn default() -> Self {
                 Self(serde_json::Number::from_f64(1.0))
             }

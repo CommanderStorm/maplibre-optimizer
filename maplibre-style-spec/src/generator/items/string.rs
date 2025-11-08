@@ -58,12 +58,12 @@ mod tests {
         pub struct Terrain {
             /// The source for the terrain data.
             #[serde(rename="source")]
-            pub source: Source,
+            pub source: TerrainSource,
         }
 
         /// The source for the terrain data.
         #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-        struct Source(String);
+        struct TerrainSource(String);
         "#);
     }
 }

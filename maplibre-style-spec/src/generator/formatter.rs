@@ -1,14 +1,19 @@
-/// Converts a string to a valid Rust struct name (UpperCamelCase)
 pub fn to_upper_camel_case(name: &str) -> String {
     let name = prefilter_names(name);
     let result = name
         .split(|c: char| !c.is_alphanumeric()) // split on non-alphanumeric
-        .filter(|s| !s.is_empty()) // skip empty parts
+        .filter(|s| !s.is_empty())
         .map(|s| {
             let mut chars = s.chars();
             match chars.next() {
                 Some(first) => {
-                    first.to_uppercase().collect::<String>() + &chars.as_str().to_lowercase()
+                    let rest = chars.as_str();
+                    // Lowercase only if the token is fully uppercase (e.g., "XML")
+                    if s.chars().all(|c| c.is_uppercase()) {
+                        first.to_uppercase().collect::<String>() + &rest.to_lowercase()
+                    } else {
+                        first.to_uppercase().collect::<String>() + rest
+                    }
                 }
                 None => String::new(),
             }
@@ -21,6 +26,7 @@ pub fn to_upper_camel_case(name: &str) -> String {
     );
     rustize(result)
 }
+
 pub fn to_snake_case(name: &str) -> String {
     let name = prefilter_names(name);
     let mut result = String::new();
@@ -116,7 +122,15 @@ mod tests {
         assert_eq!(to_upper_camel_case("hello world"), "HelloWorld");
         assert_eq!(to_upper_camel_case("123abc"), "123abc");
         assert_eq!(to_upper_camel_case("__weird__name__"), "WeirdName");
-        assert_eq!(to_upper_camel_case("alreadyCamel"), "Alreadycamel");
+        assert_eq!(to_upper_camel_case("alreadyCamel"), "AlreadyCamel");
+        assert_eq!(
+            to_upper_camel_case("ColorRamp ColorRamp"),
+            "ColorRampColorRamp"
+        );
+        assert_eq!(
+            to_upper_camel_case("color_ramp color_ramp"),
+            "ColorRampColorRamp"
+        );
     }
 
     #[test]
