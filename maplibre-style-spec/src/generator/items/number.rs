@@ -12,33 +12,19 @@ pub fn generate(
     min: Option<&Number>,
     period: Option<&Number>,
 ) {
-    let mut doc = common.doc.clone();
-    if max.is_some() || min.is_some() || period.is_some() {
-        doc.push_str("\n\n# Range\n");
-        if let Some(max) = max {
-            doc.push_str(&format!("- Maximum: {}\n", max))
-        }
-        if let Some(min) = min {
-            doc.push_str(&format!("- Minimum: {}\n", min))
-        }
-        if let Some(period) = period {
-            doc.push_str(&format!("- Period: {}\n", period))
-        }
-    }
-
     scope
-        .new_struct(&name)
-        .doc(&doc)
+        .new_struct(name)
+        .doc(&common.doc_with_range(max, min, period))
         .vis("pub")
         .derive("serde::Deserialize, PartialEq, Debug, Clone")
         .tuple_field("serde_json::Number");
     if let Some(default) = default {
         scope
-            .new_impl(&name)
+            .new_impl(name)
             .impl_trait("Default")
             .new_fn("default")
             .ret("Self")
-            .line(format!("Self({default})"));
+            .line(format!("Self({default}.into())"));
     }
 }
 

@@ -11,10 +11,10 @@ pub fn generate(scope: &mut Scope, name: &str, common: &Fields, default: &str) {
         .tuple_field("serde_json::Value");
 
     scope
-        .new_impl(&name)
+        .new_impl(name)
         .impl_trait("Default")
         .new_fn("default")
-            .ret("Self")
+        .ret("Self")
         .line(default);
 }
 

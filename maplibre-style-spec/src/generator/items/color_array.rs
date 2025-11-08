@@ -5,6 +5,7 @@ use crate::decoder::Fields;
 pub fn generate(scope: &mut Scope, name: &str, common: &Fields, default: Option<&str>) {
     let enu = scope
         .new_enum(name)
+        .attr("serde(untagged)")
         .doc(&common.doc)
         .derive("serde::Deserialize, PartialEq, Debug, Clone");
     enu.new_variant("One")
@@ -16,7 +17,7 @@ pub fn generate(scope: &mut Scope, name: &str, common: &Fields, default: Option<
 
     if let Some(default) = default {
         scope
-            .new_impl(&name)
+            .new_impl(name)
             .impl_trait("Default")
             .new_fn("default")
             .ret("Self")

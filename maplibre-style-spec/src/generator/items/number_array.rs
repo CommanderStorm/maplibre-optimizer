@@ -13,14 +13,14 @@ pub fn generate(
 ) {
     scope
         .new_struct(name)
-        .doc(&common.doc)
+        .doc(&common.doc_with_range(max, min, None))
         .attr("deprecated = \"not_implemented\"")
         .derive("serde::Deserialize, PartialEq, Debug, Clone")
         .tuple_field("serde_json::Value");
 
     if let Some(default) = default {
         scope
-            .new_impl(&name)
+            .new_impl(name)
             .impl_trait("Default")
             .new_fn("default")
             .ret("Self")

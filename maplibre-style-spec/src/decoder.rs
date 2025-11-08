@@ -247,6 +247,32 @@ pub struct Fields {
     pub requires: Option<Vec<Requirement>>,
 }
 
+impl Fields {
+    pub fn doc_with_range(
+        &self,
+        max: Option<&Number>,
+        min: Option<&Number>,
+        period: Option<&Number>,
+    ) -> String {
+        let mut doc = self.doc.clone();
+        if max.is_some() || min.is_some() || period.is_some() {
+            doc.push_str("\n\nRange: ");
+            if let Some(min) = min {
+                doc.push_str(&min.to_string());
+            }
+            doc.push_str("..");
+            if let Some(max) = max {
+                doc.push('=');
+                doc.push_str(&max.to_string());
+            }
+            if let Some(period) = period {
+                doc.push_str(&format!("every {period}\n"))
+            }
+        }
+        doc
+    }
+}
+
 #[derive(Default, Debug, PartialEq, Eq, Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Expression {

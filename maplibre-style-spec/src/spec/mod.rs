@@ -66,6 +66,8 @@ pub struct MaplibreStyleSpecification {
 }
 
 /// An expression defines a function that can be used for data-driven style properties or feature filters.
+///
+/// Range: 1..
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
 #[deprecated = "not_implemented"]
 struct Expression(serde_json::Value);
@@ -530,14 +532,13 @@ pub struct Function {
 
 /// The exponential base of the interpolation curve. It controls the rate at which the result increases. Higher values make the result increase more towards the high end of the range. With `1` the stops are interpolated linearly.
 ///
-/// # Range
-/// - Minimum: 0
+/// Range: 0..
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
 pub struct Base(serde_json::Number);
 
 impl Default for Base {
     fn default() -> Self {
-        Self(1)
+        Self(1.into())
     }
 }
 
@@ -621,6 +622,8 @@ impl Default for Type {
 }
 
 /// Zoom level and value pair.
+///
+/// Range: 0..=24
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
 #[deprecated = "not_implemented"]
 struct FunctionStop(serde_json::Value);
@@ -688,9 +691,7 @@ struct Layout(serde_json::Value);
 
 /// The maximum zoom level for the layer. At zoom levels equal to or greater than the maxzoom, the layer will be hidden.
 ///
-/// # Range
-/// - Maximum: 24
-/// - Minimum: 0
+/// Range: 0..=24
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
 pub struct Maxzoom(serde_json::Number);
 
@@ -701,9 +702,7 @@ struct Metadata(serde_json::Value);
 
 /// The minimum zoom level for the layer. At zoom levels less than the minzoom, the layer will be hidden.
 ///
-/// # Range
-/// - Maximum: 24
-/// - Minimum: 0
+/// Range: 0..=24
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
 pub struct Minzoom(serde_json::Number);
 
@@ -758,26 +757,17 @@ pub enum Type {
 }
 
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+#[serde(untagged)]
 pub enum Layout {
-    #[serde(rename = "layout_fill")]
     LayoutFill(LayoutFill),
-    #[serde(rename = "layout_line")]
     LayoutLine(LayoutLine),
-    #[serde(rename = "layout_circle")]
     LayoutCircle(LayoutCircle),
-    #[serde(rename = "layout_heatmap")]
     LayoutHeatmap(LayoutHeatmap),
-    #[serde(rename = "layout_fill-extrusion")]
     LayoutFillExtrusion(LayoutFillExtrusion),
-    #[serde(rename = "layout_symbol")]
     LayoutSymbol(LayoutSymbol),
-    #[serde(rename = "layout_raster")]
     LayoutRaster(LayoutRaster),
-    #[serde(rename = "layout_hillshade")]
     LayoutHillshade(LayoutHillshade),
-    #[serde(rename = "layout_color-relief")]
     LayoutColorRelief(LayoutColorRelief),
-    #[serde(rename = "layout_background")]
     LayoutBackground(LayoutBackground),
 }
 
@@ -1031,7 +1021,7 @@ pub struct LineMiterLimit(serde_json::Number);
 
 impl Default for LineMiterLimit {
     fn default() -> Self {
-        Self(2)
+        Self(2.into())
     }
 }
 
@@ -1041,7 +1031,7 @@ pub struct LineRoundLimit(serde_json::Number);
 
 impl Default for LineRoundLimit {
     fn default() -> Self {
-        Self(1.05)
+        Self(1.05.into())
     }
 }
 
@@ -1388,14 +1378,13 @@ impl Default for IconPitchAlignment {
 
 /// Rotates the icon clockwise.
 ///
-/// # Range
-/// - Period: 360
+/// Range: ..every 360
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
 pub struct IconRotate(serde_json::Number);
 
 impl Default for IconRotate {
     fn default() -> Self {
-        Self(0)
+        Self(0.into())
     }
 }
 
@@ -1421,14 +1410,13 @@ impl Default for IconRotationAlignment {
 
 /// Scales the original size of the icon by the provided factor. The new pixel size of the image will be the original pixel size multiplied by `icon-size`. 1 is the original size; 3 triples the size of the image.
 ///
-/// # Range
-/// - Minimum: 0
+/// Range: 0..
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
 pub struct IconSize(serde_json::Number);
 
 impl Default for IconSize {
     fn default() -> Self {
-        Self(1)
+        Self(1.into())
     }
 }
 
@@ -1503,14 +1491,13 @@ pub struct SymbolSortKey(serde_json::Number);
 
 /// Distance between two symbol anchors.
 ///
-/// # Range
-/// - Minimum: 1
+/// Range: 1..
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
 pub struct SymbolSpacing(serde_json::Number);
 
 impl Default for SymbolSpacing {
     fn default() -> Self {
-        Self(250)
+        Self(250.into())
     }
 }
 
@@ -1654,7 +1641,7 @@ pub struct TextLetterSpacing(serde_json::Number);
 
 impl Default for TextLetterSpacing {
     fn default() -> Self {
-        Self(0)
+        Self(0.into())
     }
 }
 
@@ -1664,7 +1651,7 @@ pub struct TextLineHeight(serde_json::Number);
 
 impl Default for TextLineHeight {
     fn default() -> Self {
-        Self(1.2)
+        Self(1.2.into())
     }
 }
 
@@ -1674,20 +1661,19 @@ pub struct TextMaxAngle(serde_json::Number);
 
 impl Default for TextMaxAngle {
     fn default() -> Self {
-        Self(45)
+        Self(45.into())
     }
 }
 
 /// The maximum line width for text wrapping.
 ///
-/// # Range
-/// - Minimum: 0
+/// Range: 0..
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
 pub struct TextMaxWidth(serde_json::Number);
 
 impl Default for TextMaxWidth {
     fn default() -> Self {
-        Self(10)
+        Self(10.into())
     }
 }
 
@@ -1729,14 +1715,13 @@ pub enum TextOverlap {
 
 /// Size of the additional area around the text bounding box used for detecting symbol collisions.
 ///
-/// # Range
-/// - Minimum: 0
+/// Range: 0..
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
 pub struct TextPadding(serde_json::Number);
 
 impl Default for TextPadding {
     fn default() -> Self {
-        Self(2)
+        Self(2.into())
     }
 }
 
@@ -1766,20 +1751,19 @@ pub struct TextRadialOffset(serde_json::Number);
 
 impl Default for TextRadialOffset {
     fn default() -> Self {
-        Self(0)
+        Self(0.into())
     }
 }
 
 /// Rotates the text clockwise.
 ///
-/// # Range
-/// - Period: 360
+/// Range: ..every 360
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
 pub struct TextRotate(serde_json::Number);
 
 impl Default for TextRotate {
     fn default() -> Self {
-        Self(0)
+        Self(0.into())
     }
 }
 
@@ -1808,14 +1792,13 @@ impl Default for TextRotationAlignment {
 
 /// Font size.
 ///
-/// # Range
-/// - Minimum: 0
+/// Range: 0..
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
 pub struct TextSize(serde_json::Number);
 
 impl Default for TextSize {
     fn default() -> Self {
-        Self(16)
+        Self(16.into())
     }
 }
 
@@ -1930,15 +1913,13 @@ impl Default for Color {
 
 /// Intensity of lighting (on a scale from 0 to 1). Higher numbers will present as more extreme contrast.
 ///
-/// # Range
-/// - Maximum: 1
-/// - Minimum: 0
+/// Range: 0..=1
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
 pub struct Intensity(serde_json::Number);
 
 impl Default for Intensity {
     fn default() -> Self {
-        Self(0.5)
+        Self(0.5.into())
     }
 }
 
@@ -1954,26 +1935,17 @@ impl Default for Position {
 }
 
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+#[serde(untagged)]
 pub enum Paint {
-    #[serde(rename = "paint_fill")]
     PaintFill(PaintFill),
-    #[serde(rename = "paint_line")]
     PaintLine(PaintLine),
-    #[serde(rename = "paint_circle")]
     PaintCircle(PaintCircle),
-    #[serde(rename = "paint_heatmap")]
     PaintHeatmap(PaintHeatmap),
-    #[serde(rename = "paint_fill-extrusion")]
     PaintFillExtrusion(PaintFillExtrusion),
-    #[serde(rename = "paint_symbol")]
     PaintSymbol(PaintSymbol),
-    #[serde(rename = "paint_raster")]
     PaintRaster(PaintRaster),
-    #[serde(rename = "paint_hillshade")]
     PaintHillshade(PaintHillshade),
-    #[serde(rename = "paint_color-relief")]
     PaintColorRelief(PaintColorRelief),
-    #[serde(rename = "paint_background")]
     PaintBackground(PaintBackground),
 }
 
@@ -2002,15 +1974,13 @@ impl Default for BackgroundColor {
 
 /// The opacity at which the background will be drawn.
 ///
-/// # Range
-/// - Maximum: 1
-/// - Minimum: 0
+/// Range: 0..=1
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
 pub struct BackgroundOpacity(serde_json::Number);
 
 impl Default for BackgroundOpacity {
     fn default() -> Self {
-        Self(1)
+        Self(1.into())
     }
 }
 
@@ -2062,7 +2032,7 @@ pub struct CircleBlur(serde_json::Number);
 
 impl Default for CircleBlur {
     fn default() -> Self {
-        Self(0)
+        Self(0.into())
     }
 }
 
@@ -2078,15 +2048,13 @@ impl Default for CircleColor {
 
 /// The opacity at which the circle will be drawn.
 ///
-/// # Range
-/// - Maximum: 1
-/// - Minimum: 0
+/// Range: 0..=1
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
 pub struct CircleOpacity(serde_json::Number);
 
 impl Default for CircleOpacity {
     fn default() -> Self {
-        Self(1)
+        Self(1.into())
     }
 }
 
@@ -2126,14 +2094,13 @@ impl Default for CirclePitchScale {
 
 /// Circle radius.
 ///
-/// # Range
-/// - Minimum: 0
+/// Range: 0..
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
 pub struct CircleRadius(serde_json::Number);
 
 impl Default for CircleRadius {
     fn default() -> Self {
-        Self(5)
+        Self(5.into())
     }
 }
 
@@ -2149,28 +2116,25 @@ impl Default for CircleStrokeColor {
 
 /// The opacity of the circle's stroke.
 ///
-/// # Range
-/// - Maximum: 1
-/// - Minimum: 0
+/// Range: 0..=1
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
 pub struct CircleStrokeOpacity(serde_json::Number);
 
 impl Default for CircleStrokeOpacity {
     fn default() -> Self {
-        Self(1)
+        Self(1.into())
     }
 }
 
 /// The width of the circle's stroke. Strokes are placed outside of the `circle-radius`.
 ///
-/// # Range
-/// - Minimum: 0
+/// Range: 0..
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
 pub struct CircleStrokeWidth(serde_json::Number);
 
 impl Default for CircleStrokeWidth {
     fn default() -> Self {
-        Self(0)
+        Self(0.into())
     }
 }
 
@@ -2218,15 +2182,13 @@ struct ColorReliefColor(color::DynamicColor);
 
 /// The opacity at which the color-relief will be drawn.
 ///
-/// # Range
-/// - Maximum: 1
-/// - Minimum: 0
+/// Range: 0..=1
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
 pub struct ColorReliefOpacity(serde_json::Number);
 
 impl Default for ColorReliefOpacity {
     fn default() -> Self {
-        Self(1)
+        Self(1.into())
     }
 }
 
@@ -2278,15 +2240,13 @@ impl Default for FillColor {
 
 /// The opacity of the entire fill layer. In contrast to the `fill-color`, this value will also affect the 1px stroke around the fill, if the stroke is used.
 ///
-/// # Range
-/// - Maximum: 1
-/// - Minimum: 0
+/// Range: 0..=1
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
 pub struct FillOpacity(serde_json::Number);
 
 impl Default for FillOpacity {
     fn default() -> Self {
-        Self(1)
+        Self(1.into())
     }
 }
 
@@ -2357,14 +2317,13 @@ pub struct PaintFillExtrusion {
 
 /// The height with which to extrude the base of this layer. Must be less than or equal to `fill-extrusion-height`.
 ///
-/// # Range
-/// - Minimum: 0
+/// Range: 0..
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
 pub struct FillExtrusionBase(serde_json::Number);
 
 impl Default for FillExtrusionBase {
     fn default() -> Self {
-        Self(0)
+        Self(0.into())
     }
 }
 
@@ -2380,28 +2339,25 @@ impl Default for FillExtrusionColor {
 
 /// The height with which to extrude this layer.
 ///
-/// # Range
-/// - Minimum: 0
+/// Range: 0..
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
 pub struct FillExtrusionHeight(serde_json::Number);
 
 impl Default for FillExtrusionHeight {
     fn default() -> Self {
-        Self(0)
+        Self(0.into())
     }
 }
 
 /// The opacity of the entire fill extrusion layer. This is rendered on a per-layer, not per-feature, basis, and data-driven styling is not available.
 ///
-/// # Range
-/// - Maximum: 1
-/// - Minimum: 0
+/// Range: 0..=1
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
 pub struct FillExtrusionOpacity(serde_json::Number);
 
 impl Default for FillExtrusionOpacity {
     fn default() -> Self {
-        Self(1)
+        Self(1.into())
     }
 }
 
@@ -2499,54 +2455,49 @@ impl Default for HeatmapColor {
 
 /// Similar to `heatmap-weight` but controls the intensity of the heatmap globally. Primarily used for adjusting the heatmap based on zoom level.
 ///
-/// # Range
-/// - Minimum: 0
+/// Range: 0..
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
 pub struct HeatmapIntensity(serde_json::Number);
 
 impl Default for HeatmapIntensity {
     fn default() -> Self {
-        Self(1)
+        Self(1.into())
     }
 }
 
 /// The global opacity at which the heatmap layer will be drawn.
 ///
-/// # Range
-/// - Maximum: 1
-/// - Minimum: 0
+/// Range: 0..=1
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
 pub struct HeatmapOpacity(serde_json::Number);
 
 impl Default for HeatmapOpacity {
     fn default() -> Self {
-        Self(1)
+        Self(1.into())
     }
 }
 
 /// Radius of influence of one heatmap point in pixels. Increasing the value makes the heatmap smoother, but less detailed.
 ///
-/// # Range
-/// - Minimum: 1
+/// Range: 1..
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
 pub struct HeatmapRadius(serde_json::Number);
 
 impl Default for HeatmapRadius {
     fn default() -> Self {
-        Self(30)
+        Self(30.into())
     }
 }
 
 /// A measure of how much an individual point contributes to the heatmap. A value of 10 would be equivalent to having 10 points of weight 1 in the same spot. Especially useful when combined with clustering.
 ///
-/// # Range
-/// - Minimum: 0
+/// Range: 0..
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
 pub struct HeatmapWeight(serde_json::Number);
 
 impl Default for HeatmapWeight {
     fn default() -> Self {
-        Self(1)
+        Self(1.into())
     }
 }
 
@@ -2590,20 +2541,19 @@ impl Default for HillshadeAccentColor {
 
 /// Intensity of the hillshade
 ///
-/// # Range
-/// - Maximum: 1
-/// - Minimum: 0
+/// Range: 0..=1
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
 pub struct HillshadeExaggeration(serde_json::Number);
 
 impl Default for HillshadeExaggeration {
     fn default() -> Self {
-        Self(0.5)
+        Self(0.5.into())
     }
 }
 
 /// The shading color of areas that faces towards the light source(s). Only when `hillshade-method` is set to `multidirectional` can you specify multiple light sources.
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+#[serde(untagged)]
 enum HillshadeHighlightColor {
     /// A color
     One(color::DynamicColor),
@@ -2620,6 +2570,8 @@ impl Default for HillshadeHighlightColor {
 }
 
 /// The altitude of the light source(s) used to generate the hillshading with 0 as sunset and 90 as noon. Only when `hillshade-method` is set to `multidirectional` can you specify multiple light sources.
+///
+/// Range: 0..=90
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
 #[deprecated = "not_implemented"]
 struct HillshadeIlluminationAltitude(serde_json::Value);
@@ -2648,6 +2600,8 @@ impl Default for HillshadeIlluminationAnchor {
 }
 
 /// The direction of the light source(s) used to generate the hillshading with 0 as the top of the viewport if `hillshade-illumination-anchor` is set to `viewport` and due north if `hillshade-illumination-anchor` is set to `map`. Only when `hillshade-method` is set to `multidirectional` can you specify multiple light sources.
+///
+/// Range: 0..=359
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
 #[deprecated = "not_implemented"]
 struct HillshadeIlluminationDirection(serde_json::Value);
@@ -2686,6 +2640,7 @@ impl Default for HillshadeMethod {
 
 /// The shading color of areas that face away from the light source(s). Only when `hillshade-method` is set to `multidirectional` can you specify multiple light sources.
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+#[serde(untagged)]
 enum HillshadeShadowColor {
     /// A color
     One(color::DynamicColor),
@@ -2740,14 +2695,13 @@ pub struct PaintLine {
 
 /// Blur applied to the line, in pixels.
 ///
-/// # Range
-/// - Minimum: 0
+/// Range: 0..
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
 pub struct LineBlur(serde_json::Number);
 
 impl Default for LineBlur {
     fn default() -> Self {
-        Self(0)
+        Self(0.into())
     }
 }
 
@@ -2762,20 +2716,21 @@ impl Default for LineColor {
 }
 
 /// Specifies the lengths of the alternating dashes and gaps that form the dash pattern. The lengths are later scaled by the line width. To convert a dash length to pixels, multiply the length by the current line width. GeoJSON sources with `lineMetrics: true` specified won't render dashed lines to the expected scale. Zoom-dependent expressions will be evaluated only at integer zoom levels. The only way to create an array value is using `["literal", [...]]`; arrays cannot be read from or derived from feature properties.
+///
+/// Range: 0..
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
 #[deprecated = "not_implemented"]
 struct LineDasharray(serde_json::Value);
 
 /// Draws a line casing outside of a line's actual path. Value indicates the width of the inner gap.
 ///
-/// # Range
-/// - Minimum: 0
+/// Range: 0..
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
 pub struct LineGapWidth(serde_json::Number);
 
 impl Default for LineGapWidth {
     fn default() -> Self {
-        Self(0)
+        Self(0.into())
     }
 }
 
@@ -2789,21 +2744,19 @@ pub struct LineOffset(serde_json::Number);
 
 impl Default for LineOffset {
     fn default() -> Self {
-        Self(0)
+        Self(0.into())
     }
 }
 
 /// The opacity at which the line will be drawn.
 ///
-/// # Range
-/// - Maximum: 1
-/// - Minimum: 0
+/// Range: 0..=1
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
 pub struct LineOpacity(serde_json::Number);
 
 impl Default for LineOpacity {
     fn default() -> Self {
-        Self(1)
+        Self(1.into())
     }
 }
 
@@ -2842,14 +2795,13 @@ impl Default for LineTranslateAnchor {
 
 /// Stroke thickness.
 ///
-/// # Range
-/// - Minimum: 0
+/// Range: 0..
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
 pub struct LineWidth(serde_json::Number);
 
 impl Default for LineWidth {
     fn default() -> Self {
-        Self(1)
+        Self(1.into())
     }
 }
 
@@ -2883,83 +2835,73 @@ pub struct PaintRaster {
 
 /// Increase or reduce the brightness of the image. The value is the maximum brightness.
 ///
-/// # Range
-/// - Maximum: 1
-/// - Minimum: 0
+/// Range: 0..=1
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
 pub struct RasterBrightnessMax(serde_json::Number);
 
 impl Default for RasterBrightnessMax {
     fn default() -> Self {
-        Self(1)
+        Self(1.into())
     }
 }
 
 /// Increase or reduce the brightness of the image. The value is the minimum brightness.
 ///
-/// # Range
-/// - Maximum: 1
-/// - Minimum: 0
+/// Range: 0..=1
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
 pub struct RasterBrightnessMin(serde_json::Number);
 
 impl Default for RasterBrightnessMin {
     fn default() -> Self {
-        Self(0)
+        Self(0.into())
     }
 }
 
 /// Increase or reduce the contrast of the image.
 ///
-/// # Range
-/// - Maximum: 1
-/// - Minimum: -1
+/// Range: -1..=1
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
 pub struct RasterContrast(serde_json::Number);
 
 impl Default for RasterContrast {
     fn default() -> Self {
-        Self(0)
+        Self(0.into())
     }
 }
 
 /// Fade duration when a new tile is added, or when a video is started or its coordinates are updated.
 ///
-/// # Range
-/// - Minimum: 0
+/// Range: 0..
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
 pub struct RasterFadeDuration(serde_json::Number);
 
 impl Default for RasterFadeDuration {
     fn default() -> Self {
-        Self(300)
+        Self(300.into())
     }
 }
 
 /// Rotates hues around the color wheel.
 ///
-/// # Range
-/// - Period: 360
+/// Range: ..every 360
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
 pub struct RasterHueRotate(serde_json::Number);
 
 impl Default for RasterHueRotate {
     fn default() -> Self {
-        Self(0)
+        Self(0.into())
     }
 }
 
 /// The opacity at which the image will be drawn.
 ///
-/// # Range
-/// - Maximum: 1
-/// - Minimum: 0
+/// Range: 0..=1
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
 pub struct RasterOpacity(serde_json::Number);
 
 impl Default for RasterOpacity {
     fn default() -> Self {
-        Self(1)
+        Self(1.into())
     }
 }
 
@@ -2982,15 +2924,13 @@ impl Default for RasterResampling {
 
 /// Increase or reduce the saturation of the image.
 ///
-/// # Range
-/// - Maximum: 1
-/// - Minimum: -1
+/// Range: -1..=1
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
 pub struct RasterSaturation(serde_json::Number);
 
 impl Default for RasterSaturation {
     fn default() -> Self {
-        Self(0)
+        Self(0.into())
     }
 }
 
@@ -3054,14 +2994,13 @@ impl Default for IconColor {
 
 /// Fade out the halo towards the outside.
 ///
-/// # Range
-/// - Minimum: 0
+/// Range: 0..
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
 pub struct IconHaloBlur(serde_json::Number);
 
 impl Default for IconHaloBlur {
     fn default() -> Self {
-        Self(0)
+        Self(0.into())
     }
 }
 
@@ -3082,28 +3021,25 @@ impl Default for IconHaloColor {
 ///
 /// The unit is in pixels only for SDF sprites that were created with a blur radius of 8, multiplied by the display density. I.e., the radius needs to be 16 for `@2x` sprites, etc.
 ///
-/// # Range
-/// - Minimum: 0
+/// Range: 0..
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
 pub struct IconHaloWidth(serde_json::Number);
 
 impl Default for IconHaloWidth {
     fn default() -> Self {
-        Self(0)
+        Self(0.into())
     }
 }
 
 /// The opacity at which the icon will be drawn.
 ///
-/// # Range
-/// - Maximum: 1
-/// - Minimum: 0
+/// Range: 0..=1
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
 pub struct IconOpacity(serde_json::Number);
 
 impl Default for IconOpacity {
     fn default() -> Self {
-        Self(1)
+        Self(1.into())
     }
 }
 
@@ -3147,14 +3083,13 @@ impl Default for TextColor {
 
 /// The halo's fadeout distance towards the outside.
 ///
-/// # Range
-/// - Minimum: 0
+/// Range: 0..
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
 pub struct TextHaloBlur(serde_json::Number);
 
 impl Default for TextHaloBlur {
     fn default() -> Self {
-        Self(0)
+        Self(0.into())
     }
 }
 
@@ -3173,28 +3108,25 @@ impl Default for TextHaloColor {
 
 /// Distance of halo to the font outline. Max text halo width is 1/4 of the font-size.
 ///
-/// # Range
-/// - Minimum: 0
+/// Range: 0..
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
 pub struct TextHaloWidth(serde_json::Number);
 
 impl Default for TextHaloWidth {
     fn default() -> Self {
-        Self(0)
+        Self(0.into())
     }
 }
 
 /// The opacity at which the text will be drawn.
 ///
-/// # Range
-/// - Maximum: 1
-/// - Minimum: 0
+/// Range: 0..=1
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
 pub struct TextOpacity(serde_json::Number);
 
 impl Default for TextOpacity {
     fn default() -> Self {
-        Self(1)
+        Self(1.into())
     }
 }
 
@@ -3335,15 +3267,13 @@ pub struct Sky {
 
 /// How to blend the atmosphere. Where 1 is visible atmosphere and 0 is hidden. It is best to interpolate this expression when using globe projection.
 ///
-/// # Range
-/// - Maximum: 1
-/// - Minimum: 0
+/// Range: 0..=1
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
 pub struct AtmosphereBlend(serde_json::Number);
 
 impl Default for AtmosphereBlend {
     fn default() -> Self {
-        Self(0.8)
+        Self(0.8.into())
     }
 }
 
@@ -3359,15 +3289,13 @@ impl Default for FogColor {
 
 /// How to blend the fog over the 3D terrain. Where 0 is the map center and 1 is the horizon.
 ///
-/// # Range
-/// - Maximum: 1
-/// - Minimum: 0
+/// Range: 0..=1
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
 pub struct FogGroundBlend(serde_json::Number);
 
 impl Default for FogGroundBlend {
     fn default() -> Self {
-        Self(0.5)
+        Self(0.5.into())
     }
 }
 
@@ -3383,15 +3311,13 @@ impl Default for HorizonColor {
 
 /// How to blend the fog color and the horizon color. Where 0 is using the horizon color only and 1 is using the fog color only.
 ///
-/// # Range
-/// - Maximum: 1
-/// - Minimum: 0
+/// Range: 0..=1
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
 pub struct HorizonFogBlend(serde_json::Number);
 
 impl Default for HorizonFogBlend {
     fn default() -> Self {
-        Self(0.8)
+        Self(0.8.into())
     }
 }
 
@@ -3407,31 +3333,24 @@ impl Default for SkyColor {
 
 /// How to blend the sky color and the horizon color. Where 1 is blending the color at the middle of the sky and 0 is not blending at all and using the sky color only.
 ///
-/// # Range
-/// - Maximum: 1
-/// - Minimum: 0
+/// Range: 0..=1
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
 pub struct SkyHorizonBlend(serde_json::Number);
 
 impl Default for SkyHorizonBlend {
     fn default() -> Self {
-        Self(0.8)
+        Self(0.8.into())
     }
 }
 
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+#[serde(untagged)]
 pub enum Source {
-    #[serde(rename = "source_vector")]
     SourceVector(SourceVector),
-    #[serde(rename = "source_raster")]
     SourceRaster(SourceRaster),
-    #[serde(rename = "source_raster_dem")]
     SourceRasterDem(SourceRasterDem),
-    #[serde(rename = "source_geojson")]
     SourceGeojson(SourceGeojson),
-    #[serde(rename = "source_video")]
     SourceVideo(SourceVideo),
-    #[serde(rename = "source_image")]
     SourceImage(SourceImage),
 }
 
@@ -3505,15 +3424,13 @@ struct Attribution(serde_json::Value);
 
 /// Size of the tile buffer on each side. A value of 0 produces no buffer. A value of 512 produces a buffer as wide as the tile itself. Larger values produce fewer rendering artifacts near tile edges and slower performance.
 ///
-/// # Range
-/// - Maximum: 512
-/// - Minimum: 0
+/// Range: 0..=512
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
 pub struct Buffer(serde_json::Number);
 
 impl Default for Buffer {
     fn default() -> Self {
-        Self(128)
+        Self(128.into())
     }
 }
 
@@ -3557,14 +3474,13 @@ struct Clusterproperties(serde_json::Value);
 
 /// Radius of each cluster if clustering is enabled. A value of 512 indicates a radius equal to the width of a tile.
 ///
-/// # Range
-/// - Minimum: 0
+/// Range: 0..
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
 pub struct Clusterradius(serde_json::Number);
 
 impl Default for Clusterradius {
     fn default() -> Self {
-        Self(50)
+        Self(50.into())
     }
 }
 
@@ -3606,7 +3522,7 @@ pub struct Maxzoom(serde_json::Number);
 
 impl Default for Maxzoom {
     fn default() -> Self {
-        Self(18)
+        Self(18.into())
     }
 }
 
@@ -3621,7 +3537,7 @@ pub struct Tolerance(serde_json::Number);
 
 impl Default for Tolerance {
     fn default() -> Self {
-        Self(0.375)
+        Self(0.375.into())
     }
 }
 
@@ -3728,7 +3644,7 @@ pub struct Maxzoom(serde_json::Number);
 
 impl Default for Maxzoom {
     fn default() -> Self {
-        Self(22)
+        Self(22.into())
     }
 }
 
@@ -3738,7 +3654,7 @@ pub struct Minzoom(serde_json::Number);
 
 impl Default for Minzoom {
     fn default() -> Self {
-        Self(0)
+        Self(0.into())
     }
 }
 
@@ -3765,7 +3681,7 @@ pub struct Tilesize(serde_json::Number);
 
 impl Default for Tilesize {
     fn default() -> Self {
-        Self(512)
+        Self(512.into())
     }
 }
 
@@ -3863,7 +3779,7 @@ pub struct Baseshift(serde_json::Number);
 
 impl Default for Baseshift {
     fn default() -> Self {
-        Self(0.0)
+        Self(0.0.into())
     }
 }
 
@@ -3873,7 +3789,7 @@ pub struct Bluefactor(serde_json::Number);
 
 impl Default for Bluefactor {
     fn default() -> Self {
-        Self(1.0)
+        Self(1.0.into())
     }
 }
 
@@ -3914,7 +3830,7 @@ pub struct Greenfactor(serde_json::Number);
 
 impl Default for Greenfactor {
     fn default() -> Self {
-        Self(1.0)
+        Self(1.0.into())
     }
 }
 
@@ -3924,7 +3840,7 @@ pub struct Maxzoom(serde_json::Number);
 
 impl Default for Maxzoom {
     fn default() -> Self {
-        Self(22)
+        Self(22.into())
     }
 }
 
@@ -3934,7 +3850,7 @@ pub struct Minzoom(serde_json::Number);
 
 impl Default for Minzoom {
     fn default() -> Self {
-        Self(0)
+        Self(0.into())
     }
 }
 
@@ -3944,7 +3860,7 @@ pub struct Redfactor(serde_json::Number);
 
 impl Default for Redfactor {
     fn default() -> Self {
-        Self(1.0)
+        Self(1.0.into())
     }
 }
 
@@ -3954,7 +3870,7 @@ pub struct Tilesize(serde_json::Number);
 
 impl Default for Tilesize {
     fn default() -> Self {
-        Self(512)
+        Self(512.into())
     }
 }
 
@@ -4071,7 +3987,7 @@ pub struct Maxzoom(serde_json::Number);
 
 impl Default for Maxzoom {
     fn default() -> Self {
-        Self(22)
+        Self(22.into())
     }
 }
 
@@ -4081,7 +3997,7 @@ pub struct Minzoom(serde_json::Number);
 
 impl Default for Minzoom {
     fn default() -> Self {
-        Self(0)
+        Self(0.into())
     }
 }
 
@@ -4191,14 +4107,13 @@ pub struct Terrain {
 
 /// The exaggeration of the terrain - how high it will look.
 ///
-/// # Range
-/// - Minimum: 0
+/// Range: 0..
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
 pub struct Exaggeration(serde_json::Number);
 
 impl Default for Exaggeration {
     fn default() -> Self {
-        Self(1.0)
+        Self(1.0.into())
     }
 }
 
@@ -4219,26 +4134,24 @@ pub struct Transition {
 
 /// Length of time before a transition begins.
 ///
-/// # Range
-/// - Minimum: 0
+/// Range: 0..
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
 pub struct Delay(serde_json::Number);
 
 impl Default for Delay {
     fn default() -> Self {
-        Self(0)
+        Self(0.into())
     }
 }
 
 /// Time allotted for transitions to complete.
 ///
-/// # Range
-/// - Minimum: 0
+/// Range: 0..
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
 pub struct Duration(serde_json::Number);
 
 impl Default for Duration {
     fn default() -> Self {
-        Self(300)
+        Self(300.into())
     }
 }

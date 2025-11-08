@@ -18,13 +18,13 @@ pub fn generate(scope: &mut Scope, name: &str, common: &Fields, default: &[Numbe
         }
         line.push_str(&item.to_string());
     }
-    line.push_str("]");
+    line.push(']');
 
     scope
-        .new_impl(&name)
+        .new_impl(name)
         .impl_trait("Default")
         .new_fn("default")
-            .ret("Self")
+        .ret("Self")
         .line(line);
 }
 

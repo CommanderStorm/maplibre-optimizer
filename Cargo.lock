@@ -5,7 +5,7 @@ version = 4
 [[package]]
 name = "codegen"
 version = "0.3.0"
-source = "git+https://gitlab.com/yovoslav/codegen.git?branch=master#7830f791f89fe0a12d23610294d64fff01cf98c2"
+source = "git+https://gitlab.com/Commanderstorm/codegen.git?branch=attr#79bab7c24b2f2e53c5a206b4fed7e2993304d034"
 dependencies = [
  "indexmap",
 ]

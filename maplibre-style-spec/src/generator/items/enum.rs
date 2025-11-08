@@ -20,7 +20,7 @@ pub fn generate(
                 .derive("serde::Deserialize, PartialEq, Eq, Debug, Clone, Copy");
             for value in values {
                 let var_name = to_upper_camel_case(value);
-                let var= enu.new_variant(&to_upper_camel_case(value));
+                let var = enu.new_variant(to_upper_camel_case(value));
                 if value != &var_name {
                     var.annotation(format!("serde(rename=\"{value}\")"));
                 }
@@ -29,14 +29,15 @@ pub fn generate(
         EnumValues::Numeric(values) => {
             assert!(values.len() <= u8::MAX as usize);
 
-            let enu=
-scope                .new_enum(&name)
+            let enu = scope
+                .new_enum(name)
                 .doc(&common.doc)
                 .vis("pub")
                 .repr("u8")
                 .derive("serde::Deserialize, PartialEq, Eq, Debug, Clone, Copy");
-            for v in values{
-                enu.new_variant(to_upper_camel_case(&v.to_string())).discriminant(v.to_string());
+            for v in values {
+                enu.new_variant(to_upper_camel_case(&v.to_string()))
+                    .discriminant(v.to_string());
             }
             assert!(
                 values
@@ -62,10 +63,13 @@ scope                .new_enum(&name)
 
     if let Some(default) = default {
         scope
-            .new_impl(&name)
+            .new_impl(name)
             .impl_trait("Default")
             .new_fn("default")
             .ret("Self")
-            .line(format!("Self::{}", to_upper_camel_case(&default.to_string())));
+            .line(format!(
+                "Self::{}",
+                to_upper_camel_case(&default.to_string())
+            ));
     }
 }

@@ -5,8 +5,8 @@ use codegen::Scope;
 use crate::decoder::{ParsedItem, StyleReference, TopLevelItem};
 use crate::generator::formatter::{to_snake_case, to_upper_camel_case};
 
-mod items;
 mod formatter;
+mod items;
 
 pub fn generate_spec_scope(reference: StyleReference) -> String {
     let mut scope = Scope::new();
@@ -39,11 +39,11 @@ fn generate_spec(scope: &mut Scope, root: &BTreeMap<String, ParsedItem>) {
 
 fn generate_top_level_item(scope: &mut Scope, item: TopLevelItem, name: &str) {
     match item {
-        TopLevelItem::Item(item) => generate_parsed_item(scope, &item, &name),
+        TopLevelItem::Item(item) => generate_parsed_item(scope, &item, name),
         TopLevelItem::Group(items) => {
             {
                 let group = scope
-                    .new_struct(&name)
+                    .new_struct(name)
                     .vis("pub")
                     .derive("serde::Deserialize, PartialEq, Debug, Clone");
                 for (key, item) in &items {
@@ -61,13 +61,12 @@ fn generate_top_level_item(scope: &mut Scope, item: TopLevelItem, name: &str) {
         TopLevelItem::OneOf(items) => {
             let enu = scope
                 .new_enum(name)
+                .attr("serde(untagged)")
                 .vis("pub")
                 .derive("serde::Deserialize, PartialEq, Debug, Clone");
             for key in items {
                 enu.new_variant(to_upper_camel_case(&key))
-                    .annotation(format!("#[serde(rename=\"{key}\")]"))
-                    .tuple(&to_upper_camel_case(&key));
-                // todo: is this correct or does this need an untagged variant?
+                    .tuple(to_upper_camel_case(&key));
             }
         }
     }
@@ -171,13 +170,11 @@ fn generate_parsed_item(scope: &mut Scope, item: &ParsedItem, name: &str) {
             common,
             tokens,
             default,
-        } => items::formatted::generate(scope, name, common, &default, *tokens),
+        } => items::formatted::generate(scope, name, common, default, *tokens),
         ParsedItem::Filter(fields) => items::filter::generate(scope, name, fields),
         ParsedItem::Expression(fields) => items::expression::generate(scope, name, fields),
     }
 }
-
-
 
 #[cfg(test)]
 mod tests {

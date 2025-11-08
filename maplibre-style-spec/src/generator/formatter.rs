@@ -15,7 +15,10 @@ pub fn to_upper_camel_case(name: &str) -> String {
         })
         .collect::<String>();
 
-    debug_assert_ne!(result, "", "{name} should not result in an empty string after conversion to snake case");
+    debug_assert_ne!(
+        result, "",
+        "{name} should not result in an empty string after conversion to snake case"
+    );
     rustize(result)
 }
 pub fn to_snake_case(name: &str) -> String {
@@ -29,7 +32,8 @@ pub fn to_snake_case(name: &str) -> String {
             if c.is_uppercase() {
                 // Insert underscore before uppercase if previous was lowercase
                 // or previous was not underscore and next is lowercase (e.g., "XMLHttp")
-                if (prev_was_lower || (!prev_was_underscore && has_next_lower(&name, i))) && i != 0 {
+                if (prev_was_lower || (!prev_was_underscore && has_next_lower(&name, i))) && i != 0
+                {
                     result.push('_');
                 }
                 result.push(c.to_ascii_lowercase());
@@ -52,7 +56,10 @@ pub fn to_snake_case(name: &str) -> String {
         result.pop();
     }
 
-    debug_assert_ne!(result, "", "{name} should not result in an empty string after conversion to snake case");
+    debug_assert_ne!(
+        result, "",
+        "{name} should not result in an empty string after conversion to snake case"
+    );
     rustize(result)
 }
 
@@ -79,7 +86,7 @@ fn prefilter_names(name: impl ToString) -> String {
         "<=" => "LessEqual".to_string(),
         ">" => "Greater".to_string(),
         ">=" => "GreaterEqual".to_string(),
-        "="|"==" => "Equal".to_string(),
+        "=" | "==" => "Equal".to_string(),
         "abs" => "Absolute".to_string(),
         "acos" => "Arccosine".to_string(),
         "^" => "Power".to_string(),
@@ -90,7 +97,7 @@ fn prefilter_names(name: impl ToString) -> String {
 /// replace rust names with r# prefix if they are reserved keywords
 fn rustize(name: String) -> String {
     if name.as_str() == "Default" {
-        return "DefaultStruct".to_string()
+        return "DefaultStruct".to_string();
     }
     if matches!(name.as_str(), "type") {
         format!("r#{name}")

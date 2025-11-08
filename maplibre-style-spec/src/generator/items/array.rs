@@ -3,6 +3,7 @@ use serde_json::{Number, Value};
 
 use crate::decoder::{ArrayValue, EnumValues, Fields};
 
+#[allow(clippy::too_many_arguments)]
 pub fn generate(
     scope: &mut Scope,
     name: &str,
@@ -16,7 +17,7 @@ pub fn generate(
 ) {
     scope
         .new_struct(name)
-        .doc(&common.doc)
+        .doc(&common.doc_with_range(max, min, None))
         .attr("deprecated = \"not_implemented\"")
         .derive("serde::Deserialize, PartialEq, Debug, Clone")
         .tuple_field("serde_json::Value");
@@ -29,10 +30,10 @@ pub fn generate(
             }
             line.push_str(&item.to_string());
         }
-        line.push_str("]");
+        line.push(']');
 
         scope
-            .new_impl(&name)
+            .new_impl(name)
             .impl_trait("Default")
             .new_fn("default")
             .ret("Self")

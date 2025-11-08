@@ -32,7 +32,7 @@ struct_field_names = "allow"
 [workspace.dependencies]
 anyhow = "1.0"
 clap = { version = "4", features = ["derive", "unstable-markdown", "wrap_help"] }
-codegen = { git = "https://gitlab.com/yovoslav/codegen.git", branch = "master" }
+codegen = { git = "https://gitlab.com/Commanderstorm/codegen.git", branch = "attr" }
 criterion = { version = "0.7", features = ["async_futures", "async_tokio", "html_reports"] }
 image = "0.25.8"
 insta = "1.43"
