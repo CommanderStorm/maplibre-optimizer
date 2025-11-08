@@ -513,7 +513,7 @@ pub struct Function {
     /// 
     /// If no default is provided, the style property's default is used in these circumstances.
     #[serde(rename="default")]
-    pub default: r#Default,
+    pub default: DefaultStruct,
     /// An expression.
     #[serde(rename="expression")]
     pub expression: Expression,
@@ -536,7 +536,7 @@ pub struct Function {
 pub struct Base(serde_json::Number);
 
 impl Default for Base {
-    fn default() {
+    fn default() -> Self {
         1
     }
 }
@@ -556,8 +556,8 @@ pub enum Colorspace {
 }
 
 impl Default for Colorspace {
-    fn default() {
-        "rgb"
+    fn default() -> Self {
+        Self::Rgb
     }
 }
 
@@ -574,7 +574,7 @@ impl Default for Colorspace {
 /// If no default is provided, the style property's default is used in these circumstances.
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
 #[deprecated = "not_implemented"]
-struct r#Default(serde_json::Value);
+struct DefaultStruct(serde_json::Value);
 
 /// An expression.
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
@@ -587,7 +587,7 @@ struct Expression(serde_json::Value);
 struct Property(serde_json::Value);
 
 impl Default for Property {
-    fn default() {
+    fn default() -> Self {
         $zoom
     }
 }
@@ -615,8 +615,8 @@ pub enum Type {
 }
 
 impl Default for Type {
-    fn default() {
-        "exponential"
+    fn default() -> Self {
+        Self::Exponential
     }
 }
 
@@ -800,8 +800,8 @@ pub enum Visibility {
 }
 
 impl Default for Visibility {
-    fn default() {
-        "visible"
+    fn default() -> Self {
+        Self::Visible
     }
 }
 
@@ -831,8 +831,8 @@ pub enum Visibility {
 }
 
 impl Default for Visibility {
-    fn default() {
-        "visible"
+    fn default() -> Self {
+        Self::Visible
     }
 }
 
@@ -855,8 +855,8 @@ pub enum Visibility {
 }
 
 impl Default for Visibility {
-    fn default() {
-        "visible"
+    fn default() -> Self {
+        Self::Visible
     }
 }
 
@@ -886,8 +886,8 @@ pub enum Visibility {
 }
 
 impl Default for Visibility {
-    fn default() {
-        "visible"
+    fn default() -> Self {
+        Self::Visible
     }
 }
 
@@ -910,8 +910,8 @@ pub enum Visibility {
 }
 
 impl Default for Visibility {
-    fn default() {
-        "visible"
+    fn default() -> Self {
+        Self::Visible
     }
 }
 
@@ -934,8 +934,8 @@ pub enum Visibility {
 }
 
 impl Default for Visibility {
-    fn default() {
-        "visible"
+    fn default() -> Self {
+        Self::Visible
     }
 }
 
@@ -958,8 +958,8 @@ pub enum Visibility {
 }
 
 impl Default for Visibility {
-    fn default() {
-        "visible"
+    fn default() -> Self {
+        Self::Visible
     }
 }
 
@@ -1000,8 +1000,8 @@ pub enum LineCap {
 }
 
 impl Default for LineCap {
-    fn default() {
-        "butt"
+    fn default() -> Self {
+        Self::Butt
     }
 }
 
@@ -1020,8 +1020,8 @@ pub enum LineJoin {
 }
 
 impl Default for LineJoin {
-    fn default() {
-        "miter"
+    fn default() -> Self {
+        Self::Miter
     }
 }
 
@@ -1030,7 +1030,7 @@ impl Default for LineJoin {
 pub struct LineMiterLimit(serde_json::Number);
 
 impl Default for LineMiterLimit {
-    fn default() {
+    fn default() -> Self {
         2
     }
 }
@@ -1040,7 +1040,7 @@ impl Default for LineMiterLimit {
 pub struct LineRoundLimit(serde_json::Number);
 
 impl Default for LineRoundLimit {
-    fn default() {
+    fn default() -> Self {
         1.05
     }
 }
@@ -1061,8 +1061,8 @@ pub enum Visibility {
 }
 
 impl Default for Visibility {
-    fn default() {
-        "visible"
+    fn default() -> Self {
+        Self::Visible
     }
 }
 
@@ -1085,8 +1085,8 @@ pub enum Visibility {
 }
 
 impl Default for Visibility {
-    fn default() {
-        "visible"
+    fn default() -> Self {
+        Self::Visible
     }
 }
 
@@ -1249,7 +1249,7 @@ pub struct LayoutSymbol {
 struct IconAllowOverlap(serde_json::Value);
 
 impl Default for IconAllowOverlap {
-    fn default() {
+    fn default() -> Self {
         false
     }
 }
@@ -1287,8 +1287,8 @@ pub enum IconAnchor {
 }
 
 impl Default for IconAnchor {
-    fn default() {
-        "center"
+    fn default() -> Self {
+        Self::Center
     }
 }
 
@@ -1298,7 +1298,7 @@ impl Default for IconAnchor {
 struct IconIgnorePlacement(serde_json::Value);
 
 impl Default for IconIgnorePlacement {
-    fn default() {
+    fn default() -> Self {
         false
     }
 }
@@ -1314,7 +1314,7 @@ struct IconImage(serde_json::Value);
 struct IconKeepUpright(serde_json::Value);
 
 impl Default for IconKeepUpright {
-    fn default() {
+    fn default() -> Self {
         false
     }
 }
@@ -1325,7 +1325,7 @@ impl Default for IconKeepUpright {
 struct IconOffset(serde_json::Value);
 
 impl Default for IconOffset {
-    fn default() {
+    fn default() -> Self {
         vec![0, 0]
     }
 }
@@ -1336,7 +1336,7 @@ impl Default for IconOffset {
 struct IconOptional(serde_json::Value);
 
 impl Default for IconOptional {
-    fn default() {
+    fn default() -> Self {
         false
     }
 }
@@ -1361,7 +1361,7 @@ pub enum IconOverlap {
 struct IconPadding(serde_json::Value);
 
 impl Default for IconPadding {
-    fn default() {
+    fn default() -> Self {
         vec![2]
     }
 }
@@ -1381,8 +1381,8 @@ pub enum IconPitchAlignment {
 }
 
 impl Default for IconPitchAlignment {
-    fn default() {
-        "auto"
+    fn default() -> Self {
+        Self::Auto
     }
 }
 
@@ -1394,7 +1394,7 @@ impl Default for IconPitchAlignment {
 pub struct IconRotate(serde_json::Number);
 
 impl Default for IconRotate {
-    fn default() {
+    fn default() -> Self {
         0
     }
 }
@@ -1414,8 +1414,8 @@ pub enum IconRotationAlignment {
 }
 
 impl Default for IconRotationAlignment {
-    fn default() {
-        "auto"
+    fn default() -> Self {
+        Self::Auto
     }
 }
 
@@ -1427,7 +1427,7 @@ impl Default for IconRotationAlignment {
 pub struct IconSize(serde_json::Number);
 
 impl Default for IconSize {
-    fn default() {
+    fn default() -> Self {
         1
     }
 }
@@ -1450,8 +1450,8 @@ pub enum IconTextFit {
 }
 
 impl Default for IconTextFit {
-    fn default() {
-        "none"
+    fn default() -> Self {
+        Self::None
     }
 }
 
@@ -1461,7 +1461,7 @@ impl Default for IconTextFit {
 struct IconTextFitPadding(serde_json::Value);
 
 impl Default for IconTextFitPadding {
-    fn default() {
+    fn default() -> Self {
         vec![0, 0, 0, 0]
     }
 }
@@ -1472,7 +1472,7 @@ impl Default for IconTextFitPadding {
 struct SymbolAvoidEdges(serde_json::Value);
 
 impl Default for SymbolAvoidEdges {
-    fn default() {
+    fn default() -> Self {
         false
     }
 }
@@ -1492,8 +1492,8 @@ pub enum SymbolPlacement {
 }
 
 impl Default for SymbolPlacement {
-    fn default() {
-        "point"
+    fn default() -> Self {
+        Self::Point
     }
 }
 
@@ -1509,7 +1509,7 @@ pub struct SymbolSortKey(serde_json::Number);
 pub struct SymbolSpacing(serde_json::Number);
 
 impl Default for SymbolSpacing {
-    fn default() {
+    fn default() -> Self {
         250
     }
 }
@@ -1529,8 +1529,8 @@ pub enum SymbolZOrder {
 }
 
 impl Default for SymbolZOrder {
-    fn default() {
-        "auto"
+    fn default() -> Self {
+        Self::Auto
     }
 }
 
@@ -1540,7 +1540,7 @@ impl Default for SymbolZOrder {
 struct TextAllowOverlap(serde_json::Value);
 
 impl Default for TextAllowOverlap {
-    fn default() {
+    fn default() -> Self {
         false
     }
 }
@@ -1578,8 +1578,8 @@ pub enum TextAnchor {
 }
 
 impl Default for TextAnchor {
-    fn default() {
-        "center"
+    fn default() -> Self {
+        Self::Center
     }
 }
 
@@ -1589,7 +1589,7 @@ impl Default for TextAnchor {
 struct TextField(serde_json::Value);
 
 impl Default for TextField {
-    fn default() {
+    fn default() -> Self {
 
     }
 }
@@ -1600,7 +1600,7 @@ impl Default for TextField {
 struct TextFont(serde_json::Value);
 
 impl Default for TextFont {
-    fn default() {
+    fn default() -> Self {
         vec!["Open Sans Regular", "Arial Unicode MS Regular"]
     }
 }
@@ -1611,7 +1611,7 @@ impl Default for TextFont {
 struct TextIgnorePlacement(serde_json::Value);
 
 impl Default for TextIgnorePlacement {
-    fn default() {
+    fn default() -> Self {
         false
     }
 }
@@ -1634,8 +1634,8 @@ pub enum TextJustify {
 }
 
 impl Default for TextJustify {
-    fn default() {
-        "center"
+    fn default() -> Self {
+        Self::Center
     }
 }
 
@@ -1645,7 +1645,7 @@ impl Default for TextJustify {
 struct TextKeepUpright(serde_json::Value);
 
 impl Default for TextKeepUpright {
-    fn default() {
+    fn default() -> Self {
         true
     }
 }
@@ -1655,7 +1655,7 @@ impl Default for TextKeepUpright {
 pub struct TextLetterSpacing(serde_json::Number);
 
 impl Default for TextLetterSpacing {
-    fn default() {
+    fn default() -> Self {
         0
     }
 }
@@ -1665,7 +1665,7 @@ impl Default for TextLetterSpacing {
 pub struct TextLineHeight(serde_json::Number);
 
 impl Default for TextLineHeight {
-    fn default() {
+    fn default() -> Self {
         1.2
     }
 }
@@ -1675,7 +1675,7 @@ impl Default for TextLineHeight {
 pub struct TextMaxAngle(serde_json::Number);
 
 impl Default for TextMaxAngle {
-    fn default() {
+    fn default() -> Self {
         45
     }
 }
@@ -1688,7 +1688,7 @@ impl Default for TextMaxAngle {
 pub struct TextMaxWidth(serde_json::Number);
 
 impl Default for TextMaxWidth {
-    fn default() {
+    fn default() -> Self {
         10
     }
 }
@@ -1699,7 +1699,7 @@ impl Default for TextMaxWidth {
 struct TextOffset(serde_json::Value);
 
 impl Default for TextOffset {
-    fn default() {
+    fn default() -> Self {
         vec![0, 0]
     }
 }
@@ -1710,7 +1710,7 @@ impl Default for TextOffset {
 struct TextOptional(serde_json::Value);
 
 impl Default for TextOptional {
-    fn default() {
+    fn default() -> Self {
         false
     }
 }
@@ -1737,7 +1737,7 @@ pub enum TextOverlap {
 pub struct TextPadding(serde_json::Number);
 
 impl Default for TextPadding {
-    fn default() {
+    fn default() -> Self {
         2
     }
 }
@@ -1757,8 +1757,8 @@ pub enum TextPitchAlignment {
 }
 
 impl Default for TextPitchAlignment {
-    fn default() {
-        "auto"
+    fn default() -> Self {
+        Self::Auto
     }
 }
 
@@ -1767,7 +1767,7 @@ impl Default for TextPitchAlignment {
 pub struct TextRadialOffset(serde_json::Number);
 
 impl Default for TextRadialOffset {
-    fn default() {
+    fn default() -> Self {
         0
     }
 }
@@ -1780,7 +1780,7 @@ impl Default for TextRadialOffset {
 pub struct TextRotate(serde_json::Number);
 
 impl Default for TextRotate {
-    fn default() {
+    fn default() -> Self {
         0
     }
 }
@@ -1803,8 +1803,8 @@ pub enum TextRotationAlignment {
 }
 
 impl Default for TextRotationAlignment {
-    fn default() {
-        "auto"
+    fn default() -> Self {
+        Self::Auto
     }
 }
 
@@ -1816,7 +1816,7 @@ impl Default for TextRotationAlignment {
 pub struct TextSize(serde_json::Number);
 
 impl Default for TextSize {
-    fn default() {
+    fn default() -> Self {
         16
     }
 }
@@ -1836,8 +1836,8 @@ pub enum TextTransform {
 }
 
 impl Default for TextTransform {
-    fn default() {
-        "none"
+    fn default() -> Self {
+        Self::None
     }
 }
 
@@ -1882,8 +1882,8 @@ pub enum Visibility {
 }
 
 impl Default for Visibility {
-    fn default() {
-        "visible"
+    fn default() -> Self {
+        Self::Visible
     }
 }
 
@@ -1915,8 +1915,8 @@ pub enum Anchor {
 }
 
 impl Default for Anchor {
-    fn default() {
-        "viewport"
+    fn default() -> Self {
+        Self::Viewport
     }
 }
 
@@ -1926,7 +1926,7 @@ impl Default for Anchor {
 struct Color(serde_json::Value);
 
 impl Default for Color {
-    fn default() {
+    fn default() -> Self {
         "#ffffff"
     }
 }
@@ -1940,7 +1940,7 @@ impl Default for Color {
 pub struct Intensity(serde_json::Number);
 
 impl Default for Intensity {
-    fn default() {
+    fn default() -> Self {
         0.5
     }
 }
@@ -1951,7 +1951,7 @@ impl Default for Intensity {
 struct Position(serde_json::Value);
 
 impl Default for Position {
-    fn default() {
+    fn default() -> Self {
         vec![1.15, 210, 30]
     }
 }
@@ -1999,7 +1999,7 @@ pub struct PaintBackground {
 struct BackgroundColor(serde_json::Value);
 
 impl Default for BackgroundColor {
-    fn default() {
+    fn default() -> Self {
         "#000000"
     }
 }
@@ -2013,7 +2013,7 @@ impl Default for BackgroundColor {
 pub struct BackgroundOpacity(serde_json::Number);
 
 impl Default for BackgroundOpacity {
-    fn default() {
+    fn default() -> Self {
         1
     }
 }
@@ -2065,7 +2065,7 @@ pub struct PaintCircle {
 pub struct CircleBlur(serde_json::Number);
 
 impl Default for CircleBlur {
-    fn default() {
+    fn default() -> Self {
         0
     }
 }
@@ -2076,7 +2076,7 @@ impl Default for CircleBlur {
 struct CircleColor(serde_json::Value);
 
 impl Default for CircleColor {
-    fn default() {
+    fn default() -> Self {
         "#000000"
     }
 }
@@ -2090,7 +2090,7 @@ impl Default for CircleColor {
 pub struct CircleOpacity(serde_json::Number);
 
 impl Default for CircleOpacity {
-    fn default() {
+    fn default() -> Self {
         1
     }
 }
@@ -2107,8 +2107,8 @@ pub enum CirclePitchAlignment {
 }
 
 impl Default for CirclePitchAlignment {
-    fn default() {
-        "viewport"
+    fn default() -> Self {
+        Self::Viewport
     }
 }
 
@@ -2124,8 +2124,8 @@ pub enum CirclePitchScale {
 }
 
 impl Default for CirclePitchScale {
-    fn default() {
-        "map"
+    fn default() -> Self {
+        Self::Map
     }
 }
 
@@ -2137,7 +2137,7 @@ impl Default for CirclePitchScale {
 pub struct CircleRadius(serde_json::Number);
 
 impl Default for CircleRadius {
-    fn default() {
+    fn default() -> Self {
         5
     }
 }
@@ -2148,7 +2148,7 @@ impl Default for CircleRadius {
 struct CircleStrokeColor(serde_json::Value);
 
 impl Default for CircleStrokeColor {
-    fn default() {
+    fn default() -> Self {
         "#000000"
     }
 }
@@ -2162,7 +2162,7 @@ impl Default for CircleStrokeColor {
 pub struct CircleStrokeOpacity(serde_json::Number);
 
 impl Default for CircleStrokeOpacity {
-    fn default() {
+    fn default() -> Self {
         1
     }
 }
@@ -2175,7 +2175,7 @@ impl Default for CircleStrokeOpacity {
 pub struct CircleStrokeWidth(serde_json::Number);
 
 impl Default for CircleStrokeWidth {
-    fn default() {
+    fn default() -> Self {
         0
     }
 }
@@ -2186,7 +2186,7 @@ impl Default for CircleStrokeWidth {
 struct CircleTranslate(serde_json::Value);
 
 impl Default for CircleTranslate {
-    fn default() {
+    fn default() -> Self {
         vec![0, 0]
     }
 }
@@ -2203,8 +2203,8 @@ pub enum CircleTranslateAnchor {
 }
 
 impl Default for CircleTranslateAnchor {
-    fn default() {
-        "map"
+    fn default() -> Self {
+        Self::Map
     }
 }
 
@@ -2232,7 +2232,7 @@ struct ColorReliefColor(serde_json::Value);
 pub struct ColorReliefOpacity(serde_json::Number);
 
 impl Default for ColorReliefOpacity {
-    fn default() {
+    fn default() -> Self {
         1
     }
 }
@@ -2268,7 +2268,7 @@ pub struct PaintFill {
 struct FillAntialias(serde_json::Value);
 
 impl Default for FillAntialias {
-    fn default() {
+    fn default() -> Self {
         true
     }
 }
@@ -2279,7 +2279,7 @@ impl Default for FillAntialias {
 struct FillColor(serde_json::Value);
 
 impl Default for FillColor {
-    fn default() {
+    fn default() -> Self {
         "#000000"
     }
 }
@@ -2293,7 +2293,7 @@ impl Default for FillColor {
 pub struct FillOpacity(serde_json::Number);
 
 impl Default for FillOpacity {
-    fn default() {
+    fn default() -> Self {
         1
     }
 }
@@ -2314,7 +2314,7 @@ struct FillPattern(serde_json::Value);
 struct FillTranslate(serde_json::Value);
 
 impl Default for FillTranslate {
-    fn default() {
+    fn default() -> Self {
         vec![0, 0]
     }
 }
@@ -2331,8 +2331,8 @@ pub enum FillTranslateAnchor {
 }
 
 impl Default for FillTranslateAnchor {
-    fn default() {
-        "map"
+    fn default() -> Self {
+        Self::Map
     }
 }
 
@@ -2372,7 +2372,7 @@ pub struct PaintFillExtrusion {
 pub struct FillExtrusionBase(serde_json::Number);
 
 impl Default for FillExtrusionBase {
-    fn default() {
+    fn default() -> Self {
         0
     }
 }
@@ -2383,7 +2383,7 @@ impl Default for FillExtrusionBase {
 struct FillExtrusionColor(serde_json::Value);
 
 impl Default for FillExtrusionColor {
-    fn default() {
+    fn default() -> Self {
         "#000000"
     }
 }
@@ -2396,7 +2396,7 @@ impl Default for FillExtrusionColor {
 pub struct FillExtrusionHeight(serde_json::Number);
 
 impl Default for FillExtrusionHeight {
-    fn default() {
+    fn default() -> Self {
         0
     }
 }
@@ -2410,7 +2410,7 @@ impl Default for FillExtrusionHeight {
 pub struct FillExtrusionOpacity(serde_json::Number);
 
 impl Default for FillExtrusionOpacity {
-    fn default() {
+    fn default() -> Self {
         1
     }
 }
@@ -2426,7 +2426,7 @@ struct FillExtrusionPattern(serde_json::Value);
 struct FillExtrusionTranslate(serde_json::Value);
 
 impl Default for FillExtrusionTranslate {
-    fn default() {
+    fn default() -> Self {
         vec![0, 0]
     }
 }
@@ -2443,8 +2443,8 @@ pub enum FillExtrusionTranslateAnchor {
 }
 
 impl Default for FillExtrusionTranslateAnchor {
-    fn default() {
-        "map"
+    fn default() -> Self {
+        Self::Map
     }
 }
 
@@ -2454,7 +2454,7 @@ impl Default for FillExtrusionTranslateAnchor {
 struct FillExtrusionVerticalGradient(serde_json::Value);
 
 impl Default for FillExtrusionVerticalGradient {
-    fn default() {
+    fn default() -> Self {
         true
     }
 }
@@ -2484,7 +2484,7 @@ pub struct PaintHeatmap {
 struct HeatmapColor(serde_json::Value);
 
 impl Default for HeatmapColor {
-    fn default() {
+    fn default() -> Self {
         ["interpolate",["linear"],["heatmap-density"],0,"rgba(0, 0, 255, 0)",0.1,"royalblue",0.3,"cyan",0.5,"lime",0.7,"yellow",1,"red"]
     }
 }
@@ -2497,7 +2497,7 @@ impl Default for HeatmapColor {
 pub struct HeatmapIntensity(serde_json::Number);
 
 impl Default for HeatmapIntensity {
-    fn default() {
+    fn default() -> Self {
         1
     }
 }
@@ -2511,7 +2511,7 @@ impl Default for HeatmapIntensity {
 pub struct HeatmapOpacity(serde_json::Number);
 
 impl Default for HeatmapOpacity {
-    fn default() {
+    fn default() -> Self {
         1
     }
 }
@@ -2524,7 +2524,7 @@ impl Default for HeatmapOpacity {
 pub struct HeatmapRadius(serde_json::Number);
 
 impl Default for HeatmapRadius {
-    fn default() {
+    fn default() -> Self {
         30
     }
 }
@@ -2537,7 +2537,7 @@ impl Default for HeatmapRadius {
 pub struct HeatmapWeight(serde_json::Number);
 
 impl Default for HeatmapWeight {
-    fn default() {
+    fn default() -> Self {
         1
     }
 }
@@ -2576,7 +2576,7 @@ pub struct PaintHillshade {
 struct HillshadeAccentColor(serde_json::Value);
 
 impl Default for HillshadeAccentColor {
-    fn default() {
+    fn default() -> Self {
         "#000000"
     }
 }
@@ -2590,7 +2590,7 @@ impl Default for HillshadeAccentColor {
 pub struct HillshadeExaggeration(serde_json::Number);
 
 impl Default for HillshadeExaggeration {
-    fn default() {
+    fn default() -> Self {
         0.5
     }
 }
@@ -2601,7 +2601,7 @@ impl Default for HillshadeExaggeration {
 struct HillshadeHighlightColor(serde_json::Value);
 
 impl Default for HillshadeHighlightColor {
-    fn default() {
+    fn default() -> Self {
         #FFFFFF
     }
 }
@@ -2612,7 +2612,7 @@ impl Default for HillshadeHighlightColor {
 struct HillshadeIlluminationAltitude(serde_json::Value);
 
 impl Default for HillshadeIlluminationAltitude {
-    fn default() {
+    fn default() -> Self {
         45
     }
 }
@@ -2629,8 +2629,8 @@ pub enum HillshadeIlluminationAnchor {
 }
 
 impl Default for HillshadeIlluminationAnchor {
-    fn default() {
-        "viewport"
+    fn default() -> Self {
+        Self::Viewport
     }
 }
 
@@ -2640,7 +2640,7 @@ impl Default for HillshadeIlluminationAnchor {
 struct HillshadeIlluminationDirection(serde_json::Value);
 
 impl Default for HillshadeIlluminationDirection {
-    fn default() {
+    fn default() -> Self {
         335
     }
 }
@@ -2666,8 +2666,8 @@ pub enum HillshadeMethod {
 }
 
 impl Default for HillshadeMethod {
-    fn default() {
-        "standard"
+    fn default() -> Self {
+        Self::Standard
     }
 }
 
@@ -2677,7 +2677,7 @@ impl Default for HillshadeMethod {
 struct HillshadeShadowColor(serde_json::Value);
 
 impl Default for HillshadeShadowColor {
-    fn default() {
+    fn default() -> Self {
         #000000
     }
 }
@@ -2727,7 +2727,7 @@ pub struct PaintLine {
 pub struct LineBlur(serde_json::Number);
 
 impl Default for LineBlur {
-    fn default() {
+    fn default() -> Self {
         0
     }
 }
@@ -2738,7 +2738,7 @@ impl Default for LineBlur {
 struct LineColor(serde_json::Value);
 
 impl Default for LineColor {
-    fn default() {
+    fn default() -> Self {
         "#000000"
     }
 }
@@ -2756,7 +2756,7 @@ struct LineDasharray(serde_json::Value);
 pub struct LineGapWidth(serde_json::Number);
 
 impl Default for LineGapWidth {
-    fn default() {
+    fn default() -> Self {
         0
     }
 }
@@ -2771,7 +2771,7 @@ struct LineGradient(serde_json::Value);
 pub struct LineOffset(serde_json::Number);
 
 impl Default for LineOffset {
-    fn default() {
+    fn default() -> Self {
         0
     }
 }
@@ -2785,7 +2785,7 @@ impl Default for LineOffset {
 pub struct LineOpacity(serde_json::Number);
 
 impl Default for LineOpacity {
-    fn default() {
+    fn default() -> Self {
         1
     }
 }
@@ -2801,7 +2801,7 @@ struct LinePattern(serde_json::Value);
 struct LineTranslate(serde_json::Value);
 
 impl Default for LineTranslate {
-    fn default() {
+    fn default() -> Self {
         vec![0, 0]
     }
 }
@@ -2818,8 +2818,8 @@ pub enum LineTranslateAnchor {
 }
 
 impl Default for LineTranslateAnchor {
-    fn default() {
-        "map"
+    fn default() -> Self {
+        Self::Map
     }
 }
 
@@ -2831,7 +2831,7 @@ impl Default for LineTranslateAnchor {
 pub struct LineWidth(serde_json::Number);
 
 impl Default for LineWidth {
-    fn default() {
+    fn default() -> Self {
         1
     }
 }
@@ -2873,7 +2873,7 @@ pub struct PaintRaster {
 pub struct RasterBrightnessMax(serde_json::Number);
 
 impl Default for RasterBrightnessMax {
-    fn default() {
+    fn default() -> Self {
         1
     }
 }
@@ -2887,7 +2887,7 @@ impl Default for RasterBrightnessMax {
 pub struct RasterBrightnessMin(serde_json::Number);
 
 impl Default for RasterBrightnessMin {
-    fn default() {
+    fn default() -> Self {
         0
     }
 }
@@ -2901,7 +2901,7 @@ impl Default for RasterBrightnessMin {
 pub struct RasterContrast(serde_json::Number);
 
 impl Default for RasterContrast {
-    fn default() {
+    fn default() -> Self {
         0
     }
 }
@@ -2914,7 +2914,7 @@ impl Default for RasterContrast {
 pub struct RasterFadeDuration(serde_json::Number);
 
 impl Default for RasterFadeDuration {
-    fn default() {
+    fn default() -> Self {
         300
     }
 }
@@ -2927,7 +2927,7 @@ impl Default for RasterFadeDuration {
 pub struct RasterHueRotate(serde_json::Number);
 
 impl Default for RasterHueRotate {
-    fn default() {
+    fn default() -> Self {
         0
     }
 }
@@ -2941,7 +2941,7 @@ impl Default for RasterHueRotate {
 pub struct RasterOpacity(serde_json::Number);
 
 impl Default for RasterOpacity {
-    fn default() {
+    fn default() -> Self {
         1
     }
 }
@@ -2958,8 +2958,8 @@ pub enum RasterResampling {
 }
 
 impl Default for RasterResampling {
-    fn default() {
-        "linear"
+    fn default() -> Self {
+        Self::Linear
     }
 }
 
@@ -2972,7 +2972,7 @@ impl Default for RasterResampling {
 pub struct RasterSaturation(serde_json::Number);
 
 impl Default for RasterSaturation {
-    fn default() {
+    fn default() -> Self {
         0
     }
 }
@@ -3031,7 +3031,7 @@ pub struct PaintSymbol {
 struct IconColor(serde_json::Value);
 
 impl Default for IconColor {
-    fn default() {
+    fn default() -> Self {
         "#000000"
     }
 }
@@ -3044,7 +3044,7 @@ impl Default for IconColor {
 pub struct IconHaloBlur(serde_json::Number);
 
 impl Default for IconHaloBlur {
-    fn default() {
+    fn default() -> Self {
         0
     }
 }
@@ -3055,7 +3055,7 @@ impl Default for IconHaloBlur {
 struct IconHaloColor(serde_json::Value);
 
 impl Default for IconHaloColor {
-    fn default() {
+    fn default() -> Self {
         "rgba(0, 0, 0, 0)"
     }
 }
@@ -3070,7 +3070,7 @@ impl Default for IconHaloColor {
 pub struct IconHaloWidth(serde_json::Number);
 
 impl Default for IconHaloWidth {
-    fn default() {
+    fn default() -> Self {
         0
     }
 }
@@ -3084,7 +3084,7 @@ impl Default for IconHaloWidth {
 pub struct IconOpacity(serde_json::Number);
 
 impl Default for IconOpacity {
-    fn default() {
+    fn default() -> Self {
         1
     }
 }
@@ -3095,7 +3095,7 @@ impl Default for IconOpacity {
 struct IconTranslate(serde_json::Value);
 
 impl Default for IconTranslate {
-    fn default() {
+    fn default() -> Self {
         vec![0, 0]
     }
 }
@@ -3112,8 +3112,8 @@ pub enum IconTranslateAnchor {
 }
 
 impl Default for IconTranslateAnchor {
-    fn default() {
-        "map"
+    fn default() -> Self {
+        Self::Map
     }
 }
 
@@ -3123,7 +3123,7 @@ impl Default for IconTranslateAnchor {
 struct TextColor(serde_json::Value);
 
 impl Default for TextColor {
-    fn default() {
+    fn default() -> Self {
         "#000000"
     }
 }
@@ -3136,7 +3136,7 @@ impl Default for TextColor {
 pub struct TextHaloBlur(serde_json::Number);
 
 impl Default for TextHaloBlur {
-    fn default() {
+    fn default() -> Self {
         0
     }
 }
@@ -3147,7 +3147,7 @@ impl Default for TextHaloBlur {
 struct TextHaloColor(serde_json::Value);
 
 impl Default for TextHaloColor {
-    fn default() {
+    fn default() -> Self {
         "rgba(0, 0, 0, 0)"
     }
 }
@@ -3160,7 +3160,7 @@ impl Default for TextHaloColor {
 pub struct TextHaloWidth(serde_json::Number);
 
 impl Default for TextHaloWidth {
-    fn default() {
+    fn default() -> Self {
         0
     }
 }
@@ -3174,7 +3174,7 @@ impl Default for TextHaloWidth {
 pub struct TextOpacity(serde_json::Number);
 
 impl Default for TextOpacity {
-    fn default() {
+    fn default() -> Self {
         1
     }
 }
@@ -3185,7 +3185,7 @@ impl Default for TextOpacity {
 struct TextTranslate(serde_json::Value);
 
 impl Default for TextTranslate {
-    fn default() {
+    fn default() -> Self {
         vec![0, 0]
     }
 }
@@ -3202,8 +3202,8 @@ pub enum TextTranslateAnchor {
 }
 
 impl Default for TextTranslateAnchor {
-    fn default() {
-        "map"
+    fn default() -> Self {
+        Self::Map
     }
 }
 
@@ -3220,7 +3220,7 @@ pub struct Projection {
 struct Type(serde_json::Value);
 
 impl Default for Type {
-    fn default() {
+    fn default() -> Self {
         mercator
     }
 }
@@ -3323,7 +3323,7 @@ pub struct Sky {
 pub struct AtmosphereBlend(serde_json::Number);
 
 impl Default for AtmosphereBlend {
-    fn default() {
+    fn default() -> Self {
         0.8
     }
 }
@@ -3334,7 +3334,7 @@ impl Default for AtmosphereBlend {
 struct FogColor(serde_json::Value);
 
 impl Default for FogColor {
-    fn default() {
+    fn default() -> Self {
         "#ffffff"
     }
 }
@@ -3348,7 +3348,7 @@ impl Default for FogColor {
 pub struct FogGroundBlend(serde_json::Number);
 
 impl Default for FogGroundBlend {
-    fn default() {
+    fn default() -> Self {
         0.5
     }
 }
@@ -3359,7 +3359,7 @@ impl Default for FogGroundBlend {
 struct HorizonColor(serde_json::Value);
 
 impl Default for HorizonColor {
-    fn default() {
+    fn default() -> Self {
         "#ffffff"
     }
 }
@@ -3373,7 +3373,7 @@ impl Default for HorizonColor {
 pub struct HorizonFogBlend(serde_json::Number);
 
 impl Default for HorizonFogBlend {
-    fn default() {
+    fn default() -> Self {
         0.8
     }
 }
@@ -3384,7 +3384,7 @@ impl Default for HorizonFogBlend {
 struct SkyColor(serde_json::Value);
 
 impl Default for SkyColor {
-    fn default() {
+    fn default() -> Self {
         "#88C6FC"
     }
 }
@@ -3398,7 +3398,7 @@ impl Default for SkyColor {
 pub struct SkyHorizonBlend(serde_json::Number);
 
 impl Default for SkyHorizonBlend {
-    fn default() {
+    fn default() -> Self {
         0.8
     }
 }
@@ -3496,7 +3496,7 @@ struct Attribution(serde_json::Value);
 pub struct Buffer(serde_json::Number);
 
 impl Default for Buffer {
-    fn default() {
+    fn default() -> Self {
         128
     }
 }
@@ -3515,7 +3515,7 @@ impl Default for Buffer {
 struct Cluster(serde_json::Value);
 
 impl Default for Cluster {
-    fn default() {
+    fn default() -> Self {
         false
     }
 }
@@ -3547,7 +3547,7 @@ struct Clusterproperties(serde_json::Value);
 pub struct Clusterradius(serde_json::Number);
 
 impl Default for Clusterradius {
-    fn default() {
+    fn default() -> Self {
         50
     }
 }
@@ -3568,7 +3568,7 @@ struct Filter(serde_json::Value);
 struct Generateid(serde_json::Value);
 
 impl Default for Generateid {
-    fn default() {
+    fn default() -> Self {
         false
     }
 }
@@ -3579,7 +3579,7 @@ impl Default for Generateid {
 struct Linemetrics(serde_json::Value);
 
 impl Default for Linemetrics {
-    fn default() {
+    fn default() -> Self {
         false
     }
 }
@@ -3589,7 +3589,7 @@ impl Default for Linemetrics {
 pub struct Maxzoom(serde_json::Number);
 
 impl Default for Maxzoom {
-    fn default() {
+    fn default() -> Self {
         18
     }
 }
@@ -3604,7 +3604,7 @@ struct Promoteid(serde_json::Value);
 pub struct Tolerance(serde_json::Number);
 
 impl Default for Tolerance {
-    fn default() {
+    fn default() -> Self {
         0.375
     }
 }
@@ -3701,7 +3701,7 @@ struct Attribution(serde_json::Value);
 struct Bounds(serde_json::Value);
 
 impl Default for Bounds {
-    fn default() {
+    fn default() -> Self {
         vec![-180, -85.051129, 180, 85.051129]
     }
 }
@@ -3711,7 +3711,7 @@ impl Default for Bounds {
 pub struct Maxzoom(serde_json::Number);
 
 impl Default for Maxzoom {
-    fn default() {
+    fn default() -> Self {
         22
     }
 }
@@ -3721,7 +3721,7 @@ impl Default for Maxzoom {
 pub struct Minzoom(serde_json::Number);
 
 impl Default for Minzoom {
-    fn default() {
+    fn default() -> Self {
         0
     }
 }
@@ -3738,8 +3738,8 @@ pub enum Scheme {
 }
 
 impl Default for Scheme {
-    fn default() {
-        "xyz"
+    fn default() -> Self {
+        Self::Xyz
     }
 }
 
@@ -3748,7 +3748,7 @@ impl Default for Scheme {
 pub struct Tilesize(serde_json::Number);
 
 impl Default for Tilesize {
-    fn default() {
+    fn default() -> Self {
         512
     }
 }
@@ -3777,7 +3777,7 @@ struct Url(serde_json::Value);
 struct Volatile(serde_json::Value);
 
 impl Default for Volatile {
-    fn default() {
+    fn default() -> Self {
         false
     }
 }
@@ -3846,7 +3846,7 @@ struct Attribution(serde_json::Value);
 pub struct Baseshift(serde_json::Number);
 
 impl Default for Baseshift {
-    fn default() {
+    fn default() -> Self {
         0.0
     }
 }
@@ -3856,7 +3856,7 @@ impl Default for Baseshift {
 pub struct Bluefactor(serde_json::Number);
 
 impl Default for Bluefactor {
-    fn default() {
+    fn default() -> Self {
         1.0
     }
 }
@@ -3867,7 +3867,7 @@ impl Default for Bluefactor {
 struct Bounds(serde_json::Value);
 
 impl Default for Bounds {
-    fn default() {
+    fn default() -> Self {
         vec![-180, -85.051129, 180, 85.051129]
     }
 }
@@ -3887,8 +3887,8 @@ pub enum Encoding {
 }
 
 impl Default for Encoding {
-    fn default() {
-        "mapbox"
+    fn default() -> Self {
+        Self::Mapbox
     }
 }
 
@@ -3897,7 +3897,7 @@ impl Default for Encoding {
 pub struct Greenfactor(serde_json::Number);
 
 impl Default for Greenfactor {
-    fn default() {
+    fn default() -> Self {
         1.0
     }
 }
@@ -3907,7 +3907,7 @@ impl Default for Greenfactor {
 pub struct Maxzoom(serde_json::Number);
 
 impl Default for Maxzoom {
-    fn default() {
+    fn default() -> Self {
         22
     }
 }
@@ -3917,7 +3917,7 @@ impl Default for Maxzoom {
 pub struct Minzoom(serde_json::Number);
 
 impl Default for Minzoom {
-    fn default() {
+    fn default() -> Self {
         0
     }
 }
@@ -3927,7 +3927,7 @@ impl Default for Minzoom {
 pub struct Redfactor(serde_json::Number);
 
 impl Default for Redfactor {
-    fn default() {
+    fn default() -> Self {
         1.0
     }
 }
@@ -3937,7 +3937,7 @@ impl Default for Redfactor {
 pub struct Tilesize(serde_json::Number);
 
 impl Default for Tilesize {
-    fn default() {
+    fn default() -> Self {
         512
     }
 }
@@ -3966,7 +3966,7 @@ struct Url(serde_json::Value);
 struct Volatile(serde_json::Value);
 
 impl Default for Volatile {
-    fn default() {
+    fn default() -> Self {
         false
     }
 }
@@ -4027,7 +4027,7 @@ struct Attribution(serde_json::Value);
 struct Bounds(serde_json::Value);
 
 impl Default for Bounds {
-    fn default() {
+    fn default() -> Self {
         vec![-180, -85.051129, 180, 85.051129]
     }
 }
@@ -4044,8 +4044,8 @@ pub enum Encoding {
 }
 
 impl Default for Encoding {
-    fn default() {
-        "mvt"
+    fn default() -> Self {
+        Self::Mvt
     }
 }
 
@@ -4054,7 +4054,7 @@ impl Default for Encoding {
 pub struct Maxzoom(serde_json::Number);
 
 impl Default for Maxzoom {
-    fn default() {
+    fn default() -> Self {
         22
     }
 }
@@ -4064,7 +4064,7 @@ impl Default for Maxzoom {
 pub struct Minzoom(serde_json::Number);
 
 impl Default for Minzoom {
-    fn default() {
+    fn default() -> Self {
         0
     }
 }
@@ -4086,8 +4086,8 @@ pub enum Scheme {
 }
 
 impl Default for Scheme {
-    fn default() {
-        "xyz"
+    fn default() -> Self {
+        Self::Xyz
     }
 }
 
@@ -4115,7 +4115,7 @@ struct Url(serde_json::Value);
 struct Volatile(serde_json::Value);
 
 impl Default for Volatile {
-    fn default() {
+    fn default() -> Self {
         false
     }
 }
@@ -4181,7 +4181,7 @@ pub struct Terrain {
 pub struct Exaggeration(serde_json::Number);
 
 impl Default for Exaggeration {
-    fn default() {
+    fn default() -> Self {
         1.0
     }
 }
@@ -4209,7 +4209,7 @@ pub struct Transition {
 pub struct Delay(serde_json::Number);
 
 impl Default for Delay {
-    fn default() {
+    fn default() -> Self {
         0
     }
 }
@@ -4222,7 +4222,7 @@ impl Default for Delay {
 pub struct Duration(serde_json::Number);
 
 impl Default for Duration {
-    fn default() {
+    fn default() -> Self {
         300
     }
 }

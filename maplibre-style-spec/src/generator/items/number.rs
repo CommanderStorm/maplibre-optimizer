@@ -37,6 +37,7 @@ pub fn generate(
             .new_impl(&name)
             .impl_trait("Default")
             .new_fn("default")
+            .ret("Self")
             .line(default);
     }
 }

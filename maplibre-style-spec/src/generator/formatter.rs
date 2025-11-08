@@ -89,7 +89,10 @@ fn prefilter_names(name: impl ToString) -> String {
 
 /// replace rust names with r# prefix if they are reserved keywords
 fn rustize(name: String) -> String {
-    if matches!(name.as_str(), "type" | "Default") {
+    if name.as_str() == "Default" {
+        return "DefaultStruct".to_string()
+    }
+    if matches!(name.as_str(), "type") {
         format!("r#{name}")
     } else {
         name
@@ -123,7 +126,7 @@ mod tests {
     fn test_reserved_words() {
         // reserved
         assert_eq!(to_snake_case("type"), "r#type");
-        assert_eq!(to_upper_camel_case("default"), "r#Default");
+        assert_eq!(to_upper_camel_case("default"), "DefaultStruct");
         // not reserved
         assert_eq!(to_upper_camel_case("type"), "Type");
         assert_eq!(to_snake_case("default"), "default");

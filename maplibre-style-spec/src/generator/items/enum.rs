@@ -65,6 +65,7 @@ scope                .new_enum(&name)
             .new_impl(&name)
             .impl_trait("Default")
             .new_fn("default")
-            .line(default);
+            .ret("Self")
+            .line(format!("Self::{}", to_upper_camel_case(&default.to_string())));
     }
 }
