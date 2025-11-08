@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use maplibre_style_spec::spec::decoder::{StyleReference, TopLevelItem};
+use maplibre_style_spec::decoder::{StyleReference, TopLevelItem};
 use serde_json::Value;
 
 // objects produced by errors here are too large to review

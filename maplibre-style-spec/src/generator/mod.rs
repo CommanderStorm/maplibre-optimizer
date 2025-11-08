@@ -2,7 +2,8 @@ use std::collections::HashMap;
 
 use codegen::Scope;
 
-use crate::spec::decoder::{EnumValues, ParsedItem, StyleReference, TopLevelItem};
+use crate::decoder::{ ParsedItem, StyleReference, TopLevelItem};
+mod items;
 
 pub fn generate_spec_scope(reference: StyleReference) -> String {
     let mut scope = Scope::new();
@@ -11,7 +12,7 @@ pub fn generate_spec_scope(reference: StyleReference) -> String {
 
     generate_spec(&mut scope, &reference.root);
     for (key, item) in reference.fields.into_iter() {
-        generate_top_level_item(&mut scope, item, to_upper_camel_case(&key))
+        generate_top_level_item(&mut scope, item, &to_upper_camel_case(&key))
     }
     scope.to_string()
 }
@@ -21,7 +22,7 @@ fn generate_spec(scope: &mut Scope, root: &HashMap<String, ParsedItem>) {
         .new_struct("MaplibreStyleSpecification")
         .doc("This is a Maplibre Style Specification")
         .vis("pub")
-        .derive("serde::Deserialise, PartialEq, Debug, Clone");
+        .derive("serde::Deserialize, PartialEq, Debug, Clone");
     for (key, field) in root {
         spec.new_field(key, to_upper_camel_case(key))
             .vis("pub")
@@ -29,15 +30,15 @@ fn generate_spec(scope: &mut Scope, root: &HashMap<String, ParsedItem>) {
     }
 }
 
-fn generate_top_level_item(scope: &mut Scope, item: TopLevelItem, name: String) {
+fn generate_top_level_item(scope: &mut Scope, item: TopLevelItem, name: &str) {
     match item {
-        TopLevelItem::Item(item) => generate_parsed_item(scope, &item, name),
+        TopLevelItem::Item(item) => generate_parsed_item(scope, &item, &name),
         TopLevelItem::Group(items) => {
             {
                 let group = scope
                     .new_struct(&name)
                     .vis("pub")
-                    .derive("serde::Deserialise, PartialEq, Debug, Clone");
+                    .derive("serde::Deserialize, PartialEq, Debug, Clone");
                 for (key, item) in &items {
                     group
                         .new_field(key, to_upper_camel_case(key))
@@ -46,14 +47,14 @@ fn generate_top_level_item(scope: &mut Scope, item: TopLevelItem, name: String) 
                 }
             }
             for (key, item) in items {
-                generate_parsed_item(scope, &item, to_upper_camel_case(&key));
+                generate_parsed_item(scope, &item, &to_upper_camel_case(&key));
             }
         }
         TopLevelItem::OneOf(items) => {
             let enu = scope
-                .new_enum(&name)
+                .new_enum(name)
                 .vis("pub")
-                .derive("serde::Deserialise, PartialEq, Debug, Clone");
+                .derive("serde::Deserialize, PartialEq, Debug, Clone");
             for key in items {
                 enu.new_variant(to_upper_camel_case(&key))
                     .annotation(format!("#[serde(rename=\"{key}\")]"))
@@ -65,85 +66,28 @@ fn generate_top_level_item(scope: &mut Scope, item: TopLevelItem, name: String) 
 }
 
 #[allow(unused_variables)]
-fn generate_parsed_item(scope: &mut Scope, item: &ParsedItem, name: String) {
+fn generate_parsed_item(scope: &mut Scope, item: &ParsedItem, name: &str) {
     match item {
         ParsedItem::Number {
             common,
             default,
-            maximum: _maximum,
-            minimum: _minimum,
-            period: _period,
-        } => {
-            scope
-                .new_struct(&name)
-                .doc(&common.doc)
-                .vis("pub")
-                .derive("serde::Deserialise, PartialEq, Debug, Clone")
-                .tuple_field("serde_json::Number");
-            if let Some(default) = default {
-                scope
-                    .new_impl(&name)
-                    .impl_trait("Default")
-                    .new_fn("default")
-                    .line(default);
-            }
-        }
+            maximum,
+            minimum,
+            period,
+        } => items::number::generate(
+            scope,
+            name,
+            common,
+            default.as_ref(),
+            maximum.as_ref(),
+            minimum.as_ref(),
+            period.as_ref(),
+        ),
         ParsedItem::Enum {
             common,
             default,
             values,
-        } => {
-            match values {
-                EnumValues::Simple(values) => {
-                    let enu = scope
-                        .new_enum(&name)
-                        .doc(&common.doc)
-                        .vis("pub")
-                        .derive("serde::Deserialise, PartialEq, Eq, Debug, Clone, Copy");
-                    for value in values {
-                        enu.new_variant(to_upper_camel_case(value))
-                            .annotation(format!("serde(rename=\"{value}\")"));
-                    }
-                }
-                EnumValues::Numeric(values) => {
-                    scope
-                        .new_struct(&name)
-                        .doc(&common.doc)
-                        .vis("pub")
-                        .derive("serde::Deserialise, PartialEq, Eq, Debug, Clone, Copy")
-                        .tuple_field("u8");
-                    assert!(values.len() <= u8::MAX as usize);
-                    assert!(
-                        values
-                            .iter()
-                            .all(|v| v.as_u64().is_some_and(|v| v <= u8::MAX as u64))
-                    );
-                    // todo: contribute proper repr(u8) variant support
-                }
-                EnumValues::Complex(values) => {
-                    let enu = scope
-                        .new_enum(&name)
-                        .doc(&common.doc)
-                        .vis("pub")
-                        .derive("serde::Deserialise, PartialEq, Eq, Debug, Clone, Copy");
-                    for (key, value) in values {
-                        enu.new_variant(to_upper_camel_case(key))
-                            .annotation(format!("#[serde(rename=\"{key}\")]"))
-                            .annotation(format!("/// {}", value.doc));
-                        // todo: this is sort of a hack, but it works for now
-                        // upstream a proprer .doc() method
-                    }
-                }
-            }
-
-            if let Some(default) = default {
-                scope
-                    .new_impl(&name)
-                    .impl_trait("Default")
-                    .new_fn("default")
-                    .line(default);
-            }
-        }
+        } => items::r#enum::generate(scope, name, common, default.as_ref(), values),
         ParsedItem::Array {
             common,
             default,
@@ -152,42 +96,77 @@ fn generate_parsed_item(scope: &mut Scope, item: &ParsedItem, name: String) {
             minimum,
             maximum,
             length,
-        } => todo!(),
-        ParsedItem::Color { common, default } => todo!(),
-        ParsedItem::String { common, default } => todo!(),
-        ParsedItem::Boolean { common, default } => todo!(),
-        ParsedItem::Star(fields) => todo!(),
-        ParsedItem::PropertyType(fields) => todo!(),
-        ParsedItem::ResolvedImage { common, tokens } => todo!(),
-        ParsedItem::PromoteId(fields) => todo!(),
+        } => items::array::generate(
+            scope,
+            name,
+            common,
+            default.as_ref(),
+            value,
+            values.as_ref(),
+            minimum.as_ref(),
+            maximum.as_ref(),
+            length.as_ref(),
+        ),
+        ParsedItem::Color { common, default } => {
+            items::color::generate(scope, name, common, default.as_ref())
+        }
+        ParsedItem::String { common, default } => {
+            items::string::generate(scope, name, common, default.as_deref())
+        }
+        ParsedItem::Boolean { common, default } => {
+            items::boolean::generate(scope, name, common, default.as_ref())
+        }
+        ParsedItem::Star(fields) => items::star::generate(scope, name, fields),
+        ParsedItem::PropertyType(fields) => items::property_type::generate(scope, name, fields),
+        ParsedItem::ResolvedImage { common, tokens } => {
+            items::resolved_image::generate(scope, name, common, *tokens)
+        }
+        ParsedItem::PromoteId(fields) => items::promote_id::generate(scope, name, fields),
         ParsedItem::NumberArray {
             common,
             default,
-            minimum: _minimum,
-            maximum: _maximum,
-        } => todo!(),
-        ParsedItem::ColorArray { common, default } => todo!(),
-        ParsedItem::VariableAnchorOffsetCollection(fields) => todo!(),
-        ParsedItem::Transition(fields) => todo!(),
-        ParsedItem::Terrain(fields) => todo!(),
-        ParsedItem::State { common, default } => todo!(),
-        ParsedItem::Sprite(fields) => todo!(),
-        ParsedItem::Sources(fields) => todo!(),
-        ParsedItem::Source(fields) => todo!(),
-        ParsedItem::Sky(fields) => todo!(),
-        ParsedItem::ProjectionDefinition { common, default } => todo!(),
-        ParsedItem::Projection(fields) => todo!(),
-        ParsedItem::Paint(fields) => todo!(),
-        ParsedItem::Padding { common, default } => todo!(),
-        ParsedItem::Light(fields) => todo!(),
-        ParsedItem::Layout(fields) => todo!(),
+            minimum,
+            maximum,
+        } => items::number_array::generate(
+            scope,
+            name,
+            common,
+            default.as_ref(),
+            minimum.as_ref(),
+            maximum.as_ref(),
+        ),
+        ParsedItem::ColorArray { common, default } => {
+            items::color_array::generate(scope, name, common, default.as_deref())
+        }
+        ParsedItem::VariableAnchorOffsetCollection(fields) => {
+            items::variable_anchor_offset_collection::generate(scope, name, fields)
+        }
+        ParsedItem::Transition(fields) => items::transition::generate(scope, name, fields),
+        ParsedItem::Terrain(fields) => items::terrain::generate(scope, name, fields),
+        ParsedItem::State { common, default } => {
+            items::state::generate(scope, name, common, default)
+        }
+        ParsedItem::Sprite(fields) => items::sprite::generate(scope, name, fields),
+        ParsedItem::Sources(fields) => items::sources::generate(scope, name, fields),
+        ParsedItem::Source(fields) => items::source::generate(scope, name, fields),
+        ParsedItem::Sky(fields) => items::sky::generate(scope, name, fields),
+        ParsedItem::ProjectionDefinition { common, default } => {
+            items::projection_definition::generate(scope, name, common, default.as_str())
+        }
+        ParsedItem::Projection(fields) => items::projection::generate(scope, name, fields),
+        ParsedItem::Paint(fields) => items::paint::generate(scope, name, fields),
+        ParsedItem::Padding { common, default } => {
+            items::padding::generate(scope, name, common, default.as_ref())
+        }
+        ParsedItem::Light(fields) => items::light::generate(scope, name, fields),
+        ParsedItem::Layout(fields) => items::layout::generate(scope, name, fields),
         ParsedItem::Formatted {
             common,
-            tokens: _tokens,
+            tokens,
             default,
-        } => todo!(),
-        ParsedItem::Filter(fields) => todo!(),
-        ParsedItem::Expression(fields) => todo!(),
+        } => items::formatted::generate(scope, name, common, &default, *tokens),
+        ParsedItem::Filter(fields) => items::filter::generate(scope, name, fields),
+        ParsedItem::Expression(fields) => items::expression::generate(scope, name, fields),
     }
 }
 
@@ -236,11 +215,11 @@ mod tests {
         let reference: StyleReference = serde_json::from_value(reference).unwrap();
         insta::assert_snapshot!(generate_spec_scope(reference), @r"
         /// This is a Maplibre Style Specification
-        #[derive(serde::Deserialise, PartialEq, Debug, Clone)]
+        #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
         pub struct MaplibreStyleSpecification;
 
         /// A number between 0 and 10.
-        #[derive(serde::Deserialise, PartialEq, Debug, Clone)]
+        #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
         pub struct NumberOne(serde_json::Number);
 
         impl Default for NumberOne {
@@ -268,17 +247,17 @@ mod tests {
         let spec = generate_spec_scope(reference);
         insta::assert_snapshot!(&spec, @r"
         /// This is a Maplibre Style Specification
-        #[derive(serde::Deserialise, PartialEq, Debug, Clone)]
+        #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
         pub struct MaplibreStyleSpecification;
 
-        #[derive(serde::Deserialise, PartialEq, Debug, Clone)]
+        #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
         pub struct Names {
             /// A number between 0 and 10.
             pub name_one: NameOne,
         }
 
         /// A number between 0 and 10.
-        #[derive(serde::Deserialise, PartialEq, Debug, Clone)]
+        #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
         pub struct NameOne(serde_json::Number);
 
         impl Default for NameOne {
@@ -310,10 +289,10 @@ mod tests {
         let reference: StyleReference = serde_json::from_value(reference).unwrap();
         insta::assert_snapshot!(generate_spec_scope(reference), @r#"
         /// This is a Maplibre Style Specification
-        #[derive(serde::Deserialise, PartialEq, Debug, Clone)]
+        #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
         pub struct MaplibreStyleSpecification;
 
-        #[derive(serde::Deserialise, PartialEq, Debug, Clone)]
+        #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
         pub enum Numbers {
             #[serde(rename="number_one")]
             NumberOne(NumberOne),
@@ -322,11 +301,11 @@ mod tests {
         }
 
         /// Another number
-        #[derive(serde::Deserialise, PartialEq, Debug, Clone)]
+        #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
         pub struct NumberTwo(serde_json::Number);
 
         /// A number between 0 and 20.
-        #[derive(serde::Deserialise, PartialEq, Debug, Clone)]
+        #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
         pub struct NumberOne(serde_json::Number);
 
         impl Default for NumberOne {
