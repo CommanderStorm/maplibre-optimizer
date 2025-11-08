@@ -32,10 +32,15 @@ mod tests {
     fn generate_empty() {
         let mut scope = Scope::new();
         generate(&mut scope, "Foo", &Fields::default(), None);
-        insta::assert_snapshot!(scope.to_string(), @r##"
+        insta::assert_snapshot!(scope.to_string(), @r"
         #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-        #[deprecated = "not_implemented"]
-        struct Foo(serde_json::Value);
-        "##)
+        #[serde(untagged)]
+        enum Foo {
+            /// A color
+            One(color::DynamicColor),
+            /// A set of colors
+            Multiple(Vec<color::DynamicColor>),
+        }
+        ")
     }
 }

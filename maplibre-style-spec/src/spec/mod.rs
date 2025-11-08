@@ -538,7 +538,7 @@ pub struct Base(serde_json::Number);
 
 impl Default for Base {
     fn default() -> Self {
-        Self(1.into())
+        Self(serde_json::Number::from_i128(1))
     }
 }
 
@@ -584,12 +584,11 @@ struct Expression(serde_json::Value);
 
 /// The name of a feature property to use as the function input.
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-#[deprecated = "not_implemented"]
-struct Property(serde_json::Value);
+struct Property(String);
 
 impl Default for Property {
     fn default() -> Self {
-        "$zoom".to_string()
+        Self("$zoom".to_string())
     }
 }
 
@@ -681,8 +680,7 @@ struct Filter(serde_json::Value);
 
 /// Unique layer name.
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-#[deprecated = "not_implemented"]
-struct Id(serde_json::Value);
+struct Id(String);
 
 /// Layout properties for the layer.
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
@@ -713,13 +711,11 @@ struct Paint(serde_json::Value);
 
 /// Name of a source description to be used for this layer. Required for all layer types except `background`.
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-#[deprecated = "not_implemented"]
-struct Source(serde_json::Value);
+struct Source(String);
 
 /// Layer to use from a vector tile source. Required for vector tile sources; prohibited for all other source types, including GeoJSON sources.
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-#[deprecated = "not_implemented"]
-struct SourceLayer(serde_json::Value);
+struct SourceLayer(String);
 
 /// Rendering type of this layer.
 #[derive(serde::Deserialize, PartialEq, Eq, Debug, Clone, Copy)]
@@ -1021,7 +1017,7 @@ pub struct LineMiterLimit(serde_json::Number);
 
 impl Default for LineMiterLimit {
     fn default() -> Self {
-        Self(2.into())
+        Self(serde_json::Number::from_i128(2))
     }
 }
 
@@ -1031,7 +1027,7 @@ pub struct LineRoundLimit(serde_json::Number);
 
 impl Default for LineRoundLimit {
     fn default() -> Self {
-        Self(1.05.into())
+        Self(serde_json::Number::from_f64(1.05))
     }
 }
 
@@ -1378,13 +1374,13 @@ impl Default for IconPitchAlignment {
 
 /// Rotates the icon clockwise.
 ///
-/// Range: ..every 360
+/// Range: .. every 360
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
 pub struct IconRotate(serde_json::Number);
 
 impl Default for IconRotate {
     fn default() -> Self {
-        Self(0.into())
+        Self(serde_json::Number::from_i128(0))
     }
 }
 
@@ -1416,7 +1412,7 @@ pub struct IconSize(serde_json::Number);
 
 impl Default for IconSize {
     fn default() -> Self {
-        Self(1.into())
+        Self(serde_json::Number::from_i128(1))
     }
 }
 
@@ -1497,7 +1493,7 @@ pub struct SymbolSpacing(serde_json::Number);
 
 impl Default for SymbolSpacing {
     fn default() -> Self {
-        Self(250.into())
+        Self(serde_json::Number::from_i128(250))
     }
 }
 
@@ -1641,7 +1637,7 @@ pub struct TextLetterSpacing(serde_json::Number);
 
 impl Default for TextLetterSpacing {
     fn default() -> Self {
-        Self(0.into())
+        Self(serde_json::Number::from_i128(0))
     }
 }
 
@@ -1651,7 +1647,7 @@ pub struct TextLineHeight(serde_json::Number);
 
 impl Default for TextLineHeight {
     fn default() -> Self {
-        Self(1.2.into())
+        Self(serde_json::Number::from_f64(1.2))
     }
 }
 
@@ -1661,7 +1657,7 @@ pub struct TextMaxAngle(serde_json::Number);
 
 impl Default for TextMaxAngle {
     fn default() -> Self {
-        Self(45.into())
+        Self(serde_json::Number::from_i128(45))
     }
 }
 
@@ -1673,7 +1669,7 @@ pub struct TextMaxWidth(serde_json::Number);
 
 impl Default for TextMaxWidth {
     fn default() -> Self {
-        Self(10.into())
+        Self(serde_json::Number::from_i128(10))
     }
 }
 
@@ -1721,7 +1717,7 @@ pub struct TextPadding(serde_json::Number);
 
 impl Default for TextPadding {
     fn default() -> Self {
-        Self(2.into())
+        Self(serde_json::Number::from_i128(2))
     }
 }
 
@@ -1751,19 +1747,19 @@ pub struct TextRadialOffset(serde_json::Number);
 
 impl Default for TextRadialOffset {
     fn default() -> Self {
-        Self(0.into())
+        Self(serde_json::Number::from_i128(0))
     }
 }
 
 /// Rotates the text clockwise.
 ///
-/// Range: ..every 360
+/// Range: .. every 360
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
 pub struct TextRotate(serde_json::Number);
 
 impl Default for TextRotate {
     fn default() -> Self {
-        Self(0.into())
+        Self(serde_json::Number::from_i128(0))
     }
 }
 
@@ -1798,7 +1794,7 @@ pub struct TextSize(serde_json::Number);
 
 impl Default for TextSize {
     fn default() -> Self {
-        Self(16.into())
+        Self(serde_json::Number::from_i128(16))
     }
 }
 
@@ -1919,7 +1915,7 @@ pub struct Intensity(serde_json::Number);
 
 impl Default for Intensity {
     fn default() -> Self {
-        Self(0.5.into())
+        Self(serde_json::Number::from_f64(0.5))
     }
 }
 
@@ -1980,7 +1976,7 @@ pub struct BackgroundOpacity(serde_json::Number);
 
 impl Default for BackgroundOpacity {
     fn default() -> Self {
-        Self(1.into())
+        Self(serde_json::Number::from_i128(1))
     }
 }
 
@@ -2032,7 +2028,7 @@ pub struct CircleBlur(serde_json::Number);
 
 impl Default for CircleBlur {
     fn default() -> Self {
-        Self(0.into())
+        Self(serde_json::Number::from_i128(0))
     }
 }
 
@@ -2054,7 +2050,7 @@ pub struct CircleOpacity(serde_json::Number);
 
 impl Default for CircleOpacity {
     fn default() -> Self {
-        Self(1.into())
+        Self(serde_json::Number::from_i128(1))
     }
 }
 
@@ -2100,7 +2096,7 @@ pub struct CircleRadius(serde_json::Number);
 
 impl Default for CircleRadius {
     fn default() -> Self {
-        Self(5.into())
+        Self(serde_json::Number::from_i128(5))
     }
 }
 
@@ -2122,7 +2118,7 @@ pub struct CircleStrokeOpacity(serde_json::Number);
 
 impl Default for CircleStrokeOpacity {
     fn default() -> Self {
-        Self(1.into())
+        Self(serde_json::Number::from_i128(1))
     }
 }
 
@@ -2134,7 +2130,7 @@ pub struct CircleStrokeWidth(serde_json::Number);
 
 impl Default for CircleStrokeWidth {
     fn default() -> Self {
-        Self(0.into())
+        Self(serde_json::Number::from_i128(0))
     }
 }
 
@@ -2188,7 +2184,7 @@ pub struct ColorReliefOpacity(serde_json::Number);
 
 impl Default for ColorReliefOpacity {
     fn default() -> Self {
-        Self(1.into())
+        Self(serde_json::Number::from_i128(1))
     }
 }
 
@@ -2246,7 +2242,7 @@ pub struct FillOpacity(serde_json::Number);
 
 impl Default for FillOpacity {
     fn default() -> Self {
-        Self(1.into())
+        Self(serde_json::Number::from_i128(1))
     }
 }
 
@@ -2323,7 +2319,7 @@ pub struct FillExtrusionBase(serde_json::Number);
 
 impl Default for FillExtrusionBase {
     fn default() -> Self {
-        Self(0.into())
+        Self(serde_json::Number::from_i128(0))
     }
 }
 
@@ -2345,7 +2341,7 @@ pub struct FillExtrusionHeight(serde_json::Number);
 
 impl Default for FillExtrusionHeight {
     fn default() -> Self {
-        Self(0.into())
+        Self(serde_json::Number::from_i128(0))
     }
 }
 
@@ -2357,7 +2353,7 @@ pub struct FillExtrusionOpacity(serde_json::Number);
 
 impl Default for FillExtrusionOpacity {
     fn default() -> Self {
-        Self(1.into())
+        Self(serde_json::Number::from_i128(1))
     }
 }
 
@@ -2461,7 +2457,7 @@ pub struct HeatmapIntensity(serde_json::Number);
 
 impl Default for HeatmapIntensity {
     fn default() -> Self {
-        Self(1.into())
+        Self(serde_json::Number::from_i128(1))
     }
 }
 
@@ -2473,7 +2469,7 @@ pub struct HeatmapOpacity(serde_json::Number);
 
 impl Default for HeatmapOpacity {
     fn default() -> Self {
-        Self(1.into())
+        Self(serde_json::Number::from_i128(1))
     }
 }
 
@@ -2485,7 +2481,7 @@ pub struct HeatmapRadius(serde_json::Number);
 
 impl Default for HeatmapRadius {
     fn default() -> Self {
-        Self(30.into())
+        Self(serde_json::Number::from_i128(30))
     }
 }
 
@@ -2497,7 +2493,7 @@ pub struct HeatmapWeight(serde_json::Number);
 
 impl Default for HeatmapWeight {
     fn default() -> Self {
-        Self(1.into())
+        Self(serde_json::Number::from_i128(1))
     }
 }
 
@@ -2547,7 +2543,7 @@ pub struct HillshadeExaggeration(serde_json::Number);
 
 impl Default for HillshadeExaggeration {
     fn default() -> Self {
-        Self(0.5.into())
+        Self(serde_json::Number::from_f64(0.5))
     }
 }
 
@@ -2701,7 +2697,7 @@ pub struct LineBlur(serde_json::Number);
 
 impl Default for LineBlur {
     fn default() -> Self {
-        Self(0.into())
+        Self(serde_json::Number::from_i128(0))
     }
 }
 
@@ -2730,7 +2726,7 @@ pub struct LineGapWidth(serde_json::Number);
 
 impl Default for LineGapWidth {
     fn default() -> Self {
-        Self(0.into())
+        Self(serde_json::Number::from_i128(0))
     }
 }
 
@@ -2744,7 +2740,7 @@ pub struct LineOffset(serde_json::Number);
 
 impl Default for LineOffset {
     fn default() -> Self {
-        Self(0.into())
+        Self(serde_json::Number::from_i128(0))
     }
 }
 
@@ -2756,7 +2752,7 @@ pub struct LineOpacity(serde_json::Number);
 
 impl Default for LineOpacity {
     fn default() -> Self {
-        Self(1.into())
+        Self(serde_json::Number::from_i128(1))
     }
 }
 
@@ -2801,7 +2797,7 @@ pub struct LineWidth(serde_json::Number);
 
 impl Default for LineWidth {
     fn default() -> Self {
-        Self(1.into())
+        Self(serde_json::Number::from_i128(1))
     }
 }
 
@@ -2841,7 +2837,7 @@ pub struct RasterBrightnessMax(serde_json::Number);
 
 impl Default for RasterBrightnessMax {
     fn default() -> Self {
-        Self(1.into())
+        Self(serde_json::Number::from_i128(1))
     }
 }
 
@@ -2853,7 +2849,7 @@ pub struct RasterBrightnessMin(serde_json::Number);
 
 impl Default for RasterBrightnessMin {
     fn default() -> Self {
-        Self(0.into())
+        Self(serde_json::Number::from_i128(0))
     }
 }
 
@@ -2865,7 +2861,7 @@ pub struct RasterContrast(serde_json::Number);
 
 impl Default for RasterContrast {
     fn default() -> Self {
-        Self(0.into())
+        Self(serde_json::Number::from_i128(0))
     }
 }
 
@@ -2877,19 +2873,19 @@ pub struct RasterFadeDuration(serde_json::Number);
 
 impl Default for RasterFadeDuration {
     fn default() -> Self {
-        Self(300.into())
+        Self(serde_json::Number::from_i128(300))
     }
 }
 
 /// Rotates hues around the color wheel.
 ///
-/// Range: ..every 360
+/// Range: .. every 360
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
 pub struct RasterHueRotate(serde_json::Number);
 
 impl Default for RasterHueRotate {
     fn default() -> Self {
-        Self(0.into())
+        Self(serde_json::Number::from_i128(0))
     }
 }
 
@@ -2901,7 +2897,7 @@ pub struct RasterOpacity(serde_json::Number);
 
 impl Default for RasterOpacity {
     fn default() -> Self {
-        Self(1.into())
+        Self(serde_json::Number::from_i128(1))
     }
 }
 
@@ -2930,7 +2926,7 @@ pub struct RasterSaturation(serde_json::Number);
 
 impl Default for RasterSaturation {
     fn default() -> Self {
-        Self(0.into())
+        Self(serde_json::Number::from_i128(0))
     }
 }
 
@@ -3000,7 +2996,7 @@ pub struct IconHaloBlur(serde_json::Number);
 
 impl Default for IconHaloBlur {
     fn default() -> Self {
-        Self(0.into())
+        Self(serde_json::Number::from_i128(0))
     }
 }
 
@@ -3027,7 +3023,7 @@ pub struct IconHaloWidth(serde_json::Number);
 
 impl Default for IconHaloWidth {
     fn default() -> Self {
-        Self(0.into())
+        Self(serde_json::Number::from_i128(0))
     }
 }
 
@@ -3039,7 +3035,7 @@ pub struct IconOpacity(serde_json::Number);
 
 impl Default for IconOpacity {
     fn default() -> Self {
-        Self(1.into())
+        Self(serde_json::Number::from_i128(1))
     }
 }
 
@@ -3089,7 +3085,7 @@ pub struct TextHaloBlur(serde_json::Number);
 
 impl Default for TextHaloBlur {
     fn default() -> Self {
-        Self(0.into())
+        Self(serde_json::Number::from_i128(0))
     }
 }
 
@@ -3114,7 +3110,7 @@ pub struct TextHaloWidth(serde_json::Number);
 
 impl Default for TextHaloWidth {
     fn default() -> Self {
-        Self(0.into())
+        Self(serde_json::Number::from_i128(0))
     }
 }
 
@@ -3126,7 +3122,7 @@ pub struct TextOpacity(serde_json::Number);
 
 impl Default for TextOpacity {
     fn default() -> Self {
-        Self(1.into())
+        Self(serde_json::Number::from_i128(1))
     }
 }
 
@@ -3185,8 +3181,7 @@ pub struct Promoteid {
 
 /// A name of a feature property to use as ID for feature state.
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-#[deprecated = "not_implemented"]
-struct Star(serde_json::Value);
+struct Star(String);
 
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
 pub struct PropertyType {
@@ -3273,7 +3268,7 @@ pub struct AtmosphereBlend(serde_json::Number);
 
 impl Default for AtmosphereBlend {
     fn default() -> Self {
-        Self(0.8.into())
+        Self(serde_json::Number::from_f64(0.8))
     }
 }
 
@@ -3295,7 +3290,7 @@ pub struct FogGroundBlend(serde_json::Number);
 
 impl Default for FogGroundBlend {
     fn default() -> Self {
-        Self(0.5.into())
+        Self(serde_json::Number::from_f64(0.5))
     }
 }
 
@@ -3317,7 +3312,7 @@ pub struct HorizonFogBlend(serde_json::Number);
 
 impl Default for HorizonFogBlend {
     fn default() -> Self {
-        Self(0.8.into())
+        Self(serde_json::Number::from_f64(0.8))
     }
 }
 
@@ -3339,7 +3334,7 @@ pub struct SkyHorizonBlend(serde_json::Number);
 
 impl Default for SkyHorizonBlend {
     fn default() -> Self {
-        Self(0.8.into())
+        Self(serde_json::Number::from_f64(0.8))
     }
 }
 
@@ -3419,8 +3414,7 @@ pub struct SourceGeojson {
 
 /// Contains an attribution to be displayed when the map is shown to a user.
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-#[deprecated = "not_implemented"]
-struct Attribution(serde_json::Value);
+struct Attribution(String);
 
 /// Size of the tile buffer on each side. A value of 0 produces no buffer. A value of 512 produces a buffer as wide as the tile itself. Larger values produce fewer rendering artifacts near tile edges and slower performance.
 ///
@@ -3430,7 +3424,7 @@ pub struct Buffer(serde_json::Number);
 
 impl Default for Buffer {
     fn default() -> Self {
-        Self(128.into())
+        Self(serde_json::Number::from_i128(128))
     }
 }
 
@@ -3480,7 +3474,7 @@ pub struct Clusterradius(serde_json::Number);
 
 impl Default for Clusterradius {
     fn default() -> Self {
-        Self(50.into())
+        Self(serde_json::Number::from_i128(50))
     }
 }
 
@@ -3522,7 +3516,7 @@ pub struct Maxzoom(serde_json::Number);
 
 impl Default for Maxzoom {
     fn default() -> Self {
-        Self(18.into())
+        Self(serde_json::Number::from_i128(18))
     }
 }
 
@@ -3537,7 +3531,7 @@ pub struct Tolerance(serde_json::Number);
 
 impl Default for Tolerance {
     fn default() -> Self {
-        Self(0.375.into())
+        Self(serde_json::Number::from_f64(0.375))
     }
 }
 
@@ -3577,8 +3571,7 @@ pub enum Type {
 
 /// URL that points to an image.
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-#[deprecated = "not_implemented"]
-struct Url(serde_json::Value);
+struct Url(String);
 
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
 pub struct SourceRaster {
@@ -3624,8 +3617,7 @@ struct Star(serde_json::Value);
 
 /// Contains an attribution to be displayed when the map is shown to a user.
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-#[deprecated = "not_implemented"]
-struct Attribution(serde_json::Value);
+struct Attribution(String);
 
 /// An array containing the longitude and latitude of the southwest and northeast corners of the source's bounding box in the following order: `[sw.lng, sw.lat, ne.lng, ne.lat]`. When this property is included in a source, no tiles outside of the given bounds are requested by MapLibre.
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
@@ -3644,7 +3636,7 @@ pub struct Maxzoom(serde_json::Number);
 
 impl Default for Maxzoom {
     fn default() -> Self {
-        Self(22.into())
+        Self(serde_json::Number::from_i128(22))
     }
 }
 
@@ -3654,7 +3646,7 @@ pub struct Minzoom(serde_json::Number);
 
 impl Default for Minzoom {
     fn default() -> Self {
-        Self(0.into())
+        Self(serde_json::Number::from_i128(0))
     }
 }
 
@@ -3681,7 +3673,7 @@ pub struct Tilesize(serde_json::Number);
 
 impl Default for Tilesize {
     fn default() -> Self {
-        Self(512.into())
+        Self(serde_json::Number::from_i128(512))
     }
 }
 
@@ -3700,8 +3692,7 @@ pub enum Type {
 
 /// A URL to a TileJSON resource. Supported protocols are `http:` and `https:`.
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-#[deprecated = "not_implemented"]
-struct Url(serde_json::Value);
+struct Url(String);
 
 /// A setting to determine whether a source's tiles are cached locally.
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
@@ -3770,8 +3761,7 @@ struct Star(serde_json::Value);
 
 /// Contains an attribution to be displayed when the map is shown to a user.
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-#[deprecated = "not_implemented"]
-struct Attribution(serde_json::Value);
+struct Attribution(String);
 
 /// Value that will be added to the encoding mix when decoding. Only used on custom encodings.
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
@@ -3779,7 +3769,7 @@ pub struct Baseshift(serde_json::Number);
 
 impl Default for Baseshift {
     fn default() -> Self {
-        Self(0.0.into())
+        Self(serde_json::Number::from_f64(0.0))
     }
 }
 
@@ -3789,7 +3779,7 @@ pub struct Bluefactor(serde_json::Number);
 
 impl Default for Bluefactor {
     fn default() -> Self {
-        Self(1.0.into())
+        Self(serde_json::Number::from_f64(1.0))
     }
 }
 
@@ -3830,7 +3820,7 @@ pub struct Greenfactor(serde_json::Number);
 
 impl Default for Greenfactor {
     fn default() -> Self {
-        Self(1.0.into())
+        Self(serde_json::Number::from_f64(1.0))
     }
 }
 
@@ -3840,7 +3830,7 @@ pub struct Maxzoom(serde_json::Number);
 
 impl Default for Maxzoom {
     fn default() -> Self {
-        Self(22.into())
+        Self(serde_json::Number::from_i128(22))
     }
 }
 
@@ -3850,7 +3840,7 @@ pub struct Minzoom(serde_json::Number);
 
 impl Default for Minzoom {
     fn default() -> Self {
-        Self(0.into())
+        Self(serde_json::Number::from_i128(0))
     }
 }
 
@@ -3860,7 +3850,7 @@ pub struct Redfactor(serde_json::Number);
 
 impl Default for Redfactor {
     fn default() -> Self {
-        Self(1.0.into())
+        Self(serde_json::Number::from_f64(1.0))
     }
 }
 
@@ -3870,7 +3860,7 @@ pub struct Tilesize(serde_json::Number);
 
 impl Default for Tilesize {
     fn default() -> Self {
-        Self(512.into())
+        Self(serde_json::Number::from_i128(512))
     }
 }
 
@@ -3889,8 +3879,7 @@ pub enum Type {
 
 /// A URL to a TileJSON resource. Supported protocols are `http:` and `https:`.
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-#[deprecated = "not_implemented"]
-struct Url(serde_json::Value);
+struct Url(String);
 
 /// A setting to determine whether a source's tiles are cached locally.
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
@@ -3950,8 +3939,7 @@ struct Star(serde_json::Value);
 
 /// Contains an attribution to be displayed when the map is shown to a user.
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-#[deprecated = "not_implemented"]
-struct Attribution(serde_json::Value);
+struct Attribution(String);
 
 /// An array containing the longitude and latitude of the southwest and northeast corners of the source's bounding box in the following order: `[sw.lng, sw.lat, ne.lng, ne.lat]`. When this property is included in a source, no tiles outside of the given bounds are requested by MapLibre.
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
@@ -3987,7 +3975,7 @@ pub struct Maxzoom(serde_json::Number);
 
 impl Default for Maxzoom {
     fn default() -> Self {
-        Self(22.into())
+        Self(serde_json::Number::from_i128(22))
     }
 }
 
@@ -3997,7 +3985,7 @@ pub struct Minzoom(serde_json::Number);
 
 impl Default for Minzoom {
     fn default() -> Self {
-        Self(0.into())
+        Self(serde_json::Number::from_i128(0))
     }
 }
 
@@ -4038,8 +4026,7 @@ pub enum Type {
 
 /// A URL to a TileJSON resource. Supported protocols are `http:` and `https:`.
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-#[deprecated = "not_implemented"]
-struct Url(serde_json::Value);
+struct Url(String);
 
 /// A setting to determine whether a source's tiles are cached locally.
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
@@ -4113,14 +4100,13 @@ pub struct Exaggeration(serde_json::Number);
 
 impl Default for Exaggeration {
     fn default() -> Self {
-        Self(1.0.into())
+        Self(serde_json::Number::from_f64(1.0))
     }
 }
 
 /// The source for the terrain data.
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-#[deprecated = "not_implemented"]
-struct Source(serde_json::Value);
+struct Source(String);
 
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
 pub struct Transition {
@@ -4140,7 +4126,7 @@ pub struct Delay(serde_json::Number);
 
 impl Default for Delay {
     fn default() -> Self {
-        Self(0.into())
+        Self(serde_json::Number::from_i128(0))
     }
 }
 
@@ -4152,6 +4138,6 @@ pub struct Duration(serde_json::Number);
 
 impl Default for Duration {
     fn default() -> Self {
-        Self(300.into())
+        Self(serde_json::Number::from_i128(300))
     }
 }

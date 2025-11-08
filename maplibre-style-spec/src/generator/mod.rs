@@ -203,8 +203,8 @@ mod tests {
         pub struct NumberOne(serde_json::Number);
 
         impl Default for NumberOne {
-            fn default() {
-                0
+            fn default() -> Self {
+                Self(serde_json::Number::from_i128(0))
             }
         }
         ");
@@ -242,8 +242,8 @@ mod tests {
         pub struct NameOne(serde_json::Number);
 
         impl Default for NameOne {
-            fn default() {
-                1.0
+            fn default() -> Self {
+                Self(serde_json::Number::from_f64(1.0))
             }
         }
         "#);
@@ -268,22 +268,20 @@ mod tests {
             "numbers": ["number_one", "number_two"]
         });
         let reference: StyleReference = serde_json::from_value(reference).unwrap();
-        insta::assert_snapshot!(generate_spec_scope(reference), @r#"
+        insta::assert_snapshot!(generate_spec_scope(reference), @r"
         /// This is a Maplibre Style Specification
         #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
         pub struct MaplibreStyleSpecification;
 
         /// A number between 0 and 20.
         ///
-        /// # Range
-        /// - Maximum: 10.0
-        /// - Minimum: 0.0
+        /// Range: 0.0..=10.0
         #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
         pub struct NumberOne(serde_json::Number);
 
         impl Default for NumberOne {
-            fn default() {
-                1.0
+            fn default() -> Self {
+                Self(serde_json::Number::from_f64(1.0))
             }
         }
 
@@ -292,12 +290,11 @@ mod tests {
         pub struct NumberTwo(serde_json::Number);
 
         #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+        #[serde(untagged)]
         pub enum Numbers {
-            #[serde(rename="number_one")]
             NumberOne(NumberOne),
-            #[serde(rename="number_two")]
             NumberTwo(NumberTwo),
         }
-        "#);
+        ");
     }
 }

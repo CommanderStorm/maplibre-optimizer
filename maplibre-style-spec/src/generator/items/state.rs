@@ -37,7 +37,7 @@ mod tests {
         struct Foo(serde_json::Value);
 
         impl Default for Foo {
-            fn default() {
+            fn default() -> Self {
                 "hello_world"
             }
         }

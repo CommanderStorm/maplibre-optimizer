@@ -6,9 +6,8 @@ pub fn generate(scope: &mut Scope, name: &str, common: &Fields, default: Option<
     scope
         .new_struct(name)
         .doc(&common.doc)
-        .attr("deprecated = \"not_implemented\"")
         .derive("serde::Deserialize, PartialEq, Debug, Clone")
-        .tuple_field("serde_json::Value");
+        .tuple_field("String");
 
     if let Some(default) = default {
         scope
@@ -16,21 +15,55 @@ pub fn generate(scope: &mut Scope, name: &str, common: &Fields, default: Option<
             .impl_trait("Default")
             .new_fn("default")
             .ret("Self")
-            .line(format!("\"{default}\".to_string()"));
+            .line(format!("Self(\"{default}\".to_string())"));
     }
 }
 
 #[cfg(test)]
 mod tests {
+    use serde_json::json;
+
     use super::*;
+    use crate::decoder::StyleReference;
     #[test]
     fn generate_empty() {
         let mut scope = Scope::new();
         generate(&mut scope, "Foo", &Fields::default(), None);
-        insta::assert_snapshot!(scope.to_string(), @r##"
+        insta::assert_snapshot!(scope.to_string(), @r"
         #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-        #[deprecated = "not_implemented"]
-        struct Foo(serde_json::Value);
-        "##)
+        struct Foo(String);
+        ")
+    }
+
+    #[test]
+    fn test_generate_spec_items() {
+        let reference = json!({
+            "$version": 8,
+            "$root": {},
+           "terrain": {
+                "source": {
+                  "type": "string",
+                  "doc": "The source for the terrain data.",
+                  "required": true,
+                }
+              }
+        });
+        let reference: StyleReference = serde_json::from_value(reference).unwrap();
+        insta::assert_snapshot!(crate::generator::generate_spec_scope(reference), @r#"
+        /// This is a Maplibre Style Specification
+        #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+        pub struct MaplibreStyleSpecification;
+
+        #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+        pub struct Terrain {
+            /// The source for the terrain data.
+            #[serde(rename="source")]
+            pub source: Source,
+        }
+
+        /// The source for the terrain data.
+        #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+        struct Source(String);
+        "#);
     }
 }

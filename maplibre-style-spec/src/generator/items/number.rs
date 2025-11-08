@@ -19,12 +19,21 @@ pub fn generate(
         .derive("serde::Deserialize, PartialEq, Debug, Clone")
         .tuple_field("serde_json::Number");
     if let Some(default) = default {
+        let underlying_datatype = if default.is_f64() {
+            "f64"
+        } else if default.is_i64() {
+            "i128"
+        } else {
+            "u128"
+        };
         scope
             .new_impl(name)
             .impl_trait("Default")
             .new_fn("default")
             .ret("Self")
-            .line(format!("Self({default}.into())"));
+            .line(format!(
+                "Self(serde_json::Number::from_{underlying_datatype}({default}))"
+            ));
     }
 }
 
@@ -63,10 +72,7 @@ mod tests {
         insta::assert_snapshot!(scope.to_string(), @r"
         ///
         ///
-        /// # Range
-        /// - Maximum: 1
-        /// - Minimum: 360
-        /// - Period: 360
+        /// Range: 360..=1 every 360
         #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
         pub struct Foo(serde_json::Number);
         ")
@@ -88,8 +94,8 @@ mod tests {
         pub struct Foo(serde_json::Number);
 
         impl Default for Foo {
-            fn default() {
-                42
+            fn default() -> Self {
+                Self(serde_json::Number::from_i128(42))
             }
         }
         ")

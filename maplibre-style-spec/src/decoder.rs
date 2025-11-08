@@ -266,7 +266,7 @@ impl Fields {
                 doc.push_str(&max.to_string());
             }
             if let Some(period) = period {
-                doc.push_str(&format!("every {period}\n"))
+                doc.push_str(&format!(" every {period}\n"))
             }
         }
         doc

@@ -140,9 +140,17 @@ mod tests {
     }
 
     #[test]
-    fn test_weird_names() {
+    fn test_weird_names_snake_case() {
         assert_eq!(to_snake_case("!"), "not");
         assert_eq!(to_snake_case("!="), "not_equal");
-        assert_eq!(rustize("Default".to_string()), "r#Default");
+        assert_eq!(to_snake_case("!has"), "not_has");
+        assert_eq!(to_snake_case("%"), "percentage");
+    }
+    #[test]
+    fn test_weird_names_upper_camel_case() {
+        assert_eq!(to_upper_camel_case("!"), "Not");
+        assert_eq!(to_upper_camel_case("!="), "NotEqual");
+        assert_eq!(to_upper_camel_case("!has"), "NotHas");
+        assert_eq!(to_upper_camel_case("%"), "Percentage");
     }
 }

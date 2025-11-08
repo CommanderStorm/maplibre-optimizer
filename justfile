@@ -25,11 +25,12 @@ export RUST_BACKTRACE := env('RUST_BACKTRACE', if ci_mode == '1' {'1'} else {''}
     {{just_executable()}} --list
 
 # Run integration tests and save its output as the new expected output (ordering is important)
-bless: clean-test bless-insta
+bless: clean-gen clean-test bless-insta gen
 
 # Run integration tests and save its output as the new expected output
 bless-insta *args:  (cargo-install 'cargo-insta')
     cargo insta test --accept --workspace {{args}}
+    {{just_executable()}} gen
 
 # Quick compile without building a binary
 check: (cargo-install 'cargo-hack')
@@ -108,9 +109,7 @@ fmt-toml *args: (cargo-install 'cargo-sort')
     cargo sort --workspace --order package,lib,bin,bench,features,dependencies,build-dependencies,dev-dependencies {{args}}
 
 # Generate a new spec file
-gen:
-    rm maplibre-style-spec/src/spec/mod.rs
-    echo "pub struct MaplibreStyleSpecification;" > maplibre-style-spec/src/spec/mod.rs
+gen: clean-gen
     cargo run --bin generate_spec
     {{ just_executable() }} fmt
 
@@ -167,6 +166,12 @@ cargo-install $COMMAND $INSTALL_CMD='' *args='':
 [private]
 clean-test:
     rm -rf tests/output
+
+# Remove a previusly generated spec file
+[private]
+clean-gen:
+    rm maplibre-style-spec/src/spec/mod.rs
+    echo "pub struct MaplibreStyleSpecification;" > maplibre-style-spec/src/spec/mod.rs
 
 # Install SQLX cli if not already installed.
 [private]
