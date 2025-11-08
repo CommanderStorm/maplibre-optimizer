@@ -107,14 +107,12 @@ fmt:
 fmt-toml *args: (cargo-install 'cargo-sort')
     cargo sort --workspace --order package,lib,bin,bench,features,dependencies,build-dependencies,dev-dependencies {{args}}
 
-# Do any git command, ensuring that the testing environment is set up. Accepts the same arguments as git.
-[no-exit-message]
-git *args:
-    git {{args}}
-
 # Generate a new spec file
 gen:
+    rm maplibre-style-spec/src/spec/mod.rs
+    echo "pub struct MaplibreStyleSpecification;" > maplibre-style-spec/src/spec/mod.rs
     cargo run --bin generate_spec
+    {{ just_executable() }} fmt
 
 # Run cargo fmt and cargo clippy
 lint: fmt clippy

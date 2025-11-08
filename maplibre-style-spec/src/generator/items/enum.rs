@@ -2,7 +2,7 @@ use codegen::Scope;
 use serde_json::Value;
 
 use crate::decoder::{EnumValues, Fields};
-use crate::generator::to_upper_camel_case;
+use crate::generator::formatter::to_upper_camel_case;
 
 pub fn generate(
     scope: &mut Scope,

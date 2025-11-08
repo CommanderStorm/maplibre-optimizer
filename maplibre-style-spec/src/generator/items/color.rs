@@ -8,6 +8,7 @@ pub fn generate(scope: &mut Scope, name: &str, common: &Fields, default: Option<
         .new_struct(name)
         .doc(&common.doc)
         .attr("deprecated = \"not_implemented\"")
+        .derive("serde::Deserialize, PartialEq, Debug, Clone")
         .tuple_field("serde_json::Value");
 
     if let Some(default) = default {
@@ -26,6 +27,10 @@ mod tests {
     fn generate_empty() {
         let mut scope = Scope::new();
         generate(&mut scope, "Foo", &Fields::default(), None);
-        insta::assert_snapshot!(scope.to_string(), @"")
+        insta::assert_snapshot!(scope.to_string(), @r##"
+        #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+        #[deprecated = "not_implemented"]
+        struct Foo(serde_json::Value);
+        "##)
     }
 }

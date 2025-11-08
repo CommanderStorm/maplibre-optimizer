@@ -1,9 +1,12 @@
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 
 use codegen::Scope;
 
-use crate::decoder::{ ParsedItem, StyleReference, TopLevelItem};
+use crate::decoder::{ParsedItem, StyleReference, TopLevelItem};
+use crate::generator::formatter::{to_snake_case, to_upper_camel_case};
+
 mod items;
+mod formatter;
 
 pub fn generate_spec_scope(reference: StyleReference) -> String {
     let mut scope = Scope::new();
@@ -17,16 +20,20 @@ pub fn generate_spec_scope(reference: StyleReference) -> String {
     scope.to_string()
 }
 
-fn generate_spec(scope: &mut Scope, root: &HashMap<String, ParsedItem>) {
+fn generate_spec(scope: &mut Scope, root: &BTreeMap<String, ParsedItem>) {
     let spec = scope
         .new_struct("MaplibreStyleSpecification")
         .doc("This is a Maplibre Style Specification")
         .vis("pub")
         .derive("serde::Deserialize, PartialEq, Debug, Clone");
     for (key, field) in root {
-        spec.new_field(key, to_upper_camel_case(key))
+        let fields = spec
+            .new_field(to_snake_case(key), to_upper_camel_case(key))
             .vis("pub")
             .doc(field.doc());
+        if &to_snake_case(key) != key {
+            fields.annotation(format!("#[serde(rename=\"{key}\")]"));
+        }
     }
 }
 
@@ -41,7 +48,8 @@ fn generate_top_level_item(scope: &mut Scope, item: TopLevelItem, name: &str) {
                     .derive("serde::Deserialize, PartialEq, Debug, Clone");
                 for (key, item) in &items {
                     group
-                        .new_field(key, to_upper_camel_case(key))
+                        .new_field(to_snake_case(key), to_upper_camel_case(key))
+                        .annotation(format!("#[serde(rename=\"{key}\")]"))
                         .doc(item.doc())
                         .vis("pub");
                 }
@@ -65,7 +73,6 @@ fn generate_top_level_item(scope: &mut Scope, item: TopLevelItem, name: &str) {
     }
 }
 
-#[allow(unused_variables)]
 fn generate_parsed_item(scope: &mut Scope, item: &ParsedItem, name: &str) {
     match item {
         ParsedItem::Number {
@@ -170,37 +177,13 @@ fn generate_parsed_item(scope: &mut Scope, item: &ParsedItem, name: &str) {
     }
 }
 
-/// Converts a string to a valid Rust struct name (UpperCamelCase)
-fn to_upper_camel_case(name: &str) -> String {
-    name.split(|c: char| !c.is_alphanumeric()) // split on non-alphanumeric
-        .filter(|s| !s.is_empty()) // skip empty parts
-        .map(|s| {
-            let mut chars = s.chars();
-            match chars.next() {
-                Some(first) => {
-                    first.to_uppercase().collect::<String>() + &chars.as_str().to_lowercase()
-                }
-                None => String::new(),
-            }
-        })
-        .collect::<String>()
-}
+
 
 #[cfg(test)]
 mod tests {
     use serde_json::json;
 
     use super::*;
-
-    #[test]
-    fn test_to_upper_camel_case() {
-        assert_eq!(to_upper_camel_case("my_struct_name"), "MyStructName");
-        assert_eq!(to_upper_camel_case("hello world"), "HelloWorld");
-        assert_eq!(to_upper_camel_case("123abc"), "123abc");
-        assert_eq!(to_upper_camel_case("__weird__name__"), "WeirdName");
-        assert_eq!(to_upper_camel_case("alreadyCamel"), "Alreadycamel");
-    }
-
     #[test]
     fn test_generate_spec_items() {
         let reference = json!({
@@ -245,7 +228,7 @@ mod tests {
         });
         let reference: StyleReference = serde_json::from_value(reference).unwrap();
         let spec = generate_spec_scope(reference);
-        insta::assert_snapshot!(&spec, @r"
+        insta::assert_snapshot!(&spec, @r#"
         /// This is a Maplibre Style Specification
         #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
         pub struct MaplibreStyleSpecification;
@@ -253,6 +236,7 @@ mod tests {
         #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
         pub struct Names {
             /// A number between 0 and 10.
+            #[serde(rename="name_one")]
             pub name_one: NameOne,
         }
 
@@ -265,7 +249,7 @@ mod tests {
                 1.0
             }
         }
-        ");
+        "#);
     }
 
     #[test]
@@ -292,19 +276,11 @@ mod tests {
         #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
         pub struct MaplibreStyleSpecification;
 
-        #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-        pub enum Numbers {
-            #[serde(rename="number_one")]
-            NumberOne(NumberOne),
-            #[serde(rename="number_two")]
-            NumberTwo(NumberTwo),
-        }
-
-        /// Another number
-        #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-        pub struct NumberTwo(serde_json::Number);
-
         /// A number between 0 and 20.
+        ///
+        /// # Range
+        /// - Maximum: 10.0
+        /// - Minimum: 0.0
         #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
         pub struct NumberOne(serde_json::Number);
 
@@ -312,6 +288,18 @@ mod tests {
             fn default() {
                 1.0
             }
+        }
+
+        /// Another number
+        #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+        pub struct NumberTwo(serde_json::Number);
+
+        #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+        pub enum Numbers {
+            #[serde(rename="number_one")]
+            NumberOne(NumberOne),
+            #[serde(rename="number_two")]
+            NumberTwo(NumberTwo),
         }
         "#);
     }

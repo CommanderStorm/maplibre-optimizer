@@ -8,6 +8,7 @@ pub fn generate(scope: &mut Scope, name: &str, common: &Fields, default: &Value)
         .new_struct(name)
         .doc(&common.doc)
         .attr("deprecated = \"not_implemented\"")
+        .derive("serde::Deserialize, PartialEq, Debug, Clone")
         .tuple_field("serde_json::Value");
 
     scope
@@ -29,6 +30,16 @@ mod tests {
             &Fields::default(),
             &Value::String("hello_world".to_string()),
         );
-        insta::assert_snapshot!(scope.to_string(), @"")
+        insta::assert_snapshot!(scope.to_string(), @r##"
+        #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+        #[deprecated = "not_implemented"]
+        struct Foo(serde_json::Value);
+
+        impl Default for Foo {
+            fn default() {
+                "hello_world"
+            }
+        }
+        "##)
     }
 }

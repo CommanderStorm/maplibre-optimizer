@@ -1,34 +1,13 @@
 /// This is a Maplibre Style Specification
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
 pub struct MaplibreStyleSpecification {
+    /// Default bearing, in degrees. The bearing is the compass direction that is "up"; for example, a bearing of 90° orients the map so that east is up. This value will be used only if the map has not been positioned by other means (e.g. map options or user interaction).
+    pub bearing: Bearing,
     /// Default map center in longitude and latitude.  The style center will be used only if the map has not been positioned by other means (e.g. map options or user interaction).
     pub center: Center,
-    /// Sources state which data the map should display. Specify the type of source with the `type` property. Adding a source isn't enough to make data appear on the map because sources don't contain styling details like color or width. Layers refer to a source and give it a visual representation. This makes it possible to style the same source in different ways, like differentiating between types of roads in a highways layer.
-    /// 
-    /// Tiled sources (vector and raster) must specify their details according to the [TileJSON specification](https://github.com/mapbox/tilejson-spec).
-    pub sources: Sources,
-    /// The terrain configuration.
-    pub terrain: Terrain,
-    /// The global light source.
-    pub light: Light,
-    /// The map's sky configuration. **Note:** this definition is still experimental and is under development in maplibre-gl-js.
-    pub sky: Sky,
-    /// The projection configuration
-    pub projection: Projection,
-    /// Style specification version number. Must be 8.
-    pub version: Version,
-    /// Default pitch, in degrees. Zero is perpendicular to the surface, for a look straight down at the map, while a greater value like 60 looks ahead towards the horizon. The style pitch will be used only if the map has not been positioned by other means (e.g. map options or user interaction).
-    pub pitch: Pitch,
     /// Default map center altitude in meters above sea level. The style center altitude defines the altitude where the camera is looking at and will be used only if the map has not been positioned by other means (e.g. map options or user interaction).
-    pub centerAltitude: Centeraltitude,
-    /// A human-readable name for the style.
-    pub name: Name,
-    /// A global transition definition to use as a default across properties, to be used for timing transitions between one value and the next when no property-specific transition is set. Collision-based symbol fading is controlled independently of the style's `transition` property.
-    pub transition: Transition,
-    /// An array of `{id: 'my-sprite', url: 'https://example.com/sprite'}` objects. Each object should represent a unique URL to load a sprite from and and a unique ID to use as a prefix when referencing images from that sprite (i.e. 'my-sprite:image'). All the URLs are internally extended to load both .json and .png files. If the `id` field is equal to 'default', the prefix is omitted (just 'image' instead of 'default:image'). All the IDs and URLs must be unique. For backwards compatibility, instead of an array, one can also provide a single string that represent a URL to load the sprite from. The images in this case won't be prefixed.
-    pub sprite: Sprite,
-    /// An object used to define default values when using the [`global-state`](https://maplibre.org/maplibre-style-spec/expressions/#global-state) expression.
-    pub state: State,
+    #[serde(rename="centerAltitude")]
+    pub center_altitude: Centeraltitude,
     /// The `font-faces` property can be used to specify what font files to use for rendering text. Font faces contain information needed to render complex texts such as [Devanagari](https://en.wikipedia.org/wiki/Devanagari), [Khmer](https://en.wikipedia.org/wiki/Khmer_script) among many others.<h2>Unicode range</h2>The optional `unicode-range` property can be used to only use a particular font file for characters within the specified unicode range(s). Its value should be an array of strings, each indicating a start and end of a unicode range, similar to the [CSS descriptor with the same name](https://developer.mozilla.org/en-US/docs/Web/CSS/@font-face/unicode-range). This allows specifying multiple non-consecutive unicode ranges. When not specified, the default value is `U+0-10FFFF`, meaning the font file will be used for all unicode characters.
     /// 
     /// Refer to the [Unicode Character Code Charts](https://www.unicode.org/charts/) to see ranges for scripts supported by Unicode. To see what unicode code-points are available in a font, use a tool like [FontDrop](https://fontdrop.info/).
@@ -36,11 +15,8 @@ pub struct MaplibreStyleSpecification {
     /// <h2>Font Resolution</h2>For every name in a symbol layer’s [`text-font`](./layers.md/#text-font) array, characters are matched if they are covered one of the by the font files in the corresponding entry of the `font-faces` map. Any still-unmatched characters then fall back to the [`glyphs`](./glyphs.md) URL if provided.
     /// 
     /// <h2>Supported Fonts</h2>What type of fonts are supported is implementation-defined. Unsupported fonts are ignored.
-    pub font-faces: FontFaces,
-    /// Default zoom level.  The style zoom will be used only if the map has not been positioned by other means (e.g. map options or user interaction).
-    pub zoom: Zoom,
-    /// Default roll, in degrees. The roll angle is measured counterclockwise about the camera boresight. The style roll will be used only if the map has not been positioned by other means (e.g. map options or user interaction).
-    pub roll: Roll,
+    #[serde(rename="font-faces")]
+    pub font_faces: FontFaces,
     /// A URL template for loading signed-distance-field glyph sets in PBF format.
     /// 
     /// If this property is set, any text in the `text-field` layout property is displayed in the font stack named by the `text-font` layout property based on glyphs located at the URL specified by this property. Otherwise, font faces will be determined by the `text-font` property based on the local environment.
@@ -53,464 +29,601 @@ pub struct MaplibreStyleSpecification {
     /// 
     /// The URL must be absolute, containing the [scheme, authority and path components](https://en.wikipedia.org/wiki/URL#Syntax).
     pub glyphs: Glyphs,
-    /// Default bearing, in degrees. The bearing is the compass direction that is "up"; for example, a bearing of 90° orients the map so that east is up. This value will be used only if the map has not been positioned by other means (e.g. map options or user interaction).
-    pub bearing: Bearing,
-    /// Arbitrary properties useful to track with the stylesheet, but do not influence rendering. Properties should be prefixed to avoid collisions, like 'maplibre:'.
-    pub metadata: Metadata,
     /// A style's `layers` property lists all the layers available in that style. The type of layer is specified by the `type` property, and must be one of `background`, `fill`, `line`, `symbol`, `raster`, `circle`, `fill-extrusion`, `heatmap`, `hillshade`, `color-relief`.
     /// 
     /// Except for layers of the `background` type, each layer needs to refer to a source. Layers take the data that they get from a source, optionally filter features, and then define how those features are styled.
     pub layers: Layers,
+    /// The global light source.
+    pub light: Light,
+    /// Arbitrary properties useful to track with the stylesheet, but do not influence rendering. Properties should be prefixed to avoid collisions, like 'maplibre:'.
+    pub metadata: Metadata,
+    /// A human-readable name for the style.
+    pub name: Name,
+    /// Default pitch, in degrees. Zero is perpendicular to the surface, for a look straight down at the map, while a greater value like 60 looks ahead towards the horizon. The style pitch will be used only if the map has not been positioned by other means (e.g. map options or user interaction).
+    pub pitch: Pitch,
+    /// The projection configuration
+    pub projection: Projection,
+    /// Default roll, in degrees. The roll angle is measured counterclockwise about the camera boresight. The style roll will be used only if the map has not been positioned by other means (e.g. map options or user interaction).
+    pub roll: Roll,
+    /// The map's sky configuration. **Note:** this definition is still experimental and is under development in maplibre-gl-js.
+    pub sky: Sky,
+    /// Sources state which data the map should display. Specify the type of source with the `type` property. Adding a source isn't enough to make data appear on the map because sources don't contain styling details like color or width. Layers refer to a source and give it a visual representation. This makes it possible to style the same source in different ways, like differentiating between types of roads in a highways layer.
+    /// 
+    /// Tiled sources (vector and raster) must specify their details according to the [TileJSON specification](https://github.com/mapbox/tilejson-spec).
+    pub sources: Sources,
+    /// An array of `{id: 'my-sprite', url: 'https://example.com/sprite'}` objects. Each object should represent a unique URL to load a sprite from and and a unique ID to use as a prefix when referencing images from that sprite (i.e. 'my-sprite:image'). All the URLs are internally extended to load both .json and .png files. If the `id` field is equal to 'default', the prefix is omitted (just 'image' instead of 'default:image'). All the IDs and URLs must be unique. For backwards compatibility, instead of an array, one can also provide a single string that represent a URL to load the sprite from. The images in this case won't be prefixed.
+    pub sprite: Sprite,
+    /// An object used to define default values when using the [`global-state`](https://maplibre.org/maplibre-style-spec/expressions/#global-state) expression.
+    pub state: State,
+    /// The terrain configuration.
+    pub terrain: Terrain,
+    /// A global transition definition to use as a default across properties, to be used for timing transitions between one value and the next when no property-specific transition is set. Collision-based symbol fading is controlled independently of the style's `transition` property.
+    pub transition: Transition,
+    /// Style specification version number. Must be 8.
+    pub version: Version,
+    /// Default zoom level.  The style zoom will be used only if the map has not been positioned by other means (e.g. map options or user interaction).
+    pub zoom: Zoom,
+}
+
+/// An expression defines a function that can be used for data-driven style properties or feature filters.
+#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+#[deprecated = "not_implemented"]
+struct Expression(serde_json::Value);
+
+#[derive(serde::Deserialize, PartialEq, Eq, Debug, Clone, Copy)]
+pub enum ExpressionName {
+    #[serde(rename="!")]
+    /// Logical negation. Returns `true` if the input is `false`, and `false` if the input is `true`.
+
+     - [Create and style clusters](https://maplibre.org/maplibre-gl-js/docs/examples/create-and-style-clusters/)
+    ,
+    #[serde(rename="!=")]
+    /// Returns `true` if the input values are not equal, `false` otherwise. The comparison is strictly typed: values of different runtime types are always considered unequal. Cases where the types are known to be different at parse time are considered invalid and will produce a parse error. Accepts an optional `collator` argument to control locale-dependent string comparisons.
+
+     - [Display HTML clusters with custom properties](https://maplibre.org/maplibre-gl-js/docs/examples/display-html-clusters-with-custom-properties/)
+    ,
+    #[serde(rename="%")]
+    /// Returns the remainder after integer division of the first input by the second.
+    ,
+    #[serde(rename="*")]
+    /// Returns the product of the inputs.
+    ,
+    #[serde(rename="+")]
+    /// Returns the sum of the inputs.
+    ,
+    #[serde(rename="-")]
+    /// For two inputs, returns the result of subtracting the second input from the first. For a single input, returns the result of subtracting it from 0.
+    ,
+    #[serde(rename="/")]
+    /// Returns the result of floating point division of the first input by the second.
+
+     - [Visualize population density](https://maplibre.org/maplibre-gl-js/docs/examples/visualize-population-density/)
+    ,
+    #[serde(rename="<")]
+    /// Returns `true` if the first input is strictly less than the second, `false` otherwise. The arguments are required to be either both strings or both numbers; if during evaluation they are not, expression evaluation produces an error. Cases where this constraint is known not to hold at parse time are considered in valid and will produce a parse error. Accepts an optional `collator` argument to control locale-dependent string comparisons.
+
+     - [Display HTML clusters with custom properties](https://maplibre.org/maplibre-gl-js/docs/examples/display-html-clusters-with-custom-properties/)
+    ,
+    #[serde(rename="<=")]
+    /// Returns `true` if the first input is less than or equal to the second, `false` otherwise. The arguments are required to be either both strings or both numbers; if during evaluation they are not, expression evaluation produces an error. Cases where this constraint is known not to hold at parse time are considered in valid and will produce a parse error. Accepts an optional `collator` argument to control locale-dependent string comparisons.
+    ,
+    #[serde(rename="==")]
+    /// Returns `true` if the input values are equal, `false` otherwise. The comparison is strictly typed: values of different runtime types are always considered unequal. Cases where the types are known to be different at parse time are considered invalid and will produce a parse error. Accepts an optional `collator` argument to control locale-dependent string comparisons.
+
+     - [Add multiple geometries from one GeoJSON source](https://maplibre.org/maplibre-gl-js/docs/examples/multiple-geometries/)
+
+     - [Create a time slider](https://maplibre.org/maplibre-gl-js/docs/examples/timeline-animation/)
+
+     - [Display buildings in 3D](https://maplibre.org/maplibre-gl-js/docs/examples/display-buildings-in-3d/)
+
+     - [Filter symbols by toggling a list](https://maplibre.org/maplibre-gl-js/docs/examples/filter-symbols-by-toggling-a-list/)
+    ,
+    #[serde(rename=">")]
+    /// Returns `true` if the first input is strictly greater than the second, `false` otherwise. The arguments are required to be either both strings or both numbers; if during evaluation they are not, expression evaluation produces an error. Cases where this constraint is known not to hold at parse time are considered in valid and will produce a parse error. Accepts an optional `collator` argument to control locale-dependent string comparisons.
+    ,
+    #[serde(rename=">=")]
+    /// Returns `true` if the first input is greater than or equal to the second, `false` otherwise. The arguments are required to be either both strings or both numbers; if during evaluation they are not, expression evaluation produces an error. Cases where this constraint is known not to hold at parse time are considered in valid and will produce a parse error. Accepts an optional `collator` argument to control locale-dependent string comparisons.
+
+     - [Display HTML clusters with custom properties](https://maplibre.org/maplibre-gl-js/docs/examples/display-html-clusters-with-custom-properties/)
+    ,
+    #[serde(rename="^")]
+    /// Returns the result of raising the first input to the power specified by the second.
+    ,
+    #[serde(rename="abs")]
+    /// Returns the absolute value of the input.
+    Abs,
+    #[serde(rename="accumulated")]
+    /// Gets the value of a cluster property accumulated so far. Can only be used in the `clusterProperties` option of a clustered GeoJSON source.
+    Accumulated,
+    #[serde(rename="acos")]
+    /// Returns the arccosine of the input.
+    Acos,
+    #[serde(rename="all")]
+    /// Returns `true` if all the inputs are `true`, `false` otherwise. The inputs are evaluated in order, and evaluation is short-circuiting: once an input expression evaluates to `false`, the result is `false` and no further input expressions are evaluated.
+
+     - [Display HTML clusters with custom properties](https://maplibre.org/maplibre-gl-js/docs/examples/display-html-clusters-with-custom-properties/)
+    All,
+    #[serde(rename="any")]
+    /// Returns `true` if any of the inputs are `true`, `false` otherwise. The inputs are evaluated in order, and evaluation is short-circuiting: once an input expression evaluates to `true`, the result is `true` and no further input expressions are evaluated.
+    Any,
+    #[serde(rename="array")]
+    /// Asserts that the input is an array (optionally with a specific item type and length). If, when the input expression is evaluated, it is not of the asserted type or length, then this assertion will cause the whole expression to be aborted.
+    Array,
+    #[serde(rename="asin")]
+    /// Returns the arcsine of the input.
+    Asin,
+    #[serde(rename="at")]
+    /// Retrieves an item from an array.
+    At,
+    #[serde(rename="atan")]
+    /// Returns the arctangent of the input.
+    Atan,
+    #[serde(rename="boolean")]
+    /// Asserts that the input value is a boolean. If multiple values are provided, each one is evaluated in order until a boolean is obtained. If none of the inputs are booleans, the expression is an error.
+
+     - [Create a hover effect](https://maplibre.org/maplibre-gl-js/docs/examples/create-a-hover-effect/)
+    Boolean,
+    #[serde(rename="case")]
+    /// Selects the first output whose corresponding test condition evaluates to true, or the fallback value otherwise.
+
+     - [Create a hover effect](https://maplibre.org/maplibre-gl-js/docs/examples/create-a-hover-effect/)
+
+     - [Display HTML clusters with custom properties](https://maplibre.org/maplibre-gl-js/docs/examples/display-html-clusters-with-custom-properties/)
+    Case,
+    #[serde(rename="ceil")]
+    /// Returns the smallest integer that is greater than or equal to the input.
+    Ceil,
+    #[serde(rename="coalesce")]
+    /// Evaluates each expression in turn until the first non-null value is obtained, and returns that value.
+
+     - [Use a fallback image](https://maplibre.org/maplibre-gl-js/docs/examples/use-a-fallback-image/)
+    Coalesce,
+    #[serde(rename="collator")]
+    /// Returns a `collator` for use in locale-dependent comparison operations. The `case-sensitive` and `diacritic-sensitive` options default to `false`. The `locale` argument specifies the IETF language tag of the locale to use. If none is provided, the default locale is used. If the requested locale is not available, the `collator` will use a system-defined fallback locale. Use `resolved-locale` to test the results of locale fallback behavior.
+    Collator,
+    #[serde(rename="concat")]
+    /// Returns a `string` consisting of the concatenation of the inputs. Each input is converted to a string as if by `to-string`.
+
+     - [Add a generated icon to the map](https://maplibre.org/maplibre-gl-js/docs/examples/add-a-generated-icon-to-the-map/)
+
+     - [Create a time slider](https://maplibre.org/maplibre-gl-js/docs/examples/create-a-time-slider/)
+
+     - [Use a fallback image](https://maplibre.org/maplibre-gl-js/docs/examples/fallback-image/)
+
+     - [Variable label placement](https://maplibre.org/maplibre-gl-js/docs/examples/variable-label-placement/)
+    Concat,
+    #[serde(rename="cos")]
+    /// Returns the cosine of the input.
+    Cos,
+    #[serde(rename="distance")]
+    /// Returns the shortest distance in meters between the evaluated feature and the input geometry. The input value can be a valid GeoJSON of type `Point`, `MultiPoint`, `LineString`, `MultiLineString`, `Polygon`, `MultiPolygon`, `Feature`, or `FeatureCollection`. Distance values returned may vary in precision due to loss in precision from encoding geometries, particularly below zoom level 13.
+    Distance,
+    #[serde(rename="downcase")]
+    /// Returns the input string converted to lowercase. Follows the Unicode Default Case Conversion algorithm and the locale-insensitive case mappings in the Unicode Character Database.
+
+     - [Change the case of labels](https://maplibre.org/maplibre-gl-js/docs/examples/change-case-of-labels/)
+    Downcase,
+    #[serde(rename="e")]
+    /// Returns the mathematical constant e.
+    E,
+    #[serde(rename="elevation")]
+    /// Gets the elevation of a pixel (in meters above the vertical datum reference of the `raster-dem` tiles) from a `raster-dem` source. Can only be used in the `color-relief-color` property of a `color-relief` layer.
+    Elevation,
+    #[serde(rename="feature-state")]
+    /// Retrieves a property value from the current feature's state. Returns null if the requested property is not present on the feature's state. A feature's state is not part of the GeoJSON or vector tile data, and must be set programmatically on each feature. When `source.promoteId` is not provided, features are identified by their `id` attribute, which must be an integer or a string that can be cast to an integer. When `source.promoteId` is provided, features are identified by their `promoteId` property, which may be a number, string, or any primitive data type. Note that ["feature-state"] can only be used with paint properties that support data-driven styling.
+
+     - [Create a hover effect](https://maplibre.org/maplibre-gl-js/docs/examples/create-a-hover-effect/)
+    FeatureState,
+    #[serde(rename="floor")]
+    /// Returns the largest integer that is less than or equal to the input.
+    Floor,
+    #[serde(rename="format")]
+    /// Returns a `formatted` string for displaying mixed-format text in the `text-field` property. The input may contain a string literal or expression, including an [`'image'`](#image) expression. Strings may be followed by a style override object that supports the following properties:
+
+    - `"text-font"`: Overrides the font stack specified by the root layout property.
+
+    - `"text-color"`: Overrides the color specified by the root paint property.
+
+    - `"font-scale"`: Applies a scaling factor on `text-size` as specified by the root layout property.
+
+    - `"vertical-align"`: Aligns vertically text section or image in relation to the row it belongs to. Possible values are: 
+    	- `"bottom"` *default*: align the bottom of this section with the bottom of other sections.
+    <img alt="Visual representation of bottom alignment" src="https://github.com/user-attachments/assets/0474a2fd-a4b2-417c-9187-7a13a28695bc"/>
+    	- `"center"`: align the center of this section with the center of other sections.
+    <img alt="Visual representation of center alignment" src="https://github.com/user-attachments/assets/92237455-be6d-4c5d-b8f6-8127effc1950"/>
+    	- `"top"`: align the top of this section with the top of other sections.
+    <img alt="Visual representation of top alignment" src="https://github.com/user-attachments/assets/45dccb28-d977-4abb-a006-4ea9792b7c53"/>
+    	- Refer to [the design proposal](https://github.com/maplibre/maplibre-style-spec/issues/832) for more details.
+
+     - [Change the case of labels](https://maplibre.org/maplibre-gl-js/docs/examples/change-case-of-labels/)
+
+     - [Display and style rich text labels](https://maplibre.org/maplibre-gl-js/docs/examples/display-and-style-rich-text-labels/)
+    Format,
+    #[serde(rename="geometry-type")]
+    /// Returns the feature's simple geometry type: `Point`, `LineString`, or `Polygon`. `MultiPoint`, `MultiLineString`, and `MultiPolygon` are returned as `Point`, `LineString`, and `Polygon`, respectively.
+    GeometryType,
+    #[serde(rename="get")]
+    /// Retrieves a property value from the current feature's properties, or from another object if a second argument is provided. Returns null if the requested property is missing.
+
+     - [Change the case of labels](https://maplibre.org/maplibre-gl-js/docs/examples/change-case-of-labels/)
+
+     - [Display HTML clusters with custom properties](https://maplibre.org/maplibre-gl-js/docs/examples/display-html-clusters-with-custom-properties/)
+
+     - [Extrude polygons for 3D indoor mapping](https://maplibre.org/maplibre-gl-js/docs/examples/extrude-polygons-for-3d-indoor-mapping/)
+    Get,
+    #[serde(rename="global-state")]
+    /// Retrieves a property value from global state that can be set with platform-specific APIs. Defaults can be provided using the [`state`](https://maplibre.org/maplibre-style-spec/root/#state) root property. Returns `null` if no value nor default value is set for the retrieved property.
+    GlobalState,
+    #[serde(rename="has")]
+    /// Tests for the presence of a property value in the current feature's properties, or from another object if a second argument is provided.
+
+     - [Create and style clusters](https://maplibre.org/maplibre-gl-js/docs/examples/create-and-style-clusters/)
+    Has,
+    #[serde(rename="heatmap-density")]
+    /// Gets the kernel density estimation of a pixel in a heatmap layer, which is a relative measure of how many data points are crowded around a particular pixel. Can only be used in the `heatmap-color` property.
+    HeatmapDensity,
+    #[serde(rename="id")]
+    /// Gets the feature's id, if it has one.
+    Id,
+    #[serde(rename="image")]
+    /// Returns an `image` type for use in `icon-image`, `*-pattern` entries and as a section in the `format` expression. If set, the `image` argument will check that the requested image exists in the style and will return either the resolved image name or `null`, depending on whether or not the image is currently in the style. This validation process is synchronous and requires the image to have been added to the style before requesting it in the `image` argument.
+
+     - [Use a fallback image](https://maplibre.org/maplibre-gl-js/docs/examples/use-a-fallback-image/)
+    Image,
+    #[serde(rename="in")]
+    /// Determines whether an item exists in an array or a substring exists in a string.
+
+     - [Measure distances](https://maplibre.org/maplibre-gl-js/docs/examples/measure-distances/)
+    In,
+    #[serde(rename="index-of")]
+    /// Returns the first position at which an item can be found in an array or a substring can be found in a string, or `-1` if the input cannot be found. Accepts an optional index from where to begin the search. In a string, a UTF-16 surrogate pair counts as a single position.
+    IndexOf,
+    #[serde(rename="interpolate")]
+    /// Produces continuous, smooth results by interpolating between pairs of input and output values ("stops"). The `input` may be any numeric expression (e.g., `["get", "population"]`). Stop inputs must be numeric literals in strictly ascending order. The output type must be `number`, `array<number>`, `color`, `array<color>`, or `projection`.
+
+    Interpolation types:
+
+    - `["linear"]`, or an expression returning one of those types: Interpolates linearly between the pair of stops just less than and just greater than the input.
+
+    - `["exponential", base]`: Interpolates exponentially between the stops just less than and just greater than the input. `base` controls the rate at which the output increases: higher values make the output increase more towards the high end of the range. With values close to 1 the output increases linearly.
+
+    - `["cubic-bezier", x1, y1, x2, y2]`: Interpolates using the cubic bezier curve defined by the given control points.
+
+     - [Animate map camera around a point](https://maplibre.org/maplibre-gl-js/docs/examples/animate-camera-around-point/)
+
+     - [Change building color based on zoom level](https://maplibre.org/maplibre-gl-js/docs/examples/change-building-color-based-on-zoom-level/)
+
+     - [Create a heatmap layer](https://maplibre.org/maplibre-gl-js/docs/examples/heatmap-layer/)
+
+     - [Visualize population density](https://maplibre.org/maplibre-gl-js/docs/examples/visualize-population-density/)
+    Interpolate,
+    #[serde(rename="interpolate-hcl")]
+    /// Produces continuous, smooth results by interpolating between pairs of input and output values ("stops"). Works like `interpolate`, but the output type must be `color` or `array<color>`, and the interpolation is performed in the Hue-Chroma-Luminance color space.
+    InterpolateHcl,
+    #[serde(rename="interpolate-lab")]
+    /// Produces continuous, smooth results by interpolating between pairs of input and output values ("stops"). Works like `interpolate`, but the output type must be `color` or `array<color>`, and the interpolation is performed in the CIELAB color space.
+    InterpolateLab,
+    #[serde(rename="is-supported-script")]
+    /// Returns `true` if the input string is expected to render legibly. Returns `false` if the input string contains sections that cannot be rendered without potential loss of meaning (e.g. Indic scripts that require complex text shaping, or right-to-left scripts if the `mapbox-gl-rtl-text` plugin is not in use in MapLibre GL JS).
+    IsSupportedScript,
+    #[serde(rename="length")]
+    /// Gets the length of an array or string. In a string, a UTF-16 surrogate pair counts as a single position.
+    Length,
+    #[serde(rename="let")]
+    /// Binds expressions to named variables, which can then be referenced in the result expression using `["var", "variable_name"]`.
+
+     - [Visualize population density](https://maplibre.org/maplibre-gl-js/docs/examples/visualize-population-density/)
+    Let,
+    #[serde(rename="line-progress")]
+    /// Gets the progress along a gradient line. Can only be used in the `line-gradient` property.
+    LineProgress,
+    #[serde(rename="literal")]
+    /// Provides a literal array or object value.
+
+     - [Display and style rich text labels](https://maplibre.org/maplibre-gl-js/docs/examples/display-and-style-rich-text-labels/)
+    Literal,
+    #[serde(rename="ln")]
+    /// Returns the natural logarithm of the input.
+    Ln,
+    #[serde(rename="ln2")]
+    /// Returns the mathematical constant ln(2).
+    Ln2,
+    #[serde(rename="log10")]
+    /// Returns the base-ten logarithm of the input.
+    Log10,
+    #[serde(rename="log2")]
+    /// Returns the base-two logarithm of the input.
+    Log2,
+    #[serde(rename="match")]
+    /// Selects the output whose label value matches the input value, or the fallback value if no match is found. The input can be any expression (e.g. `["get", "building_type"]`). Each label must be either:
+
+     - a single literal value; or
+
+     - an array of literal values, whose values must be all strings or all numbers (e.g. `[100, 101]` or `["c", "b"]`). The input matches if any of the values in the array matches, similar to the `"in"` operator.
+
+    Each label must be unique. If the input type does not match the type of the labels, the result will be the fallback value.
+    Match,
+    #[serde(rename="max")]
+    /// Returns the maximum value of the inputs.
+    Max,
+    #[serde(rename="min")]
+    /// Returns the minimum value of the inputs.
+    Min,
+    #[serde(rename="number")]
+    /// Asserts that the input value is a number. If multiple values are provided, each one is evaluated in order until a number is obtained. If none of the inputs are numbers, the expression is an error.
+    Number,
+    #[serde(rename="number-format")]
+    /// Converts the input number into a string representation using the providing formatting rules. If set, the `locale` argument specifies the locale to use, as a BCP 47 language tag. If set, the `currency` argument specifies an ISO 4217 code to use for currency-style formatting. If set, the `min-fraction-digits` and `max-fraction-digits` arguments specify the minimum and maximum number of fractional digits to include.
+
+     - [Display HTML clusters with custom properties](https://maplibre.org/maplibre-gl-js/docs/examples/display-html-clusters-with-custom-properties/)
+    NumberFormat,
+    #[serde(rename="object")]
+    /// Asserts that the input value is an object. If multiple values are provided, each one is evaluated in order until an object is obtained. If none of the inputs are objects, the expression is an error.
+    Object,
+    #[serde(rename="pi")]
+    /// Returns the mathematical constant pi.
+    Pi,
+    #[serde(rename="properties")]
+    /// Gets the feature properties object.  Note that in some cases, it may be more efficient to use ["get", "property_name"] directly.
+    Properties,
+    #[serde(rename="resolved-locale")]
+    /// Returns the IETF language tag of the locale being used by the provided `collator`. This can be used to determine the default system locale, or to determine if a requested locale was successfully loaded.
+    ResolvedLocale,
+    #[serde(rename="rgb")]
+    /// Creates a color value from red, green, and blue components, which must range between 0 and 255, and an alpha component of 1. If any component is out of range, the expression is an error.
+    Rgb,
+    #[serde(rename="rgba")]
+    /// Creates a color value from red, green, blue components, which must range between 0 and 255, and an alpha component which must range between 0 and 1. If any component is out of range, the expression is an error.
+    Rgba,
+    #[serde(rename="round")]
+    /// Rounds the input to the nearest integer. Halfway values are rounded away from zero. For example, `["round", -1.5]` evaluates to -2.
+    Round,
+    #[serde(rename="sin")]
+    /// Returns the sine of the input.
+    Sin,
+    #[serde(rename="slice")]
+    /// Returns a subarray from an array or a substring from a string from a specified start index, or between a start index and an end index if set. The return value is inclusive of the start index but not of the end index. In a string, a UTF-16 surrogate pair counts as a single position.
+    Slice,
+    #[serde(rename="sqrt")]
+    /// Returns the square root of the input.
+    Sqrt,
+    #[serde(rename="step")]
+    /// Produces discrete, stepped results by evaluating a piecewise-constant function defined by pairs of input and output values ("stops"). The `input` may be any numeric expression (e.g., `["get", "population"]`). Stop inputs must be numeric literals in strictly ascending order.
+
+    Returns the output value of the stop just less than the input, or the first output if the input is less than the first stop.
+
+     - [Create and style clusters](https://maplibre.org/maplibre-gl-js/docs/examples/create-and-style-clusters/)
+    Step,
+    #[serde(rename="string")]
+    /// Asserts that the input value is a string. If multiple values are provided, each one is evaluated in order until a string is obtained. If none of the inputs are strings, the expression is an error.
+    String,
+    #[serde(rename="tan")]
+    /// Returns the tangent of the input.
+    Tan,
+    #[serde(rename="to-boolean")]
+    /// Converts the input value to a boolean. The result is `false` when the input is an empty string, 0, `false`, `null`, or `NaN`; otherwise it is `true`.
+    ToBoolean,
+    #[serde(rename="to-color")]
+    /// Converts the input value to a color. If multiple values are provided, each one is evaluated in order until the first successful conversion is obtained. If none of the inputs can be converted, the expression is an error.
+
+     - [Visualize population density](https://maplibre.org/maplibre-gl-js/docs/examples/visualize-population-density/)
+    ToColor,
+    #[serde(rename="to-number")]
+    /// Converts the input value to a number, if possible. If the input is `null` or `false`, the result is 0. If the input is `true`, the result is 1. If the input is a string, it is converted to a number as specified by the ["ToNumber Applied to the String Type" algorithm](https://tc39.github.io/ecma262/#sec-tonumber-applied-to-the-string-type) of the ECMAScript Language Specification. If multiple values are provided, each one is evaluated in order until the first successful conversion is obtained. If none of the inputs can be converted, the expression is an error.
+    ToNumber,
+    #[serde(rename="to-rgba")]
+    /// Returns a four-element array containing the input color's red, green, blue, and alpha components, in that order.
+    ToRgba,
+    #[serde(rename="to-string")]
+    /// Converts the input value to a string. If the input is `null`, the result is `""`. If the input is a boolean, the result is `"true"` or `"false"`. If the input is a number, it is converted to a string as specified by the ["NumberToString" algorithm](https://tc39.github.io/ecma262/#sec-tostring-applied-to-the-number-type) of the ECMAScript Language Specification. If the input is a color, it is converted to a string of the form `"rgba(r,g,b,a)"`, where `r`, `g`, and `b` are numerals ranging from 0 to 255, and `a` ranges from 0 to 1. Otherwise, the input is converted to a string in the format specified by the [`JSON.stringify`](https://tc39.github.io/ecma262/#sec-json.stringify) function of the ECMAScript Language Specification.
+
+     - [Create a time slider](https://maplibre.org/maplibre-gl-js/docs/examples/create-a-time-slider/)
+    ToString,
+    #[serde(rename="typeof")]
+    /// Returns a string describing the type of the given value.
+    Typeof,
+    #[serde(rename="upcase")]
+    /// Returns the input string converted to uppercase. Follows the Unicode Default Case Conversion algorithm and the locale-insensitive case mappings in the Unicode Character Database.
+
+     - [Change the case of labels](https://maplibre.org/maplibre-gl-js/docs/examples/change-case-of-labels/)
+    Upcase,
+    #[serde(rename="var")]
+    /// References variable bound using `let`.
+
+     - [Visualize population density](https://maplibre.org/maplibre-gl-js/docs/examples/visualize-population-density/)
+    Var,
+    #[serde(rename="within")]
+    /// Returns `true` if the evaluated feature is fully contained inside a boundary of the input geometry, `false` otherwise. The input value can be a valid GeoJSON of type `Polygon`, `MultiPolygon`, `Feature`, or `FeatureCollection`. Supported features for evaluation:
+
+    - `Point`: Returns `false` if a point is on the boundary or falls outside the boundary.
+
+    - `LineString`: Returns `false` if any part of a line falls outside the boundary, the line intersects the boundary, or a line's endpoint is on the boundary.
+    Within,
+    #[serde(rename="zoom")]
+    /// Gets the current zoom level.  Note that in style layout and paint properties, ["zoom"] may only appear as the input to a top-level "step" or "interpolate" expression.
+    Zoom,
+}
+
+/// A filter selects specific features from a layer.
+#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+#[deprecated = "not_implemented"]
+struct Filter(serde_json::Value);
+
+/// The filter operator.
+#[derive(serde::Deserialize, PartialEq, Eq, Debug, Clone, Copy)]
+pub enum FilterOperator {
+    #[serde(rename="!=")]
+    /// `["!=", key, value]` inequality: `feature[key] ≠ value`
+    ,
+    #[serde(rename="!has")]
+    /// `["!has", key]` `feature[key]` does not exist
+    Has,
+    #[serde(rename="!in")]
+    /// `["!in", key, v0, ..., vn]` set exclusion: `feature[key] ∉ {v0, ..., vn}`
+    In,
+    #[serde(rename="<")]
+    /// `["<", key, value]` less than: `feature[key] < value`
+    ,
+    #[serde(rename="<=")]
+    /// `["<=", key, value]` less than or equal: `feature[key] ≤ value`
+    ,
+    #[serde(rename="==")]
+    /// `["==", key, value]` equality: `feature[key] = value`
+    ,
+    #[serde(rename=">")]
+    /// `[">", key, value]` greater than: `feature[key] > value`
+    ,
+    #[serde(rename=">=")]
+    /// `[">=", key, value]` greater than or equal: `feature[key] ≥ value`
+    ,
+    #[serde(rename="all")]
+    /// `["all", f0, ..., fn]` logical `AND`: `f0 ∧ ... ∧ fn`
+    All,
+    #[serde(rename="any")]
+    /// `["any", f0, ..., fn]` logical `OR`: `f0 ∨ ... ∨ fn`
+    Any,
+    #[serde(rename="has")]
+    /// `["has", key]` `feature[key]` exists
+    Has,
+    #[serde(rename="in")]
+    /// `["in", key, v0, ..., vn]` set inclusion: `feature[key] ∈ {v0, ..., vn}`
+    In,
+    #[serde(rename="none")]
+    /// `["none", f0, ..., fn]` logical `NOR`: `¬f0 ∧ ... ∧ ¬fn`
+    None,
 }
 
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-pub struct PaintBackground {
-    /// The color with which the background will be drawn.
-    pub background-color: BackgroundColor,
-    /// Name of image in sprite to use for drawing an image background. For seamless patterns, image width and height must be a factor of two (2, 4, 8, ..., 512). Note that zoom-dependent expressions will be evaluated only at integer zoom levels.
-    pub background-pattern: BackgroundPattern,
-    /// The opacity at which the background will be drawn.
-    pub background-opacity: BackgroundOpacity,
+pub struct Function {
+    /// The exponential base of the interpolation curve. It controls the rate at which the result increases. Higher values make the result increase more towards the high end of the range. With `1` the stops are interpolated linearly.
+    #[serde(rename="base")]
+    pub base: Base,
+    /// The color space in which colors interpolated. Interpolating colors in perceptual color spaces like LAB and HCL tend to produce color ramps that look more consistent and produce colors that can be differentiated more easily than those interpolated in RGB space.
+    #[serde(rename="colorSpace")]
+    pub color_space: Colorspace,
+    /// A value to serve as a fallback function result when a value isn't otherwise available. It is used in the following circumstances:
+    /// 
+    /// * In categorical functions, when the feature value does not match any of the stop domain values.
+    /// 
+    /// * In property and zoom-and-property functions, when a feature does not contain a value for the specified property.
+    /// 
+    /// * In identity functions, when the feature value is not valid for the style property (for example, if the function is being used for a `circle-color` property but the feature property value is not a string or not a valid color).
+    /// 
+    /// * In interval or exponential property and zoom-and-property functions, when the feature value is not numeric.
+    /// 
+    /// If no default is provided, the style property's default is used in these circumstances.
+    #[serde(rename="default")]
+    pub default: r#Default,
+    /// An expression.
+    #[serde(rename="expression")]
+    pub expression: Expression,
+    /// The name of a feature property to use as the function input.
+    #[serde(rename="property")]
+    pub property: Property,
+    /// An array of stops.
+    #[serde(rename="stops")]
+    pub stops: Stops,
+    /// The interpolation strategy to use in function evaluation.
+    #[serde(rename="type")]
+    pub r#type: Type,
 }
 
-/// The color with which the background will be drawn.
-#[deprecated = "not_implemented"]
-struct BackgroundColor(serde_json::Value);
-
-impl Default for BackgroundColor {
-    fn default() {
-        "#000000"
-    }
-}
-
-/// Name of image in sprite to use for drawing an image background. For seamless patterns, image width and height must be a factor of two (2, 4, 8, ..., 512). Note that zoom-dependent expressions will be evaluated only at integer zoom levels.
-#[deprecated = "not_implemented"]
-struct BackgroundPattern(serde_json::Value);
-
-/// The opacity at which the background will be drawn.
+/// The exponential base of the interpolation curve. It controls the rate at which the result increases. Higher values make the result increase more towards the high end of the range. With `1` the stops are interpolated linearly.
 ///
 /// # Range
-/// - Maximum: 1
 /// - Minimum: 0
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-pub struct BackgroundOpacity(serde_json::Number);
+pub struct Base(serde_json::Number);
 
-impl Default for BackgroundOpacity {
+impl Default for Base {
     fn default() {
         1
     }
 }
 
-#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-pub struct PaintHillshade {
-    /// Direction of light source when map is rotated.
-    pub hillshade-illumination-anchor: HillshadeIlluminationAnchor,
-    /// The shading color of areas that faces towards the light source(s). Only when `hillshade-method` is set to `multidirectional` can you specify multiple light sources.
-    pub hillshade-highlight-color: HillshadeHighlightColor,
-    /// Intensity of the hillshade
-    pub hillshade-exaggeration: HillshadeExaggeration,
-    /// The shading color used to accentuate rugged terrain like sharp cliffs and gorges.
-    pub hillshade-accent-color: HillshadeAccentColor,
-    /// The shading color of areas that face away from the light source(s). Only when `hillshade-method` is set to `multidirectional` can you specify multiple light sources.
-    pub hillshade-shadow-color: HillshadeShadowColor,
-    /// The altitude of the light source(s) used to generate the hillshading with 0 as sunset and 90 as noon. Only when `hillshade-method` is set to `multidirectional` can you specify multiple light sources.
-    pub hillshade-illumination-altitude: HillshadeIlluminationAltitude,
-    /// The hillshade algorithm to use, one of `standard`, `basic`, `combined`, `igor`, or `multidirectional`. ![image](assets/hillshade_methods.png)
-    pub hillshade-method: HillshadeMethod,
-    /// The direction of the light source(s) used to generate the hillshading with 0 as the top of the viewport if `hillshade-illumination-anchor` is set to `viewport` and due north if `hillshade-illumination-anchor` is set to `map`. Only when `hillshade-method` is set to `multidirectional` can you specify multiple light sources.
-    pub hillshade-illumination-direction: HillshadeIlluminationDirection,
-}
-
-/// Direction of light source when map is rotated.
+/// The color space in which colors interpolated. Interpolating colors in perceptual color spaces like LAB and HCL tend to produce color ramps that look more consistent and produce colors that can be differentiated more easily than those interpolated in RGB space.
 #[derive(serde::Deserialize, PartialEq, Eq, Debug, Clone, Copy)]
-pub enum HillshadeIlluminationAnchor {
-    #[serde(rename="viewport")]
-    /// The hillshade illumination is relative to the top of the viewport.
-    Viewport,
-    #[serde(rename="map")]
-    /// The hillshade illumination is relative to the north direction.
-    Map,
+pub enum Colorspace {
+    #[serde(rename="hcl")]
+    /// Use the HCL color space to interpolate color values, interpolating the Hue, Chroma, and Luminance channels individually.
+    Hcl,
+    #[serde(rename="lab")]
+    /// Use the LAB color space to interpolate color values.
+    Lab,
+    #[serde(rename="rgb")]
+    /// Use the RGB color space to interpolate color values
+    Rgb,
 }
 
-impl Default for HillshadeIlluminationAnchor {
+impl Default for Colorspace {
     fn default() {
-        "viewport"
+        "rgb"
     }
 }
 
-/// The shading color of areas that faces towards the light source(s). Only when `hillshade-method` is set to `multidirectional` can you specify multiple light sources.
-#[deprecated = "not_implemented"]
-struct HillshadeHighlightColor(serde_json::Value);
-
-impl Default for HillshadeHighlightColor {
-    fn default() {
-        #FFFFFF
-    }
-}
-
-/// Intensity of the hillshade
+/// A value to serve as a fallback function result when a value isn't otherwise available. It is used in the following circumstances:
 ///
-/// # Range
-/// - Maximum: 1
-/// - Minimum: 0
-#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-pub struct HillshadeExaggeration(serde_json::Number);
-
-impl Default for HillshadeExaggeration {
-    fn default() {
-        0.5
-    }
-}
-
-/// The shading color used to accentuate rugged terrain like sharp cliffs and gorges.
-#[deprecated = "not_implemented"]
-struct HillshadeAccentColor(serde_json::Value);
-
-impl Default for HillshadeAccentColor {
-    fn default() {
-        "#000000"
-    }
-}
-
-/// The shading color of areas that face away from the light source(s). Only when `hillshade-method` is set to `multidirectional` can you specify multiple light sources.
-#[deprecated = "not_implemented"]
-struct HillshadeShadowColor(serde_json::Value);
-
-impl Default for HillshadeShadowColor {
-    fn default() {
-        #000000
-    }
-}
-
-/// The altitude of the light source(s) used to generate the hillshading with 0 as sunset and 90 as noon. Only when `hillshade-method` is set to `multidirectional` can you specify multiple light sources.
-#[deprecated = "not_implemented"]
-struct HillshadeIlluminationAltitude(serde_json::Value);
-
-impl Default for HillshadeIlluminationAltitude {
-    fn default() {
-        45
-    }
-}
-
-/// The hillshade algorithm to use, one of `standard`, `basic`, `combined`, `igor`, or `multidirectional`. ![image](assets/hillshade_methods.png)
-#[derive(serde::Deserialize, PartialEq, Eq, Debug, Clone, Copy)]
-pub enum HillshadeMethod {
-    #[serde(rename="basic")]
-    /// Basic hillshade. Uses a simple physics model where the reflected light intensity is proportional to the cosine of the angle between the incident light and the surface normal. Similar to GDAL's `gdaldem` default algorithm.
-    Basic,
-    #[serde(rename="combined")]
-    /// Hillshade algorithm whose intensity scales with slope. Similar to GDAL's `gdaldem` with `-combined` option.
-    Combined,
-    #[serde(rename="multidirectional")]
-    /// Hillshade with multiple illumination directions. Uses the basic hillshade model with multiple independent light sources.
-    Multidirectional,
-    #[serde(rename="standard")]
-    /// The legacy hillshade method.
-    Standard,
-    #[serde(rename="igor")]
-    /// Hillshade algorithm which tries to minimize effects on other map features beneath. Similar to GDAL's `gdaldem` with `-igor` option.
-    Igor,
-}
-
-impl Default for HillshadeMethod {
-    fn default() {
-        "standard"
-    }
-}
-
-/// The direction of the light source(s) used to generate the hillshading with 0 as the top of the viewport if `hillshade-illumination-anchor` is set to `viewport` and due north if `hillshade-illumination-anchor` is set to `map`. Only when `hillshade-method` is set to `multidirectional` can you specify multiple light sources.
-#[deprecated = "not_implemented"]
-struct HillshadeIlluminationDirection(serde_json::Value);
-
-impl Default for HillshadeIlluminationDirection {
-    fn default() {
-        335
-    }
-}
-
-#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-pub struct Transition {
-    /// Time allotted for transitions to complete.
-    pub duration: Duration,
-    /// Length of time before a transition begins.
-    pub delay: Delay,
-}
-
-/// Time allotted for transitions to complete.
+/// * In categorical functions, when the feature value does not match any of the stop domain values.
 ///
-/// # Range
-/// - Minimum: 0
-#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-pub struct Duration(serde_json::Number);
-
-impl Default for Duration {
-    fn default() {
-        300
-    }
-}
-
-/// Length of time before a transition begins.
+/// * In property and zoom-and-property functions, when a feature does not contain a value for the specified property.
 ///
-/// # Range
-/// - Minimum: 0
+/// * In identity functions, when the feature value is not valid for the style property (for example, if the function is being used for a `circle-color` property but the feature property value is not a string or not a valid color).
+///
+/// * In interval or exponential property and zoom-and-property functions, when the feature value is not numeric.
+///
+/// If no default is provided, the style property's default is used in these circumstances.
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-pub struct Delay(serde_json::Number);
+#[deprecated = "not_implemented"]
+struct r#Default(serde_json::Value);
 
-impl Default for Delay {
+/// An expression.
+#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+#[deprecated = "not_implemented"]
+struct Expression(serde_json::Value);
+
+/// The name of a feature property to use as the function input.
+#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+#[deprecated = "not_implemented"]
+struct Property(serde_json::Value);
+
+impl Default for Property {
     fn default() {
-        0
+        $zoom
     }
 }
 
+/// An array of stops.
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-pub struct SourceVideo {
-    /// URLs to video content in order of preferred format.
-    pub urls: Urls,
-    /// The data type of the video source.
-    pub type: Type,
-    /// Corners of video specified in longitude, latitude pairs.
-    pub coordinates: Coordinates,
-}
-
-/// URLs to video content in order of preferred format.
 #[deprecated = "not_implemented"]
-struct Urls(serde_json::Value);
+struct Stops(serde_json::Value);
 
-/// The data type of the video source.
+/// The interpolation strategy to use in function evaluation.
 #[derive(serde::Deserialize, PartialEq, Eq, Debug, Clone, Copy)]
 pub enum Type {
-    #[serde(rename="video")]
-    /// A video data source.
-    Video,
+    #[serde(rename="categorical")]
+    /// Return the output value of the stop equal to the function input.
+    Categorical,
+    #[serde(rename="exponential")]
+    /// Generate an output by interpolating between stops just less than and just greater than the function input.
+    Exponential,
+    #[serde(rename="identity")]
+    /// Return the input value as the output value.
+    Identity,
+    #[serde(rename="interval")]
+    /// Return the output value of the stop just less than the function input.
+    Interval,
 }
 
-/// Corners of video specified in longitude, latitude pairs.
+impl Default for Type {
+    fn default() {
+        "exponential"
+    }
+}
+
+/// Zoom level and value pair.
+#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
 #[deprecated = "not_implemented"]
-struct Coordinates(serde_json::Value);
-
-#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-pub struct Promoteid {
-    /// A name of a feature property to use as ID for feature state.
-    pub *: ,
-}
-
-/// A name of a feature property to use as ID for feature state.
-#[deprecated = "not_implemented"]
-struct (serde_json::Value);
-
-#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-pub struct PaintFillExtrusion {
-    /// Controls the frame of reference for `fill-extrusion-translate`.
-    pub fill-extrusion-translate-anchor: FillExtrusionTranslateAnchor,
-    /// The opacity of the entire fill extrusion layer. This is rendered on a per-layer, not per-feature, basis, and data-driven styling is not available.
-    pub fill-extrusion-opacity: FillExtrusionOpacity,
-    /// The geometry's offset. Values are [x, y] where negatives indicate left and up (on the flat plane), respectively.
-    pub fill-extrusion-translate: FillExtrusionTranslate,
-    /// The height with which to extrude the base of this layer. Must be less than or equal to `fill-extrusion-height`.
-    pub fill-extrusion-base: FillExtrusionBase,
-    /// The height with which to extrude this layer.
-    pub fill-extrusion-height: FillExtrusionHeight,
-    /// The base color of the extruded fill. The extrusion's surfaces will be shaded differently based on this color in combination with the root `light` settings. If this color is specified as `rgba` with an alpha component, the alpha component will be ignored; use `fill-extrusion-opacity` to set layer opacity.
-    pub fill-extrusion-color: FillExtrusionColor,
-    /// Name of image in sprite to use for drawing images on extruded fills. For seamless patterns, image width and height must be a factor of two (2, 4, 8, ..., 512). Note that zoom-dependent expressions will be evaluated only at integer zoom levels.
-    pub fill-extrusion-pattern: FillExtrusionPattern,
-    /// Whether to apply a vertical gradient to the sides of a fill-extrusion layer. If true, sides will be shaded slightly darker farther down.
-    pub fill-extrusion-vertical-gradient: FillExtrusionVerticalGradient,
-}
-
-/// Controls the frame of reference for `fill-extrusion-translate`.
-#[derive(serde::Deserialize, PartialEq, Eq, Debug, Clone, Copy)]
-pub enum FillExtrusionTranslateAnchor {
-    #[serde(rename="map")]
-    /// The fill extrusion is translated relative to the map.
-    Map,
-    #[serde(rename="viewport")]
-    /// The fill extrusion is translated relative to the viewport.
-    Viewport,
-}
-
-impl Default for FillExtrusionTranslateAnchor {
-    fn default() {
-        "map"
-    }
-}
-
-/// The opacity of the entire fill extrusion layer. This is rendered on a per-layer, not per-feature, basis, and data-driven styling is not available.
-///
-/// # Range
-/// - Maximum: 1
-/// - Minimum: 0
-#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-pub struct FillExtrusionOpacity(serde_json::Number);
-
-impl Default for FillExtrusionOpacity {
-    fn default() {
-        1
-    }
-}
-
-/// The geometry's offset. Values are [x, y] where negatives indicate left and up (on the flat plane), respectively.
-#[deprecated = "not_implemented"]
-struct FillExtrusionTranslate(serde_json::Value);
-
-impl Default for FillExtrusionTranslate {
-    fn default() {
-        vec![0, 0]
-    }
-}
-
-/// The height with which to extrude the base of this layer. Must be less than or equal to `fill-extrusion-height`.
-///
-/// # Range
-/// - Minimum: 0
-#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-pub struct FillExtrusionBase(serde_json::Number);
-
-impl Default for FillExtrusionBase {
-    fn default() {
-        0
-    }
-}
-
-/// The height with which to extrude this layer.
-///
-/// # Range
-/// - Minimum: 0
-#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-pub struct FillExtrusionHeight(serde_json::Number);
-
-impl Default for FillExtrusionHeight {
-    fn default() {
-        0
-    }
-}
-
-/// The base color of the extruded fill. The extrusion's surfaces will be shaded differently based on this color in combination with the root `light` settings. If this color is specified as `rgba` with an alpha component, the alpha component will be ignored; use `fill-extrusion-opacity` to set layer opacity.
-#[deprecated = "not_implemented"]
-struct FillExtrusionColor(serde_json::Value);
-
-impl Default for FillExtrusionColor {
-    fn default() {
-        "#000000"
-    }
-}
-
-/// Name of image in sprite to use for drawing images on extruded fills. For seamless patterns, image width and height must be a factor of two (2, 4, 8, ..., 512). Note that zoom-dependent expressions will be evaluated only at integer zoom levels.
-#[deprecated = "not_implemented"]
-struct FillExtrusionPattern(serde_json::Value);
-
-/// Whether to apply a vertical gradient to the sides of a fill-extrusion layer. If true, sides will be shaded slightly darker farther down.
-#[deprecated = "not_implemented"]
-struct FillExtrusionVerticalGradient(serde_json::Value);
-
-impl Default for FillExtrusionVerticalGradient {
-    fn default() {
-        true
-    }
-}
-
-#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-pub struct LayoutCircle {
-    /// Sorts features in ascending order based on this value. Features with a higher sort key will appear above features with a lower sort key.
-    pub circle-sort-key: CircleSortKey,
-    /// Whether this layer is displayed.
-    pub visibility: Visibility,
-}
-
-/// Sorts features in ascending order based on this value. Features with a higher sort key will appear above features with a lower sort key.
-#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-pub struct CircleSortKey(serde_json::Number);
-
-/// Whether this layer is displayed.
-#[derive(serde::Deserialize, PartialEq, Eq, Debug, Clone, Copy)]
-pub enum Visibility {
-    #[serde(rename="visible")]
-    /// The layer is shown.
-    Visible,
-    #[serde(rename="none")]
-    /// The layer is not shown.
-    None,
-}
-
-impl Default for Visibility {
-    fn default() {
-        "visible"
-    }
-}
-
-#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-pub struct LayoutBackground {
-    /// Whether this layer is displayed.
-    pub visibility: Visibility,
-}
-
-/// Whether this layer is displayed.
-#[derive(serde::Deserialize, PartialEq, Eq, Debug, Clone, Copy)]
-pub enum Visibility {
-    #[serde(rename="none")]
-    /// The layer is not shown.
-    None,
-    #[serde(rename="visible")]
-    /// The layer is shown.
-    Visible,
-}
-
-impl Default for Visibility {
-    fn default() {
-        "visible"
-    }
-}
-
-#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-pub enum Source {
-    #[serde(rename="source_vector")]
-    SourceVector(SourceVector),
-    #[serde(rename="source_raster")]
-    SourceRaster(SourceRaster),
-    #[serde(rename="source_raster_dem")]
-    SourceRasterDem(SourceRasterDem),
-    #[serde(rename="source_geojson")]
-    SourceGeojson(SourceGeojson),
-    #[serde(rename="source_video")]
-    SourceVideo(SourceVideo),
-    #[serde(rename="source_image")]
-    SourceImage(SourceImage),
-}
-
-#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-pub struct Sources {
-    /// Specification of a data source. For vector and raster sources, either TileJSON or a URL to a TileJSON must be provided. For image and video sources, a URL must be provided. For GeoJSON sources, a URL or inline GeoJSON must be provided.
-    pub *: ,
-}
-
-/// Specification of a data source. For vector and raster sources, either TileJSON or a URL to a TileJSON must be provided. For image and video sources, a URL must be provided. For GeoJSON sources, a URL or inline GeoJSON must be provided.
-#[deprecated = "not_implemented"]
-struct (serde_json::Value);
-
-#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-pub struct Terrain {
-    /// The source for the terrain data.
-    pub source: Source,
-    /// The exaggeration of the terrain - how high it will look.
-    pub exaggeration: Exaggeration,
-}
-
-/// The source for the terrain data.
-#[deprecated = "not_implemented"]
-struct Source(serde_json::Value);
-
-/// The exaggeration of the terrain - how high it will look.
-///
-/// # Range
-/// - Minimum: 0
-#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-pub struct Exaggeration(serde_json::Number);
-
-impl Default for Exaggeration {
-    fn default() {
-        1.0
-    }
-}
+struct FunctionStop(serde_json::Value);
 
 /// The geometry type for the filter to select.
 #[derive(serde::Deserialize, PartialEq, Eq, Debug, Clone, Copy)]
@@ -527,147 +640,450 @@ pub enum GeometryType {
 }
 
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-pub struct PaintFill {
-    /// Whether or not the fill should be antialiased.
-    pub fill-antialias: FillAntialias,
-    /// Name of image in sprite to use for drawing image fills. For seamless patterns, image width and height must be a factor of two (2, 4, 8, ..., 512). Note that zoom-dependent expressions will be evaluated only at integer zoom levels.
-    pub fill-pattern: FillPattern,
-    /// The geometry's offset. Values are [x, y] where negatives indicate left and up, respectively.
-    pub fill-translate: FillTranslate,
-    /// The outline color of the fill. Matches the value of `fill-color` if unspecified.
-    pub fill-outline-color: FillOutlineColor,
-    /// The color of the filled part of this layer. This color can be specified as `rgba` with an alpha component and the color's opacity will not affect the opacity of the 1px stroke, if it is used.
-    pub fill-color: FillColor,
-    /// Controls the frame of reference for `fill-translate`.
-    pub fill-translate-anchor: FillTranslateAnchor,
-    /// The opacity of the entire fill layer. In contrast to the `fill-color`, this value will also affect the 1px stroke around the fill, if the stroke is used.
-    pub fill-opacity: FillOpacity,
+pub struct Layer {
+    /// A expression specifying conditions on source features. Only features that match the filter are displayed. Zoom expressions in filters are only evaluated at integer zoom levels. The `feature-state` expression is not supported in filter expressions.
+    #[serde(rename="filter")]
+    pub filter: Filter,
+    /// Unique layer name.
+    #[serde(rename="id")]
+    pub id: Id,
+    /// Layout properties for the layer.
+    #[serde(rename="layout")]
+    pub layout: Layout,
+    /// The maximum zoom level for the layer. At zoom levels equal to or greater than the maxzoom, the layer will be hidden.
+    #[serde(rename="maxzoom")]
+    pub maxzoom: Maxzoom,
+    /// Arbitrary properties useful to track with the layer, but do not influence rendering. Properties should be prefixed to avoid collisions, like 'maplibre:'.
+    #[serde(rename="metadata")]
+    pub metadata: Metadata,
+    /// The minimum zoom level for the layer. At zoom levels less than the minzoom, the layer will be hidden.
+    #[serde(rename="minzoom")]
+    pub minzoom: Minzoom,
+    /// Default paint properties for this layer.
+    #[serde(rename="paint")]
+    pub paint: Paint,
+    /// Name of a source description to be used for this layer. Required for all layer types except `background`.
+    #[serde(rename="source")]
+    pub source: Source,
+    /// Layer to use from a vector tile source. Required for vector tile sources; prohibited for all other source types, including GeoJSON sources.
+    #[serde(rename="source-layer")]
+    pub source_layer: SourceLayer,
+    /// Rendering type of this layer.
+    #[serde(rename="type")]
+    pub r#type: Type,
 }
 
-/// Whether or not the fill should be antialiased.
+/// A expression specifying conditions on source features. Only features that match the filter are displayed. Zoom expressions in filters are only evaluated at integer zoom levels. The `feature-state` expression is not supported in filter expressions.
+#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
 #[deprecated = "not_implemented"]
-struct FillAntialias(serde_json::Value);
+struct Filter(serde_json::Value);
 
-impl Default for FillAntialias {
-    fn default() {
-        true
-    }
-}
-
-/// Name of image in sprite to use for drawing image fills. For seamless patterns, image width and height must be a factor of two (2, 4, 8, ..., 512). Note that zoom-dependent expressions will be evaluated only at integer zoom levels.
+/// Unique layer name.
+#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
 #[deprecated = "not_implemented"]
-struct FillPattern(serde_json::Value);
+struct Id(serde_json::Value);
 
-/// The geometry's offset. Values are [x, y] where negatives indicate left and up, respectively.
+/// Layout properties for the layer.
+#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
 #[deprecated = "not_implemented"]
-struct FillTranslate(serde_json::Value);
+struct Layout(serde_json::Value);
 
-impl Default for FillTranslate {
-    fn default() {
-        vec![0, 0]
-    }
-}
-
-/// The outline color of the fill. Matches the value of `fill-color` if unspecified.
-#[deprecated = "not_implemented"]
-struct FillOutlineColor(serde_json::Value);
-
-/// The color of the filled part of this layer. This color can be specified as `rgba` with an alpha component and the color's opacity will not affect the opacity of the 1px stroke, if it is used.
-#[deprecated = "not_implemented"]
-struct FillColor(serde_json::Value);
-
-impl Default for FillColor {
-    fn default() {
-        "#000000"
-    }
-}
-
-/// Controls the frame of reference for `fill-translate`.
-#[derive(serde::Deserialize, PartialEq, Eq, Debug, Clone, Copy)]
-pub enum FillTranslateAnchor {
-    #[serde(rename="viewport")]
-    /// The fill is translated relative to the viewport.
-    Viewport,
-    #[serde(rename="map")]
-    /// The fill is translated relative to the map.
-    Map,
-}
-
-impl Default for FillTranslateAnchor {
-    fn default() {
-        "map"
-    }
-}
-
-/// The opacity of the entire fill layer. In contrast to the `fill-color`, this value will also affect the 1px stroke around the fill, if the stroke is used.
+/// The maximum zoom level for the layer. At zoom levels equal to or greater than the maxzoom, the layer will be hidden.
 ///
 /// # Range
-/// - Maximum: 1
+/// - Maximum: 24
 /// - Minimum: 0
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-pub struct FillOpacity(serde_json::Number);
+pub struct Maxzoom(serde_json::Number);
 
-impl Default for FillOpacity {
-    fn default() {
-        1
-    }
+/// Arbitrary properties useful to track with the layer, but do not influence rendering. Properties should be prefixed to avoid collisions, like 'maplibre:'.
+#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+#[deprecated = "not_implemented"]
+struct Metadata(serde_json::Value);
+
+/// The minimum zoom level for the layer. At zoom levels less than the minzoom, the layer will be hidden.
+///
+/// # Range
+/// - Maximum: 24
+/// - Minimum: 0
+#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+pub struct Minzoom(serde_json::Number);
+
+/// Default paint properties for this layer.
+#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+#[deprecated = "not_implemented"]
+struct Paint(serde_json::Value);
+
+/// Name of a source description to be used for this layer. Required for all layer types except `background`.
+#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+#[deprecated = "not_implemented"]
+struct Source(serde_json::Value);
+
+/// Layer to use from a vector tile source. Required for vector tile sources; prohibited for all other source types, including GeoJSON sources.
+#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+#[deprecated = "not_implemented"]
+struct SourceLayer(serde_json::Value);
+
+/// Rendering type of this layer.
+#[derive(serde::Deserialize, PartialEq, Eq, Debug, Clone, Copy)]
+pub enum Type {
+    #[serde(rename="background")]
+    /// The background color or pattern of the map.
+    Background,
+    #[serde(rename="circle")]
+    /// A filled circle.
+    Circle,
+    #[serde(rename="color-relief")]
+    /// Client-side elevation coloring based on DEM data. The implementation supports Mapbox Terrain RGB, Mapzen Terrarium tiles and custom encodings.
+    ColorRelief,
+    #[serde(rename="fill")]
+    /// A filled polygon with an optional stroked border.
+    Fill,
+    #[serde(rename="fill-extrusion")]
+    /// An extruded (3D) polygon.
+    FillExtrusion,
+    #[serde(rename="heatmap")]
+    /// A heatmap.
+    Heatmap,
+    #[serde(rename="hillshade")]
+    /// Client-side hillshading visualization based on DEM data. The implementation supports Mapbox Terrain RGB, Mapzen Terrarium tiles and custom encodings.
+    Hillshade,
+    #[serde(rename="line")]
+    /// A stroked line.
+    Line,
+    #[serde(rename="raster")]
+    /// Raster map textures such as satellite imagery.
+    Raster,
+    #[serde(rename="symbol")]
+    /// An icon or a text label.
+    Symbol,
 }
 
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-pub struct PropertyType {
-    /// Property is constant across all zoom levels and property values.
-    pub constant: Constant,
-    /// Property is non-interpolable; rather, its values will be cross-faded to smoothly transition between integer zooms. It can be represented using a property expression.
-    pub cross-faded-data-driven: CrossFadedDataDriven,
-    /// Property is interpolable and can be represented using a property expression.
-    pub data-driven: DataDriven,
-    /// Property should be specified using a color ramp from which the output color can be sampled based on a property calculation.
-    pub color-ramp: ColorRamp,
-    /// Property is non-interpolable; rather, its values will be cross-faded to smoothly transition between integer zooms.
-    pub cross-faded: CrossFaded,
-    /// Property is interpolable but cannot be represented using a property expression.
-    pub data-constant: DataConstant,
+pub enum Layout {
+    #[serde(rename="layout_fill")]
+    LayoutFill(LayoutFill),
+    #[serde(rename="layout_line")]
+    LayoutLine(LayoutLine),
+    #[serde(rename="layout_circle")]
+    LayoutCircle(LayoutCircle),
+    #[serde(rename="layout_heatmap")]
+    LayoutHeatmap(LayoutHeatmap),
+    #[serde(rename="layout_fill-extrusion")]
+    LayoutFillExtrusion(LayoutFillExtrusion),
+    #[serde(rename="layout_symbol")]
+    LayoutSymbol(LayoutSymbol),
+    #[serde(rename="layout_raster")]
+    LayoutRaster(LayoutRaster),
+    #[serde(rename="layout_hillshade")]
+    LayoutHillshade(LayoutHillshade),
+    #[serde(rename="layout_color-relief")]
+    LayoutColorRelief(LayoutColorRelief),
+    #[serde(rename="layout_background")]
+    LayoutBackground(LayoutBackground),
 }
 
-/// Property is constant across all zoom levels and property values.
-#[deprecated = "not_implemented"]
-struct Constant(serde_json::Value);
-
-/// Property is non-interpolable; rather, its values will be cross-faded to smoothly transition between integer zooms. It can be represented using a property expression.
-#[deprecated = "not_implemented"]
-struct CrossFadedDataDriven(serde_json::Value);
-
-/// Property is interpolable and can be represented using a property expression.
-#[deprecated = "not_implemented"]
-struct DataDriven(serde_json::Value);
-
-/// Property should be specified using a color ramp from which the output color can be sampled based on a property calculation.
-#[deprecated = "not_implemented"]
-struct ColorRamp(serde_json::Value);
-
-/// Property is non-interpolable; rather, its values will be cross-faded to smoothly transition between integer zooms.
-#[deprecated = "not_implemented"]
-struct CrossFaded(serde_json::Value);
-
-/// Property is interpolable but cannot be represented using a property expression.
-#[deprecated = "not_implemented"]
-struct DataConstant(serde_json::Value);
-
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-pub struct LayoutHeatmap {
+pub struct LayoutBackground {
     /// Whether this layer is displayed.
+    #[serde(rename="visibility")]
     pub visibility: Visibility,
 }
 
 /// Whether this layer is displayed.
 #[derive(serde::Deserialize, PartialEq, Eq, Debug, Clone, Copy)]
 pub enum Visibility {
-    #[serde(rename="visible")]
-    /// The layer is shown.
-    Visible,
     #[serde(rename="none")]
     /// The layer is not shown.
     None,
+    #[serde(rename="visible")]
+    /// The layer is shown.
+    Visible,
+}
+
+impl Default for Visibility {
+    fn default() {
+        "visible"
+    }
+}
+
+#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+pub struct LayoutCircle {
+    /// Sorts features in ascending order based on this value. Features with a higher sort key will appear above features with a lower sort key.
+    #[serde(rename="circle-sort-key")]
+    pub circle_sort_key: CircleSortKey,
+    /// Whether this layer is displayed.
+    #[serde(rename="visibility")]
+    pub visibility: Visibility,
+}
+
+/// Sorts features in ascending order based on this value. Features with a higher sort key will appear above features with a lower sort key.
+#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+pub struct CircleSortKey(serde_json::Number);
+
+/// Whether this layer is displayed.
+#[derive(serde::Deserialize, PartialEq, Eq, Debug, Clone, Copy)]
+pub enum Visibility {
+    #[serde(rename="none")]
+    /// The layer is not shown.
+    None,
+    #[serde(rename="visible")]
+    /// The layer is shown.
+    Visible,
+}
+
+impl Default for Visibility {
+    fn default() {
+        "visible"
+    }
+}
+
+#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+pub struct LayoutColorRelief {
+    /// Whether this layer is displayed.
+    #[serde(rename="visibility")]
+    pub visibility: Visibility,
+}
+
+/// Whether this layer is displayed.
+#[derive(serde::Deserialize, PartialEq, Eq, Debug, Clone, Copy)]
+pub enum Visibility {
+    #[serde(rename="none")]
+    /// The layer is not shown.
+    None,
+    #[serde(rename="visible")]
+    /// The layer is shown.
+    Visible,
+}
+
+impl Default for Visibility {
+    fn default() {
+        "visible"
+    }
+}
+
+#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+pub struct LayoutFill {
+    /// Sorts features in ascending order based on this value. Features with a higher sort key will appear above features with a lower sort key.
+    #[serde(rename="fill-sort-key")]
+    pub fill_sort_key: FillSortKey,
+    /// Whether this layer is displayed.
+    #[serde(rename="visibility")]
+    pub visibility: Visibility,
+}
+
+/// Sorts features in ascending order based on this value. Features with a higher sort key will appear above features with a lower sort key.
+#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+pub struct FillSortKey(serde_json::Number);
+
+/// Whether this layer is displayed.
+#[derive(serde::Deserialize, PartialEq, Eq, Debug, Clone, Copy)]
+pub enum Visibility {
+    #[serde(rename="none")]
+    /// The layer is not shown.
+    None,
+    #[serde(rename="visible")]
+    /// The layer is shown.
+    Visible,
+}
+
+impl Default for Visibility {
+    fn default() {
+        "visible"
+    }
+}
+
+#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+pub struct LayoutFillExtrusion {
+    /// Whether this layer is displayed.
+    #[serde(rename="visibility")]
+    pub visibility: Visibility,
+}
+
+/// Whether this layer is displayed.
+#[derive(serde::Deserialize, PartialEq, Eq, Debug, Clone, Copy)]
+pub enum Visibility {
+    #[serde(rename="none")]
+    /// The layer is not shown.
+    None,
+    #[serde(rename="visible")]
+    /// The layer is shown.
+    Visible,
+}
+
+impl Default for Visibility {
+    fn default() {
+        "visible"
+    }
+}
+
+#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+pub struct LayoutHeatmap {
+    /// Whether this layer is displayed.
+    #[serde(rename="visibility")]
+    pub visibility: Visibility,
+}
+
+/// Whether this layer is displayed.
+#[derive(serde::Deserialize, PartialEq, Eq, Debug, Clone, Copy)]
+pub enum Visibility {
+    #[serde(rename="none")]
+    /// The layer is not shown.
+    None,
+    #[serde(rename="visible")]
+    /// The layer is shown.
+    Visible,
+}
+
+impl Default for Visibility {
+    fn default() {
+        "visible"
+    }
+}
+
+#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+pub struct LayoutHillshade {
+    /// Whether this layer is displayed.
+    #[serde(rename="visibility")]
+    pub visibility: Visibility,
+}
+
+/// Whether this layer is displayed.
+#[derive(serde::Deserialize, PartialEq, Eq, Debug, Clone, Copy)]
+pub enum Visibility {
+    #[serde(rename="none")]
+    /// The layer is not shown.
+    None,
+    #[serde(rename="visible")]
+    /// The layer is shown.
+    Visible,
+}
+
+impl Default for Visibility {
+    fn default() {
+        "visible"
+    }
+}
+
+#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+pub struct LayoutLine {
+    /// The display of line endings.
+    #[serde(rename="line-cap")]
+    pub line_cap: LineCap,
+    /// The display of lines when joining.
+    #[serde(rename="line-join")]
+    pub line_join: LineJoin,
+    /// Used to automatically convert miter joins to bevel joins for sharp angles.
+    #[serde(rename="line-miter-limit")]
+    pub line_miter_limit: LineMiterLimit,
+    /// Used to automatically convert round joins to miter joins for shallow angles.
+    #[serde(rename="line-round-limit")]
+    pub line_round_limit: LineRoundLimit,
+    /// Sorts features in ascending order based on this value. Features with a higher sort key will appear above features with a lower sort key.
+    #[serde(rename="line-sort-key")]
+    pub line_sort_key: LineSortKey,
+    /// Whether this layer is displayed.
+    #[serde(rename="visibility")]
+    pub visibility: Visibility,
+}
+
+/// The display of line endings.
+#[derive(serde::Deserialize, PartialEq, Eq, Debug, Clone, Copy)]
+pub enum LineCap {
+    #[serde(rename="butt")]
+    /// A cap with a squared-off end which is drawn to the exact endpoint of the line.
+    Butt,
+    #[serde(rename="round")]
+    /// A cap with a rounded end which is drawn beyond the endpoint of the line at a radius of one-half of the line's width and centered on the endpoint of the line.
+    Round,
+    #[serde(rename="square")]
+    /// A cap with a squared-off end which is drawn beyond the endpoint of the line at a distance of one-half of the line's width.
+    Square,
+}
+
+impl Default for LineCap {
+    fn default() {
+        "butt"
+    }
+}
+
+/// The display of lines when joining.
+#[derive(serde::Deserialize, PartialEq, Eq, Debug, Clone, Copy)]
+pub enum LineJoin {
+    #[serde(rename="bevel")]
+    /// A join with a squared-off end which is drawn beyond the endpoint of the line at a distance of one-half of the line's width.
+    Bevel,
+    #[serde(rename="miter")]
+    /// A join with a sharp, angled corner which is drawn with the outer sides beyond the endpoint of the path until they meet.
+    Miter,
+    #[serde(rename="round")]
+    /// A join with a rounded end which is drawn beyond the endpoint of the line at a radius of one-half of the line's width and centered on the endpoint of the line.
+    Round,
+}
+
+impl Default for LineJoin {
+    fn default() {
+        "miter"
+    }
+}
+
+/// Used to automatically convert miter joins to bevel joins for sharp angles.
+#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+pub struct LineMiterLimit(serde_json::Number);
+
+impl Default for LineMiterLimit {
+    fn default() {
+        2
+    }
+}
+
+/// Used to automatically convert round joins to miter joins for shallow angles.
+#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+pub struct LineRoundLimit(serde_json::Number);
+
+impl Default for LineRoundLimit {
+    fn default() {
+        1.05
+    }
+}
+
+/// Sorts features in ascending order based on this value. Features with a higher sort key will appear above features with a lower sort key.
+#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+pub struct LineSortKey(serde_json::Number);
+
+/// Whether this layer is displayed.
+#[derive(serde::Deserialize, PartialEq, Eq, Debug, Clone, Copy)]
+pub enum Visibility {
+    #[serde(rename="none")]
+    /// The layer is not shown.
+    None,
+    #[serde(rename="visible")]
+    /// The layer is shown.
+    Visible,
+}
+
+impl Default for Visibility {
+    fn default() {
+        "visible"
+    }
+}
+
+#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+pub struct LayoutRaster {
+    /// Whether this layer is displayed.
+    #[serde(rename="visibility")]
+    pub visibility: Visibility,
+}
+
+/// Whether this layer is displayed.
+#[derive(serde::Deserialize, PartialEq, Eq, Debug, Clone, Copy)]
+pub enum Visibility {
+    #[serde(rename="none")]
+    /// The layer is not shown.
+    None,
+    #[serde(rename="visible")]
+    /// The layer is shown.
+    Visible,
 }
 
 impl Default for Visibility {
@@ -678,42 +1094,132 @@ impl Default for Visibility {
 
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
 pub struct LayoutSymbol {
-    /// To increase the chance of placing high-priority labels on the map, you can provide an array of `text-anchor` locations: the renderer will attempt to place the label at each location, in order, before moving onto the next label. Use `text-justify: auto` to choose justification based on anchor position. To apply an offset, use the `text-radial-offset` or the two-dimensional `text-offset`.
-    pub text-variable-anchor: TextVariableAnchor,
-    /// If true, icons will display without their corresponding text when the text collides with other symbols and the icon does not.
-    pub text-optional: TextOptional,
-    /// If true, the icon may be flipped to prevent it from being rendered upside-down.
-    pub icon-keep-upright: IconKeepUpright,
+    /// If true, the icon will be visible even if it collides with other previously drawn symbols.
+    #[serde(rename="icon-allow-overlap")]
+    pub icon_allow_overlap: IconAllowOverlap,
     /// Part of the icon placed closest to the anchor.
-    pub icon-anchor: IconAnchor,
-    /// Orientation of icon when map is pitched.
-    pub icon-pitch-alignment: IconPitchAlignment,
-    /// Rotates the text clockwise.
-    pub text-rotate: TextRotate,
-    /// Size of the additional area around the text bounding box used for detecting symbol collisions.
-    pub text-padding: TextPadding,
-    /// Size of the additional area added to dimensions determined by `icon-text-fit`, in clockwise order: top, right, bottom, left.
-    pub icon-text-fit-padding: IconTextFitPadding,
-    /// Orientation of text when map is pitched.
-    pub text-pitch-alignment: TextPitchAlignment,
-    /// If true, other symbols can be visible even if they collide with the text.
-    pub text-ignore-placement: TextIgnorePlacement,
-    /// Label placement relative to its geometry.
-    pub symbol-placement: SymbolPlacement,
-    /// If true, the symbols will not cross tile edges to avoid mutual collisions. Recommended in layers that don't have enough padding in the vector tile to prevent collisions, or if it is a point symbol layer placed after a line symbol layer. When using a client that supports global collision detection, like MapLibre GL JS version 0.42.0 or greater, enabling this property is not needed to prevent clipped labels at tile boundaries.
-    pub symbol-avoid-edges: SymbolAvoidEdges,
-    /// Distance between two symbol anchors.
-    pub symbol-spacing: SymbolSpacing,
-    /// Scales the original size of the icon by the provided factor. The new pixel size of the image will be the original pixel size multiplied by `icon-size`. 1 is the original size; 3 triples the size of the image.
-    pub icon-size: IconSize,
-    /// If true, text will display without their corresponding icons when the icon collides with other symbols and the text does not.
-    pub icon-optional: IconOptional,
+    #[serde(rename="icon-anchor")]
+    pub icon_anchor: IconAnchor,
+    /// If true, other symbols can be visible even if they collide with the icon.
+    #[serde(rename="icon-ignore-placement")]
+    pub icon_ignore_placement: IconIgnorePlacement,
+    /// Name of image in sprite to use for drawing an image background.
+    #[serde(rename="icon-image")]
+    pub icon_image: IconImage,
+    /// If true, the icon may be flipped to prevent it from being rendered upside-down.
+    #[serde(rename="icon-keep-upright")]
+    pub icon_keep_upright: IconKeepUpright,
     /// Offset distance of icon from its anchor. Positive values indicate right and down, while negative values indicate left and up. Each component is multiplied by the value of `icon-size` to obtain the final offset in pixels. When combined with `icon-rotate` the offset will be as if the rotated direction was up.
-    pub icon-offset: IconOffset,
+    #[serde(rename="icon-offset")]
+    pub icon_offset: IconOffset,
+    /// If true, text will display without their corresponding icons when the icon collides with other symbols and the text does not.
+    #[serde(rename="icon-optional")]
+    pub icon_optional: IconOptional,
+    /// Allows for control over whether to show an icon when it overlaps other symbols on the map. If `icon-overlap` is not set, `icon-allow-overlap` is used instead.
+    #[serde(rename="icon-overlap")]
+    pub icon_overlap: IconOverlap,
+    /// Size of additional area round the icon bounding box used for detecting symbol collisions.
+    #[serde(rename="icon-padding")]
+    pub icon_padding: IconPadding,
+    /// Orientation of icon when map is pitched.
+    #[serde(rename="icon-pitch-alignment")]
+    pub icon_pitch_alignment: IconPitchAlignment,
+    /// Rotates the icon clockwise.
+    #[serde(rename="icon-rotate")]
+    pub icon_rotate: IconRotate,
+    /// In combination with `symbol-placement`, determines the rotation behavior of icons.
+    #[serde(rename="icon-rotation-alignment")]
+    pub icon_rotation_alignment: IconRotationAlignment,
+    /// Scales the original size of the icon by the provided factor. The new pixel size of the image will be the original pixel size multiplied by `icon-size`. 1 is the original size; 3 triples the size of the image.
+    #[serde(rename="icon-size")]
+    pub icon_size: IconSize,
     /// Scales the icon to fit around the associated text.
-    pub icon-text-fit: IconTextFit,
+    #[serde(rename="icon-text-fit")]
+    pub icon_text_fit: IconTextFit,
+    /// Size of the additional area added to dimensions determined by `icon-text-fit`, in clockwise order: top, right, bottom, left.
+    #[serde(rename="icon-text-fit-padding")]
+    pub icon_text_fit_padding: IconTextFitPadding,
+    /// If true, the symbols will not cross tile edges to avoid mutual collisions. Recommended in layers that don't have enough padding in the vector tile to prevent collisions, or if it is a point symbol layer placed after a line symbol layer. When using a client that supports global collision detection, like MapLibre GL JS version 0.42.0 or greater, enabling this property is not needed to prevent clipped labels at tile boundaries.
+    #[serde(rename="symbol-avoid-edges")]
+    pub symbol_avoid_edges: SymbolAvoidEdges,
+    /// Label placement relative to its geometry.
+    #[serde(rename="symbol-placement")]
+    pub symbol_placement: SymbolPlacement,
+    /// Sorts features in ascending order based on this value. Features with lower sort keys are drawn and placed first.  When `icon-allow-overlap` or `text-allow-overlap` is `false`, features with a lower sort key will have priority during placement. When `icon-allow-overlap` or `text-allow-overlap` is set to `true`, features with a higher sort key will overlap over features with a lower sort key.
+    #[serde(rename="symbol-sort-key")]
+    pub symbol_sort_key: SymbolSortKey,
+    /// Distance between two symbol anchors.
+    #[serde(rename="symbol-spacing")]
+    pub symbol_spacing: SymbolSpacing,
+    /// Determines whether overlapping symbols in the same layer are rendered in the order that they appear in the data source or by their y-position relative to the viewport. To control the order and prioritization of symbols otherwise, use `symbol-sort-key`.
+    #[serde(rename="symbol-z-order")]
+    pub symbol_z_order: SymbolZOrder,
+    /// If true, the text will be visible even if it collides with other previously drawn symbols.
+    #[serde(rename="text-allow-overlap")]
+    pub text_allow_overlap: TextAllowOverlap,
+    /// Part of the text placed closest to the anchor.
+    #[serde(rename="text-anchor")]
+    pub text_anchor: TextAnchor,
+    /// Value to use for a text label. If a plain `string` is provided, it will be treated as a `formatted` with default/inherited formatting options.
+    #[serde(rename="text-field")]
+    pub text_field: TextField,
+    /// Fonts to use for displaying text. If the `glyphs` root property is specified, this array is joined together and interpreted as a font stack name. Otherwise, it is interpreted as a cascading fallback list of local font names.
+    #[serde(rename="text-font")]
+    pub text_font: TextFont,
+    /// If true, other symbols can be visible even if they collide with the text.
+    #[serde(rename="text-ignore-placement")]
+    pub text_ignore_placement: TextIgnorePlacement,
+    /// Text justification options.
+    #[serde(rename="text-justify")]
+    pub text_justify: TextJustify,
+    /// If true, the text may be flipped vertically to prevent it from being rendered upside-down.
+    #[serde(rename="text-keep-upright")]
+    pub text_keep_upright: TextKeepUpright,
+    /// Text tracking amount.
+    #[serde(rename="text-letter-spacing")]
+    pub text_letter_spacing: TextLetterSpacing,
+    /// Text leading value for multi-line text.
+    #[serde(rename="text-line-height")]
+    pub text_line_height: TextLineHeight,
+    /// Maximum angle change between adjacent characters.
+    #[serde(rename="text-max-angle")]
+    pub text_max_angle: TextMaxAngle,
+    /// The maximum line width for text wrapping.
+    #[serde(rename="text-max-width")]
+    pub text_max_width: TextMaxWidth,
+    /// Offset distance of text from its anchor. Positive values indicate right and down, while negative values indicate left and up. If used with text-variable-anchor, input values will be taken as absolute values. Offsets along the x- and y-axis will be applied automatically based on the anchor position.
+    #[serde(rename="text-offset")]
+    pub text_offset: TextOffset,
+    /// If true, icons will display without their corresponding text when the text collides with other symbols and the icon does not.
+    #[serde(rename="text-optional")]
+    pub text_optional: TextOptional,
     /// Allows for control over whether to show symbol text when it overlaps other symbols on the map. If `text-overlap` is not set, `text-allow-overlap` is used instead
-    pub text-overlap: TextOverlap,
+    #[serde(rename="text-overlap")]
+    pub text_overlap: TextOverlap,
+    /// Size of the additional area around the text bounding box used for detecting symbol collisions.
+    #[serde(rename="text-padding")]
+    pub text_padding: TextPadding,
+    /// Orientation of text when map is pitched.
+    #[serde(rename="text-pitch-alignment")]
+    pub text_pitch_alignment: TextPitchAlignment,
+    /// Radial offset of text, in the direction of the symbol's anchor. Useful in combination with `text-variable-anchor`, which defaults to using the two-dimensional `text-offset` if present.
+    #[serde(rename="text-radial-offset")]
+    pub text_radial_offset: TextRadialOffset,
+    /// Rotates the text clockwise.
+    #[serde(rename="text-rotate")]
+    pub text_rotate: TextRotate,
+    /// In combination with `symbol-placement`, determines the rotation behavior of the individual glyphs forming the text.
+    #[serde(rename="text-rotation-alignment")]
+    pub text_rotation_alignment: TextRotationAlignment,
+    /// Font size.
+    #[serde(rename="text-size")]
+    pub text_size: TextSize,
+    /// Specifies how to capitalize text, similar to the CSS `text-transform` property.
+    #[serde(rename="text-transform")]
+    pub text_transform: TextTransform,
+    /// To increase the chance of placing high-priority labels on the map, you can provide an array of `text-anchor` locations: the renderer will attempt to place the label at each location, in order, before moving onto the next label. Use `text-justify: auto` to choose justification based on anchor position. To apply an offset, use the `text-radial-offset` or the two-dimensional `text-offset`.
+    #[serde(rename="text-variable-anchor")]
+    pub text_variable_anchor: TextVariableAnchor,
     /// To increase the chance of placing high-priority labels on the map, you can provide an array of `text-anchor` locations, each paired with an offset value. The renderer will attempt to place the label at each location, in order, before moving on to the next location+offset. Use `text-justify: auto` to choose justification based on anchor position. 
     /// 
     ///  The length of the array must be even, and must alternate between enum and point entries. i.e., each anchor location must be accompanied by a point, and that point defines the offset when the corresponding anchor location is used. Positive offset values indicate right and down, while negative values indicate left and up. Anchor locations may repeat, allowing the renderer to try multiple offsets to try and place a label using the same anchor. 
@@ -729,76 +1235,83 @@ pub struct LayoutSymbol {
     ///  When the renderer chooses the `top` anchor, `[0, 4]` will be used for `text-offset`; the text will be shifted down by 4 ems. 
     /// 
     ///  When the renderer chooses the `left` anchor, `[3, 0]` will be used for `text-offset`; the text will be shifted right by 3 ems.
-    pub text-variable-anchor-offset: TextVariableAnchorOffset,
-    /// The maximum line width for text wrapping.
-    pub text-max-width: TextMaxWidth,
-    /// Name of image in sprite to use for drawing an image background.
-    pub icon-image: IconImage,
-    /// Sorts features in ascending order based on this value. Features with lower sort keys are drawn and placed first.  When `icon-allow-overlap` or `text-allow-overlap` is `false`, features with a lower sort key will have priority during placement. When `icon-allow-overlap` or `text-allow-overlap` is set to `true`, features with a higher sort key will overlap over features with a lower sort key.
-    pub symbol-sort-key: SymbolSortKey,
-    /// If true, the icon will be visible even if it collides with other previously drawn symbols.
-    pub icon-allow-overlap: IconAllowOverlap,
-    /// Rotates the icon clockwise.
-    pub icon-rotate: IconRotate,
-    /// In combination with `symbol-placement`, determines the rotation behavior of the individual glyphs forming the text.
-    pub text-rotation-alignment: TextRotationAlignment,
-    /// Maximum angle change between adjacent characters.
-    pub text-max-angle: TextMaxAngle,
-    /// If true, the text may be flipped vertically to prevent it from being rendered upside-down.
-    pub text-keep-upright: TextKeepUpright,
-    /// Size of additional area round the icon bounding box used for detecting symbol collisions.
-    pub icon-padding: IconPadding,
-    /// Determines whether overlapping symbols in the same layer are rendered in the order that they appear in the data source or by their y-position relative to the viewport. To control the order and prioritization of symbols otherwise, use `symbol-sort-key`.
-    pub symbol-z-order: SymbolZOrder,
-    /// Part of the text placed closest to the anchor.
-    pub text-anchor: TextAnchor,
-    /// Specifies how to capitalize text, similar to the CSS `text-transform` property.
-    pub text-transform: TextTransform,
-    /// Value to use for a text label. If a plain `string` is provided, it will be treated as a `formatted` with default/inherited formatting options.
-    pub text-field: TextField,
-    /// Text tracking amount.
-    pub text-letter-spacing: TextLetterSpacing,
-    /// Radial offset of text, in the direction of the symbol's anchor. Useful in combination with `text-variable-anchor`, which defaults to using the two-dimensional `text-offset` if present.
-    pub text-radial-offset: TextRadialOffset,
-    /// Text leading value for multi-line text.
-    pub text-line-height: TextLineHeight,
-    /// In combination with `symbol-placement`, determines the rotation behavior of icons.
-    pub icon-rotation-alignment: IconRotationAlignment,
-    /// Offset distance of text from its anchor. Positive values indicate right and down, while negative values indicate left and up. If used with text-variable-anchor, input values will be taken as absolute values. Offsets along the x- and y-axis will be applied automatically based on the anchor position.
-    pub text-offset: TextOffset,
-    /// Whether this layer is displayed.
-    pub visibility: Visibility,
-    /// Font size.
-    pub text-size: TextSize,
-    /// If true, other symbols can be visible even if they collide with the icon.
-    pub icon-ignore-placement: IconIgnorePlacement,
-    /// Text justification options.
-    pub text-justify: TextJustify,
+    #[serde(rename="text-variable-anchor-offset")]
+    pub text_variable_anchor_offset: TextVariableAnchorOffset,
     /// The property allows control over a symbol's orientation. Note that the property values act as a hint, so that a symbol whose language doesn’t support the provided orientation will be laid out in its natural orientation. Example: English point symbol will be rendered horizontally even if array value contains single 'vertical' enum value. The order of elements in an array define priority order for the placement of an orientation variant.
-    pub text-writing-mode: TextWritingMode,
-    /// Allows for control over whether to show an icon when it overlaps other symbols on the map. If `icon-overlap` is not set, `icon-allow-overlap` is used instead.
-    pub icon-overlap: IconOverlap,
-    /// If true, the text will be visible even if it collides with other previously drawn symbols.
-    pub text-allow-overlap: TextAllowOverlap,
-    /// Fonts to use for displaying text. If the `glyphs` root property is specified, this array is joined together and interpreted as a font stack name. Otherwise, it is interpreted as a cascading fallback list of local font names.
-    pub text-font: TextFont,
+    #[serde(rename="text-writing-mode")]
+    pub text_writing_mode: TextWritingMode,
+    /// Whether this layer is displayed.
+    #[serde(rename="visibility")]
+    pub visibility: Visibility,
 }
 
-/// To increase the chance of placing high-priority labels on the map, you can provide an array of `text-anchor` locations: the renderer will attempt to place the label at each location, in order, before moving onto the next label. Use `text-justify: auto` to choose justification based on anchor position. To apply an offset, use the `text-radial-offset` or the two-dimensional `text-offset`.
+/// If true, the icon will be visible even if it collides with other previously drawn symbols.
+#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
 #[deprecated = "not_implemented"]
-struct TextVariableAnchor(serde_json::Value);
+struct IconAllowOverlap(serde_json::Value);
 
-/// If true, icons will display without their corresponding text when the text collides with other symbols and the icon does not.
-#[deprecated = "not_implemented"]
-struct TextOptional(serde_json::Value);
-
-impl Default for TextOptional {
+impl Default for IconAllowOverlap {
     fn default() {
         false
     }
 }
 
+/// Part of the icon placed closest to the anchor.
+#[derive(serde::Deserialize, PartialEq, Eq, Debug, Clone, Copy)]
+pub enum IconAnchor {
+    #[serde(rename="bottom")]
+    /// The bottom of the icon is placed closest to the anchor.
+    Bottom,
+    #[serde(rename="bottom-left")]
+    /// The bottom left corner of the icon is placed closest to the anchor.
+    BottomLeft,
+    #[serde(rename="bottom-right")]
+    /// The bottom right corner of the icon is placed closest to the anchor.
+    BottomRight,
+    #[serde(rename="center")]
+    /// The center of the icon is placed closest to the anchor.
+    Center,
+    #[serde(rename="left")]
+    /// The left side of the icon is placed closest to the anchor.
+    Left,
+    #[serde(rename="right")]
+    /// The right side of the icon is placed closest to the anchor.
+    Right,
+    #[serde(rename="top")]
+    /// The top of the icon is placed closest to the anchor.
+    Top,
+    #[serde(rename="top-left")]
+    /// The top left corner of the icon is placed closest to the anchor.
+    TopLeft,
+    #[serde(rename="top-right")]
+    /// The top right corner of the icon is placed closest to the anchor.
+    TopRight,
+}
+
+impl Default for IconAnchor {
+    fn default() {
+        "center"
+    }
+}
+
+/// If true, other symbols can be visible even if they collide with the icon.
+#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+#[deprecated = "not_implemented"]
+struct IconIgnorePlacement(serde_json::Value);
+
+impl Default for IconIgnorePlacement {
+    fn default() {
+        false
+    }
+}
+
+/// Name of image in sprite to use for drawing an image background.
+#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+#[deprecated = "not_implemented"]
+struct IconImage(serde_json::Value);
+
 /// If true, the icon may be flipped to prevent it from being rendered upside-down.
+#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
 #[deprecated = "not_implemented"]
 struct IconKeepUpright(serde_json::Value);
 
@@ -808,56 +1321,65 @@ impl Default for IconKeepUpright {
     }
 }
 
-/// Part of the icon placed closest to the anchor.
-#[derive(serde::Deserialize, PartialEq, Eq, Debug, Clone, Copy)]
-pub enum IconAnchor {
-    #[serde(rename="right")]
-    /// The right side of the icon is placed closest to the anchor.
-    Right,
-    #[serde(rename="top")]
-    /// The top of the icon is placed closest to the anchor.
-    Top,
-    #[serde(rename="bottom-right")]
-    /// The bottom right corner of the icon is placed closest to the anchor.
-    BottomRight,
-    #[serde(rename="bottom")]
-    /// The bottom of the icon is placed closest to the anchor.
-    Bottom,
-    #[serde(rename="top-right")]
-    /// The top right corner of the icon is placed closest to the anchor.
-    TopRight,
-    #[serde(rename="bottom-left")]
-    /// The bottom left corner of the icon is placed closest to the anchor.
-    BottomLeft,
-    #[serde(rename="top-left")]
-    /// The top left corner of the icon is placed closest to the anchor.
-    TopLeft,
-    #[serde(rename="center")]
-    /// The center of the icon is placed closest to the anchor.
-    Center,
-    #[serde(rename="left")]
-    /// The left side of the icon is placed closest to the anchor.
-    Left,
+/// Offset distance of icon from its anchor. Positive values indicate right and down, while negative values indicate left and up. Each component is multiplied by the value of `icon-size` to obtain the final offset in pixels. When combined with `icon-rotate` the offset will be as if the rotated direction was up.
+#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+#[deprecated = "not_implemented"]
+struct IconOffset(serde_json::Value);
+
+impl Default for IconOffset {
+    fn default() {
+        vec![0, 0]
+    }
 }
 
-impl Default for IconAnchor {
+/// If true, text will display without their corresponding icons when the icon collides with other symbols and the text does not.
+#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+#[deprecated = "not_implemented"]
+struct IconOptional(serde_json::Value);
+
+impl Default for IconOptional {
     fn default() {
-        "center"
+        false
+    }
+}
+
+/// Allows for control over whether to show an icon when it overlaps other symbols on the map. If `icon-overlap` is not set, `icon-allow-overlap` is used instead.
+#[derive(serde::Deserialize, PartialEq, Eq, Debug, Clone, Copy)]
+pub enum IconOverlap {
+    #[serde(rename="always")]
+    /// The icon will be visible even if it collides with any other previously drawn symbol.
+    Always,
+    #[serde(rename="cooperative")]
+    /// If the icon collides with another previously drawn symbol, the overlap mode for that symbol is checked. If the previous symbol was placed using `never` overlap mode, the new icon is hidden. If the previous symbol was placed using `always` or `cooperative` overlap mode, the new icon is visible.
+    Cooperative,
+    #[serde(rename="never")]
+    /// The icon will be hidden if it collides with any other previously drawn symbol.
+    Never,
+}
+
+/// Size of additional area round the icon bounding box used for detecting symbol collisions.
+#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+#[deprecated = "not_implemented"]
+struct IconPadding(serde_json::Value);
+
+impl Default for IconPadding {
+    fn default() {
+        vec![2]
     }
 }
 
 /// Orientation of icon when map is pitched.
 #[derive(serde::Deserialize, PartialEq, Eq, Debug, Clone, Copy)]
 pub enum IconPitchAlignment {
-    #[serde(rename="viewport")]
-    /// The icon is aligned to the plane of the viewport.
-    Viewport,
     #[serde(rename="auto")]
     /// Automatically matches the value of `icon-rotation-alignment`.
     Auto,
     #[serde(rename="map")]
     /// The icon is aligned to the plane of the map.
     Map,
+    #[serde(rename="viewport")]
+    /// The icon is aligned to the plane of the viewport.
+    Viewport,
 }
 
 impl Default for IconPitchAlignment {
@@ -866,112 +1388,36 @@ impl Default for IconPitchAlignment {
     }
 }
 
-/// Rotates the text clockwise.
+/// Rotates the icon clockwise.
 ///
 /// # Range
 /// - Period: 360
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-pub struct TextRotate(serde_json::Number);
+pub struct IconRotate(serde_json::Number);
 
-impl Default for TextRotate {
+impl Default for IconRotate {
     fn default() {
         0
     }
 }
 
-/// Size of the additional area around the text bounding box used for detecting symbol collisions.
-///
-/// # Range
-/// - Minimum: 0
-#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-pub struct TextPadding(serde_json::Number);
-
-impl Default for TextPadding {
-    fn default() {
-        2
-    }
-}
-
-/// Size of the additional area added to dimensions determined by `icon-text-fit`, in clockwise order: top, right, bottom, left.
-#[deprecated = "not_implemented"]
-struct IconTextFitPadding(serde_json::Value);
-
-impl Default for IconTextFitPadding {
-    fn default() {
-        vec![0, 0, 0, 0]
-    }
-}
-
-/// Orientation of text when map is pitched.
+/// In combination with `symbol-placement`, determines the rotation behavior of icons.
 #[derive(serde::Deserialize, PartialEq, Eq, Debug, Clone, Copy)]
-pub enum TextPitchAlignment {
+pub enum IconRotationAlignment {
+    #[serde(rename="auto")]
+    /// When `symbol-placement` is set to `point`, this is equivalent to `viewport`. When `symbol-placement` is set to `line` or `line-center`, this is equivalent to `map`.
+    Auto,
     #[serde(rename="map")]
-    /// The text is aligned to the plane of the map.
+    /// When `symbol-placement` is set to `point`, aligns icons east-west. When `symbol-placement` is set to `line` or `line-center`, aligns icon x-axes with the line.
     Map,
     #[serde(rename="viewport")]
-    /// The text is aligned to the plane of the viewport.
+    /// Produces icons whose x-axes are aligned with the x-axis of the viewport, regardless of the value of `symbol-placement`.
     Viewport,
-    #[serde(rename="auto")]
-    /// Automatically matches the value of `text-rotation-alignment`.
-    Auto,
 }
 
-impl Default for TextPitchAlignment {
+impl Default for IconRotationAlignment {
     fn default() {
         "auto"
-    }
-}
-
-/// If true, other symbols can be visible even if they collide with the text.
-#[deprecated = "not_implemented"]
-struct TextIgnorePlacement(serde_json::Value);
-
-impl Default for TextIgnorePlacement {
-    fn default() {
-        false
-    }
-}
-
-/// Label placement relative to its geometry.
-#[derive(serde::Deserialize, PartialEq, Eq, Debug, Clone, Copy)]
-pub enum SymbolPlacement {
-    #[serde(rename="point")]
-    /// The label is placed at the point where the geometry is located.
-    Point,
-    #[serde(rename="line")]
-    /// The label is placed along the line of the geometry. Can only be used on `LineString` and `Polygon` geometries.
-    Line,
-    #[serde(rename="line-center")]
-    /// The label is placed at the center of the line of the geometry. Can only be used on `LineString` and `Polygon` geometries. Note that a single feature in a vector tile may contain multiple line geometries.
-    LineCenter,
-}
-
-impl Default for SymbolPlacement {
-    fn default() {
-        "point"
-    }
-}
-
-/// If true, the symbols will not cross tile edges to avoid mutual collisions. Recommended in layers that don't have enough padding in the vector tile to prevent collisions, or if it is a point symbol layer placed after a line symbol layer. When using a client that supports global collision detection, like MapLibre GL JS version 0.42.0 or greater, enabling this property is not needed to prevent clipped labels at tile boundaries.
-#[deprecated = "not_implemented"]
-struct SymbolAvoidEdges(serde_json::Value);
-
-impl Default for SymbolAvoidEdges {
-    fn default() {
-        false
-    }
-}
-
-/// Distance between two symbol anchors.
-///
-/// # Range
-/// - Minimum: 1
-#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-pub struct SymbolSpacing(serde_json::Number);
-
-impl Default for SymbolSpacing {
-    fn default() {
-        250
     }
 }
 
@@ -988,46 +1434,286 @@ impl Default for IconSize {
     }
 }
 
-/// If true, text will display without their corresponding icons when the icon collides with other symbols and the text does not.
-#[deprecated = "not_implemented"]
-struct IconOptional(serde_json::Value);
-
-impl Default for IconOptional {
-    fn default() {
-        false
-    }
-}
-
-/// Offset distance of icon from its anchor. Positive values indicate right and down, while negative values indicate left and up. Each component is multiplied by the value of `icon-size` to obtain the final offset in pixels. When combined with `icon-rotate` the offset will be as if the rotated direction was up.
-#[deprecated = "not_implemented"]
-struct IconOffset(serde_json::Value);
-
-impl Default for IconOffset {
-    fn default() {
-        vec![0, 0]
-    }
-}
-
 /// Scales the icon to fit around the associated text.
 #[derive(serde::Deserialize, PartialEq, Eq, Debug, Clone, Copy)]
 pub enum IconTextFit {
-    #[serde(rename="none")]
-    /// The icon is displayed at its intrinsic aspect ratio.
-    None,
-    #[serde(rename="height")]
-    /// The icon is scaled in the y-dimension to fit the height of the text.
-    Height,
-    #[serde(rename="width")]
-    /// The icon is scaled in the x-dimension to fit the width of the text.
-    Width,
     #[serde(rename="both")]
     /// The icon is scaled in both x- and y-dimensions.
     Both,
+    #[serde(rename="height")]
+    /// The icon is scaled in the y-dimension to fit the height of the text.
+    Height,
+    #[serde(rename="none")]
+    /// The icon is displayed at its intrinsic aspect ratio.
+    None,
+    #[serde(rename="width")]
+    /// The icon is scaled in the x-dimension to fit the width of the text.
+    Width,
 }
 
 impl Default for IconTextFit {
     fn default() {
         "none"
+    }
+}
+
+/// Size of the additional area added to dimensions determined by `icon-text-fit`, in clockwise order: top, right, bottom, left.
+#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+#[deprecated = "not_implemented"]
+struct IconTextFitPadding(serde_json::Value);
+
+impl Default for IconTextFitPadding {
+    fn default() {
+        vec![0, 0, 0, 0]
+    }
+}
+
+/// If true, the symbols will not cross tile edges to avoid mutual collisions. Recommended in layers that don't have enough padding in the vector tile to prevent collisions, or if it is a point symbol layer placed after a line symbol layer. When using a client that supports global collision detection, like MapLibre GL JS version 0.42.0 or greater, enabling this property is not needed to prevent clipped labels at tile boundaries.
+#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+#[deprecated = "not_implemented"]
+struct SymbolAvoidEdges(serde_json::Value);
+
+impl Default for SymbolAvoidEdges {
+    fn default() {
+        false
+    }
+}
+
+/// Label placement relative to its geometry.
+#[derive(serde::Deserialize, PartialEq, Eq, Debug, Clone, Copy)]
+pub enum SymbolPlacement {
+    #[serde(rename="line")]
+    /// The label is placed along the line of the geometry. Can only be used on `LineString` and `Polygon` geometries.
+    Line,
+    #[serde(rename="line-center")]
+    /// The label is placed at the center of the line of the geometry. Can only be used on `LineString` and `Polygon` geometries. Note that a single feature in a vector tile may contain multiple line geometries.
+    LineCenter,
+    #[serde(rename="point")]
+    /// The label is placed at the point where the geometry is located.
+    Point,
+}
+
+impl Default for SymbolPlacement {
+    fn default() {
+        "point"
+    }
+}
+
+/// Sorts features in ascending order based on this value. Features with lower sort keys are drawn and placed first.  When `icon-allow-overlap` or `text-allow-overlap` is `false`, features with a lower sort key will have priority during placement. When `icon-allow-overlap` or `text-allow-overlap` is set to `true`, features with a higher sort key will overlap over features with a lower sort key.
+#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+pub struct SymbolSortKey(serde_json::Number);
+
+/// Distance between two symbol anchors.
+///
+/// # Range
+/// - Minimum: 1
+#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+pub struct SymbolSpacing(serde_json::Number);
+
+impl Default for SymbolSpacing {
+    fn default() {
+        250
+    }
+}
+
+/// Determines whether overlapping symbols in the same layer are rendered in the order that they appear in the data source or by their y-position relative to the viewport. To control the order and prioritization of symbols otherwise, use `symbol-sort-key`.
+#[derive(serde::Deserialize, PartialEq, Eq, Debug, Clone, Copy)]
+pub enum SymbolZOrder {
+    #[serde(rename="auto")]
+    /// Sorts symbols by `symbol-sort-key` if set. Otherwise, sorts symbols by their y-position relative to the viewport if `icon-allow-overlap` or `text-allow-overlap` is set to `true` or `icon-ignore-placement` or `text-ignore-placement` is `false`.
+    Auto,
+    #[serde(rename="source")]
+    /// Sorts symbols by `symbol-sort-key` if set. Otherwise, no sorting is applied; symbols are rendered in the same order as the source data.
+    Source,
+    #[serde(rename="viewport-y")]
+    /// Sorts symbols by their y-position relative to the viewport if `icon-allow-overlap` or `text-allow-overlap` is set to `true` or `icon-ignore-placement` or `text-ignore-placement` is `false`.
+    ViewportY,
+}
+
+impl Default for SymbolZOrder {
+    fn default() {
+        "auto"
+    }
+}
+
+/// If true, the text will be visible even if it collides with other previously drawn symbols.
+#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+#[deprecated = "not_implemented"]
+struct TextAllowOverlap(serde_json::Value);
+
+impl Default for TextAllowOverlap {
+    fn default() {
+        false
+    }
+}
+
+/// Part of the text placed closest to the anchor.
+#[derive(serde::Deserialize, PartialEq, Eq, Debug, Clone, Copy)]
+pub enum TextAnchor {
+    #[serde(rename="bottom")]
+    /// The bottom of the text is placed closest to the anchor.
+    Bottom,
+    #[serde(rename="bottom-left")]
+    /// The bottom left corner of the text is placed closest to the anchor.
+    BottomLeft,
+    #[serde(rename="bottom-right")]
+    /// The bottom right corner of the text is placed closest to the anchor.
+    BottomRight,
+    #[serde(rename="center")]
+    /// The center of the text is placed closest to the anchor.
+    Center,
+    #[serde(rename="left")]
+    /// The left side of the text is placed closest to the anchor.
+    Left,
+    #[serde(rename="right")]
+    /// The right side of the text is placed closest to the anchor.
+    Right,
+    #[serde(rename="top")]
+    /// The top of the text is placed closest to the anchor.
+    Top,
+    #[serde(rename="top-left")]
+    /// The top left corner of the text is placed closest to the anchor.
+    TopLeft,
+    #[serde(rename="top-right")]
+    /// The top right corner of the text is placed closest to the anchor.
+    TopRight,
+}
+
+impl Default for TextAnchor {
+    fn default() {
+        "center"
+    }
+}
+
+/// Value to use for a text label. If a plain `string` is provided, it will be treated as a `formatted` with default/inherited formatting options.
+#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+#[deprecated = "not_implemented"]
+struct TextField(serde_json::Value);
+
+impl Default for TextField {
+    fn default() {
+
+    }
+}
+
+/// Fonts to use for displaying text. If the `glyphs` root property is specified, this array is joined together and interpreted as a font stack name. Otherwise, it is interpreted as a cascading fallback list of local font names.
+#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+#[deprecated = "not_implemented"]
+struct TextFont(serde_json::Value);
+
+impl Default for TextFont {
+    fn default() {
+        vec!["Open Sans Regular", "Arial Unicode MS Regular"]
+    }
+}
+
+/// If true, other symbols can be visible even if they collide with the text.
+#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+#[deprecated = "not_implemented"]
+struct TextIgnorePlacement(serde_json::Value);
+
+impl Default for TextIgnorePlacement {
+    fn default() {
+        false
+    }
+}
+
+/// Text justification options.
+#[derive(serde::Deserialize, PartialEq, Eq, Debug, Clone, Copy)]
+pub enum TextJustify {
+    #[serde(rename="auto")]
+    /// The text is aligned towards the anchor position.
+    Auto,
+    #[serde(rename="center")]
+    /// The text is centered.
+    Center,
+    #[serde(rename="left")]
+    /// The text is aligned to the left.
+    Left,
+    #[serde(rename="right")]
+    /// The text is aligned to the right.
+    Right,
+}
+
+impl Default for TextJustify {
+    fn default() {
+        "center"
+    }
+}
+
+/// If true, the text may be flipped vertically to prevent it from being rendered upside-down.
+#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+#[deprecated = "not_implemented"]
+struct TextKeepUpright(serde_json::Value);
+
+impl Default for TextKeepUpright {
+    fn default() {
+        true
+    }
+}
+
+/// Text tracking amount.
+#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+pub struct TextLetterSpacing(serde_json::Number);
+
+impl Default for TextLetterSpacing {
+    fn default() {
+        0
+    }
+}
+
+/// Text leading value for multi-line text.
+#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+pub struct TextLineHeight(serde_json::Number);
+
+impl Default for TextLineHeight {
+    fn default() {
+        1.2
+    }
+}
+
+/// Maximum angle change between adjacent characters.
+#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+pub struct TextMaxAngle(serde_json::Number);
+
+impl Default for TextMaxAngle {
+    fn default() {
+        45
+    }
+}
+
+/// The maximum line width for text wrapping.
+///
+/// # Range
+/// - Minimum: 0
+#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+pub struct TextMaxWidth(serde_json::Number);
+
+impl Default for TextMaxWidth {
+    fn default() {
+        10
+    }
+}
+
+/// Offset distance of text from its anchor. Positive values indicate right and down, while negative values indicate left and up. If used with text-variable-anchor, input values will be taken as absolute values. Offsets along the x- and y-axis will be applied automatically based on the anchor position.
+#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+#[deprecated = "not_implemented"]
+struct TextOffset(serde_json::Value);
+
+impl Default for TextOffset {
+    fn default() {
+        vec![0, 0]
+    }
+}
+
+/// If true, icons will display without their corresponding text when the text collides with other symbols and the icon does not.
+#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+#[deprecated = "not_implemented"]
+struct TextOptional(serde_json::Value);
+
+impl Default for TextOptional {
+    fn default() {
+        false
     }
 }
 
@@ -1045,63 +1731,57 @@ pub enum TextOverlap {
     Never,
 }
 
-/// To increase the chance of placing high-priority labels on the map, you can provide an array of `text-anchor` locations, each paired with an offset value. The renderer will attempt to place the label at each location, in order, before moving on to the next location+offset. Use `text-justify: auto` to choose justification based on anchor position. 
-///
-///  The length of the array must be even, and must alternate between enum and point entries. i.e., each anchor location must be accompanied by a point, and that point defines the offset when the corresponding anchor location is used. Positive offset values indicate right and down, while negative values indicate left and up. Anchor locations may repeat, allowing the renderer to try multiple offsets to try and place a label using the same anchor. 
-///
-///  When present, this property takes precedence over `text-anchor`, `text-variable-anchor`, `text-offset`, and `text-radial-offset`. 
-///
-///  ```json 
-///
-///  { "text-variable-anchor-offset": ["top", [0, 4], "left", [3,0], "bottom", [1, 1]] } 
-///
-///  ``` 
-///
-///  When the renderer chooses the `top` anchor, `[0, 4]` will be used for `text-offset`; the text will be shifted down by 4 ems. 
-///
-///  When the renderer chooses the `left` anchor, `[3, 0]` will be used for `text-offset`; the text will be shifted right by 3 ems.
-#[deprecated = "not_implemented"]
-struct TextVariableAnchorOffset(serde_json::Value);
-
-/// The maximum line width for text wrapping.
+/// Size of the additional area around the text bounding box used for detecting symbol collisions.
 ///
 /// # Range
 /// - Minimum: 0
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-pub struct TextMaxWidth(serde_json::Number);
+pub struct TextPadding(serde_json::Number);
 
-impl Default for TextMaxWidth {
+impl Default for TextPadding {
     fn default() {
-        10
+        2
     }
 }
 
-/// Name of image in sprite to use for drawing an image background.
-#[deprecated = "not_implemented"]
-struct IconImage(serde_json::Value);
+/// Orientation of text when map is pitched.
+#[derive(serde::Deserialize, PartialEq, Eq, Debug, Clone, Copy)]
+pub enum TextPitchAlignment {
+    #[serde(rename="auto")]
+    /// Automatically matches the value of `text-rotation-alignment`.
+    Auto,
+    #[serde(rename="map")]
+    /// The text is aligned to the plane of the map.
+    Map,
+    #[serde(rename="viewport")]
+    /// The text is aligned to the plane of the viewport.
+    Viewport,
+}
 
-/// Sorts features in ascending order based on this value. Features with lower sort keys are drawn and placed first.  When `icon-allow-overlap` or `text-allow-overlap` is `false`, features with a lower sort key will have priority during placement. When `icon-allow-overlap` or `text-allow-overlap` is set to `true`, features with a higher sort key will overlap over features with a lower sort key.
+impl Default for TextPitchAlignment {
+    fn default() {
+        "auto"
+    }
+}
+
+/// Radial offset of text, in the direction of the symbol's anchor. Useful in combination with `text-variable-anchor`, which defaults to using the two-dimensional `text-offset` if present.
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-pub struct SymbolSortKey(serde_json::Number);
+pub struct TextRadialOffset(serde_json::Number);
 
-/// If true, the icon will be visible even if it collides with other previously drawn symbols.
-#[deprecated = "not_implemented"]
-struct IconAllowOverlap(serde_json::Value);
-
-impl Default for IconAllowOverlap {
+impl Default for TextRadialOffset {
     fn default() {
-        false
+        0
     }
 }
 
-/// Rotates the icon clockwise.
+/// Rotates the text clockwise.
 ///
 /// # Range
 /// - Period: 360
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-pub struct IconRotate(serde_json::Number);
+pub struct TextRotate(serde_json::Number);
 
-impl Default for IconRotate {
+impl Default for TextRotate {
     fn default() {
         0
     }
@@ -1110,18 +1790,18 @@ impl Default for IconRotate {
 /// In combination with `symbol-placement`, determines the rotation behavior of the individual glyphs forming the text.
 #[derive(serde::Deserialize, PartialEq, Eq, Debug, Clone, Copy)]
 pub enum TextRotationAlignment {
-    #[serde(rename="viewport-glyph")]
-    /// When `symbol-placement` is set to `point`, aligns text to the x-axis of the viewport. When `symbol-placement` is set to `line` or `line-center`, aligns glyphs to the x-axis of the viewport and places them along the line.
-    ViewportGlyph,
-    #[serde(rename="viewport")]
-    /// Produces glyphs whose x-axes are aligned with the x-axis of the viewport, regardless of the value of `symbol-placement`.
-    Viewport,
     #[serde(rename="auto")]
     /// When `symbol-placement` is set to `point`, this is equivalent to `viewport`. When `symbol-placement` is set to `line` or `line-center`, this is equivalent to `map`.
     Auto,
     #[serde(rename="map")]
     /// When `symbol-placement` is set to `point`, aligns text east-west. When `symbol-placement` is set to `line` or `line-center`, aligns text x-axes with the line.
     Map,
+    #[serde(rename="viewport")]
+    /// Produces glyphs whose x-axes are aligned with the x-axis of the viewport, regardless of the value of `symbol-placement`.
+    Viewport,
+    #[serde(rename="viewport-glyph")]
+    /// When `symbol-placement` is set to `point`, aligns text to the x-axis of the viewport. When `symbol-placement` is set to `line` or `line-center`, aligns glyphs to the x-axis of the viewport and places them along the line.
+    ViewportGlyph,
 }
 
 impl Default for TextRotationAlignment {
@@ -1130,91 +1810,16 @@ impl Default for TextRotationAlignment {
     }
 }
 
-/// Maximum angle change between adjacent characters.
+/// Font size.
+///
+/// # Range
+/// - Minimum: 0
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-pub struct TextMaxAngle(serde_json::Number);
+pub struct TextSize(serde_json::Number);
 
-impl Default for TextMaxAngle {
+impl Default for TextSize {
     fn default() {
-        45
-    }
-}
-
-/// If true, the text may be flipped vertically to prevent it from being rendered upside-down.
-#[deprecated = "not_implemented"]
-struct TextKeepUpright(serde_json::Value);
-
-impl Default for TextKeepUpright {
-    fn default() {
-        true
-    }
-}
-
-/// Size of additional area round the icon bounding box used for detecting symbol collisions.
-#[deprecated = "not_implemented"]
-struct IconPadding(serde_json::Value);
-
-impl Default for IconPadding {
-    fn default() {
-        vec![2]
-    }
-}
-
-/// Determines whether overlapping symbols in the same layer are rendered in the order that they appear in the data source or by their y-position relative to the viewport. To control the order and prioritization of symbols otherwise, use `symbol-sort-key`.
-#[derive(serde::Deserialize, PartialEq, Eq, Debug, Clone, Copy)]
-pub enum SymbolZOrder {
-    #[serde(rename="viewport-y")]
-    /// Sorts symbols by their y-position relative to the viewport if `icon-allow-overlap` or `text-allow-overlap` is set to `true` or `icon-ignore-placement` or `text-ignore-placement` is `false`.
-    ViewportY,
-    #[serde(rename="source")]
-    /// Sorts symbols by `symbol-sort-key` if set. Otherwise, no sorting is applied; symbols are rendered in the same order as the source data.
-    Source,
-    #[serde(rename="auto")]
-    /// Sorts symbols by `symbol-sort-key` if set. Otherwise, sorts symbols by their y-position relative to the viewport if `icon-allow-overlap` or `text-allow-overlap` is set to `true` or `icon-ignore-placement` or `text-ignore-placement` is `false`.
-    Auto,
-}
-
-impl Default for SymbolZOrder {
-    fn default() {
-        "auto"
-    }
-}
-
-/// Part of the text placed closest to the anchor.
-#[derive(serde::Deserialize, PartialEq, Eq, Debug, Clone, Copy)]
-pub enum TextAnchor {
-    #[serde(rename="bottom-right")]
-    /// The bottom right corner of the text is placed closest to the anchor.
-    BottomRight,
-    #[serde(rename="center")]
-    /// The center of the text is placed closest to the anchor.
-    Center,
-    #[serde(rename="right")]
-    /// The right side of the text is placed closest to the anchor.
-    Right,
-    #[serde(rename="top")]
-    /// The top of the text is placed closest to the anchor.
-    Top,
-    #[serde(rename="top-left")]
-    /// The top left corner of the text is placed closest to the anchor.
-    TopLeft,
-    #[serde(rename="top-right")]
-    /// The top right corner of the text is placed closest to the anchor.
-    TopRight,
-    #[serde(rename="left")]
-    /// The left side of the text is placed closest to the anchor.
-    Left,
-    #[serde(rename="bottom")]
-    /// The bottom of the text is placed closest to the anchor.
-    Bottom,
-    #[serde(rename="bottom-left")]
-    /// The bottom left corner of the text is placed closest to the anchor.
-    BottomLeft,
-}
-
-impl Default for TextAnchor {
-    fn default() {
-        "center"
+        16
     }
 }
 
@@ -1238,198 +1843,44 @@ impl Default for TextTransform {
     }
 }
 
-/// Value to use for a text label. If a plain `string` is provided, it will be treated as a `formatted` with default/inherited formatting options.
+/// To increase the chance of placing high-priority labels on the map, you can provide an array of `text-anchor` locations: the renderer will attempt to place the label at each location, in order, before moving onto the next label. Use `text-justify: auto` to choose justification based on anchor position. To apply an offset, use the `text-radial-offset` or the two-dimensional `text-offset`.
+#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
 #[deprecated = "not_implemented"]
-struct TextField(serde_json::Value);
+struct TextVariableAnchor(serde_json::Value);
 
-impl Default for TextField {
-    fn default() {
-
-    }
-}
-
-/// Text tracking amount.
-#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-pub struct TextLetterSpacing(serde_json::Number);
-
-impl Default for TextLetterSpacing {
-    fn default() {
-        0
-    }
-}
-
-/// Radial offset of text, in the direction of the symbol's anchor. Useful in combination with `text-variable-anchor`, which defaults to using the two-dimensional `text-offset` if present.
-#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-pub struct TextRadialOffset(serde_json::Number);
-
-impl Default for TextRadialOffset {
-    fn default() {
-        0
-    }
-}
-
-/// Text leading value for multi-line text.
-#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-pub struct TextLineHeight(serde_json::Number);
-
-impl Default for TextLineHeight {
-    fn default() {
-        1.2
-    }
-}
-
-/// In combination with `symbol-placement`, determines the rotation behavior of icons.
-#[derive(serde::Deserialize, PartialEq, Eq, Debug, Clone, Copy)]
-pub enum IconRotationAlignment {
-    #[serde(rename="viewport")]
-    /// Produces icons whose x-axes are aligned with the x-axis of the viewport, regardless of the value of `symbol-placement`.
-    Viewport,
-    #[serde(rename="auto")]
-    /// When `symbol-placement` is set to `point`, this is equivalent to `viewport`. When `symbol-placement` is set to `line` or `line-center`, this is equivalent to `map`.
-    Auto,
-    #[serde(rename="map")]
-    /// When `symbol-placement` is set to `point`, aligns icons east-west. When `symbol-placement` is set to `line` or `line-center`, aligns icon x-axes with the line.
-    Map,
-}
-
-impl Default for IconRotationAlignment {
-    fn default() {
-        "auto"
-    }
-}
-
-/// Offset distance of text from its anchor. Positive values indicate right and down, while negative values indicate left and up. If used with text-variable-anchor, input values will be taken as absolute values. Offsets along the x- and y-axis will be applied automatically based on the anchor position.
-#[deprecated = "not_implemented"]
-struct TextOffset(serde_json::Value);
-
-impl Default for TextOffset {
-    fn default() {
-        vec![0, 0]
-    }
-}
-
-/// Whether this layer is displayed.
-#[derive(serde::Deserialize, PartialEq, Eq, Debug, Clone, Copy)]
-pub enum Visibility {
-    #[serde(rename="visible")]
-    /// The layer is shown.
-    Visible,
-    #[serde(rename="none")]
-    /// The layer is not shown.
-    None,
-}
-
-impl Default for Visibility {
-    fn default() {
-        "visible"
-    }
-}
-
-/// Font size.
+/// To increase the chance of placing high-priority labels on the map, you can provide an array of `text-anchor` locations, each paired with an offset value. The renderer will attempt to place the label at each location, in order, before moving on to the next location+offset. Use `text-justify: auto` to choose justification based on anchor position. 
 ///
-/// # Range
-/// - Minimum: 0
+///  The length of the array must be even, and must alternate between enum and point entries. i.e., each anchor location must be accompanied by a point, and that point defines the offset when the corresponding anchor location is used. Positive offset values indicate right and down, while negative values indicate left and up. Anchor locations may repeat, allowing the renderer to try multiple offsets to try and place a label using the same anchor. 
+///
+///  When present, this property takes precedence over `text-anchor`, `text-variable-anchor`, `text-offset`, and `text-radial-offset`. 
+///
+///  ```json 
+///
+///  { "text-variable-anchor-offset": ["top", [0, 4], "left", [3,0], "bottom", [1, 1]] } 
+///
+///  ``` 
+///
+///  When the renderer chooses the `top` anchor, `[0, 4]` will be used for `text-offset`; the text will be shifted down by 4 ems. 
+///
+///  When the renderer chooses the `left` anchor, `[3, 0]` will be used for `text-offset`; the text will be shifted right by 3 ems.
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-pub struct TextSize(serde_json::Number);
-
-impl Default for TextSize {
-    fn default() {
-        16
-    }
-}
-
-/// If true, other symbols can be visible even if they collide with the icon.
 #[deprecated = "not_implemented"]
-struct IconIgnorePlacement(serde_json::Value);
-
-impl Default for IconIgnorePlacement {
-    fn default() {
-        false
-    }
-}
-
-/// Text justification options.
-#[derive(serde::Deserialize, PartialEq, Eq, Debug, Clone, Copy)]
-pub enum TextJustify {
-    #[serde(rename="center")]
-    /// The text is centered.
-    Center,
-    #[serde(rename="auto")]
-    /// The text is aligned towards the anchor position.
-    Auto,
-    #[serde(rename="right")]
-    /// The text is aligned to the right.
-    Right,
-    #[serde(rename="left")]
-    /// The text is aligned to the left.
-    Left,
-}
-
-impl Default for TextJustify {
-    fn default() {
-        "center"
-    }
-}
+struct TextVariableAnchorOffset(serde_json::Value);
 
 /// The property allows control over a symbol's orientation. Note that the property values act as a hint, so that a symbol whose language doesn’t support the provided orientation will be laid out in its natural orientation. Example: English point symbol will be rendered horizontally even if array value contains single 'vertical' enum value. The order of elements in an array define priority order for the placement of an orientation variant.
+#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
 #[deprecated = "not_implemented"]
 struct TextWritingMode(serde_json::Value);
 
-/// Allows for control over whether to show an icon when it overlaps other symbols on the map. If `icon-overlap` is not set, `icon-allow-overlap` is used instead.
-#[derive(serde::Deserialize, PartialEq, Eq, Debug, Clone, Copy)]
-pub enum IconOverlap {
-    #[serde(rename="cooperative")]
-    /// If the icon collides with another previously drawn symbol, the overlap mode for that symbol is checked. If the previous symbol was placed using `never` overlap mode, the new icon is hidden. If the previous symbol was placed using `always` or `cooperative` overlap mode, the new icon is visible.
-    Cooperative,
-    #[serde(rename="never")]
-    /// The icon will be hidden if it collides with any other previously drawn symbol.
-    Never,
-    #[serde(rename="always")]
-    /// The icon will be visible even if it collides with any other previously drawn symbol.
-    Always,
-}
-
-/// If true, the text will be visible even if it collides with other previously drawn symbols.
-#[deprecated = "not_implemented"]
-struct TextAllowOverlap(serde_json::Value);
-
-impl Default for TextAllowOverlap {
-    fn default() {
-        false
-    }
-}
-
-/// Fonts to use for displaying text. If the `glyphs` root property is specified, this array is joined together and interpreted as a font stack name. Otherwise, it is interpreted as a cascading fallback list of local font names.
-#[deprecated = "not_implemented"]
-struct TextFont(serde_json::Value);
-
-impl Default for TextFont {
-    fn default() {
-        vec!["Open Sans Regular", "Arial Unicode MS Regular"]
-    }
-}
-
-#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-pub struct LayoutFill {
-    /// Sorts features in ascending order based on this value. Features with a higher sort key will appear above features with a lower sort key.
-    pub fill-sort-key: FillSortKey,
-    /// Whether this layer is displayed.
-    pub visibility: Visibility,
-}
-
-/// Sorts features in ascending order based on this value. Features with a higher sort key will appear above features with a lower sort key.
-#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-pub struct FillSortKey(serde_json::Number);
-
 /// Whether this layer is displayed.
 #[derive(serde::Deserialize, PartialEq, Eq, Debug, Clone, Copy)]
 pub enum Visibility {
-    #[serde(rename="visible")]
-    /// The layer is shown.
-    Visible,
     #[serde(rename="none")]
     /// The layer is not shown.
     None,
+    #[serde(rename="visible")]
+    /// The layer is shown.
+    Visible,
 }
 
 impl Default for Visibility {
@@ -1439,398 +1890,617 @@ impl Default for Visibility {
 }
 
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-pub struct Function {
-    /// An expression.
-    pub expression: Expression,
-    /// The exponential base of the interpolation curve. It controls the rate at which the result increases. Higher values make the result increase more towards the high end of the range. With `1` the stops are interpolated linearly.
-    pub base: Base,
-    /// The name of a feature property to use as the function input.
-    pub property: Property,
-    /// A value to serve as a fallback function result when a value isn't otherwise available. It is used in the following circumstances:
-    /// 
-    /// * In categorical functions, when the feature value does not match any of the stop domain values.
-    /// 
-    /// * In property and zoom-and-property functions, when a feature does not contain a value for the specified property.
-    /// 
-    /// * In identity functions, when the feature value is not valid for the style property (for example, if the function is being used for a `circle-color` property but the feature property value is not a string or not a valid color).
-    /// 
-    /// * In interval or exponential property and zoom-and-property functions, when the feature value is not numeric.
-    /// 
-    /// If no default is provided, the style property's default is used in these circumstances.
-    pub default: Default,
-    /// The color space in which colors interpolated. Interpolating colors in perceptual color spaces like LAB and HCL tend to produce color ramps that look more consistent and produce colors that can be differentiated more easily than those interpolated in RGB space.
-    pub colorSpace: Colorspace,
-    /// An array of stops.
-    pub stops: Stops,
-    /// The interpolation strategy to use in function evaluation.
-    pub type: Type,
+pub struct Light {
+    /// Whether extruded geometries are lit relative to the map or viewport.
+    #[serde(rename="anchor")]
+    pub anchor: Anchor,
+    /// Color tint for lighting extruded geometries.
+    #[serde(rename="color")]
+    pub color: Color,
+    /// Intensity of lighting (on a scale from 0 to 1). Higher numbers will present as more extreme contrast.
+    #[serde(rename="intensity")]
+    pub intensity: Intensity,
+    /// Position of the light source relative to lit (extruded) geometries, in [r radial coordinate, a azimuthal angle, p polar angle] where r indicates the distance from the center of the base of an object to its light, a indicates the position of the light relative to 0° (0° when `light.anchor` is set to `viewport` corresponds to the top of the viewport, or 0° when `light.anchor` is set to `map` corresponds to due north, and degrees proceed clockwise), and p indicates the height of the light (from 0°, directly above, to 180°, directly below).
+    #[serde(rename="position")]
+    pub position: Position,
 }
 
-/// An expression.
-#[deprecated = "not_implemented"]
-struct Expression(serde_json::Value);
+/// Whether extruded geometries are lit relative to the map or viewport.
+#[derive(serde::Deserialize, PartialEq, Eq, Debug, Clone, Copy)]
+pub enum Anchor {
+    #[serde(rename="map")]
+    /// The position of the light source is aligned to the rotation of the map.
+    Map,
+    #[serde(rename="viewport")]
+    /// The position of the light source is aligned to the rotation of the viewport.
+    Viewport,
+}
 
-/// The exponential base of the interpolation curve. It controls the rate at which the result increases. Higher values make the result increase more towards the high end of the range. With `1` the stops are interpolated linearly.
+impl Default for Anchor {
+    fn default() {
+        "viewport"
+    }
+}
+
+/// Color tint for lighting extruded geometries.
+#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+#[deprecated = "not_implemented"]
+struct Color(serde_json::Value);
+
+impl Default for Color {
+    fn default() {
+        "#ffffff"
+    }
+}
+
+/// Intensity of lighting (on a scale from 0 to 1). Higher numbers will present as more extreme contrast.
 ///
 /// # Range
+/// - Maximum: 1
 /// - Minimum: 0
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-pub struct Base(serde_json::Number);
+pub struct Intensity(serde_json::Number);
 
-impl Default for Base {
+impl Default for Intensity {
+    fn default() {
+        0.5
+    }
+}
+
+/// Position of the light source relative to lit (extruded) geometries, in [r radial coordinate, a azimuthal angle, p polar angle] where r indicates the distance from the center of the base of an object to its light, a indicates the position of the light relative to 0° (0° when `light.anchor` is set to `viewport` corresponds to the top of the viewport, or 0° when `light.anchor` is set to `map` corresponds to due north, and degrees proceed clockwise), and p indicates the height of the light (from 0°, directly above, to 180°, directly below).
+#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+#[deprecated = "not_implemented"]
+struct Position(serde_json::Value);
+
+impl Default for Position {
+    fn default() {
+        vec![1.15, 210, 30]
+    }
+}
+
+#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+pub enum Paint {
+    #[serde(rename="paint_fill")]
+    PaintFill(PaintFill),
+    #[serde(rename="paint_line")]
+    PaintLine(PaintLine),
+    #[serde(rename="paint_circle")]
+    PaintCircle(PaintCircle),
+    #[serde(rename="paint_heatmap")]
+    PaintHeatmap(PaintHeatmap),
+    #[serde(rename="paint_fill-extrusion")]
+    PaintFillExtrusion(PaintFillExtrusion),
+    #[serde(rename="paint_symbol")]
+    PaintSymbol(PaintSymbol),
+    #[serde(rename="paint_raster")]
+    PaintRaster(PaintRaster),
+    #[serde(rename="paint_hillshade")]
+    PaintHillshade(PaintHillshade),
+    #[serde(rename="paint_color-relief")]
+    PaintColorRelief(PaintColorRelief),
+    #[serde(rename="paint_background")]
+    PaintBackground(PaintBackground),
+}
+
+#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+pub struct PaintBackground {
+    /// The color with which the background will be drawn.
+    #[serde(rename="background-color")]
+    pub background_color: BackgroundColor,
+    /// The opacity at which the background will be drawn.
+    #[serde(rename="background-opacity")]
+    pub background_opacity: BackgroundOpacity,
+    /// Name of image in sprite to use for drawing an image background. For seamless patterns, image width and height must be a factor of two (2, 4, 8, ..., 512). Note that zoom-dependent expressions will be evaluated only at integer zoom levels.
+    #[serde(rename="background-pattern")]
+    pub background_pattern: BackgroundPattern,
+}
+
+/// The color with which the background will be drawn.
+#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+#[deprecated = "not_implemented"]
+struct BackgroundColor(serde_json::Value);
+
+impl Default for BackgroundColor {
+    fn default() {
+        "#000000"
+    }
+}
+
+/// The opacity at which the background will be drawn.
+///
+/// # Range
+/// - Maximum: 1
+/// - Minimum: 0
+#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+pub struct BackgroundOpacity(serde_json::Number);
+
+impl Default for BackgroundOpacity {
     fn default() {
         1
     }
 }
 
-/// The name of a feature property to use as the function input.
+/// Name of image in sprite to use for drawing an image background. For seamless patterns, image width and height must be a factor of two (2, 4, 8, ..., 512). Note that zoom-dependent expressions will be evaluated only at integer zoom levels.
+#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
 #[deprecated = "not_implemented"]
-struct Property(serde_json::Value);
-
-impl Default for Property {
-    fn default() {
-        $zoom
-    }
-}
-
-/// A value to serve as a fallback function result when a value isn't otherwise available. It is used in the following circumstances:
-///
-/// * In categorical functions, when the feature value does not match any of the stop domain values.
-///
-/// * In property and zoom-and-property functions, when a feature does not contain a value for the specified property.
-///
-/// * In identity functions, when the feature value is not valid for the style property (for example, if the function is being used for a `circle-color` property but the feature property value is not a string or not a valid color).
-///
-/// * In interval or exponential property and zoom-and-property functions, when the feature value is not numeric.
-///
-/// If no default is provided, the style property's default is used in these circumstances.
-#[deprecated = "not_implemented"]
-struct Default(serde_json::Value);
-
-/// The color space in which colors interpolated. Interpolating colors in perceptual color spaces like LAB and HCL tend to produce color ramps that look more consistent and produce colors that can be differentiated more easily than those interpolated in RGB space.
-#[derive(serde::Deserialize, PartialEq, Eq, Debug, Clone, Copy)]
-pub enum Colorspace {
-    #[serde(rename="rgb")]
-    /// Use the RGB color space to interpolate color values
-    Rgb,
-    #[serde(rename="lab")]
-    /// Use the LAB color space to interpolate color values.
-    Lab,
-    #[serde(rename="hcl")]
-    /// Use the HCL color space to interpolate color values, interpolating the Hue, Chroma, and Luminance channels individually.
-    Hcl,
-}
-
-impl Default for Colorspace {
-    fn default() {
-        "rgb"
-    }
-}
-
-/// An array of stops.
-#[deprecated = "not_implemented"]
-struct Stops(serde_json::Value);
-
-/// The interpolation strategy to use in function evaluation.
-#[derive(serde::Deserialize, PartialEq, Eq, Debug, Clone, Copy)]
-pub enum Type {
-    #[serde(rename="identity")]
-    /// Return the input value as the output value.
-    Identity,
-    #[serde(rename="categorical")]
-    /// Return the output value of the stop equal to the function input.
-    Categorical,
-    #[serde(rename="exponential")]
-    /// Generate an output by interpolating between stops just less than and just greater than the function input.
-    Exponential,
-    #[serde(rename="interval")]
-    /// Return the output value of the stop just less than the function input.
-    Interval,
-}
-
-impl Default for Type {
-    fn default() {
-        "exponential"
-    }
-}
+struct BackgroundPattern(serde_json::Value);
 
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-pub struct Layer {
-    /// Layer to use from a vector tile source. Required for vector tile sources; prohibited for all other source types, including GeoJSON sources.
-    pub source-layer: SourceLayer,
-    /// Unique layer name.
-    pub id: Id,
-    /// The minimum zoom level for the layer. At zoom levels less than the minzoom, the layer will be hidden.
-    pub minzoom: Minzoom,
-    /// A expression specifying conditions on source features. Only features that match the filter are displayed. Zoom expressions in filters are only evaluated at integer zoom levels. The `feature-state` expression is not supported in filter expressions.
-    pub filter: Filter,
-    /// Name of a source description to be used for this layer. Required for all layer types except `background`.
-    pub source: Source,
-    /// Rendering type of this layer.
-    pub type: Type,
-    /// Layout properties for the layer.
-    pub layout: Layout,
-    /// Arbitrary properties useful to track with the layer, but do not influence rendering. Properties should be prefixed to avoid collisions, like 'maplibre:'.
-    pub metadata: Metadata,
-    /// The maximum zoom level for the layer. At zoom levels equal to or greater than the maxzoom, the layer will be hidden.
-    pub maxzoom: Maxzoom,
-    /// Default paint properties for this layer.
-    pub paint: Paint,
+pub struct PaintCircle {
+    /// Amount to blur the circle. 1 blurs the circle such that only the centerpoint is full opacity.
+    #[serde(rename="circle-blur")]
+    pub circle_blur: CircleBlur,
+    /// The fill color of the circle.
+    #[serde(rename="circle-color")]
+    pub circle_color: CircleColor,
+    /// The opacity at which the circle will be drawn.
+    #[serde(rename="circle-opacity")]
+    pub circle_opacity: CircleOpacity,
+    /// Orientation of circle when map is pitched.
+    #[serde(rename="circle-pitch-alignment")]
+    pub circle_pitch_alignment: CirclePitchAlignment,
+    /// Controls the scaling behavior of the circle when the map is pitched.
+    #[serde(rename="circle-pitch-scale")]
+    pub circle_pitch_scale: CirclePitchScale,
+    /// Circle radius.
+    #[serde(rename="circle-radius")]
+    pub circle_radius: CircleRadius,
+    /// The stroke color of the circle.
+    #[serde(rename="circle-stroke-color")]
+    pub circle_stroke_color: CircleStrokeColor,
+    /// The opacity of the circle's stroke.
+    #[serde(rename="circle-stroke-opacity")]
+    pub circle_stroke_opacity: CircleStrokeOpacity,
+    /// The width of the circle's stroke. Strokes are placed outside of the `circle-radius`.
+    #[serde(rename="circle-stroke-width")]
+    pub circle_stroke_width: CircleStrokeWidth,
+    /// The geometry's offset. Values are [x, y] where negatives indicate left and up, respectively.
+    #[serde(rename="circle-translate")]
+    pub circle_translate: CircleTranslate,
+    /// Controls the frame of reference for `circle-translate`.
+    #[serde(rename="circle-translate-anchor")]
+    pub circle_translate_anchor: CircleTranslateAnchor,
 }
 
-/// Layer to use from a vector tile source. Required for vector tile sources; prohibited for all other source types, including GeoJSON sources.
-#[deprecated = "not_implemented"]
-struct SourceLayer(serde_json::Value);
-
-/// Unique layer name.
-#[deprecated = "not_implemented"]
-struct Id(serde_json::Value);
-
-/// The minimum zoom level for the layer. At zoom levels less than the minzoom, the layer will be hidden.
-///
-/// # Range
-/// - Maximum: 24
-/// - Minimum: 0
+/// Amount to blur the circle. 1 blurs the circle such that only the centerpoint is full opacity.
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-pub struct Minzoom(serde_json::Number);
+pub struct CircleBlur(serde_json::Number);
 
-/// A expression specifying conditions on source features. Only features that match the filter are displayed. Zoom expressions in filters are only evaluated at integer zoom levels. The `feature-state` expression is not supported in filter expressions.
-#[deprecated = "not_implemented"]
-struct Filter(serde_json::Value);
-
-/// Name of a source description to be used for this layer. Required for all layer types except `background`.
-#[deprecated = "not_implemented"]
-struct Source(serde_json::Value);
-
-/// Rendering type of this layer.
-#[derive(serde::Deserialize, PartialEq, Eq, Debug, Clone, Copy)]
-pub enum Type {
-    #[serde(rename="symbol")]
-    /// An icon or a text label.
-    Symbol,
-    #[serde(rename="fill-extrusion")]
-    /// An extruded (3D) polygon.
-    FillExtrusion,
-    #[serde(rename="circle")]
-    /// A filled circle.
-    Circle,
-    #[serde(rename="color-relief")]
-    /// Client-side elevation coloring based on DEM data. The implementation supports Mapbox Terrain RGB, Mapzen Terrarium tiles and custom encodings.
-    ColorRelief,
-    #[serde(rename="hillshade")]
-    /// Client-side hillshading visualization based on DEM data. The implementation supports Mapbox Terrain RGB, Mapzen Terrarium tiles and custom encodings.
-    Hillshade,
-    #[serde(rename="heatmap")]
-    /// A heatmap.
-    Heatmap,
-    #[serde(rename="line")]
-    /// A stroked line.
-    Line,
-    #[serde(rename="raster")]
-    /// Raster map textures such as satellite imagery.
-    Raster,
-    #[serde(rename="background")]
-    /// The background color or pattern of the map.
-    Background,
-    #[serde(rename="fill")]
-    /// A filled polygon with an optional stroked border.
-    Fill,
-}
-
-/// Layout properties for the layer.
-#[deprecated = "not_implemented"]
-struct Layout(serde_json::Value);
-
-/// Arbitrary properties useful to track with the layer, but do not influence rendering. Properties should be prefixed to avoid collisions, like 'maplibre:'.
-#[deprecated = "not_implemented"]
-struct Metadata(serde_json::Value);
-
-/// The maximum zoom level for the layer. At zoom levels equal to or greater than the maxzoom, the layer will be hidden.
-///
-/// # Range
-/// - Maximum: 24
-/// - Minimum: 0
-#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-pub struct Maxzoom(serde_json::Number);
-
-/// Default paint properties for this layer.
-#[deprecated = "not_implemented"]
-struct Paint(serde_json::Value);
-
-#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-pub struct LayoutHillshade {
-    /// Whether this layer is displayed.
-    pub visibility: Visibility,
-}
-
-/// Whether this layer is displayed.
-#[derive(serde::Deserialize, PartialEq, Eq, Debug, Clone, Copy)]
-pub enum Visibility {
-    #[serde(rename="visible")]
-    /// The layer is shown.
-    Visible,
-    #[serde(rename="none")]
-    /// The layer is not shown.
-    None,
-}
-
-impl Default for Visibility {
-    fn default() {
-        "visible"
-    }
-}
-
-#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-pub struct SourceVector {
-    /// A property to use as a feature id (for feature state). Either a property name, or an object of the form `{<sourceLayer>: <propertyName>}`. If specified as a string for a vector tile source, the same property is used across all its source layers.
-    pub promoteId: Promoteid,
-    /// A setting to determine whether a source's tiles are cached locally.
-    pub volatile: Volatile,
-    /// The encoding used by this source. Mapbox Vector Tiles encoding is used by default.
-    pub encoding: Encoding,
-    /// Maximum zoom level for which tiles are available, as in the TileJSON spec. Data from tiles at the maxzoom are used when displaying the map at higher zoom levels.
-    pub maxzoom: Maxzoom,
-    /// Other keys to configure the data source.
-    pub *: ,
-    /// An array containing the longitude and latitude of the southwest and northeast corners of the source's bounding box in the following order: `[sw.lng, sw.lat, ne.lng, ne.lat]`. When this property is included in a source, no tiles outside of the given bounds are requested by MapLibre.
-    pub bounds: Bounds,
-    /// Contains an attribution to be displayed when the map is shown to a user.
-    pub attribution: Attribution,
-    /// Influences the y direction of the tile coordinates. The global-mercator (aka Spherical Mercator) profile is assumed.
-    pub scheme: Scheme,
-    /// An array of one or more tile source URLs, as in the TileJSON spec.
-    pub tiles: Tiles,
-    /// A URL to a TileJSON resource. Supported protocols are `http:` and `https:`.
-    pub url: Url,
-    /// Minimum zoom level for which tiles are available, as in the TileJSON spec.
-    pub minzoom: Minzoom,
-    /// The type of the source.
-    pub type: Type,
-}
-
-/// A property to use as a feature id (for feature state). Either a property name, or an object of the form `{<sourceLayer>: <propertyName>}`. If specified as a string for a vector tile source, the same property is used across all its source layers.
-#[deprecated = "not_implemented"]
-struct Promoteid(serde_json::Value);
-
-/// A setting to determine whether a source's tiles are cached locally.
-#[deprecated = "not_implemented"]
-struct Volatile(serde_json::Value);
-
-impl Default for Volatile {
-    fn default() {
-        false
-    }
-}
-
-/// The encoding used by this source. Mapbox Vector Tiles encoding is used by default.
-#[derive(serde::Deserialize, PartialEq, Eq, Debug, Clone, Copy)]
-pub enum Encoding {
-    #[serde(rename="mvt")]
-    /// Mapbox Vector Tiles. See http://github.com/mapbox/vector-tile-spec for more info.
-    Mvt,
-    #[serde(rename="mlt")]
-    /// MapLibre Vector Tiles. See https://github.com/maplibre/maplibre-tile-spec for more info.
-    Mlt,
-}
-
-impl Default for Encoding {
-    fn default() {
-        "mvt"
-    }
-}
-
-/// Maximum zoom level for which tiles are available, as in the TileJSON spec. Data from tiles at the maxzoom are used when displaying the map at higher zoom levels.
-#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-pub struct Maxzoom(serde_json::Number);
-
-impl Default for Maxzoom {
-    fn default() {
-        22
-    }
-}
-
-/// Other keys to configure the data source.
-#[deprecated = "not_implemented"]
-struct (serde_json::Value);
-
-/// An array containing the longitude and latitude of the southwest and northeast corners of the source's bounding box in the following order: `[sw.lng, sw.lat, ne.lng, ne.lat]`. When this property is included in a source, no tiles outside of the given bounds are requested by MapLibre.
-#[deprecated = "not_implemented"]
-struct Bounds(serde_json::Value);
-
-impl Default for Bounds {
-    fn default() {
-        vec![-180, -85.051129, 180, 85.051129]
-    }
-}
-
-/// Contains an attribution to be displayed when the map is shown to a user.
-#[deprecated = "not_implemented"]
-struct Attribution(serde_json::Value);
-
-/// Influences the y direction of the tile coordinates. The global-mercator (aka Spherical Mercator) profile is assumed.
-#[derive(serde::Deserialize, PartialEq, Eq, Debug, Clone, Copy)]
-pub enum Scheme {
-    #[serde(rename="tms")]
-    /// OSGeo spec scheme.
-    Tms,
-    #[serde(rename="xyz")]
-    /// Slippy map tilenames scheme.
-    Xyz,
-}
-
-impl Default for Scheme {
-    fn default() {
-        "xyz"
-    }
-}
-
-/// An array of one or more tile source URLs, as in the TileJSON spec.
-#[deprecated = "not_implemented"]
-struct Tiles(serde_json::Value);
-
-/// A URL to a TileJSON resource. Supported protocols are `http:` and `https:`.
-#[deprecated = "not_implemented"]
-struct Url(serde_json::Value);
-
-/// Minimum zoom level for which tiles are available, as in the TileJSON spec.
-#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-pub struct Minzoom(serde_json::Number);
-
-impl Default for Minzoom {
+impl Default for CircleBlur {
     fn default() {
         0
     }
 }
 
-/// The type of the source.
+/// The fill color of the circle.
+#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+#[deprecated = "not_implemented"]
+struct CircleColor(serde_json::Value);
+
+impl Default for CircleColor {
+    fn default() {
+        "#000000"
+    }
+}
+
+/// The opacity at which the circle will be drawn.
+///
+/// # Range
+/// - Maximum: 1
+/// - Minimum: 0
+#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+pub struct CircleOpacity(serde_json::Number);
+
+impl Default for CircleOpacity {
+    fn default() {
+        1
+    }
+}
+
+/// Orientation of circle when map is pitched.
 #[derive(serde::Deserialize, PartialEq, Eq, Debug, Clone, Copy)]
-pub enum Type {
-    #[serde(rename="vector")]
-    /// A vector tile source.
-    Vector,
+pub enum CirclePitchAlignment {
+    #[serde(rename="map")]
+    /// The circle is aligned to the plane of the map.
+    Map,
+    #[serde(rename="viewport")]
+    /// The circle is aligned to the plane of the viewport.
+    Viewport,
+}
+
+impl Default for CirclePitchAlignment {
+    fn default() {
+        "viewport"
+    }
+}
+
+/// Controls the scaling behavior of the circle when the map is pitched.
+#[derive(serde::Deserialize, PartialEq, Eq, Debug, Clone, Copy)]
+pub enum CirclePitchScale {
+    #[serde(rename="map")]
+    /// Circles are scaled according to their apparent distance to the camera.
+    Map,
+    #[serde(rename="viewport")]
+    /// Circles are not scaled.
+    Viewport,
+}
+
+impl Default for CirclePitchScale {
+    fn default() {
+        "map"
+    }
+}
+
+/// Circle radius.
+///
+/// # Range
+/// - Minimum: 0
+#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+pub struct CircleRadius(serde_json::Number);
+
+impl Default for CircleRadius {
+    fn default() {
+        5
+    }
+}
+
+/// The stroke color of the circle.
+#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+#[deprecated = "not_implemented"]
+struct CircleStrokeColor(serde_json::Value);
+
+impl Default for CircleStrokeColor {
+    fn default() {
+        "#000000"
+    }
+}
+
+/// The opacity of the circle's stroke.
+///
+/// # Range
+/// - Maximum: 1
+/// - Minimum: 0
+#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+pub struct CircleStrokeOpacity(serde_json::Number);
+
+impl Default for CircleStrokeOpacity {
+    fn default() {
+        1
+    }
+}
+
+/// The width of the circle's stroke. Strokes are placed outside of the `circle-radius`.
+///
+/// # Range
+/// - Minimum: 0
+#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+pub struct CircleStrokeWidth(serde_json::Number);
+
+impl Default for CircleStrokeWidth {
+    fn default() {
+        0
+    }
+}
+
+/// The geometry's offset. Values are [x, y] where negatives indicate left and up, respectively.
+#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+#[deprecated = "not_implemented"]
+struct CircleTranslate(serde_json::Value);
+
+impl Default for CircleTranslate {
+    fn default() {
+        vec![0, 0]
+    }
+}
+
+/// Controls the frame of reference for `circle-translate`.
+#[derive(serde::Deserialize, PartialEq, Eq, Debug, Clone, Copy)]
+pub enum CircleTranslateAnchor {
+    #[serde(rename="map")]
+    /// The circle is translated relative to the map.
+    Map,
+    #[serde(rename="viewport")]
+    /// The circle is translated relative to the viewport.
+    Viewport,
+}
+
+impl Default for CircleTranslateAnchor {
+    fn default() {
+        "map"
+    }
+}
+
+#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+pub struct PaintColorRelief {
+    /// Defines the color of each pixel based on its elevation. Should be an expression that uses `["elevation"]` as input.
+    #[serde(rename="color-relief-color")]
+    pub color_relief_color: ColorReliefColor,
+    /// The opacity at which the color-relief will be drawn.
+    #[serde(rename="color-relief-opacity")]
+    pub color_relief_opacity: ColorReliefOpacity,
+}
+
+/// Defines the color of each pixel based on its elevation. Should be an expression that uses `["elevation"]` as input.
+#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+#[deprecated = "not_implemented"]
+struct ColorReliefColor(serde_json::Value);
+
+/// The opacity at which the color-relief will be drawn.
+///
+/// # Range
+/// - Maximum: 1
+/// - Minimum: 0
+#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+pub struct ColorReliefOpacity(serde_json::Number);
+
+impl Default for ColorReliefOpacity {
+    fn default() {
+        1
+    }
+}
+
+#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+pub struct PaintFill {
+    /// Whether or not the fill should be antialiased.
+    #[serde(rename="fill-antialias")]
+    pub fill_antialias: FillAntialias,
+    /// The color of the filled part of this layer. This color can be specified as `rgba` with an alpha component and the color's opacity will not affect the opacity of the 1px stroke, if it is used.
+    #[serde(rename="fill-color")]
+    pub fill_color: FillColor,
+    /// The opacity of the entire fill layer. In contrast to the `fill-color`, this value will also affect the 1px stroke around the fill, if the stroke is used.
+    #[serde(rename="fill-opacity")]
+    pub fill_opacity: FillOpacity,
+    /// The outline color of the fill. Matches the value of `fill-color` if unspecified.
+    #[serde(rename="fill-outline-color")]
+    pub fill_outline_color: FillOutlineColor,
+    /// Name of image in sprite to use for drawing image fills. For seamless patterns, image width and height must be a factor of two (2, 4, 8, ..., 512). Note that zoom-dependent expressions will be evaluated only at integer zoom levels.
+    #[serde(rename="fill-pattern")]
+    pub fill_pattern: FillPattern,
+    /// The geometry's offset. Values are [x, y] where negatives indicate left and up, respectively.
+    #[serde(rename="fill-translate")]
+    pub fill_translate: FillTranslate,
+    /// Controls the frame of reference for `fill-translate`.
+    #[serde(rename="fill-translate-anchor")]
+    pub fill_translate_anchor: FillTranslateAnchor,
+}
+
+/// Whether or not the fill should be antialiased.
+#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+#[deprecated = "not_implemented"]
+struct FillAntialias(serde_json::Value);
+
+impl Default for FillAntialias {
+    fn default() {
+        true
+    }
+}
+
+/// The color of the filled part of this layer. This color can be specified as `rgba` with an alpha component and the color's opacity will not affect the opacity of the 1px stroke, if it is used.
+#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+#[deprecated = "not_implemented"]
+struct FillColor(serde_json::Value);
+
+impl Default for FillColor {
+    fn default() {
+        "#000000"
+    }
+}
+
+/// The opacity of the entire fill layer. In contrast to the `fill-color`, this value will also affect the 1px stroke around the fill, if the stroke is used.
+///
+/// # Range
+/// - Maximum: 1
+/// - Minimum: 0
+#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+pub struct FillOpacity(serde_json::Number);
+
+impl Default for FillOpacity {
+    fn default() {
+        1
+    }
+}
+
+/// The outline color of the fill. Matches the value of `fill-color` if unspecified.
+#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+#[deprecated = "not_implemented"]
+struct FillOutlineColor(serde_json::Value);
+
+/// Name of image in sprite to use for drawing image fills. For seamless patterns, image width and height must be a factor of two (2, 4, 8, ..., 512). Note that zoom-dependent expressions will be evaluated only at integer zoom levels.
+#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+#[deprecated = "not_implemented"]
+struct FillPattern(serde_json::Value);
+
+/// The geometry's offset. Values are [x, y] where negatives indicate left and up, respectively.
+#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+#[deprecated = "not_implemented"]
+struct FillTranslate(serde_json::Value);
+
+impl Default for FillTranslate {
+    fn default() {
+        vec![0, 0]
+    }
+}
+
+/// Controls the frame of reference for `fill-translate`.
+#[derive(serde::Deserialize, PartialEq, Eq, Debug, Clone, Copy)]
+pub enum FillTranslateAnchor {
+    #[serde(rename="map")]
+    /// The fill is translated relative to the map.
+    Map,
+    #[serde(rename="viewport")]
+    /// The fill is translated relative to the viewport.
+    Viewport,
+}
+
+impl Default for FillTranslateAnchor {
+    fn default() {
+        "map"
+    }
+}
+
+#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+pub struct PaintFillExtrusion {
+    /// The height with which to extrude the base of this layer. Must be less than or equal to `fill-extrusion-height`.
+    #[serde(rename="fill-extrusion-base")]
+    pub fill_extrusion_base: FillExtrusionBase,
+    /// The base color of the extruded fill. The extrusion's surfaces will be shaded differently based on this color in combination with the root `light` settings. If this color is specified as `rgba` with an alpha component, the alpha component will be ignored; use `fill-extrusion-opacity` to set layer opacity.
+    #[serde(rename="fill-extrusion-color")]
+    pub fill_extrusion_color: FillExtrusionColor,
+    /// The height with which to extrude this layer.
+    #[serde(rename="fill-extrusion-height")]
+    pub fill_extrusion_height: FillExtrusionHeight,
+    /// The opacity of the entire fill extrusion layer. This is rendered on a per-layer, not per-feature, basis, and data-driven styling is not available.
+    #[serde(rename="fill-extrusion-opacity")]
+    pub fill_extrusion_opacity: FillExtrusionOpacity,
+    /// Name of image in sprite to use for drawing images on extruded fills. For seamless patterns, image width and height must be a factor of two (2, 4, 8, ..., 512). Note that zoom-dependent expressions will be evaluated only at integer zoom levels.
+    #[serde(rename="fill-extrusion-pattern")]
+    pub fill_extrusion_pattern: FillExtrusionPattern,
+    /// The geometry's offset. Values are [x, y] where negatives indicate left and up (on the flat plane), respectively.
+    #[serde(rename="fill-extrusion-translate")]
+    pub fill_extrusion_translate: FillExtrusionTranslate,
+    /// Controls the frame of reference for `fill-extrusion-translate`.
+    #[serde(rename="fill-extrusion-translate-anchor")]
+    pub fill_extrusion_translate_anchor: FillExtrusionTranslateAnchor,
+    /// Whether to apply a vertical gradient to the sides of a fill-extrusion layer. If true, sides will be shaded slightly darker farther down.
+    #[serde(rename="fill-extrusion-vertical-gradient")]
+    pub fill_extrusion_vertical_gradient: FillExtrusionVerticalGradient,
+}
+
+/// The height with which to extrude the base of this layer. Must be less than or equal to `fill-extrusion-height`.
+///
+/// # Range
+/// - Minimum: 0
+#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+pub struct FillExtrusionBase(serde_json::Number);
+
+impl Default for FillExtrusionBase {
+    fn default() {
+        0
+    }
+}
+
+/// The base color of the extruded fill. The extrusion's surfaces will be shaded differently based on this color in combination with the root `light` settings. If this color is specified as `rgba` with an alpha component, the alpha component will be ignored; use `fill-extrusion-opacity` to set layer opacity.
+#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+#[deprecated = "not_implemented"]
+struct FillExtrusionColor(serde_json::Value);
+
+impl Default for FillExtrusionColor {
+    fn default() {
+        "#000000"
+    }
+}
+
+/// The height with which to extrude this layer.
+///
+/// # Range
+/// - Minimum: 0
+#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+pub struct FillExtrusionHeight(serde_json::Number);
+
+impl Default for FillExtrusionHeight {
+    fn default() {
+        0
+    }
+}
+
+/// The opacity of the entire fill extrusion layer. This is rendered on a per-layer, not per-feature, basis, and data-driven styling is not available.
+///
+/// # Range
+/// - Maximum: 1
+/// - Minimum: 0
+#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+pub struct FillExtrusionOpacity(serde_json::Number);
+
+impl Default for FillExtrusionOpacity {
+    fn default() {
+        1
+    }
+}
+
+/// Name of image in sprite to use for drawing images on extruded fills. For seamless patterns, image width and height must be a factor of two (2, 4, 8, ..., 512). Note that zoom-dependent expressions will be evaluated only at integer zoom levels.
+#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+#[deprecated = "not_implemented"]
+struct FillExtrusionPattern(serde_json::Value);
+
+/// The geometry's offset. Values are [x, y] where negatives indicate left and up (on the flat plane), respectively.
+#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+#[deprecated = "not_implemented"]
+struct FillExtrusionTranslate(serde_json::Value);
+
+impl Default for FillExtrusionTranslate {
+    fn default() {
+        vec![0, 0]
+    }
+}
+
+/// Controls the frame of reference for `fill-extrusion-translate`.
+#[derive(serde::Deserialize, PartialEq, Eq, Debug, Clone, Copy)]
+pub enum FillExtrusionTranslateAnchor {
+    #[serde(rename="map")]
+    /// The fill extrusion is translated relative to the map.
+    Map,
+    #[serde(rename="viewport")]
+    /// The fill extrusion is translated relative to the viewport.
+    Viewport,
+}
+
+impl Default for FillExtrusionTranslateAnchor {
+    fn default() {
+        "map"
+    }
+}
+
+/// Whether to apply a vertical gradient to the sides of a fill-extrusion layer. If true, sides will be shaded slightly darker farther down.
+#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+#[deprecated = "not_implemented"]
+struct FillExtrusionVerticalGradient(serde_json::Value);
+
+impl Default for FillExtrusionVerticalGradient {
+    fn default() {
+        true
+    }
 }
 
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
 pub struct PaintHeatmap {
     /// Defines the color of each pixel based on its density value in a heatmap.  Should be an expression that uses `["heatmap-density"]` as input.
-    pub heatmap-color: HeatmapColor,
-    /// The global opacity at which the heatmap layer will be drawn.
-    pub heatmap-opacity: HeatmapOpacity,
+    #[serde(rename="heatmap-color")]
+    pub heatmap_color: HeatmapColor,
     /// Similar to `heatmap-weight` but controls the intensity of the heatmap globally. Primarily used for adjusting the heatmap based on zoom level.
-    pub heatmap-intensity: HeatmapIntensity,
+    #[serde(rename="heatmap-intensity")]
+    pub heatmap_intensity: HeatmapIntensity,
+    /// The global opacity at which the heatmap layer will be drawn.
+    #[serde(rename="heatmap-opacity")]
+    pub heatmap_opacity: HeatmapOpacity,
     /// Radius of influence of one heatmap point in pixels. Increasing the value makes the heatmap smoother, but less detailed.
-    pub heatmap-radius: HeatmapRadius,
+    #[serde(rename="heatmap-radius")]
+    pub heatmap_radius: HeatmapRadius,
     /// A measure of how much an individual point contributes to the heatmap. A value of 10 would be equivalent to having 10 points of weight 1 in the same spot. Especially useful when combined with clustering.
-    pub heatmap-weight: HeatmapWeight,
+    #[serde(rename="heatmap-weight")]
+    pub heatmap_weight: HeatmapWeight,
 }
 
 /// Defines the color of each pixel based on its density value in a heatmap.  Should be an expression that uses `["heatmap-density"]` as input.
+#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
 #[deprecated = "not_implemented"]
 struct HeatmapColor(serde_json::Value);
 
 impl Default for HeatmapColor {
     fn default() {
         ["interpolate",["linear"],["heatmap-density"],0,"rgba(0, 0, 255, 0)",0.1,"royalblue",0.3,"cyan",0.5,"lime",0.7,"yellow",1,"red"]
+    }
+}
+
+/// Similar to `heatmap-weight` but controls the intensity of the heatmap globally. Primarily used for adjusting the heatmap based on zoom level.
+///
+/// # Range
+/// - Minimum: 0
+#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+pub struct HeatmapIntensity(serde_json::Number);
+
+impl Default for HeatmapIntensity {
+    fn default() {
+        1
     }
 }
 
@@ -1843,19 +2513,6 @@ impl Default for HeatmapColor {
 pub struct HeatmapOpacity(serde_json::Number);
 
 impl Default for HeatmapOpacity {
-    fn default() {
-        1
-    }
-}
-
-/// Similar to `heatmap-weight` but controls the intensity of the heatmap globally. Primarily used for adjusting the heatmap based on zoom level.
-///
-/// # Range
-/// - Minimum: 0
-#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-pub struct HeatmapIntensity(serde_json::Number);
-
-impl Default for HeatmapIntensity {
     fn default() {
         1
     }
@@ -1887,144 +2544,198 @@ impl Default for HeatmapWeight {
     }
 }
 
-/// A filter selects specific features from a layer.
+#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+pub struct PaintHillshade {
+    /// The shading color used to accentuate rugged terrain like sharp cliffs and gorges.
+    #[serde(rename="hillshade-accent-color")]
+    pub hillshade_accent_color: HillshadeAccentColor,
+    /// Intensity of the hillshade
+    #[serde(rename="hillshade-exaggeration")]
+    pub hillshade_exaggeration: HillshadeExaggeration,
+    /// The shading color of areas that faces towards the light source(s). Only when `hillshade-method` is set to `multidirectional` can you specify multiple light sources.
+    #[serde(rename="hillshade-highlight-color")]
+    pub hillshade_highlight_color: HillshadeHighlightColor,
+    /// The altitude of the light source(s) used to generate the hillshading with 0 as sunset and 90 as noon. Only when `hillshade-method` is set to `multidirectional` can you specify multiple light sources.
+    #[serde(rename="hillshade-illumination-altitude")]
+    pub hillshade_illumination_altitude: HillshadeIlluminationAltitude,
+    /// Direction of light source when map is rotated.
+    #[serde(rename="hillshade-illumination-anchor")]
+    pub hillshade_illumination_anchor: HillshadeIlluminationAnchor,
+    /// The direction of the light source(s) used to generate the hillshading with 0 as the top of the viewport if `hillshade-illumination-anchor` is set to `viewport` and due north if `hillshade-illumination-anchor` is set to `map`. Only when `hillshade-method` is set to `multidirectional` can you specify multiple light sources.
+    #[serde(rename="hillshade-illumination-direction")]
+    pub hillshade_illumination_direction: HillshadeIlluminationDirection,
+    /// The hillshade algorithm to use, one of `standard`, `basic`, `combined`, `igor`, or `multidirectional`. ![image](assets/hillshade_methods.png)
+    #[serde(rename="hillshade-method")]
+    pub hillshade_method: HillshadeMethod,
+    /// The shading color of areas that face away from the light source(s). Only when `hillshade-method` is set to `multidirectional` can you specify multiple light sources.
+    #[serde(rename="hillshade-shadow-color")]
+    pub hillshade_shadow_color: HillshadeShadowColor,
+}
+
+/// The shading color used to accentuate rugged terrain like sharp cliffs and gorges.
+#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
 #[deprecated = "not_implemented"]
-struct Filter(serde_json::Value);
+struct HillshadeAccentColor(serde_json::Value);
 
-#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-pub struct LayoutLine {
-    /// Sorts features in ascending order based on this value. Features with a higher sort key will appear above features with a lower sort key.
-    pub line-sort-key: LineSortKey,
-    /// The display of line endings.
-    pub line-cap: LineCap,
-    /// The display of lines when joining.
-    pub line-join: LineJoin,
-    /// Used to automatically convert round joins to miter joins for shallow angles.
-    pub line-round-limit: LineRoundLimit,
-    /// Used to automatically convert miter joins to bevel joins for sharp angles.
-    pub line-miter-limit: LineMiterLimit,
-    /// Whether this layer is displayed.
-    pub visibility: Visibility,
+impl Default for HillshadeAccentColor {
+    fn default() {
+        "#000000"
+    }
 }
 
-/// Sorts features in ascending order based on this value. Features with a higher sort key will appear above features with a lower sort key.
+/// Intensity of the hillshade
+///
+/// # Range
+/// - Maximum: 1
+/// - Minimum: 0
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-pub struct LineSortKey(serde_json::Number);
+pub struct HillshadeExaggeration(serde_json::Number);
 
-/// The display of line endings.
+impl Default for HillshadeExaggeration {
+    fn default() {
+        0.5
+    }
+}
+
+/// The shading color of areas that faces towards the light source(s). Only when `hillshade-method` is set to `multidirectional` can you specify multiple light sources.
+#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+#[deprecated = "not_implemented"]
+struct HillshadeHighlightColor(serde_json::Value);
+
+impl Default for HillshadeHighlightColor {
+    fn default() {
+        #FFFFFF
+    }
+}
+
+/// The altitude of the light source(s) used to generate the hillshading with 0 as sunset and 90 as noon. Only when `hillshade-method` is set to `multidirectional` can you specify multiple light sources.
+#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+#[deprecated = "not_implemented"]
+struct HillshadeIlluminationAltitude(serde_json::Value);
+
+impl Default for HillshadeIlluminationAltitude {
+    fn default() {
+        45
+    }
+}
+
+/// Direction of light source when map is rotated.
 #[derive(serde::Deserialize, PartialEq, Eq, Debug, Clone, Copy)]
-pub enum LineCap {
-    #[serde(rename="round")]
-    /// A cap with a rounded end which is drawn beyond the endpoint of the line at a radius of one-half of the line's width and centered on the endpoint of the line.
-    Round,
-    #[serde(rename="butt")]
-    /// A cap with a squared-off end which is drawn to the exact endpoint of the line.
-    Butt,
-    #[serde(rename="square")]
-    /// A cap with a squared-off end which is drawn beyond the endpoint of the line at a distance of one-half of the line's width.
-    Square,
+pub enum HillshadeIlluminationAnchor {
+    #[serde(rename="map")]
+    /// The hillshade illumination is relative to the north direction.
+    Map,
+    #[serde(rename="viewport")]
+    /// The hillshade illumination is relative to the top of the viewport.
+    Viewport,
 }
 
-impl Default for LineCap {
+impl Default for HillshadeIlluminationAnchor {
     fn default() {
-        "butt"
+        "viewport"
     }
 }
 
-/// The display of lines when joining.
-#[derive(serde::Deserialize, PartialEq, Eq, Debug, Clone, Copy)]
-pub enum LineJoin {
-    #[serde(rename="bevel")]
-    /// A join with a squared-off end which is drawn beyond the endpoint of the line at a distance of one-half of the line's width.
-    Bevel,
-    #[serde(rename="round")]
-    /// A join with a rounded end which is drawn beyond the endpoint of the line at a radius of one-half of the line's width and centered on the endpoint of the line.
-    Round,
-    #[serde(rename="miter")]
-    /// A join with a sharp, angled corner which is drawn with the outer sides beyond the endpoint of the path until they meet.
-    Miter,
-}
-
-impl Default for LineJoin {
-    fn default() {
-        "miter"
-    }
-}
-
-/// Used to automatically convert round joins to miter joins for shallow angles.
+/// The direction of the light source(s) used to generate the hillshading with 0 as the top of the viewport if `hillshade-illumination-anchor` is set to `viewport` and due north if `hillshade-illumination-anchor` is set to `map`. Only when `hillshade-method` is set to `multidirectional` can you specify multiple light sources.
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-pub struct LineRoundLimit(serde_json::Number);
+#[deprecated = "not_implemented"]
+struct HillshadeIlluminationDirection(serde_json::Value);
 
-impl Default for LineRoundLimit {
+impl Default for HillshadeIlluminationDirection {
     fn default() {
-        1.05
+        335
     }
 }
 
-/// Used to automatically convert miter joins to bevel joins for sharp angles.
-#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-pub struct LineMiterLimit(serde_json::Number);
-
-impl Default for LineMiterLimit {
-    fn default() {
-        2
-    }
-}
-
-/// Whether this layer is displayed.
+/// The hillshade algorithm to use, one of `standard`, `basic`, `combined`, `igor`, or `multidirectional`. ![image](assets/hillshade_methods.png)
 #[derive(serde::Deserialize, PartialEq, Eq, Debug, Clone, Copy)]
-pub enum Visibility {
-    #[serde(rename="none")]
-    /// The layer is not shown.
-    None,
-    #[serde(rename="visible")]
-    /// The layer is shown.
-    Visible,
+pub enum HillshadeMethod {
+    #[serde(rename="basic")]
+    /// Basic hillshade. Uses a simple physics model where the reflected light intensity is proportional to the cosine of the angle between the incident light and the surface normal. Similar to GDAL's `gdaldem` default algorithm.
+    Basic,
+    #[serde(rename="combined")]
+    /// Hillshade algorithm whose intensity scales with slope. Similar to GDAL's `gdaldem` with `-combined` option.
+    Combined,
+    #[serde(rename="igor")]
+    /// Hillshade algorithm which tries to minimize effects on other map features beneath. Similar to GDAL's `gdaldem` with `-igor` option.
+    Igor,
+    #[serde(rename="multidirectional")]
+    /// Hillshade with multiple illumination directions. Uses the basic hillshade model with multiple independent light sources.
+    Multidirectional,
+    #[serde(rename="standard")]
+    /// The legacy hillshade method.
+    Standard,
 }
 
-impl Default for Visibility {
+impl Default for HillshadeMethod {
     fn default() {
-        "visible"
+        "standard"
+    }
+}
+
+/// The shading color of areas that face away from the light source(s). Only when `hillshade-method` is set to `multidirectional` can you specify multiple light sources.
+#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+#[deprecated = "not_implemented"]
+struct HillshadeShadowColor(serde_json::Value);
+
+impl Default for HillshadeShadowColor {
+    fn default() {
+        #000000
     }
 }
 
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
 pub struct PaintLine {
-    /// The line's offset. For linear features, a positive value offsets the line to the right, relative to the direction of the line, and a negative value to the left. For polygon features, a positive value results in an inset, and a negative value results in an outset.
-    pub line-offset: LineOffset,
-    /// The color with which the line will be drawn.
-    pub line-color: LineColor,
-    /// The geometry's offset. Values are [x, y] where negatives indicate left and up, respectively.
-    pub line-translate: LineTranslate,
-    /// Stroke thickness.
-    pub line-width: LineWidth,
-    /// Draws a line casing outside of a line's actual path. Value indicates the width of the inner gap.
-    pub line-gap-width: LineGapWidth,
-    /// Specifies the lengths of the alternating dashes and gaps that form the dash pattern. The lengths are later scaled by the line width. To convert a dash length to pixels, multiply the length by the current line width. GeoJSON sources with `lineMetrics: true` specified won't render dashed lines to the expected scale. Zoom-dependent expressions will be evaluated only at integer zoom levels. The only way to create an array value is using `["literal", [...]]`; arrays cannot be read from or derived from feature properties.
-    pub line-dasharray: LineDasharray,
-    /// Defines a gradient with which to color a line feature. Can only be used with GeoJSON sources that specify `"lineMetrics": true`.
-    pub line-gradient: LineGradient,
     /// Blur applied to the line, in pixels.
-    pub line-blur: LineBlur,
-    /// Controls the frame of reference for `line-translate`.
-    pub line-translate-anchor: LineTranslateAnchor,
-    /// Name of image in sprite to use for drawing image lines. For seamless patterns, image width must be a factor of two (2, 4, 8, ..., 512). Note that zoom-dependent expressions will be evaluated only at integer zoom levels.
-    pub line-pattern: LinePattern,
+    #[serde(rename="line-blur")]
+    pub line_blur: LineBlur,
+    /// The color with which the line will be drawn.
+    #[serde(rename="line-color")]
+    pub line_color: LineColor,
+    /// Specifies the lengths of the alternating dashes and gaps that form the dash pattern. The lengths are later scaled by the line width. To convert a dash length to pixels, multiply the length by the current line width. GeoJSON sources with `lineMetrics: true` specified won't render dashed lines to the expected scale. Zoom-dependent expressions will be evaluated only at integer zoom levels. The only way to create an array value is using `["literal", [...]]`; arrays cannot be read from or derived from feature properties.
+    #[serde(rename="line-dasharray")]
+    pub line_dasharray: LineDasharray,
+    /// Draws a line casing outside of a line's actual path. Value indicates the width of the inner gap.
+    #[serde(rename="line-gap-width")]
+    pub line_gap_width: LineGapWidth,
+    /// Defines a gradient with which to color a line feature. Can only be used with GeoJSON sources that specify `"lineMetrics": true`.
+    #[serde(rename="line-gradient")]
+    pub line_gradient: LineGradient,
+    /// The line's offset. For linear features, a positive value offsets the line to the right, relative to the direction of the line, and a negative value to the left. For polygon features, a positive value results in an inset, and a negative value results in an outset.
+    #[serde(rename="line-offset")]
+    pub line_offset: LineOffset,
     /// The opacity at which the line will be drawn.
-    pub line-opacity: LineOpacity,
+    #[serde(rename="line-opacity")]
+    pub line_opacity: LineOpacity,
+    /// Name of image in sprite to use for drawing image lines. For seamless patterns, image width must be a factor of two (2, 4, 8, ..., 512). Note that zoom-dependent expressions will be evaluated only at integer zoom levels.
+    #[serde(rename="line-pattern")]
+    pub line_pattern: LinePattern,
+    /// The geometry's offset. Values are [x, y] where negatives indicate left and up, respectively.
+    #[serde(rename="line-translate")]
+    pub line_translate: LineTranslate,
+    /// Controls the frame of reference for `line-translate`.
+    #[serde(rename="line-translate-anchor")]
+    pub line_translate_anchor: LineTranslateAnchor,
+    /// Stroke thickness.
+    #[serde(rename="line-width")]
+    pub line_width: LineWidth,
 }
 
-/// The line's offset. For linear features, a positive value offsets the line to the right, relative to the direction of the line, and a negative value to the left. For polygon features, a positive value results in an inset, and a negative value results in an outset.
+/// Blur applied to the line, in pixels.
+///
+/// # Range
+/// - Minimum: 0
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-pub struct LineOffset(serde_json::Number);
+pub struct LineBlur(serde_json::Number);
 
-impl Default for LineOffset {
+impl Default for LineBlur {
     fn default() {
         0
     }
 }
 
 /// The color with which the line will be drawn.
+#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
 #[deprecated = "not_implemented"]
 struct LineColor(serde_json::Value);
 
@@ -2034,28 +2745,10 @@ impl Default for LineColor {
     }
 }
 
-/// The geometry's offset. Values are [x, y] where negatives indicate left and up, respectively.
-#[deprecated = "not_implemented"]
-struct LineTranslate(serde_json::Value);
-
-impl Default for LineTranslate {
-    fn default() {
-        vec![0, 0]
-    }
-}
-
-/// Stroke thickness.
-///
-/// # Range
-/// - Minimum: 0
+/// Specifies the lengths of the alternating dashes and gaps that form the dash pattern. The lengths are later scaled by the line width. To convert a dash length to pixels, multiply the length by the current line width. GeoJSON sources with `lineMetrics: true` specified won't render dashed lines to the expected scale. Zoom-dependent expressions will be evaluated only at integer zoom levels. The only way to create an array value is using `["literal", [...]]`; arrays cannot be read from or derived from feature properties.
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-pub struct LineWidth(serde_json::Number);
-
-impl Default for LineWidth {
-    fn default() {
-        1
-    }
-}
+#[deprecated = "not_implemented"]
+struct LineDasharray(serde_json::Value);
 
 /// Draws a line casing outside of a line's actual path. Value indicates the width of the inner gap.
 ///
@@ -2070,24 +2763,48 @@ impl Default for LineGapWidth {
     }
 }
 
-/// Specifies the lengths of the alternating dashes and gaps that form the dash pattern. The lengths are later scaled by the line width. To convert a dash length to pixels, multiply the length by the current line width. GeoJSON sources with `lineMetrics: true` specified won't render dashed lines to the expected scale. Zoom-dependent expressions will be evaluated only at integer zoom levels. The only way to create an array value is using `["literal", [...]]`; arrays cannot be read from or derived from feature properties.
-#[deprecated = "not_implemented"]
-struct LineDasharray(serde_json::Value);
-
 /// Defines a gradient with which to color a line feature. Can only be used with GeoJSON sources that specify `"lineMetrics": true`.
+#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
 #[deprecated = "not_implemented"]
 struct LineGradient(serde_json::Value);
 
-/// Blur applied to the line, in pixels.
-///
-/// # Range
-/// - Minimum: 0
+/// The line's offset. For linear features, a positive value offsets the line to the right, relative to the direction of the line, and a negative value to the left. For polygon features, a positive value results in an inset, and a negative value results in an outset.
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-pub struct LineBlur(serde_json::Number);
+pub struct LineOffset(serde_json::Number);
 
-impl Default for LineBlur {
+impl Default for LineOffset {
     fn default() {
         0
+    }
+}
+
+/// The opacity at which the line will be drawn.
+///
+/// # Range
+/// - Maximum: 1
+/// - Minimum: 0
+#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+pub struct LineOpacity(serde_json::Number);
+
+impl Default for LineOpacity {
+    fn default() {
+        1
+    }
+}
+
+/// Name of image in sprite to use for drawing image lines. For seamless patterns, image width must be a factor of two (2, 4, 8, ..., 512). Note that zoom-dependent expressions will be evaluated only at integer zoom levels.
+#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+#[deprecated = "not_implemented"]
+struct LinePattern(serde_json::Value);
+
+/// The geometry's offset. Values are [x, y] where negatives indicate left and up, respectively.
+#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+#[deprecated = "not_implemented"]
+struct LineTranslate(serde_json::Value);
+
+impl Default for LineTranslate {
+    fn default() {
+        vec![0, 0]
     }
 }
 
@@ -2108,1473 +2825,45 @@ impl Default for LineTranslateAnchor {
     }
 }
 
-/// Name of image in sprite to use for drawing image lines. For seamless patterns, image width must be a factor of two (2, 4, 8, ..., 512). Note that zoom-dependent expressions will be evaluated only at integer zoom levels.
-#[deprecated = "not_implemented"]
-struct LinePattern(serde_json::Value);
-
-/// The opacity at which the line will be drawn.
+/// Stroke thickness.
 ///
 /// # Range
-/// - Maximum: 1
 /// - Minimum: 0
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-pub struct LineOpacity(serde_json::Number);
+pub struct LineWidth(serde_json::Number);
 
-impl Default for LineOpacity {
+impl Default for LineWidth {
     fn default() {
         1
     }
-}
-
-/// An expression defines a function that can be used for data-driven style properties or feature filters.
-#[deprecated = "not_implemented"]
-struct Expression(serde_json::Value);
-
-#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-pub struct SourceRasterDem {
-    /// An array containing the longitude and latitude of the southwest and northeast corners of the source's bounding box in the following order: `[sw.lng, sw.lat, ne.lng, ne.lat]`. When this property is included in a source, no tiles outside of the given bounds are requested by MapLibre.
-    pub bounds: Bounds,
-    /// A URL to a TileJSON resource. Supported protocols are `http:` and `https:`.
-    pub url: Url,
-    /// Minimum zoom level for which tiles are available, as in the TileJSON spec.
-    pub minzoom: Minzoom,
-    /// Value that will be multiplied by the blue channel value when decoding. Only used on custom encodings.
-    pub blueFactor: Bluefactor,
-    /// Maximum zoom level for which tiles are available, as in the TileJSON spec. Data from tiles at the maxzoom are used when displaying the map at higher zoom levels.
-    pub maxzoom: Maxzoom,
-    /// The type of the source.
-    pub type: Type,
-    /// The encoding used by this source. Mapbox Terrain RGB is used by default.
-    pub encoding: Encoding,
-    /// Contains an attribution to be displayed when the map is shown to a user.
-    pub attribution: Attribution,
-    /// Value that will be multiplied by the green channel value when decoding. Only used on custom encodings.
-    pub greenFactor: Greenfactor,
-    /// An array of one or more tile source URLs, as in the TileJSON spec.
-    pub tiles: Tiles,
-    /// The minimum visual size to display tiles for this layer. Only configurable for raster layers.
-    pub tileSize: Tilesize,
-    /// Value that will be multiplied by the red channel value when decoding. Only used on custom encodings.
-    pub redFactor: Redfactor,
-    /// Value that will be added to the encoding mix when decoding. Only used on custom encodings.
-    pub baseShift: Baseshift,
-    /// A setting to determine whether a source's tiles are cached locally.
-    pub volatile: Volatile,
-    /// Other keys to configure the data source.
-    pub *: ,
-}
-
-/// An array containing the longitude and latitude of the southwest and northeast corners of the source's bounding box in the following order: `[sw.lng, sw.lat, ne.lng, ne.lat]`. When this property is included in a source, no tiles outside of the given bounds are requested by MapLibre.
-#[deprecated = "not_implemented"]
-struct Bounds(serde_json::Value);
-
-impl Default for Bounds {
-    fn default() {
-        vec![-180, -85.051129, 180, 85.051129]
-    }
-}
-
-/// A URL to a TileJSON resource. Supported protocols are `http:` and `https:`.
-#[deprecated = "not_implemented"]
-struct Url(serde_json::Value);
-
-/// Minimum zoom level for which tiles are available, as in the TileJSON spec.
-#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-pub struct Minzoom(serde_json::Number);
-
-impl Default for Minzoom {
-    fn default() {
-        0
-    }
-}
-
-/// Value that will be multiplied by the blue channel value when decoding. Only used on custom encodings.
-#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-pub struct Bluefactor(serde_json::Number);
-
-impl Default for Bluefactor {
-    fn default() {
-        1.0
-    }
-}
-
-/// Maximum zoom level for which tiles are available, as in the TileJSON spec. Data from tiles at the maxzoom are used when displaying the map at higher zoom levels.
-#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-pub struct Maxzoom(serde_json::Number);
-
-impl Default for Maxzoom {
-    fn default() {
-        22
-    }
-}
-
-/// The type of the source.
-#[derive(serde::Deserialize, PartialEq, Eq, Debug, Clone, Copy)]
-pub enum Type {
-    #[serde(rename="raster-dem")]
-    /// A RGB-encoded raster DEM source
-    RasterDem,
-}
-
-/// The encoding used by this source. Mapbox Terrain RGB is used by default.
-#[derive(serde::Deserialize, PartialEq, Eq, Debug, Clone, Copy)]
-pub enum Encoding {
-    #[serde(rename="terrarium")]
-    /// Terrarium format PNG tiles. See https://aws.amazon.com/es/public-datasets/terrain/ for more info.
-    Terrarium,
-    #[serde(rename="mapbox")]
-    /// Mapbox Terrain RGB tiles. See https://www.mapbox.com/help/access-elevation-data/#mapbox-terrain-rgb for more info.
-    Mapbox,
-    #[serde(rename="custom")]
-    /// Decodes tiles using the redFactor, blueFactor, greenFactor, baseShift parameters.
-    Custom,
-}
-
-impl Default for Encoding {
-    fn default() {
-        "mapbox"
-    }
-}
-
-/// Contains an attribution to be displayed when the map is shown to a user.
-#[deprecated = "not_implemented"]
-struct Attribution(serde_json::Value);
-
-/// Value that will be multiplied by the green channel value when decoding. Only used on custom encodings.
-#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-pub struct Greenfactor(serde_json::Number);
-
-impl Default for Greenfactor {
-    fn default() {
-        1.0
-    }
-}
-
-/// An array of one or more tile source URLs, as in the TileJSON spec.
-#[deprecated = "not_implemented"]
-struct Tiles(serde_json::Value);
-
-/// The minimum visual size to display tiles for this layer. Only configurable for raster layers.
-#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-pub struct Tilesize(serde_json::Number);
-
-impl Default for Tilesize {
-    fn default() {
-        512
-    }
-}
-
-/// Value that will be multiplied by the red channel value when decoding. Only used on custom encodings.
-#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-pub struct Redfactor(serde_json::Number);
-
-impl Default for Redfactor {
-    fn default() {
-        1.0
-    }
-}
-
-/// Value that will be added to the encoding mix when decoding. Only used on custom encodings.
-#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-pub struct Baseshift(serde_json::Number);
-
-impl Default for Baseshift {
-    fn default() {
-        0.0
-    }
-}
-
-/// A setting to determine whether a source's tiles are cached locally.
-#[deprecated = "not_implemented"]
-struct Volatile(serde_json::Value);
-
-impl Default for Volatile {
-    fn default() {
-        false
-    }
-}
-
-/// Other keys to configure the data source.
-#[deprecated = "not_implemented"]
-struct (serde_json::Value);
-
-#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-pub struct SourceImage {
-    /// URL that points to an image.
-    pub url: Url,
-    /// Corners of image specified in longitude, latitude pairs.
-    pub coordinates: Coordinates,
-    /// The data type of the image source.
-    pub type: Type,
-}
-
-/// URL that points to an image.
-#[deprecated = "not_implemented"]
-struct Url(serde_json::Value);
-
-/// Corners of image specified in longitude, latitude pairs.
-#[deprecated = "not_implemented"]
-struct Coordinates(serde_json::Value);
-
-/// The data type of the image source.
-#[derive(serde::Deserialize, PartialEq, Eq, Debug, Clone, Copy)]
-pub enum Type {
-    #[serde(rename="image")]
-    /// An image data source.
-    Image,
-}
-
-#[derive(serde::Deserialize, PartialEq, Eq, Debug, Clone, Copy)]
-pub enum ExpressionName {
-    #[serde(rename="format")]
-    /// Returns a `formatted` string for displaying mixed-format text in the `text-field` property. The input may contain a string literal or expression, including an [`'image'`](#image) expression. Strings may be followed by a style override object that supports the following properties:
-
-    - `"text-font"`: Overrides the font stack specified by the root layout property.
-
-    - `"text-color"`: Overrides the color specified by the root paint property.
-
-    - `"font-scale"`: Applies a scaling factor on `text-size` as specified by the root layout property.
-
-    - `"vertical-align"`: Aligns vertically text section or image in relation to the row it belongs to. Possible values are: 
-    	- `"bottom"` *default*: align the bottom of this section with the bottom of other sections.
-    <img alt="Visual representation of bottom alignment" src="https://github.com/user-attachments/assets/0474a2fd-a4b2-417c-9187-7a13a28695bc"/>
-    	- `"center"`: align the center of this section with the center of other sections.
-    <img alt="Visual representation of center alignment" src="https://github.com/user-attachments/assets/92237455-be6d-4c5d-b8f6-8127effc1950"/>
-    	- `"top"`: align the top of this section with the top of other sections.
-    <img alt="Visual representation of top alignment" src="https://github.com/user-attachments/assets/45dccb28-d977-4abb-a006-4ea9792b7c53"/>
-    	- Refer to [the design proposal](https://github.com/maplibre/maplibre-style-spec/issues/832) for more details.
-
-     - [Change the case of labels](https://maplibre.org/maplibre-gl-js/docs/examples/change-case-of-labels/)
-
-     - [Display and style rich text labels](https://maplibre.org/maplibre-gl-js/docs/examples/display-and-style-rich-text-labels/)
-    Format,
-    #[serde(rename="rgb")]
-    /// Creates a color value from red, green, and blue components, which must range between 0 and 255, and an alpha component of 1. If any component is out of range, the expression is an error.
-    Rgb,
-    #[serde(rename="atan")]
-    /// Returns the arctangent of the input.
-    Atan,
-    #[serde(rename="ln2")]
-    /// Returns the mathematical constant ln(2).
-    Ln2,
-    #[serde(rename="to-color")]
-    /// Converts the input value to a color. If multiple values are provided, each one is evaluated in order until the first successful conversion is obtained. If none of the inputs can be converted, the expression is an error.
-
-     - [Visualize population density](https://maplibre.org/maplibre-gl-js/docs/examples/visualize-population-density/)
-    ToColor,
-    #[serde(rename="image")]
-    /// Returns an `image` type for use in `icon-image`, `*-pattern` entries and as a section in the `format` expression. If set, the `image` argument will check that the requested image exists in the style and will return either the resolved image name or `null`, depending on whether or not the image is currently in the style. This validation process is synchronous and requires the image to have been added to the style before requesting it in the `image` argument.
-
-     - [Use a fallback image](https://maplibre.org/maplibre-gl-js/docs/examples/use-a-fallback-image/)
-    Image,
-    #[serde(rename="+")]
-    /// Returns the sum of the inputs.
-    ,
-    #[serde(rename="to-boolean")]
-    /// Converts the input value to a boolean. The result is `false` when the input is an empty string, 0, `false`, `null`, or `NaN`; otherwise it is `true`.
-    ToBoolean,
-    #[serde(rename="%")]
-    /// Returns the remainder after integer division of the first input by the second.
-    ,
-    #[serde(rename="interpolate-lab")]
-    /// Produces continuous, smooth results by interpolating between pairs of input and output values ("stops"). Works like `interpolate`, but the output type must be `color` or `array<color>`, and the interpolation is performed in the CIELAB color space.
-    InterpolateLab,
-    #[serde(rename="object")]
-    /// Asserts that the input value is an object. If multiple values are provided, each one is evaluated in order until an object is obtained. If none of the inputs are objects, the expression is an error.
-    Object,
-    #[serde(rename="step")]
-    /// Produces discrete, stepped results by evaluating a piecewise-constant function defined by pairs of input and output values ("stops"). The `input` may be any numeric expression (e.g., `["get", "population"]`). Stop inputs must be numeric literals in strictly ascending order.
-
-    Returns the output value of the stop just less than the input, or the first output if the input is less than the first stop.
-
-     - [Create and style clusters](https://maplibre.org/maplibre-gl-js/docs/examples/create-and-style-clusters/)
-    Step,
-    #[serde(rename="log10")]
-    /// Returns the base-ten logarithm of the input.
-    Log10,
-    #[serde(rename="max")]
-    /// Returns the maximum value of the inputs.
-    Max,
-    #[serde(rename="resolved-locale")]
-    /// Returns the IETF language tag of the locale being used by the provided `collator`. This can be used to determine the default system locale, or to determine if a requested locale was successfully loaded.
-    ResolvedLocale,
-    #[serde(rename="collator")]
-    /// Returns a `collator` for use in locale-dependent comparison operations. The `case-sensitive` and `diacritic-sensitive` options default to `false`. The `locale` argument specifies the IETF language tag of the locale to use. If none is provided, the default locale is used. If the requested locale is not available, the `collator` will use a system-defined fallback locale. Use `resolved-locale` to test the results of locale fallback behavior.
-    Collator,
-    #[serde(rename="!")]
-    /// Logical negation. Returns `true` if the input is `false`, and `false` if the input is `true`.
-
-     - [Create and style clusters](https://maplibre.org/maplibre-gl-js/docs/examples/create-and-style-clusters/)
-    ,
-    #[serde(rename="to-string")]
-    /// Converts the input value to a string. If the input is `null`, the result is `""`. If the input is a boolean, the result is `"true"` or `"false"`. If the input is a number, it is converted to a string as specified by the ["NumberToString" algorithm](https://tc39.github.io/ecma262/#sec-tostring-applied-to-the-number-type) of the ECMAScript Language Specification. If the input is a color, it is converted to a string of the form `"rgba(r,g,b,a)"`, where `r`, `g`, and `b` are numerals ranging from 0 to 255, and `a` ranges from 0 to 1. Otherwise, the input is converted to a string in the format specified by the [`JSON.stringify`](https://tc39.github.io/ecma262/#sec-json.stringify) function of the ECMAScript Language Specification.
-
-     - [Create a time slider](https://maplibre.org/maplibre-gl-js/docs/examples/create-a-time-slider/)
-    ToString,
-    #[serde(rename="array")]
-    /// Asserts that the input is an array (optionally with a specific item type and length). If, when the input expression is evaluated, it is not of the asserted type or length, then this assertion will cause the whole expression to be aborted.
-    Array,
-    #[serde(rename="is-supported-script")]
-    /// Returns `true` if the input string is expected to render legibly. Returns `false` if the input string contains sections that cannot be rendered without potential loss of meaning (e.g. Indic scripts that require complex text shaping, or right-to-left scripts if the `mapbox-gl-rtl-text` plugin is not in use in MapLibre GL JS).
-    IsSupportedScript,
-    #[serde(rename="var")]
-    /// References variable bound using `let`.
-
-     - [Visualize population density](https://maplibre.org/maplibre-gl-js/docs/examples/visualize-population-density/)
-    Var,
-    #[serde(rename="length")]
-    /// Gets the length of an array or string. In a string, a UTF-16 surrogate pair counts as a single position.
-    Length,
-    #[serde(rename="!=")]
-    /// Returns `true` if the input values are not equal, `false` otherwise. The comparison is strictly typed: values of different runtime types are always considered unequal. Cases where the types are known to be different at parse time are considered invalid and will produce a parse error. Accepts an optional `collator` argument to control locale-dependent string comparisons.
-
-     - [Display HTML clusters with custom properties](https://maplibre.org/maplibre-gl-js/docs/examples/display-html-clusters-with-custom-properties/)
-    ,
-    #[serde(rename="let")]
-    /// Binds expressions to named variables, which can then be referenced in the result expression using `["var", "variable_name"]`.
-
-     - [Visualize population density](https://maplibre.org/maplibre-gl-js/docs/examples/visualize-population-density/)
-    Let,
-    #[serde(rename="asin")]
-    /// Returns the arcsine of the input.
-    Asin,
-    #[serde(rename="floor")]
-    /// Returns the largest integer that is less than or equal to the input.
-    Floor,
-    #[serde(rename=">=")]
-    /// Returns `true` if the first input is greater than or equal to the second, `false` otherwise. The arguments are required to be either both strings or both numbers; if during evaluation they are not, expression evaluation produces an error. Cases where this constraint is known not to hold at parse time are considered in valid and will produce a parse error. Accepts an optional `collator` argument to control locale-dependent string comparisons.
-
-     - [Display HTML clusters with custom properties](https://maplibre.org/maplibre-gl-js/docs/examples/display-html-clusters-with-custom-properties/)
-    ,
-    #[serde(rename="to-number")]
-    /// Converts the input value to a number, if possible. If the input is `null` or `false`, the result is 0. If the input is `true`, the result is 1. If the input is a string, it is converted to a number as specified by the ["ToNumber Applied to the String Type" algorithm](https://tc39.github.io/ecma262/#sec-tonumber-applied-to-the-string-type) of the ECMAScript Language Specification. If multiple values are provided, each one is evaluated in order until the first successful conversion is obtained. If none of the inputs can be converted, the expression is an error.
-    ToNumber,
-    #[serde(rename="literal")]
-    /// Provides a literal array or object value.
-
-     - [Display and style rich text labels](https://maplibre.org/maplibre-gl-js/docs/examples/display-and-style-rich-text-labels/)
-    Literal,
-    #[serde(rename="typeof")]
-    /// Returns a string describing the type of the given value.
-    Typeof,
-    #[serde(rename="feature-state")]
-    /// Retrieves a property value from the current feature's state. Returns null if the requested property is not present on the feature's state. A feature's state is not part of the GeoJSON or vector tile data, and must be set programmatically on each feature. When `source.promoteId` is not provided, features are identified by their `id` attribute, which must be an integer or a string that can be cast to an integer. When `source.promoteId` is provided, features are identified by their `promoteId` property, which may be a number, string, or any primitive data type. Note that ["feature-state"] can only be used with paint properties that support data-driven styling.
-
-     - [Create a hover effect](https://maplibre.org/maplibre-gl-js/docs/examples/create-a-hover-effect/)
-    FeatureState,
-    #[serde(rename="rgba")]
-    /// Creates a color value from red, green, blue components, which must range between 0 and 255, and an alpha component which must range between 0 and 1. If any component is out of range, the expression is an error.
-    Rgba,
-    #[serde(rename="index-of")]
-    /// Returns the first position at which an item can be found in an array or a substring can be found in a string, or `-1` if the input cannot be found. Accepts an optional index from where to begin the search. In a string, a UTF-16 surrogate pair counts as a single position.
-    IndexOf,
-    #[serde(rename="case")]
-    /// Selects the first output whose corresponding test condition evaluates to true, or the fallback value otherwise.
-
-     - [Create a hover effect](https://maplibre.org/maplibre-gl-js/docs/examples/create-a-hover-effect/)
-
-     - [Display HTML clusters with custom properties](https://maplibre.org/maplibre-gl-js/docs/examples/display-html-clusters-with-custom-properties/)
-    Case,
-    #[serde(rename="zoom")]
-    /// Gets the current zoom level.  Note that in style layout and paint properties, ["zoom"] may only appear as the input to a top-level "step" or "interpolate" expression.
-    Zoom,
-    #[serde(rename="line-progress")]
-    /// Gets the progress along a gradient line. Can only be used in the `line-gradient` property.
-    LineProgress,
-    #[serde(rename="ln")]
-    /// Returns the natural logarithm of the input.
-    Ln,
-    #[serde(rename="log2")]
-    /// Returns the base-two logarithm of the input.
-    Log2,
-    #[serde(rename="round")]
-    /// Rounds the input to the nearest integer. Halfway values are rounded away from zero. For example, `["round", -1.5]` evaluates to -2.
-    Round,
-    #[serde(rename="ceil")]
-    /// Returns the smallest integer that is greater than or equal to the input.
-    Ceil,
-    #[serde(rename="<=")]
-    /// Returns `true` if the first input is less than or equal to the second, `false` otherwise. The arguments are required to be either both strings or both numbers; if during evaluation they are not, expression evaluation produces an error. Cases where this constraint is known not to hold at parse time are considered in valid and will produce a parse error. Accepts an optional `collator` argument to control locale-dependent string comparisons.
-    ,
-    #[serde(rename="any")]
-    /// Returns `true` if any of the inputs are `true`, `false` otherwise. The inputs are evaluated in order, and evaluation is short-circuiting: once an input expression evaluates to `true`, the result is `true` and no further input expressions are evaluated.
-    Any,
-    #[serde(rename="concat")]
-    /// Returns a `string` consisting of the concatenation of the inputs. Each input is converted to a string as if by `to-string`.
-
-     - [Add a generated icon to the map](https://maplibre.org/maplibre-gl-js/docs/examples/add-a-generated-icon-to-the-map/)
-
-     - [Create a time slider](https://maplibre.org/maplibre-gl-js/docs/examples/create-a-time-slider/)
-
-     - [Use a fallback image](https://maplibre.org/maplibre-gl-js/docs/examples/fallback-image/)
-
-     - [Variable label placement](https://maplibre.org/maplibre-gl-js/docs/examples/variable-label-placement/)
-    Concat,
-    #[serde(rename="/")]
-    /// Returns the result of floating point division of the first input by the second.
-
-     - [Visualize population density](https://maplibre.org/maplibre-gl-js/docs/examples/visualize-population-density/)
-    ,
-    #[serde(rename="all")]
-    /// Returns `true` if all the inputs are `true`, `false` otherwise. The inputs are evaluated in order, and evaluation is short-circuiting: once an input expression evaluates to `false`, the result is `false` and no further input expressions are evaluated.
-
-     - [Display HTML clusters with custom properties](https://maplibre.org/maplibre-gl-js/docs/examples/display-html-clusters-with-custom-properties/)
-    All,
-    #[serde(rename="*")]
-    /// Returns the product of the inputs.
-    ,
-    #[serde(rename="downcase")]
-    /// Returns the input string converted to lowercase. Follows the Unicode Default Case Conversion algorithm and the locale-insensitive case mappings in the Unicode Character Database.
-
-     - [Change the case of labels](https://maplibre.org/maplibre-gl-js/docs/examples/change-case-of-labels/)
-    Downcase,
-    #[serde(rename="in")]
-    /// Determines whether an item exists in an array or a substring exists in a string.
-
-     - [Measure distances](https://maplibre.org/maplibre-gl-js/docs/examples/measure-distances/)
-    In,
-    #[serde(rename="accumulated")]
-    /// Gets the value of a cluster property accumulated so far. Can only be used in the `clusterProperties` option of a clustered GeoJSON source.
-    Accumulated,
-    #[serde(rename="-")]
-    /// For two inputs, returns the result of subtracting the second input from the first. For a single input, returns the result of subtracting it from 0.
-    ,
-    #[serde(rename="get")]
-    /// Retrieves a property value from the current feature's properties, or from another object if a second argument is provided. Returns null if the requested property is missing.
-
-     - [Change the case of labels](https://maplibre.org/maplibre-gl-js/docs/examples/change-case-of-labels/)
-
-     - [Display HTML clusters with custom properties](https://maplibre.org/maplibre-gl-js/docs/examples/display-html-clusters-with-custom-properties/)
-
-     - [Extrude polygons for 3D indoor mapping](https://maplibre.org/maplibre-gl-js/docs/examples/extrude-polygons-for-3d-indoor-mapping/)
-    Get,
-    #[serde(rename="sin")]
-    /// Returns the sine of the input.
-    Sin,
-    #[serde(rename="number-format")]
-    /// Converts the input number into a string representation using the providing formatting rules. If set, the `locale` argument specifies the locale to use, as a BCP 47 language tag. If set, the `currency` argument specifies an ISO 4217 code to use for currency-style formatting. If set, the `min-fraction-digits` and `max-fraction-digits` arguments specify the minimum and maximum number of fractional digits to include.
-
-     - [Display HTML clusters with custom properties](https://maplibre.org/maplibre-gl-js/docs/examples/display-html-clusters-with-custom-properties/)
-    NumberFormat,
-    #[serde(rename="tan")]
-    /// Returns the tangent of the input.
-    Tan,
-    #[serde(rename="^")]
-    /// Returns the result of raising the first input to the power specified by the second.
-    ,
-    #[serde(rename="<")]
-    /// Returns `true` if the first input is strictly less than the second, `false` otherwise. The arguments are required to be either both strings or both numbers; if during evaluation they are not, expression evaluation produces an error. Cases where this constraint is known not to hold at parse time are considered in valid and will produce a parse error. Accepts an optional `collator` argument to control locale-dependent string comparisons.
-
-     - [Display HTML clusters with custom properties](https://maplibre.org/maplibre-gl-js/docs/examples/display-html-clusters-with-custom-properties/)
-    ,
-    #[serde(rename="min")]
-    /// Returns the minimum value of the inputs.
-    Min,
-    #[serde(rename="interpolate")]
-    /// Produces continuous, smooth results by interpolating between pairs of input and output values ("stops"). The `input` may be any numeric expression (e.g., `["get", "population"]`). Stop inputs must be numeric literals in strictly ascending order. The output type must be `number`, `array<number>`, `color`, `array<color>`, or `projection`.
-
-    Interpolation types:
-
-    - `["linear"]`, or an expression returning one of those types: Interpolates linearly between the pair of stops just less than and just greater than the input.
-
-    - `["exponential", base]`: Interpolates exponentially between the stops just less than and just greater than the input. `base` controls the rate at which the output increases: higher values make the output increase more towards the high end of the range. With values close to 1 the output increases linearly.
-
-    - `["cubic-bezier", x1, y1, x2, y2]`: Interpolates using the cubic bezier curve defined by the given control points.
-
-     - [Animate map camera around a point](https://maplibre.org/maplibre-gl-js/docs/examples/animate-camera-around-point/)
-
-     - [Change building color based on zoom level](https://maplibre.org/maplibre-gl-js/docs/examples/change-building-color-based-on-zoom-level/)
-
-     - [Create a heatmap layer](https://maplibre.org/maplibre-gl-js/docs/examples/heatmap-layer/)
-
-     - [Visualize population density](https://maplibre.org/maplibre-gl-js/docs/examples/visualize-population-density/)
-    Interpolate,
-    #[serde(rename="interpolate-hcl")]
-    /// Produces continuous, smooth results by interpolating between pairs of input and output values ("stops"). Works like `interpolate`, but the output type must be `color` or `array<color>`, and the interpolation is performed in the Hue-Chroma-Luminance color space.
-    InterpolateHcl,
-    #[serde(rename="number")]
-    /// Asserts that the input value is a number. If multiple values are provided, each one is evaluated in order until a number is obtained. If none of the inputs are numbers, the expression is an error.
-    Number,
-    #[serde(rename="at")]
-    /// Retrieves an item from an array.
-    At,
-    #[serde(rename="e")]
-    /// Returns the mathematical constant e.
-    E,
-    #[serde(rename="has")]
-    /// Tests for the presence of a property value in the current feature's properties, or from another object if a second argument is provided.
-
-     - [Create and style clusters](https://maplibre.org/maplibre-gl-js/docs/examples/create-and-style-clusters/)
-    Has,
-    #[serde(rename="geometry-type")]
-    /// Returns the feature's simple geometry type: `Point`, `LineString`, or `Polygon`. `MultiPoint`, `MultiLineString`, and `MultiPolygon` are returned as `Point`, `LineString`, and `Polygon`, respectively.
-    GeometryType,
-    #[serde(rename="id")]
-    /// Gets the feature's id, if it has one.
-    Id,
-    #[serde(rename="abs")]
-    /// Returns the absolute value of the input.
-    Abs,
-    #[serde(rename="acos")]
-    /// Returns the arccosine of the input.
-    Acos,
-    #[serde(rename="distance")]
-    /// Returns the shortest distance in meters between the evaluated feature and the input geometry. The input value can be a valid GeoJSON of type `Point`, `MultiPoint`, `LineString`, `MultiLineString`, `Polygon`, `MultiPolygon`, `Feature`, or `FeatureCollection`. Distance values returned may vary in precision due to loss in precision from encoding geometries, particularly below zoom level 13.
-    Distance,
-    #[serde(rename="==")]
-    /// Returns `true` if the input values are equal, `false` otherwise. The comparison is strictly typed: values of different runtime types are always considered unequal. Cases where the types are known to be different at parse time are considered invalid and will produce a parse error. Accepts an optional `collator` argument to control locale-dependent string comparisons.
-
-     - [Add multiple geometries from one GeoJSON source](https://maplibre.org/maplibre-gl-js/docs/examples/multiple-geometries/)
-
-     - [Create a time slider](https://maplibre.org/maplibre-gl-js/docs/examples/timeline-animation/)
-
-     - [Display buildings in 3D](https://maplibre.org/maplibre-gl-js/docs/examples/display-buildings-in-3d/)
-
-     - [Filter symbols by toggling a list](https://maplibre.org/maplibre-gl-js/docs/examples/filter-symbols-by-toggling-a-list/)
-    ,
-    #[serde(rename="pi")]
-    /// Returns the mathematical constant pi.
-    Pi,
-    #[serde(rename=">")]
-    /// Returns `true` if the first input is strictly greater than the second, `false` otherwise. The arguments are required to be either both strings or both numbers; if during evaluation they are not, expression evaluation produces an error. Cases where this constraint is known not to hold at parse time are considered in valid and will produce a parse error. Accepts an optional `collator` argument to control locale-dependent string comparisons.
-    ,
-    #[serde(rename="elevation")]
-    /// Gets the elevation of a pixel (in meters above the vertical datum reference of the `raster-dem` tiles) from a `raster-dem` source. Can only be used in the `color-relief-color` property of a `color-relief` layer.
-    Elevation,
-    #[serde(rename="within")]
-    /// Returns `true` if the evaluated feature is fully contained inside a boundary of the input geometry, `false` otherwise. The input value can be a valid GeoJSON of type `Polygon`, `MultiPolygon`, `Feature`, or `FeatureCollection`. Supported features for evaluation:
-
-    - `Point`: Returns `false` if a point is on the boundary or falls outside the boundary.
-
-    - `LineString`: Returns `false` if any part of a line falls outside the boundary, the line intersects the boundary, or a line's endpoint is on the boundary.
-    Within,
-    #[serde(rename="cos")]
-    /// Returns the cosine of the input.
-    Cos,
-    #[serde(rename="boolean")]
-    /// Asserts that the input value is a boolean. If multiple values are provided, each one is evaluated in order until a boolean is obtained. If none of the inputs are booleans, the expression is an error.
-
-     - [Create a hover effect](https://maplibre.org/maplibre-gl-js/docs/examples/create-a-hover-effect/)
-    Boolean,
-    #[serde(rename="upcase")]
-    /// Returns the input string converted to uppercase. Follows the Unicode Default Case Conversion algorithm and the locale-insensitive case mappings in the Unicode Character Database.
-
-     - [Change the case of labels](https://maplibre.org/maplibre-gl-js/docs/examples/change-case-of-labels/)
-    Upcase,
-    #[serde(rename="coalesce")]
-    /// Evaluates each expression in turn until the first non-null value is obtained, and returns that value.
-
-     - [Use a fallback image](https://maplibre.org/maplibre-gl-js/docs/examples/use-a-fallback-image/)
-    Coalesce,
-    #[serde(rename="match")]
-    /// Selects the output whose label value matches the input value, or the fallback value if no match is found. The input can be any expression (e.g. `["get", "building_type"]`). Each label must be either:
-
-     - a single literal value; or
-
-     - an array of literal values, whose values must be all strings or all numbers (e.g. `[100, 101]` or `["c", "b"]`). The input matches if any of the values in the array matches, similar to the `"in"` operator.
-
-    Each label must be unique. If the input type does not match the type of the labels, the result will be the fallback value.
-    Match,
-    #[serde(rename="sqrt")]
-    /// Returns the square root of the input.
-    Sqrt,
-    #[serde(rename="string")]
-    /// Asserts that the input value is a string. If multiple values are provided, each one is evaluated in order until a string is obtained. If none of the inputs are strings, the expression is an error.
-    String,
-    #[serde(rename="slice")]
-    /// Returns a subarray from an array or a substring from a string from a specified start index, or between a start index and an end index if set. The return value is inclusive of the start index but not of the end index. In a string, a UTF-16 surrogate pair counts as a single position.
-    Slice,
-    #[serde(rename="global-state")]
-    /// Retrieves a property value from global state that can be set with platform-specific APIs. Defaults can be provided using the [`state`](https://maplibre.org/maplibre-style-spec/root/#state) root property. Returns `null` if no value nor default value is set for the retrieved property.
-    GlobalState,
-    #[serde(rename="heatmap-density")]
-    /// Gets the kernel density estimation of a pixel in a heatmap layer, which is a relative measure of how many data points are crowded around a particular pixel. Can only be used in the `heatmap-color` property.
-    HeatmapDensity,
-    #[serde(rename="properties")]
-    /// Gets the feature properties object.  Note that in some cases, it may be more efficient to use ["get", "property_name"] directly.
-    Properties,
-    #[serde(rename="to-rgba")]
-    /// Returns a four-element array containing the input color's red, green, blue, and alpha components, in that order.
-    ToRgba,
-}
-
-/// Zoom level and value pair.
-#[deprecated = "not_implemented"]
-struct FunctionStop(serde_json::Value);
-
-#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-pub struct PaintColorRelief {
-    /// The opacity at which the color-relief will be drawn.
-    pub color-relief-opacity: ColorReliefOpacity,
-    /// Defines the color of each pixel based on its elevation. Should be an expression that uses `["elevation"]` as input.
-    pub color-relief-color: ColorReliefColor,
-}
-
-/// The opacity at which the color-relief will be drawn.
-///
-/// # Range
-/// - Maximum: 1
-/// - Minimum: 0
-#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-pub struct ColorReliefOpacity(serde_json::Number);
-
-impl Default for ColorReliefOpacity {
-    fn default() {
-        1
-    }
-}
-
-/// Defines the color of each pixel based on its elevation. Should be an expression that uses `["elevation"]` as input.
-#[deprecated = "not_implemented"]
-struct ColorReliefColor(serde_json::Value);
-
-/// The filter operator.
-#[derive(serde::Deserialize, PartialEq, Eq, Debug, Clone, Copy)]
-pub enum FilterOperator {
-    #[serde(rename="<")]
-    /// `["<", key, value]` less than: `feature[key] < value`
-    ,
-    #[serde(rename="!has")]
-    /// `["!has", key]` `feature[key]` does not exist
-    Has,
-    #[serde(rename="any")]
-    /// `["any", f0, ..., fn]` logical `OR`: `f0 ∨ ... ∨ fn`
-    Any,
-    #[serde(rename="!in")]
-    /// `["!in", key, v0, ..., vn]` set exclusion: `feature[key] ∉ {v0, ..., vn}`
-    In,
-    #[serde(rename="==")]
-    /// `["==", key, value]` equality: `feature[key] = value`
-    ,
-    #[serde(rename="has")]
-    /// `["has", key]` `feature[key]` exists
-    Has,
-    #[serde(rename=">")]
-    /// `[">", key, value]` greater than: `feature[key] > value`
-    ,
-    #[serde(rename="in")]
-    /// `["in", key, v0, ..., vn]` set inclusion: `feature[key] ∈ {v0, ..., vn}`
-    In,
-    #[serde(rename="all")]
-    /// `["all", f0, ..., fn]` logical `AND`: `f0 ∧ ... ∧ fn`
-    All,
-    #[serde(rename="!=")]
-    /// `["!=", key, value]` inequality: `feature[key] ≠ value`
-    ,
-    #[serde(rename=">=")]
-    /// `[">=", key, value]` greater than or equal: `feature[key] ≥ value`
-    ,
-    #[serde(rename="none")]
-    /// `["none", f0, ..., fn]` logical `NOR`: `¬f0 ∧ ... ∧ ¬fn`
-    None,
-    #[serde(rename="<=")]
-    /// `["<=", key, value]` less than or equal: `feature[key] ≤ value`
-    ,
-}
-
-#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-pub struct Sky {
-    /// The base color for the sky.
-    pub sky-color: SkyColor,
-    /// How to blend the fog color and the horizon color. Where 0 is using the horizon color only and 1 is using the fog color only.
-    pub horizon-fog-blend: HorizonFogBlend,
-    /// How to blend the sky color and the horizon color. Where 1 is blending the color at the middle of the sky and 0 is not blending at all and using the sky color only.
-    pub sky-horizon-blend: SkyHorizonBlend,
-    /// The base color for the fog. Requires 3D terrain.
-    pub fog-color: FogColor,
-    /// How to blend the atmosphere. Where 1 is visible atmosphere and 0 is hidden. It is best to interpolate this expression when using globe projection.
-    pub atmosphere-blend: AtmosphereBlend,
-    /// How to blend the fog over the 3D terrain. Where 0 is the map center and 1 is the horizon.
-    pub fog-ground-blend: FogGroundBlend,
-    /// The base color at the horizon.
-    pub horizon-color: HorizonColor,
-}
-
-/// The base color for the sky.
-#[deprecated = "not_implemented"]
-struct SkyColor(serde_json::Value);
-
-impl Default for SkyColor {
-    fn default() {
-        "#88C6FC"
-    }
-}
-
-/// How to blend the fog color and the horizon color. Where 0 is using the horizon color only and 1 is using the fog color only.
-///
-/// # Range
-/// - Maximum: 1
-/// - Minimum: 0
-#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-pub struct HorizonFogBlend(serde_json::Number);
-
-impl Default for HorizonFogBlend {
-    fn default() {
-        0.8
-    }
-}
-
-/// How to blend the sky color and the horizon color. Where 1 is blending the color at the middle of the sky and 0 is not blending at all and using the sky color only.
-///
-/// # Range
-/// - Maximum: 1
-/// - Minimum: 0
-#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-pub struct SkyHorizonBlend(serde_json::Number);
-
-impl Default for SkyHorizonBlend {
-    fn default() {
-        0.8
-    }
-}
-
-/// The base color for the fog. Requires 3D terrain.
-#[deprecated = "not_implemented"]
-struct FogColor(serde_json::Value);
-
-impl Default for FogColor {
-    fn default() {
-        "#ffffff"
-    }
-}
-
-/// How to blend the atmosphere. Where 1 is visible atmosphere and 0 is hidden. It is best to interpolate this expression when using globe projection.
-///
-/// # Range
-/// - Maximum: 1
-/// - Minimum: 0
-#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-pub struct AtmosphereBlend(serde_json::Number);
-
-impl Default for AtmosphereBlend {
-    fn default() {
-        0.8
-    }
-}
-
-/// How to blend the fog over the 3D terrain. Where 0 is the map center and 1 is the horizon.
-///
-/// # Range
-/// - Maximum: 1
-/// - Minimum: 0
-#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-pub struct FogGroundBlend(serde_json::Number);
-
-impl Default for FogGroundBlend {
-    fn default() {
-        0.5
-    }
-}
-
-/// The base color at the horizon.
-#[deprecated = "not_implemented"]
-struct HorizonColor(serde_json::Value);
-
-impl Default for HorizonColor {
-    fn default() {
-        "#ffffff"
-    }
-}
-
-#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-pub struct Light {
-    /// Intensity of lighting (on a scale from 0 to 1). Higher numbers will present as more extreme contrast.
-    pub intensity: Intensity,
-    /// Position of the light source relative to lit (extruded) geometries, in [r radial coordinate, a azimuthal angle, p polar angle] where r indicates the distance from the center of the base of an object to its light, a indicates the position of the light relative to 0° (0° when `light.anchor` is set to `viewport` corresponds to the top of the viewport, or 0° when `light.anchor` is set to `map` corresponds to due north, and degrees proceed clockwise), and p indicates the height of the light (from 0°, directly above, to 180°, directly below).
-    pub position: Position,
-    /// Color tint for lighting extruded geometries.
-    pub color: Color,
-    /// Whether extruded geometries are lit relative to the map or viewport.
-    pub anchor: Anchor,
-}
-
-/// Intensity of lighting (on a scale from 0 to 1). Higher numbers will present as more extreme contrast.
-///
-/// # Range
-/// - Maximum: 1
-/// - Minimum: 0
-#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-pub struct Intensity(serde_json::Number);
-
-impl Default for Intensity {
-    fn default() {
-        0.5
-    }
-}
-
-/// Position of the light source relative to lit (extruded) geometries, in [r radial coordinate, a azimuthal angle, p polar angle] where r indicates the distance from the center of the base of an object to its light, a indicates the position of the light relative to 0° (0° when `light.anchor` is set to `viewport` corresponds to the top of the viewport, or 0° when `light.anchor` is set to `map` corresponds to due north, and degrees proceed clockwise), and p indicates the height of the light (from 0°, directly above, to 180°, directly below).
-#[deprecated = "not_implemented"]
-struct Position(serde_json::Value);
-
-impl Default for Position {
-    fn default() {
-        vec![1.15, 210, 30]
-    }
-}
-
-/// Color tint for lighting extruded geometries.
-#[deprecated = "not_implemented"]
-struct Color(serde_json::Value);
-
-impl Default for Color {
-    fn default() {
-        "#ffffff"
-    }
-}
-
-/// Whether extruded geometries are lit relative to the map or viewport.
-#[derive(serde::Deserialize, PartialEq, Eq, Debug, Clone, Copy)]
-pub enum Anchor {
-    #[serde(rename="map")]
-    /// The position of the light source is aligned to the rotation of the map.
-    Map,
-    #[serde(rename="viewport")]
-    /// The position of the light source is aligned to the rotation of the viewport.
-    Viewport,
-}
-
-impl Default for Anchor {
-    fn default() {
-        "viewport"
-    }
-}
-
-#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-pub struct LayoutRaster {
-    /// Whether this layer is displayed.
-    pub visibility: Visibility,
-}
-
-/// Whether this layer is displayed.
-#[derive(serde::Deserialize, PartialEq, Eq, Debug, Clone, Copy)]
-pub enum Visibility {
-    #[serde(rename="none")]
-    /// The layer is not shown.
-    None,
-    #[serde(rename="visible")]
-    /// The layer is shown.
-    Visible,
-}
-
-impl Default for Visibility {
-    fn default() {
-        "visible"
-    }
-}
-
-#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-pub struct PaintCircle {
-    /// The opacity at which the circle will be drawn.
-    pub circle-opacity: CircleOpacity,
-    /// Circle radius.
-    pub circle-radius: CircleRadius,
-    /// The fill color of the circle.
-    pub circle-color: CircleColor,
-    /// Controls the frame of reference for `circle-translate`.
-    pub circle-translate-anchor: CircleTranslateAnchor,
-    /// The opacity of the circle's stroke.
-    pub circle-stroke-opacity: CircleStrokeOpacity,
-    /// Controls the scaling behavior of the circle when the map is pitched.
-    pub circle-pitch-scale: CirclePitchScale,
-    /// Orientation of circle when map is pitched.
-    pub circle-pitch-alignment: CirclePitchAlignment,
-    /// Amount to blur the circle. 1 blurs the circle such that only the centerpoint is full opacity.
-    pub circle-blur: CircleBlur,
-    /// The geometry's offset. Values are [x, y] where negatives indicate left and up, respectively.
-    pub circle-translate: CircleTranslate,
-    /// The stroke color of the circle.
-    pub circle-stroke-color: CircleStrokeColor,
-    /// The width of the circle's stroke. Strokes are placed outside of the `circle-radius`.
-    pub circle-stroke-width: CircleStrokeWidth,
-}
-
-/// The opacity at which the circle will be drawn.
-///
-/// # Range
-/// - Maximum: 1
-/// - Minimum: 0
-#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-pub struct CircleOpacity(serde_json::Number);
-
-impl Default for CircleOpacity {
-    fn default() {
-        1
-    }
-}
-
-/// Circle radius.
-///
-/// # Range
-/// - Minimum: 0
-#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-pub struct CircleRadius(serde_json::Number);
-
-impl Default for CircleRadius {
-    fn default() {
-        5
-    }
-}
-
-/// The fill color of the circle.
-#[deprecated = "not_implemented"]
-struct CircleColor(serde_json::Value);
-
-impl Default for CircleColor {
-    fn default() {
-        "#000000"
-    }
-}
-
-/// Controls the frame of reference for `circle-translate`.
-#[derive(serde::Deserialize, PartialEq, Eq, Debug, Clone, Copy)]
-pub enum CircleTranslateAnchor {
-    #[serde(rename="viewport")]
-    /// The circle is translated relative to the viewport.
-    Viewport,
-    #[serde(rename="map")]
-    /// The circle is translated relative to the map.
-    Map,
-}
-
-impl Default for CircleTranslateAnchor {
-    fn default() {
-        "map"
-    }
-}
-
-/// The opacity of the circle's stroke.
-///
-/// # Range
-/// - Maximum: 1
-/// - Minimum: 0
-#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-pub struct CircleStrokeOpacity(serde_json::Number);
-
-impl Default for CircleStrokeOpacity {
-    fn default() {
-        1
-    }
-}
-
-/// Controls the scaling behavior of the circle when the map is pitched.
-#[derive(serde::Deserialize, PartialEq, Eq, Debug, Clone, Copy)]
-pub enum CirclePitchScale {
-    #[serde(rename="map")]
-    /// Circles are scaled according to their apparent distance to the camera.
-    Map,
-    #[serde(rename="viewport")]
-    /// Circles are not scaled.
-    Viewport,
-}
-
-impl Default for CirclePitchScale {
-    fn default() {
-        "map"
-    }
-}
-
-/// Orientation of circle when map is pitched.
-#[derive(serde::Deserialize, PartialEq, Eq, Debug, Clone, Copy)]
-pub enum CirclePitchAlignment {
-    #[serde(rename="map")]
-    /// The circle is aligned to the plane of the map.
-    Map,
-    #[serde(rename="viewport")]
-    /// The circle is aligned to the plane of the viewport.
-    Viewport,
-}
-
-impl Default for CirclePitchAlignment {
-    fn default() {
-        "viewport"
-    }
-}
-
-/// Amount to blur the circle. 1 blurs the circle such that only the centerpoint is full opacity.
-#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-pub struct CircleBlur(serde_json::Number);
-
-impl Default for CircleBlur {
-    fn default() {
-        0
-    }
-}
-
-/// The geometry's offset. Values are [x, y] where negatives indicate left and up, respectively.
-#[deprecated = "not_implemented"]
-struct CircleTranslate(serde_json::Value);
-
-impl Default for CircleTranslate {
-    fn default() {
-        vec![0, 0]
-    }
-}
-
-/// The stroke color of the circle.
-#[deprecated = "not_implemented"]
-struct CircleStrokeColor(serde_json::Value);
-
-impl Default for CircleStrokeColor {
-    fn default() {
-        "#000000"
-    }
-}
-
-/// The width of the circle's stroke. Strokes are placed outside of the `circle-radius`.
-///
-/// # Range
-/// - Minimum: 0
-#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-pub struct CircleStrokeWidth(serde_json::Number);
-
-impl Default for CircleStrokeWidth {
-    fn default() {
-        0
-    }
-}
-
-#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-pub struct SourceRaster {
-    /// A setting to determine whether a source's tiles are cached locally.
-    pub volatile: Volatile,
-    /// Minimum zoom level for which tiles are available, as in the TileJSON spec.
-    pub minzoom: Minzoom,
-    /// Other keys to configure the data source.
-    pub *: ,
-    /// Contains an attribution to be displayed when the map is shown to a user.
-    pub attribution: Attribution,
-    /// The type of the source.
-    pub type: Type,
-    /// Maximum zoom level for which tiles are available, as in the TileJSON spec. Data from tiles at the maxzoom are used when displaying the map at higher zoom levels.
-    pub maxzoom: Maxzoom,
-    /// The minimum visual size to display tiles for this layer. Only configurable for raster layers.
-    pub tileSize: Tilesize,
-    /// An array of one or more tile source URLs, as in the TileJSON spec.
-    pub tiles: Tiles,
-    /// A URL to a TileJSON resource. Supported protocols are `http:` and `https:`.
-    pub url: Url,
-    /// An array containing the longitude and latitude of the southwest and northeast corners of the source's bounding box in the following order: `[sw.lng, sw.lat, ne.lng, ne.lat]`. When this property is included in a source, no tiles outside of the given bounds are requested by MapLibre.
-    pub bounds: Bounds,
-    /// Influences the y direction of the tile coordinates. The global-mercator (aka Spherical Mercator) profile is assumed.
-    pub scheme: Scheme,
-}
-
-/// A setting to determine whether a source's tiles are cached locally.
-#[deprecated = "not_implemented"]
-struct Volatile(serde_json::Value);
-
-impl Default for Volatile {
-    fn default() {
-        false
-    }
-}
-
-/// Minimum zoom level for which tiles are available, as in the TileJSON spec.
-#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-pub struct Minzoom(serde_json::Number);
-
-impl Default for Minzoom {
-    fn default() {
-        0
-    }
-}
-
-/// Other keys to configure the data source.
-#[deprecated = "not_implemented"]
-struct (serde_json::Value);
-
-/// Contains an attribution to be displayed when the map is shown to a user.
-#[deprecated = "not_implemented"]
-struct Attribution(serde_json::Value);
-
-/// The type of the source.
-#[derive(serde::Deserialize, PartialEq, Eq, Debug, Clone, Copy)]
-pub enum Type {
-    #[serde(rename="raster")]
-    /// A raster tile source.
-    Raster,
-}
-
-/// Maximum zoom level for which tiles are available, as in the TileJSON spec. Data from tiles at the maxzoom are used when displaying the map at higher zoom levels.
-#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-pub struct Maxzoom(serde_json::Number);
-
-impl Default for Maxzoom {
-    fn default() {
-        22
-    }
-}
-
-/// The minimum visual size to display tiles for this layer. Only configurable for raster layers.
-#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-pub struct Tilesize(serde_json::Number);
-
-impl Default for Tilesize {
-    fn default() {
-        512
-    }
-}
-
-/// An array of one or more tile source URLs, as in the TileJSON spec.
-#[deprecated = "not_implemented"]
-struct Tiles(serde_json::Value);
-
-/// A URL to a TileJSON resource. Supported protocols are `http:` and `https:`.
-#[deprecated = "not_implemented"]
-struct Url(serde_json::Value);
-
-/// An array containing the longitude and latitude of the southwest and northeast corners of the source's bounding box in the following order: `[sw.lng, sw.lat, ne.lng, ne.lat]`. When this property is included in a source, no tiles outside of the given bounds are requested by MapLibre.
-#[deprecated = "not_implemented"]
-struct Bounds(serde_json::Value);
-
-impl Default for Bounds {
-    fn default() {
-        vec![-180, -85.051129, 180, 85.051129]
-    }
-}
-
-/// Influences the y direction of the tile coordinates. The global-mercator (aka Spherical Mercator) profile is assumed.
-#[derive(serde::Deserialize, PartialEq, Eq, Debug, Clone, Copy)]
-pub enum Scheme {
-    #[serde(rename="tms")]
-    /// OSGeo spec scheme.
-    Tms,
-    #[serde(rename="xyz")]
-    /// Slippy map tilenames scheme.
-    Xyz,
-}
-
-impl Default for Scheme {
-    fn default() {
-        "xyz"
-    }
-}
-
-#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-pub struct LayoutFillExtrusion {
-    /// Whether this layer is displayed.
-    pub visibility: Visibility,
-}
-
-/// Whether this layer is displayed.
-#[derive(serde::Deserialize, PartialEq, Eq, Debug, Clone, Copy)]
-pub enum Visibility {
-    #[serde(rename="none")]
-    /// The layer is not shown.
-    None,
-    #[serde(rename="visible")]
-    /// The layer is shown.
-    Visible,
-}
-
-impl Default for Visibility {
-    fn default() {
-        "visible"
-    }
-}
-
-#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-pub struct PaintSymbol {
-    /// The color of the text's halo, which helps it stand out from backgrounds.
-    pub text-halo-color: TextHaloColor,
-    /// Controls the frame of reference for `icon-translate`.
-    pub icon-translate-anchor: IconTranslateAnchor,
-    /// The opacity at which the text will be drawn.
-    pub text-opacity: TextOpacity,
-    /// Distance of halo to the font outline. Max text halo width is 1/4 of the font-size.
-    pub text-halo-width: TextHaloWidth,
-    /// Distance that the text's anchor is moved from its original placement. Positive values indicate right and down, while negative values indicate left and up.
-    pub text-translate: TextTranslate,
-    /// The color of the icon. This can only be used with SDF icons.
-    pub icon-color: IconColor,
-    /// The color with which the text will be drawn.
-    pub text-color: TextColor,
-    /// The opacity at which the icon will be drawn.
-    pub icon-opacity: IconOpacity,
-    /// Controls the frame of reference for `text-translate`.
-    pub text-translate-anchor: TextTranslateAnchor,
-    /// The color of the icon's halo. Icon halos can only be used with SDF icons.
-    pub icon-halo-color: IconHaloColor,
-    /// The halo's fadeout distance towards the outside.
-    pub text-halo-blur: TextHaloBlur,
-    /// Distance of halo to the icon outline. 
-    /// 
-    /// The unit is in pixels only for SDF sprites that were created with a blur radius of 8, multiplied by the display density. I.e., the radius needs to be 16 for `@2x` sprites, etc.
-    pub icon-halo-width: IconHaloWidth,
-    /// Fade out the halo towards the outside.
-    pub icon-halo-blur: IconHaloBlur,
-    /// Distance that the icon's anchor is moved from its original placement. Positive values indicate right and down, while negative values indicate left and up.
-    pub icon-translate: IconTranslate,
-}
-
-/// The color of the text's halo, which helps it stand out from backgrounds.
-#[deprecated = "not_implemented"]
-struct TextHaloColor(serde_json::Value);
-
-impl Default for TextHaloColor {
-    fn default() {
-        "rgba(0, 0, 0, 0)"
-    }
-}
-
-/// Controls the frame of reference for `icon-translate`.
-#[derive(serde::Deserialize, PartialEq, Eq, Debug, Clone, Copy)]
-pub enum IconTranslateAnchor {
-    #[serde(rename="map")]
-    /// Icons are translated relative to the map.
-    Map,
-    #[serde(rename="viewport")]
-    /// Icons are translated relative to the viewport.
-    Viewport,
-}
-
-impl Default for IconTranslateAnchor {
-    fn default() {
-        "map"
-    }
-}
-
-/// The opacity at which the text will be drawn.
-///
-/// # Range
-/// - Maximum: 1
-/// - Minimum: 0
-#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-pub struct TextOpacity(serde_json::Number);
-
-impl Default for TextOpacity {
-    fn default() {
-        1
-    }
-}
-
-/// Distance of halo to the font outline. Max text halo width is 1/4 of the font-size.
-///
-/// # Range
-/// - Minimum: 0
-#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-pub struct TextHaloWidth(serde_json::Number);
-
-impl Default for TextHaloWidth {
-    fn default() {
-        0
-    }
-}
-
-/// Distance that the text's anchor is moved from its original placement. Positive values indicate right and down, while negative values indicate left and up.
-#[deprecated = "not_implemented"]
-struct TextTranslate(serde_json::Value);
-
-impl Default for TextTranslate {
-    fn default() {
-        vec![0, 0]
-    }
-}
-
-/// The color of the icon. This can only be used with SDF icons.
-#[deprecated = "not_implemented"]
-struct IconColor(serde_json::Value);
-
-impl Default for IconColor {
-    fn default() {
-        "#000000"
-    }
-}
-
-/// The color with which the text will be drawn.
-#[deprecated = "not_implemented"]
-struct TextColor(serde_json::Value);
-
-impl Default for TextColor {
-    fn default() {
-        "#000000"
-    }
-}
-
-/// The opacity at which the icon will be drawn.
-///
-/// # Range
-/// - Maximum: 1
-/// - Minimum: 0
-#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-pub struct IconOpacity(serde_json::Number);
-
-impl Default for IconOpacity {
-    fn default() {
-        1
-    }
-}
-
-/// Controls the frame of reference for `text-translate`.
-#[derive(serde::Deserialize, PartialEq, Eq, Debug, Clone, Copy)]
-pub enum TextTranslateAnchor {
-    #[serde(rename="map")]
-    /// The text is translated relative to the map.
-    Map,
-    #[serde(rename="viewport")]
-    /// The text is translated relative to the viewport.
-    Viewport,
-}
-
-impl Default for TextTranslateAnchor {
-    fn default() {
-        "map"
-    }
-}
-
-/// The color of the icon's halo. Icon halos can only be used with SDF icons.
-#[deprecated = "not_implemented"]
-struct IconHaloColor(serde_json::Value);
-
-impl Default for IconHaloColor {
-    fn default() {
-        "rgba(0, 0, 0, 0)"
-    }
-}
-
-/// The halo's fadeout distance towards the outside.
-///
-/// # Range
-/// - Minimum: 0
-#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-pub struct TextHaloBlur(serde_json::Number);
-
-impl Default for TextHaloBlur {
-    fn default() {
-        0
-    }
-}
-
-/// Distance of halo to the icon outline. 
-///
-/// The unit is in pixels only for SDF sprites that were created with a blur radius of 8, multiplied by the display density. I.e., the radius needs to be 16 for `@2x` sprites, etc.
-///
-/// # Range
-/// - Minimum: 0
-#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-pub struct IconHaloWidth(serde_json::Number);
-
-impl Default for IconHaloWidth {
-    fn default() {
-        0
-    }
-}
-
-/// Fade out the halo towards the outside.
-///
-/// # Range
-/// - Minimum: 0
-#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-pub struct IconHaloBlur(serde_json::Number);
-
-impl Default for IconHaloBlur {
-    fn default() {
-        0
-    }
-}
-
-/// Distance that the icon's anchor is moved from its original placement. Positive values indicate right and down, while negative values indicate left and up.
-#[deprecated = "not_implemented"]
-struct IconTranslate(serde_json::Value);
-
-impl Default for IconTranslate {
-    fn default() {
-        vec![0, 0]
-    }
-}
-
-#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-pub struct LayoutColorRelief {
-    /// Whether this layer is displayed.
-    pub visibility: Visibility,
-}
-
-/// Whether this layer is displayed.
-#[derive(serde::Deserialize, PartialEq, Eq, Debug, Clone, Copy)]
-pub enum Visibility {
-    #[serde(rename="none")]
-    /// The layer is not shown.
-    None,
-    #[serde(rename="visible")]
-    /// The layer is shown.
-    Visible,
-}
-
-impl Default for Visibility {
-    fn default() {
-        "visible"
-    }
-}
-
-#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-pub enum Layout {
-    #[serde(rename="layout_fill")]
-    LayoutFill(LayoutFill),
-    #[serde(rename="layout_line")]
-    LayoutLine(LayoutLine),
-    #[serde(rename="layout_circle")]
-    LayoutCircle(LayoutCircle),
-    #[serde(rename="layout_heatmap")]
-    LayoutHeatmap(LayoutHeatmap),
-    #[serde(rename="layout_fill-extrusion")]
-    LayoutFillExtrusion(LayoutFillExtrusion),
-    #[serde(rename="layout_symbol")]
-    LayoutSymbol(LayoutSymbol),
-    #[serde(rename="layout_raster")]
-    LayoutRaster(LayoutRaster),
-    #[serde(rename="layout_hillshade")]
-    LayoutHillshade(LayoutHillshade),
-    #[serde(rename="layout_color-relief")]
-    LayoutColorRelief(LayoutColorRelief),
-    #[serde(rename="layout_background")]
-    LayoutBackground(LayoutBackground),
 }
 
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
 pub struct PaintRaster {
-    /// The opacity at which the image will be drawn.
-    pub raster-opacity: RasterOpacity,
-    /// Rotates hues around the color wheel.
-    pub raster-hue-rotate: RasterHueRotate,
     /// Increase or reduce the brightness of the image. The value is the maximum brightness.
-    pub raster-brightness-max: RasterBrightnessMax,
-    /// The resampling/interpolation method to use for overscaling, also known as texture magnification filter
-    pub raster-resampling: RasterResampling,
-    /// Increase or reduce the contrast of the image.
-    pub raster-contrast: RasterContrast,
-    /// Fade duration when a new tile is added, or when a video is started or its coordinates are updated.
-    pub raster-fade-duration: RasterFadeDuration,
+    #[serde(rename="raster-brightness-max")]
+    pub raster_brightness_max: RasterBrightnessMax,
     /// Increase or reduce the brightness of the image. The value is the minimum brightness.
-    pub raster-brightness-min: RasterBrightnessMin,
+    #[serde(rename="raster-brightness-min")]
+    pub raster_brightness_min: RasterBrightnessMin,
+    /// Increase or reduce the contrast of the image.
+    #[serde(rename="raster-contrast")]
+    pub raster_contrast: RasterContrast,
+    /// Fade duration when a new tile is added, or when a video is started or its coordinates are updated.
+    #[serde(rename="raster-fade-duration")]
+    pub raster_fade_duration: RasterFadeDuration,
+    /// Rotates hues around the color wheel.
+    #[serde(rename="raster-hue-rotate")]
+    pub raster_hue_rotate: RasterHueRotate,
+    /// The opacity at which the image will be drawn.
+    #[serde(rename="raster-opacity")]
+    pub raster_opacity: RasterOpacity,
+    /// The resampling/interpolation method to use for overscaling, also known as texture magnification filter
+    #[serde(rename="raster-resampling")]
+    pub raster_resampling: RasterResampling,
     /// Increase or reduce the saturation of the image.
-    pub raster-saturation: RasterSaturation,
-}
-
-/// The opacity at which the image will be drawn.
-///
-/// # Range
-/// - Maximum: 1
-/// - Minimum: 0
-#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-pub struct RasterOpacity(serde_json::Number);
-
-impl Default for RasterOpacity {
-    fn default() {
-        1
-    }
-}
-
-/// Rotates hues around the color wheel.
-///
-/// # Range
-/// - Period: 360
-#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-pub struct RasterHueRotate(serde_json::Number);
-
-impl Default for RasterHueRotate {
-    fn default() {
-        0
-    }
+    #[serde(rename="raster-saturation")]
+    pub raster_saturation: RasterSaturation,
 }
 
 /// Increase or reduce the brightness of the image. The value is the maximum brightness.
@@ -3591,20 +2880,17 @@ impl Default for RasterBrightnessMax {
     }
 }
 
-/// The resampling/interpolation method to use for overscaling, also known as texture magnification filter
-#[derive(serde::Deserialize, PartialEq, Eq, Debug, Clone, Copy)]
-pub enum RasterResampling {
-    #[serde(rename="nearest")]
-    /// Nearest neighbor filtering interpolates pixel values using the nearest original source pixel creating a sharp but pixelated look when overscaled
-    Nearest,
-    #[serde(rename="linear")]
-    /// (Bi)linear filtering interpolates pixel values using the weighted average of the four closest original source pixels creating a smooth but blurry look when overscaled
-    Linear,
-}
+/// Increase or reduce the brightness of the image. The value is the minimum brightness.
+///
+/// # Range
+/// - Maximum: 1
+/// - Minimum: 0
+#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+pub struct RasterBrightnessMin(serde_json::Number);
 
-impl Default for RasterResampling {
+impl Default for RasterBrightnessMin {
     fn default() {
-        "linear"
+        0
     }
 }
 
@@ -3635,17 +2921,47 @@ impl Default for RasterFadeDuration {
     }
 }
 
-/// Increase or reduce the brightness of the image. The value is the minimum brightness.
+/// Rotates hues around the color wheel.
+///
+/// # Range
+/// - Period: 360
+#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+pub struct RasterHueRotate(serde_json::Number);
+
+impl Default for RasterHueRotate {
+    fn default() {
+        0
+    }
+}
+
+/// The opacity at which the image will be drawn.
 ///
 /// # Range
 /// - Maximum: 1
 /// - Minimum: 0
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-pub struct RasterBrightnessMin(serde_json::Number);
+pub struct RasterOpacity(serde_json::Number);
 
-impl Default for RasterBrightnessMin {
+impl Default for RasterOpacity {
     fn default() {
-        0
+        1
+    }
+}
+
+/// The resampling/interpolation method to use for overscaling, also known as texture magnification filter
+#[derive(serde::Deserialize, PartialEq, Eq, Debug, Clone, Copy)]
+pub enum RasterResampling {
+    #[serde(rename="linear")]
+    /// (Bi)linear filtering interpolates pixel values using the weighted average of the four closest original source pixels creating a smooth but blurry look when overscaled
+    Linear,
+    #[serde(rename="nearest")]
+    /// Nearest neighbor filtering interpolates pixel values using the nearest original source pixel creating a sharp but pixelated look when overscaled
+    Nearest,
+}
+
+impl Default for RasterResampling {
+    fn default() {
+        "linear"
     }
 }
 
@@ -3664,12 +2980,244 @@ impl Default for RasterSaturation {
 }
 
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+pub struct PaintSymbol {
+    /// The color of the icon. This can only be used with SDF icons.
+    #[serde(rename="icon-color")]
+    pub icon_color: IconColor,
+    /// Fade out the halo towards the outside.
+    #[serde(rename="icon-halo-blur")]
+    pub icon_halo_blur: IconHaloBlur,
+    /// The color of the icon's halo. Icon halos can only be used with SDF icons.
+    #[serde(rename="icon-halo-color")]
+    pub icon_halo_color: IconHaloColor,
+    /// Distance of halo to the icon outline. 
+    /// 
+    /// The unit is in pixels only for SDF sprites that were created with a blur radius of 8, multiplied by the display density. I.e., the radius needs to be 16 for `@2x` sprites, etc.
+    #[serde(rename="icon-halo-width")]
+    pub icon_halo_width: IconHaloWidth,
+    /// The opacity at which the icon will be drawn.
+    #[serde(rename="icon-opacity")]
+    pub icon_opacity: IconOpacity,
+    /// Distance that the icon's anchor is moved from its original placement. Positive values indicate right and down, while negative values indicate left and up.
+    #[serde(rename="icon-translate")]
+    pub icon_translate: IconTranslate,
+    /// Controls the frame of reference for `icon-translate`.
+    #[serde(rename="icon-translate-anchor")]
+    pub icon_translate_anchor: IconTranslateAnchor,
+    /// The color with which the text will be drawn.
+    #[serde(rename="text-color")]
+    pub text_color: TextColor,
+    /// The halo's fadeout distance towards the outside.
+    #[serde(rename="text-halo-blur")]
+    pub text_halo_blur: TextHaloBlur,
+    /// The color of the text's halo, which helps it stand out from backgrounds.
+    #[serde(rename="text-halo-color")]
+    pub text_halo_color: TextHaloColor,
+    /// Distance of halo to the font outline. Max text halo width is 1/4 of the font-size.
+    #[serde(rename="text-halo-width")]
+    pub text_halo_width: TextHaloWidth,
+    /// The opacity at which the text will be drawn.
+    #[serde(rename="text-opacity")]
+    pub text_opacity: TextOpacity,
+    /// Distance that the text's anchor is moved from its original placement. Positive values indicate right and down, while negative values indicate left and up.
+    #[serde(rename="text-translate")]
+    pub text_translate: TextTranslate,
+    /// Controls the frame of reference for `text-translate`.
+    #[serde(rename="text-translate-anchor")]
+    pub text_translate_anchor: TextTranslateAnchor,
+}
+
+/// The color of the icon. This can only be used with SDF icons.
+#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+#[deprecated = "not_implemented"]
+struct IconColor(serde_json::Value);
+
+impl Default for IconColor {
+    fn default() {
+        "#000000"
+    }
+}
+
+/// Fade out the halo towards the outside.
+///
+/// # Range
+/// - Minimum: 0
+#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+pub struct IconHaloBlur(serde_json::Number);
+
+impl Default for IconHaloBlur {
+    fn default() {
+        0
+    }
+}
+
+/// The color of the icon's halo. Icon halos can only be used with SDF icons.
+#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+#[deprecated = "not_implemented"]
+struct IconHaloColor(serde_json::Value);
+
+impl Default for IconHaloColor {
+    fn default() {
+        "rgba(0, 0, 0, 0)"
+    }
+}
+
+/// Distance of halo to the icon outline. 
+///
+/// The unit is in pixels only for SDF sprites that were created with a blur radius of 8, multiplied by the display density. I.e., the radius needs to be 16 for `@2x` sprites, etc.
+///
+/// # Range
+/// - Minimum: 0
+#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+pub struct IconHaloWidth(serde_json::Number);
+
+impl Default for IconHaloWidth {
+    fn default() {
+        0
+    }
+}
+
+/// The opacity at which the icon will be drawn.
+///
+/// # Range
+/// - Maximum: 1
+/// - Minimum: 0
+#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+pub struct IconOpacity(serde_json::Number);
+
+impl Default for IconOpacity {
+    fn default() {
+        1
+    }
+}
+
+/// Distance that the icon's anchor is moved from its original placement. Positive values indicate right and down, while negative values indicate left and up.
+#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+#[deprecated = "not_implemented"]
+struct IconTranslate(serde_json::Value);
+
+impl Default for IconTranslate {
+    fn default() {
+        vec![0, 0]
+    }
+}
+
+/// Controls the frame of reference for `icon-translate`.
+#[derive(serde::Deserialize, PartialEq, Eq, Debug, Clone, Copy)]
+pub enum IconTranslateAnchor {
+    #[serde(rename="map")]
+    /// Icons are translated relative to the map.
+    Map,
+    #[serde(rename="viewport")]
+    /// Icons are translated relative to the viewport.
+    Viewport,
+}
+
+impl Default for IconTranslateAnchor {
+    fn default() {
+        "map"
+    }
+}
+
+/// The color with which the text will be drawn.
+#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+#[deprecated = "not_implemented"]
+struct TextColor(serde_json::Value);
+
+impl Default for TextColor {
+    fn default() {
+        "#000000"
+    }
+}
+
+/// The halo's fadeout distance towards the outside.
+///
+/// # Range
+/// - Minimum: 0
+#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+pub struct TextHaloBlur(serde_json::Number);
+
+impl Default for TextHaloBlur {
+    fn default() {
+        0
+    }
+}
+
+/// The color of the text's halo, which helps it stand out from backgrounds.
+#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+#[deprecated = "not_implemented"]
+struct TextHaloColor(serde_json::Value);
+
+impl Default for TextHaloColor {
+    fn default() {
+        "rgba(0, 0, 0, 0)"
+    }
+}
+
+/// Distance of halo to the font outline. Max text halo width is 1/4 of the font-size.
+///
+/// # Range
+/// - Minimum: 0
+#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+pub struct TextHaloWidth(serde_json::Number);
+
+impl Default for TextHaloWidth {
+    fn default() {
+        0
+    }
+}
+
+/// The opacity at which the text will be drawn.
+///
+/// # Range
+/// - Maximum: 1
+/// - Minimum: 0
+#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+pub struct TextOpacity(serde_json::Number);
+
+impl Default for TextOpacity {
+    fn default() {
+        1
+    }
+}
+
+/// Distance that the text's anchor is moved from its original placement. Positive values indicate right and down, while negative values indicate left and up.
+#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+#[deprecated = "not_implemented"]
+struct TextTranslate(serde_json::Value);
+
+impl Default for TextTranslate {
+    fn default() {
+        vec![0, 0]
+    }
+}
+
+/// Controls the frame of reference for `text-translate`.
+#[derive(serde::Deserialize, PartialEq, Eq, Debug, Clone, Copy)]
+pub enum TextTranslateAnchor {
+    #[serde(rename="map")]
+    /// The text is translated relative to the map.
+    Map,
+    #[serde(rename="viewport")]
+    /// The text is translated relative to the viewport.
+    Viewport,
+}
+
+impl Default for TextTranslateAnchor {
+    fn default() {
+        "map"
+    }
+}
+
+#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
 pub struct Projection {
     /// The projection definition type. Can be specified as a string, a transition state, or an expression.
-    pub type: Type,
+    #[serde(rename="type")]
+    pub r#type: Type,
 }
 
 /// The projection definition type. Can be specified as a string, a transition state, or an expression.
+#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
 #[deprecated = "not_implemented"]
 struct Type(serde_json::Value);
 
@@ -3680,33 +3228,207 @@ impl Default for Type {
 }
 
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-pub enum Paint {
-    #[serde(rename="paint_fill")]
-    PaintFill(PaintFill),
-    #[serde(rename="paint_line")]
-    PaintLine(PaintLine),
-    #[serde(rename="paint_circle")]
-    PaintCircle(PaintCircle),
-    #[serde(rename="paint_heatmap")]
-    PaintHeatmap(PaintHeatmap),
-    #[serde(rename="paint_fill-extrusion")]
-    PaintFillExtrusion(PaintFillExtrusion),
-    #[serde(rename="paint_symbol")]
-    PaintSymbol(PaintSymbol),
-    #[serde(rename="paint_raster")]
-    PaintRaster(PaintRaster),
-    #[serde(rename="paint_hillshade")]
-    PaintHillshade(PaintHillshade),
-    #[serde(rename="paint_color-relief")]
-    PaintColorRelief(PaintColorRelief),
-    #[serde(rename="paint_background")]
-    PaintBackground(PaintBackground),
+pub struct Promoteid {
+    /// A name of a feature property to use as ID for feature state.
+    #[serde(rename="*")]
+    pub : ,
+}
+
+/// A name of a feature property to use as ID for feature state.
+#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+#[deprecated = "not_implemented"]
+struct (serde_json::Value);
+
+#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+pub struct PropertyType {
+    /// Property should be specified using a color ramp from which the output color can be sampled based on a property calculation.
+    #[serde(rename="color-ramp")]
+    pub color_ramp: ColorRamp,
+    /// Property is constant across all zoom levels and property values.
+    #[serde(rename="constant")]
+    pub constant: Constant,
+    /// Property is non-interpolable; rather, its values will be cross-faded to smoothly transition between integer zooms.
+    #[serde(rename="cross-faded")]
+    pub cross_faded: CrossFaded,
+    /// Property is non-interpolable; rather, its values will be cross-faded to smoothly transition between integer zooms. It can be represented using a property expression.
+    #[serde(rename="cross-faded-data-driven")]
+    pub cross_faded_data_driven: CrossFadedDataDriven,
+    /// Property is interpolable but cannot be represented using a property expression.
+    #[serde(rename="data-constant")]
+    pub data_constant: DataConstant,
+    /// Property is interpolable and can be represented using a property expression.
+    #[serde(rename="data-driven")]
+    pub data_driven: DataDriven,
+}
+
+/// Property should be specified using a color ramp from which the output color can be sampled based on a property calculation.
+#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+#[deprecated = "not_implemented"]
+struct ColorRamp(serde_json::Value);
+
+/// Property is constant across all zoom levels and property values.
+#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+#[deprecated = "not_implemented"]
+struct Constant(serde_json::Value);
+
+/// Property is non-interpolable; rather, its values will be cross-faded to smoothly transition between integer zooms.
+#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+#[deprecated = "not_implemented"]
+struct CrossFaded(serde_json::Value);
+
+/// Property is non-interpolable; rather, its values will be cross-faded to smoothly transition between integer zooms. It can be represented using a property expression.
+#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+#[deprecated = "not_implemented"]
+struct CrossFadedDataDriven(serde_json::Value);
+
+/// Property is interpolable but cannot be represented using a property expression.
+#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+#[deprecated = "not_implemented"]
+struct DataConstant(serde_json::Value);
+
+/// Property is interpolable and can be represented using a property expression.
+#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+#[deprecated = "not_implemented"]
+struct DataDriven(serde_json::Value);
+
+#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+pub struct Sky {
+    /// How to blend the atmosphere. Where 1 is visible atmosphere and 0 is hidden. It is best to interpolate this expression when using globe projection.
+    #[serde(rename="atmosphere-blend")]
+    pub atmosphere_blend: AtmosphereBlend,
+    /// The base color for the fog. Requires 3D terrain.
+    #[serde(rename="fog-color")]
+    pub fog_color: FogColor,
+    /// How to blend the fog over the 3D terrain. Where 0 is the map center and 1 is the horizon.
+    #[serde(rename="fog-ground-blend")]
+    pub fog_ground_blend: FogGroundBlend,
+    /// The base color at the horizon.
+    #[serde(rename="horizon-color")]
+    pub horizon_color: HorizonColor,
+    /// How to blend the fog color and the horizon color. Where 0 is using the horizon color only and 1 is using the fog color only.
+    #[serde(rename="horizon-fog-blend")]
+    pub horizon_fog_blend: HorizonFogBlend,
+    /// The base color for the sky.
+    #[serde(rename="sky-color")]
+    pub sky_color: SkyColor,
+    /// How to blend the sky color and the horizon color. Where 1 is blending the color at the middle of the sky and 0 is not blending at all and using the sky color only.
+    #[serde(rename="sky-horizon-blend")]
+    pub sky_horizon_blend: SkyHorizonBlend,
+}
+
+/// How to blend the atmosphere. Where 1 is visible atmosphere and 0 is hidden. It is best to interpolate this expression when using globe projection.
+///
+/// # Range
+/// - Maximum: 1
+/// - Minimum: 0
+#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+pub struct AtmosphereBlend(serde_json::Number);
+
+impl Default for AtmosphereBlend {
+    fn default() {
+        0.8
+    }
+}
+
+/// The base color for the fog. Requires 3D terrain.
+#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+#[deprecated = "not_implemented"]
+struct FogColor(serde_json::Value);
+
+impl Default for FogColor {
+    fn default() {
+        "#ffffff"
+    }
+}
+
+/// How to blend the fog over the 3D terrain. Where 0 is the map center and 1 is the horizon.
+///
+/// # Range
+/// - Maximum: 1
+/// - Minimum: 0
+#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+pub struct FogGroundBlend(serde_json::Number);
+
+impl Default for FogGroundBlend {
+    fn default() {
+        0.5
+    }
+}
+
+/// The base color at the horizon.
+#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+#[deprecated = "not_implemented"]
+struct HorizonColor(serde_json::Value);
+
+impl Default for HorizonColor {
+    fn default() {
+        "#ffffff"
+    }
+}
+
+/// How to blend the fog color and the horizon color. Where 0 is using the horizon color only and 1 is using the fog color only.
+///
+/// # Range
+/// - Maximum: 1
+/// - Minimum: 0
+#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+pub struct HorizonFogBlend(serde_json::Number);
+
+impl Default for HorizonFogBlend {
+    fn default() {
+        0.8
+    }
+}
+
+/// The base color for the sky.
+#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+#[deprecated = "not_implemented"]
+struct SkyColor(serde_json::Value);
+
+impl Default for SkyColor {
+    fn default() {
+        "#88C6FC"
+    }
+}
+
+/// How to blend the sky color and the horizon color. Where 1 is blending the color at the middle of the sky and 0 is not blending at all and using the sky color only.
+///
+/// # Range
+/// - Maximum: 1
+/// - Minimum: 0
+#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+pub struct SkyHorizonBlend(serde_json::Number);
+
+impl Default for SkyHorizonBlend {
+    fn default() {
+        0.8
+    }
+}
+
+#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+pub enum Source {
+    #[serde(rename="source_vector")]
+    SourceVector(SourceVector),
+    #[serde(rename="source_raster")]
+    SourceRaster(SourceRaster),
+    #[serde(rename="source_raster_dem")]
+    SourceRasterDem(SourceRasterDem),
+    #[serde(rename="source_geojson")]
+    SourceGeojson(SourceGeojson),
+    #[serde(rename="source_video")]
+    SourceVideo(SourceVideo),
+    #[serde(rename="source_image")]
+    SourceImage(SourceImage),
 }
 
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
 pub struct SourceGeojson {
-    /// Max zoom on which to cluster points if clustering is enabled. Defaults to one zoom less than maxzoom (so that last zoom features are not clustered). Clusters are re-evaluated at integer zoom levels so setting clusterMaxZoom to 14 means the clusters will be displayed until z15.
-    pub clusterMaxZoom: Clustermaxzoom,
+    /// Contains an attribution to be displayed when the map is shown to a user.
+    #[serde(rename="attribution")]
+    pub attribution: Attribution,
+    /// Size of the tile buffer on each side. A value of 0 produces no buffer. A value of 512 produces a buffer as wide as the tile itself. Larger values produce fewer rendering artifacts near tile edges and slower performance.
+    #[serde(rename="buffer")]
+    pub buffer: Buffer,
     /// If the data is a collection of point features, setting this to true clusters the points by radius into groups. Cluster groups become new `Point` features in the source with additional properties:
     /// 
     ///  * `cluster` Is `true` if the point is a cluster 
@@ -3716,27 +3438,14 @@ pub struct SourceGeojson {
     ///  * `point_count` Number of original points grouped into this cluster
     /// 
     ///  * `point_count_abbreviated` An abbreviated point count
+    #[serde(rename="cluster")]
     pub cluster: Cluster,
-    /// Whether to calculate line distance metrics. This is required for line layers that specify `line-gradient` values.
-    pub lineMetrics: Linemetrics,
-    /// A property to use as a feature id (for feature state). Either a property name, or an object of the form `{<sourceLayer>: <propertyName>}`.
-    pub promoteId: Promoteid,
-    /// An expression for filtering features prior to processing them for rendering.
-    pub filter: Filter,
-    /// Contains an attribution to be displayed when the map is shown to a user.
-    pub attribution: Attribution,
-    /// Radius of each cluster if clustering is enabled. A value of 512 indicates a radius equal to the width of a tile.
-    pub clusterRadius: Clusterradius,
+    /// Max zoom on which to cluster points if clustering is enabled. Defaults to one zoom less than maxzoom (so that last zoom features are not clustered). Clusters are re-evaluated at integer zoom levels so setting clusterMaxZoom to 14 means the clusters will be displayed until z15.
+    #[serde(rename="clusterMaxZoom")]
+    pub cluster_max_zoom: Clustermaxzoom,
     /// Minimum number of points necessary to form a cluster if clustering is enabled. Defaults to `2`.
-    pub clusterMinPoints: Clusterminpoints,
-    /// Maximum zoom level at which to create vector tiles (higher means greater detail at high zoom levels).
-    pub maxzoom: Maxzoom,
-    /// Whether to generate ids for the geojson features. When enabled, the `feature.id` property will be auto assigned based on its index in the `features` array, over-writing any previous values.
-    pub generateId: Generateid,
-    /// The data type of the GeoJSON source.
-    pub type: Type,
-    /// Size of the tile buffer on each side. A value of 0 produces no buffer. A value of 512 produces a buffer as wide as the tile itself. Larger values produce fewer rendering artifacts near tile edges and slower performance.
-    pub buffer: Buffer,
+    #[serde(rename="clusterMinPoints")]
+    pub cluster_min_points: Clusterminpoints,
     /// An object defining custom properties on the generated clusters if clustering is enabled, aggregating values from clustered points. Has the form `{"property_name": [operator, map_expression]}`. `operator` is any expression function that accepts at least 2 operands (e.g. `"+"` or `"max"`) — it accumulates the property value from clusters/points the cluster contains; `map_expression` produces the value of a single point.
     /// 
     /// Example: `{"sum": ["+", ["get", "scalerank"]]}`.
@@ -3744,101 +3453,41 @@ pub struct SourceGeojson {
     /// For more advanced use cases, in place of `operator`, you can use a custom reduce expression that references a special `["accumulated"]` value, e.g.:
     /// 
     /// `{"sum": [["+", ["accumulated"], ["get", "sum"]], ["get", "scalerank"]]}`
-    pub clusterProperties: Clusterproperties,
+    #[serde(rename="clusterProperties")]
+    pub cluster_properties: Clusterproperties,
+    /// Radius of each cluster if clustering is enabled. A value of 512 indicates a radius equal to the width of a tile.
+    #[serde(rename="clusterRadius")]
+    pub cluster_radius: Clusterradius,
     /// A URL to a GeoJSON file, or inline GeoJSON.
+    #[serde(rename="data")]
     pub data: Data,
+    /// An expression for filtering features prior to processing them for rendering.
+    #[serde(rename="filter")]
+    pub filter: Filter,
+    /// Whether to generate ids for the geojson features. When enabled, the `feature.id` property will be auto assigned based on its index in the `features` array, over-writing any previous values.
+    #[serde(rename="generateId")]
+    pub generate_id: Generateid,
+    /// Whether to calculate line distance metrics. This is required for line layers that specify `line-gradient` values.
+    #[serde(rename="lineMetrics")]
+    pub line_metrics: Linemetrics,
+    /// Maximum zoom level at which to create vector tiles (higher means greater detail at high zoom levels).
+    #[serde(rename="maxzoom")]
+    pub maxzoom: Maxzoom,
+    /// A property to use as a feature id (for feature state). Either a property name, or an object of the form `{<sourceLayer>: <propertyName>}`.
+    #[serde(rename="promoteId")]
+    pub promote_id: Promoteid,
     /// Douglas-Peucker simplification tolerance (higher means simpler geometries and faster performance).
+    #[serde(rename="tolerance")]
     pub tolerance: Tolerance,
+    /// The data type of the GeoJSON source.
+    #[serde(rename="type")]
+    pub r#type: Type,
 }
-
-/// Max zoom on which to cluster points if clustering is enabled. Defaults to one zoom less than maxzoom (so that last zoom features are not clustered). Clusters are re-evaluated at integer zoom levels so setting clusterMaxZoom to 14 means the clusters will be displayed until z15.
-#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-pub struct Clustermaxzoom(serde_json::Number);
-
-/// If the data is a collection of point features, setting this to true clusters the points by radius into groups. Cluster groups become new `Point` features in the source with additional properties:
-///
-///  * `cluster` Is `true` if the point is a cluster 
-///
-///  * `cluster_id` A unique id for the cluster to be used in conjunction with the [cluster inspection methods](https://maplibre.org/maplibre-gl-js/docs/API/classes/GeoJSONSource/#getclusterexpansionzoom)
-///
-///  * `point_count` Number of original points grouped into this cluster
-///
-///  * `point_count_abbreviated` An abbreviated point count
-#[deprecated = "not_implemented"]
-struct Cluster(serde_json::Value);
-
-impl Default for Cluster {
-    fn default() {
-        false
-    }
-}
-
-/// Whether to calculate line distance metrics. This is required for line layers that specify `line-gradient` values.
-#[deprecated = "not_implemented"]
-struct Linemetrics(serde_json::Value);
-
-impl Default for Linemetrics {
-    fn default() {
-        false
-    }
-}
-
-/// A property to use as a feature id (for feature state). Either a property name, or an object of the form `{<sourceLayer>: <propertyName>}`.
-#[deprecated = "not_implemented"]
-struct Promoteid(serde_json::Value);
-
-/// An expression for filtering features prior to processing them for rendering.
-#[deprecated = "not_implemented"]
-struct Filter(serde_json::Value);
 
 /// Contains an attribution to be displayed when the map is shown to a user.
+#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
 #[deprecated = "not_implemented"]
 struct Attribution(serde_json::Value);
-
-/// Radius of each cluster if clustering is enabled. A value of 512 indicates a radius equal to the width of a tile.
-///
-/// # Range
-/// - Minimum: 0
-#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-pub struct Clusterradius(serde_json::Number);
-
-impl Default for Clusterradius {
-    fn default() {
-        50
-    }
-}
-
-/// Minimum number of points necessary to form a cluster if clustering is enabled. Defaults to `2`.
-#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-pub struct Clusterminpoints(serde_json::Number);
-
-/// Maximum zoom level at which to create vector tiles (higher means greater detail at high zoom levels).
-#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-pub struct Maxzoom(serde_json::Number);
-
-impl Default for Maxzoom {
-    fn default() {
-        18
-    }
-}
-
-/// Whether to generate ids for the geojson features. When enabled, the `feature.id` property will be auto assigned based on its index in the `features` array, over-writing any previous values.
-#[deprecated = "not_implemented"]
-struct Generateid(serde_json::Value);
-
-impl Default for Generateid {
-    fn default() {
-        false
-    }
-}
-
-/// The data type of the GeoJSON source.
-#[derive(serde::Deserialize, PartialEq, Eq, Debug, Clone, Copy)]
-pub enum Type {
-    #[serde(rename="geojson")]
-    /// A GeoJSON data source.
-    Geojson,
-}
 
 /// Size of the tile buffer on each side. A value of 0 produces no buffer. A value of 512 produces a buffer as wide as the tile itself. Larger values produce fewer rendering artifacts near tile edges and slower performance.
 ///
@@ -3854,6 +3503,33 @@ impl Default for Buffer {
     }
 }
 
+/// If the data is a collection of point features, setting this to true clusters the points by radius into groups. Cluster groups become new `Point` features in the source with additional properties:
+///
+///  * `cluster` Is `true` if the point is a cluster 
+///
+///  * `cluster_id` A unique id for the cluster to be used in conjunction with the [cluster inspection methods](https://maplibre.org/maplibre-gl-js/docs/API/classes/GeoJSONSource/#getclusterexpansionzoom)
+///
+///  * `point_count` Number of original points grouped into this cluster
+///
+///  * `point_count_abbreviated` An abbreviated point count
+#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+#[deprecated = "not_implemented"]
+struct Cluster(serde_json::Value);
+
+impl Default for Cluster {
+    fn default() {
+        false
+    }
+}
+
+/// Max zoom on which to cluster points if clustering is enabled. Defaults to one zoom less than maxzoom (so that last zoom features are not clustered). Clusters are re-evaluated at integer zoom levels so setting clusterMaxZoom to 14 means the clusters will be displayed until z15.
+#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+pub struct Clustermaxzoom(serde_json::Number);
+
+/// Minimum number of points necessary to form a cluster if clustering is enabled. Defaults to `2`.
+#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+pub struct Clusterminpoints(serde_json::Number);
+
 /// An object defining custom properties on the generated clusters if clustering is enabled, aggregating values from clustered points. Has the form `{"property_name": [operator, map_expression]}`. `operator` is any expression function that accepts at least 2 operands (e.g. `"+"` or `"max"`) — it accumulates the property value from clusters/points the cluster contains; `map_expression` produces the value of a single point.
 ///
 /// Example: `{"sum": ["+", ["get", "scalerank"]]}`.
@@ -3861,12 +3537,69 @@ impl Default for Buffer {
 /// For more advanced use cases, in place of `operator`, you can use a custom reduce expression that references a special `["accumulated"]` value, e.g.:
 ///
 /// `{"sum": [["+", ["accumulated"], ["get", "sum"]], ["get", "scalerank"]]}`
+#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
 #[deprecated = "not_implemented"]
 struct Clusterproperties(serde_json::Value);
 
+/// Radius of each cluster if clustering is enabled. A value of 512 indicates a radius equal to the width of a tile.
+///
+/// # Range
+/// - Minimum: 0
+#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+pub struct Clusterradius(serde_json::Number);
+
+impl Default for Clusterradius {
+    fn default() {
+        50
+    }
+}
+
 /// A URL to a GeoJSON file, or inline GeoJSON.
+#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
 #[deprecated = "not_implemented"]
 struct Data(serde_json::Value);
+
+/// An expression for filtering features prior to processing them for rendering.
+#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+#[deprecated = "not_implemented"]
+struct Filter(serde_json::Value);
+
+/// Whether to generate ids for the geojson features. When enabled, the `feature.id` property will be auto assigned based on its index in the `features` array, over-writing any previous values.
+#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+#[deprecated = "not_implemented"]
+struct Generateid(serde_json::Value);
+
+impl Default for Generateid {
+    fn default() {
+        false
+    }
+}
+
+/// Whether to calculate line distance metrics. This is required for line layers that specify `line-gradient` values.
+#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+#[deprecated = "not_implemented"]
+struct Linemetrics(serde_json::Value);
+
+impl Default for Linemetrics {
+    fn default() {
+        false
+    }
+}
+
+/// Maximum zoom level at which to create vector tiles (higher means greater detail at high zoom levels).
+#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+pub struct Maxzoom(serde_json::Number);
+
+impl Default for Maxzoom {
+    fn default() {
+        18
+    }
+}
+
+/// A property to use as a feature id (for feature state). Either a property name, or an object of the form `{<sourceLayer>: <propertyName>}`.
+#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+#[deprecated = "not_implemented"]
+struct Promoteid(serde_json::Value);
 
 /// Douglas-Peucker simplification tolerance (higher means simpler geometries and faster performance).
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
@@ -3875,5 +3608,623 @@ pub struct Tolerance(serde_json::Number);
 impl Default for Tolerance {
     fn default() {
         0.375
+    }
+}
+
+/// The data type of the GeoJSON source.
+#[derive(serde::Deserialize, PartialEq, Eq, Debug, Clone, Copy)]
+pub enum Type {
+    #[serde(rename="geojson")]
+    /// A GeoJSON data source.
+    Geojson,
+}
+
+#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+pub struct SourceImage {
+    /// Corners of image specified in longitude, latitude pairs.
+    #[serde(rename="coordinates")]
+    pub coordinates: Coordinates,
+    /// The data type of the image source.
+    #[serde(rename="type")]
+    pub r#type: Type,
+    /// URL that points to an image.
+    #[serde(rename="url")]
+    pub url: Url,
+}
+
+/// Corners of image specified in longitude, latitude pairs.
+#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+#[deprecated = "not_implemented"]
+struct Coordinates(serde_json::Value);
+
+/// The data type of the image source.
+#[derive(serde::Deserialize, PartialEq, Eq, Debug, Clone, Copy)]
+pub enum Type {
+    #[serde(rename="image")]
+    /// An image data source.
+    Image,
+}
+
+/// URL that points to an image.
+#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+#[deprecated = "not_implemented"]
+struct Url(serde_json::Value);
+
+#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+pub struct SourceRaster {
+    /// Other keys to configure the data source.
+    #[serde(rename="*")]
+    pub : ,
+    /// Contains an attribution to be displayed when the map is shown to a user.
+    #[serde(rename="attribution")]
+    pub attribution: Attribution,
+    /// An array containing the longitude and latitude of the southwest and northeast corners of the source's bounding box in the following order: `[sw.lng, sw.lat, ne.lng, ne.lat]`. When this property is included in a source, no tiles outside of the given bounds are requested by MapLibre.
+    #[serde(rename="bounds")]
+    pub bounds: Bounds,
+    /// Maximum zoom level for which tiles are available, as in the TileJSON spec. Data from tiles at the maxzoom are used when displaying the map at higher zoom levels.
+    #[serde(rename="maxzoom")]
+    pub maxzoom: Maxzoom,
+    /// Minimum zoom level for which tiles are available, as in the TileJSON spec.
+    #[serde(rename="minzoom")]
+    pub minzoom: Minzoom,
+    /// Influences the y direction of the tile coordinates. The global-mercator (aka Spherical Mercator) profile is assumed.
+    #[serde(rename="scheme")]
+    pub scheme: Scheme,
+    /// The minimum visual size to display tiles for this layer. Only configurable for raster layers.
+    #[serde(rename="tileSize")]
+    pub tile_size: Tilesize,
+    /// An array of one or more tile source URLs, as in the TileJSON spec.
+    #[serde(rename="tiles")]
+    pub tiles: Tiles,
+    /// The type of the source.
+    #[serde(rename="type")]
+    pub r#type: Type,
+    /// A URL to a TileJSON resource. Supported protocols are `http:` and `https:`.
+    #[serde(rename="url")]
+    pub url: Url,
+    /// A setting to determine whether a source's tiles are cached locally.
+    #[serde(rename="volatile")]
+    pub volatile: Volatile,
+}
+
+/// Other keys to configure the data source.
+#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+#[deprecated = "not_implemented"]
+struct (serde_json::Value);
+
+/// Contains an attribution to be displayed when the map is shown to a user.
+#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+#[deprecated = "not_implemented"]
+struct Attribution(serde_json::Value);
+
+/// An array containing the longitude and latitude of the southwest and northeast corners of the source's bounding box in the following order: `[sw.lng, sw.lat, ne.lng, ne.lat]`. When this property is included in a source, no tiles outside of the given bounds are requested by MapLibre.
+#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+#[deprecated = "not_implemented"]
+struct Bounds(serde_json::Value);
+
+impl Default for Bounds {
+    fn default() {
+        vec![-180, -85.051129, 180, 85.051129]
+    }
+}
+
+/// Maximum zoom level for which tiles are available, as in the TileJSON spec. Data from tiles at the maxzoom are used when displaying the map at higher zoom levels.
+#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+pub struct Maxzoom(serde_json::Number);
+
+impl Default for Maxzoom {
+    fn default() {
+        22
+    }
+}
+
+/// Minimum zoom level for which tiles are available, as in the TileJSON spec.
+#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+pub struct Minzoom(serde_json::Number);
+
+impl Default for Minzoom {
+    fn default() {
+        0
+    }
+}
+
+/// Influences the y direction of the tile coordinates. The global-mercator (aka Spherical Mercator) profile is assumed.
+#[derive(serde::Deserialize, PartialEq, Eq, Debug, Clone, Copy)]
+pub enum Scheme {
+    #[serde(rename="tms")]
+    /// OSGeo spec scheme.
+    Tms,
+    #[serde(rename="xyz")]
+    /// Slippy map tilenames scheme.
+    Xyz,
+}
+
+impl Default for Scheme {
+    fn default() {
+        "xyz"
+    }
+}
+
+/// The minimum visual size to display tiles for this layer. Only configurable for raster layers.
+#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+pub struct Tilesize(serde_json::Number);
+
+impl Default for Tilesize {
+    fn default() {
+        512
+    }
+}
+
+/// An array of one or more tile source URLs, as in the TileJSON spec.
+#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+#[deprecated = "not_implemented"]
+struct Tiles(serde_json::Value);
+
+/// The type of the source.
+#[derive(serde::Deserialize, PartialEq, Eq, Debug, Clone, Copy)]
+pub enum Type {
+    #[serde(rename="raster")]
+    /// A raster tile source.
+    Raster,
+}
+
+/// A URL to a TileJSON resource. Supported protocols are `http:` and `https:`.
+#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+#[deprecated = "not_implemented"]
+struct Url(serde_json::Value);
+
+/// A setting to determine whether a source's tiles are cached locally.
+#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+#[deprecated = "not_implemented"]
+struct Volatile(serde_json::Value);
+
+impl Default for Volatile {
+    fn default() {
+        false
+    }
+}
+
+#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+pub struct SourceRasterDem {
+    /// Other keys to configure the data source.
+    #[serde(rename="*")]
+    pub : ,
+    /// Contains an attribution to be displayed when the map is shown to a user.
+    #[serde(rename="attribution")]
+    pub attribution: Attribution,
+    /// Value that will be added to the encoding mix when decoding. Only used on custom encodings.
+    #[serde(rename="baseShift")]
+    pub base_shift: Baseshift,
+    /// Value that will be multiplied by the blue channel value when decoding. Only used on custom encodings.
+    #[serde(rename="blueFactor")]
+    pub blue_factor: Bluefactor,
+    /// An array containing the longitude and latitude of the southwest and northeast corners of the source's bounding box in the following order: `[sw.lng, sw.lat, ne.lng, ne.lat]`. When this property is included in a source, no tiles outside of the given bounds are requested by MapLibre.
+    #[serde(rename="bounds")]
+    pub bounds: Bounds,
+    /// The encoding used by this source. Mapbox Terrain RGB is used by default.
+    #[serde(rename="encoding")]
+    pub encoding: Encoding,
+    /// Value that will be multiplied by the green channel value when decoding. Only used on custom encodings.
+    #[serde(rename="greenFactor")]
+    pub green_factor: Greenfactor,
+    /// Maximum zoom level for which tiles are available, as in the TileJSON spec. Data from tiles at the maxzoom are used when displaying the map at higher zoom levels.
+    #[serde(rename="maxzoom")]
+    pub maxzoom: Maxzoom,
+    /// Minimum zoom level for which tiles are available, as in the TileJSON spec.
+    #[serde(rename="minzoom")]
+    pub minzoom: Minzoom,
+    /// Value that will be multiplied by the red channel value when decoding. Only used on custom encodings.
+    #[serde(rename="redFactor")]
+    pub red_factor: Redfactor,
+    /// The minimum visual size to display tiles for this layer. Only configurable for raster layers.
+    #[serde(rename="tileSize")]
+    pub tile_size: Tilesize,
+    /// An array of one or more tile source URLs, as in the TileJSON spec.
+    #[serde(rename="tiles")]
+    pub tiles: Tiles,
+    /// The type of the source.
+    #[serde(rename="type")]
+    pub r#type: Type,
+    /// A URL to a TileJSON resource. Supported protocols are `http:` and `https:`.
+    #[serde(rename="url")]
+    pub url: Url,
+    /// A setting to determine whether a source's tiles are cached locally.
+    #[serde(rename="volatile")]
+    pub volatile: Volatile,
+}
+
+/// Other keys to configure the data source.
+#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+#[deprecated = "not_implemented"]
+struct (serde_json::Value);
+
+/// Contains an attribution to be displayed when the map is shown to a user.
+#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+#[deprecated = "not_implemented"]
+struct Attribution(serde_json::Value);
+
+/// Value that will be added to the encoding mix when decoding. Only used on custom encodings.
+#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+pub struct Baseshift(serde_json::Number);
+
+impl Default for Baseshift {
+    fn default() {
+        0.0
+    }
+}
+
+/// Value that will be multiplied by the blue channel value when decoding. Only used on custom encodings.
+#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+pub struct Bluefactor(serde_json::Number);
+
+impl Default for Bluefactor {
+    fn default() {
+        1.0
+    }
+}
+
+/// An array containing the longitude and latitude of the southwest and northeast corners of the source's bounding box in the following order: `[sw.lng, sw.lat, ne.lng, ne.lat]`. When this property is included in a source, no tiles outside of the given bounds are requested by MapLibre.
+#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+#[deprecated = "not_implemented"]
+struct Bounds(serde_json::Value);
+
+impl Default for Bounds {
+    fn default() {
+        vec![-180, -85.051129, 180, 85.051129]
+    }
+}
+
+/// The encoding used by this source. Mapbox Terrain RGB is used by default.
+#[derive(serde::Deserialize, PartialEq, Eq, Debug, Clone, Copy)]
+pub enum Encoding {
+    #[serde(rename="custom")]
+    /// Decodes tiles using the redFactor, blueFactor, greenFactor, baseShift parameters.
+    Custom,
+    #[serde(rename="mapbox")]
+    /// Mapbox Terrain RGB tiles. See https://www.mapbox.com/help/access-elevation-data/#mapbox-terrain-rgb for more info.
+    Mapbox,
+    #[serde(rename="terrarium")]
+    /// Terrarium format PNG tiles. See https://aws.amazon.com/es/public-datasets/terrain/ for more info.
+    Terrarium,
+}
+
+impl Default for Encoding {
+    fn default() {
+        "mapbox"
+    }
+}
+
+/// Value that will be multiplied by the green channel value when decoding. Only used on custom encodings.
+#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+pub struct Greenfactor(serde_json::Number);
+
+impl Default for Greenfactor {
+    fn default() {
+        1.0
+    }
+}
+
+/// Maximum zoom level for which tiles are available, as in the TileJSON spec. Data from tiles at the maxzoom are used when displaying the map at higher zoom levels.
+#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+pub struct Maxzoom(serde_json::Number);
+
+impl Default for Maxzoom {
+    fn default() {
+        22
+    }
+}
+
+/// Minimum zoom level for which tiles are available, as in the TileJSON spec.
+#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+pub struct Minzoom(serde_json::Number);
+
+impl Default for Minzoom {
+    fn default() {
+        0
+    }
+}
+
+/// Value that will be multiplied by the red channel value when decoding. Only used on custom encodings.
+#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+pub struct Redfactor(serde_json::Number);
+
+impl Default for Redfactor {
+    fn default() {
+        1.0
+    }
+}
+
+/// The minimum visual size to display tiles for this layer. Only configurable for raster layers.
+#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+pub struct Tilesize(serde_json::Number);
+
+impl Default for Tilesize {
+    fn default() {
+        512
+    }
+}
+
+/// An array of one or more tile source URLs, as in the TileJSON spec.
+#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+#[deprecated = "not_implemented"]
+struct Tiles(serde_json::Value);
+
+/// The type of the source.
+#[derive(serde::Deserialize, PartialEq, Eq, Debug, Clone, Copy)]
+pub enum Type {
+    #[serde(rename="raster-dem")]
+    /// A RGB-encoded raster DEM source
+    RasterDem,
+}
+
+/// A URL to a TileJSON resource. Supported protocols are `http:` and `https:`.
+#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+#[deprecated = "not_implemented"]
+struct Url(serde_json::Value);
+
+/// A setting to determine whether a source's tiles are cached locally.
+#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+#[deprecated = "not_implemented"]
+struct Volatile(serde_json::Value);
+
+impl Default for Volatile {
+    fn default() {
+        false
+    }
+}
+
+#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+pub struct SourceVector {
+    /// Other keys to configure the data source.
+    #[serde(rename="*")]
+    pub : ,
+    /// Contains an attribution to be displayed when the map is shown to a user.
+    #[serde(rename="attribution")]
+    pub attribution: Attribution,
+    /// An array containing the longitude and latitude of the southwest and northeast corners of the source's bounding box in the following order: `[sw.lng, sw.lat, ne.lng, ne.lat]`. When this property is included in a source, no tiles outside of the given bounds are requested by MapLibre.
+    #[serde(rename="bounds")]
+    pub bounds: Bounds,
+    /// The encoding used by this source. Mapbox Vector Tiles encoding is used by default.
+    #[serde(rename="encoding")]
+    pub encoding: Encoding,
+    /// Maximum zoom level for which tiles are available, as in the TileJSON spec. Data from tiles at the maxzoom are used when displaying the map at higher zoom levels.
+    #[serde(rename="maxzoom")]
+    pub maxzoom: Maxzoom,
+    /// Minimum zoom level for which tiles are available, as in the TileJSON spec.
+    #[serde(rename="minzoom")]
+    pub minzoom: Minzoom,
+    /// A property to use as a feature id (for feature state). Either a property name, or an object of the form `{<sourceLayer>: <propertyName>}`. If specified as a string for a vector tile source, the same property is used across all its source layers.
+    #[serde(rename="promoteId")]
+    pub promote_id: Promoteid,
+    /// Influences the y direction of the tile coordinates. The global-mercator (aka Spherical Mercator) profile is assumed.
+    #[serde(rename="scheme")]
+    pub scheme: Scheme,
+    /// An array of one or more tile source URLs, as in the TileJSON spec.
+    #[serde(rename="tiles")]
+    pub tiles: Tiles,
+    /// The type of the source.
+    #[serde(rename="type")]
+    pub r#type: Type,
+    /// A URL to a TileJSON resource. Supported protocols are `http:` and `https:`.
+    #[serde(rename="url")]
+    pub url: Url,
+    /// A setting to determine whether a source's tiles are cached locally.
+    #[serde(rename="volatile")]
+    pub volatile: Volatile,
+}
+
+/// Other keys to configure the data source.
+#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+#[deprecated = "not_implemented"]
+struct (serde_json::Value);
+
+/// Contains an attribution to be displayed when the map is shown to a user.
+#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+#[deprecated = "not_implemented"]
+struct Attribution(serde_json::Value);
+
+/// An array containing the longitude and latitude of the southwest and northeast corners of the source's bounding box in the following order: `[sw.lng, sw.lat, ne.lng, ne.lat]`. When this property is included in a source, no tiles outside of the given bounds are requested by MapLibre.
+#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+#[deprecated = "not_implemented"]
+struct Bounds(serde_json::Value);
+
+impl Default for Bounds {
+    fn default() {
+        vec![-180, -85.051129, 180, 85.051129]
+    }
+}
+
+/// The encoding used by this source. Mapbox Vector Tiles encoding is used by default.
+#[derive(serde::Deserialize, PartialEq, Eq, Debug, Clone, Copy)]
+pub enum Encoding {
+    #[serde(rename="mlt")]
+    /// MapLibre Vector Tiles. See https://github.com/maplibre/maplibre-tile-spec for more info.
+    Mlt,
+    #[serde(rename="mvt")]
+    /// Mapbox Vector Tiles. See http://github.com/mapbox/vector-tile-spec for more info.
+    Mvt,
+}
+
+impl Default for Encoding {
+    fn default() {
+        "mvt"
+    }
+}
+
+/// Maximum zoom level for which tiles are available, as in the TileJSON spec. Data from tiles at the maxzoom are used when displaying the map at higher zoom levels.
+#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+pub struct Maxzoom(serde_json::Number);
+
+impl Default for Maxzoom {
+    fn default() {
+        22
+    }
+}
+
+/// Minimum zoom level for which tiles are available, as in the TileJSON spec.
+#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+pub struct Minzoom(serde_json::Number);
+
+impl Default for Minzoom {
+    fn default() {
+        0
+    }
+}
+
+/// A property to use as a feature id (for feature state). Either a property name, or an object of the form `{<sourceLayer>: <propertyName>}`. If specified as a string for a vector tile source, the same property is used across all its source layers.
+#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+#[deprecated = "not_implemented"]
+struct Promoteid(serde_json::Value);
+
+/// Influences the y direction of the tile coordinates. The global-mercator (aka Spherical Mercator) profile is assumed.
+#[derive(serde::Deserialize, PartialEq, Eq, Debug, Clone, Copy)]
+pub enum Scheme {
+    #[serde(rename="tms")]
+    /// OSGeo spec scheme.
+    Tms,
+    #[serde(rename="xyz")]
+    /// Slippy map tilenames scheme.
+    Xyz,
+}
+
+impl Default for Scheme {
+    fn default() {
+        "xyz"
+    }
+}
+
+/// An array of one or more tile source URLs, as in the TileJSON spec.
+#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+#[deprecated = "not_implemented"]
+struct Tiles(serde_json::Value);
+
+/// The type of the source.
+#[derive(serde::Deserialize, PartialEq, Eq, Debug, Clone, Copy)]
+pub enum Type {
+    #[serde(rename="vector")]
+    /// A vector tile source.
+    Vector,
+}
+
+/// A URL to a TileJSON resource. Supported protocols are `http:` and `https:`.
+#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+#[deprecated = "not_implemented"]
+struct Url(serde_json::Value);
+
+/// A setting to determine whether a source's tiles are cached locally.
+#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+#[deprecated = "not_implemented"]
+struct Volatile(serde_json::Value);
+
+impl Default for Volatile {
+    fn default() {
+        false
+    }
+}
+
+#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+pub struct SourceVideo {
+    /// Corners of video specified in longitude, latitude pairs.
+    #[serde(rename="coordinates")]
+    pub coordinates: Coordinates,
+    /// The data type of the video source.
+    #[serde(rename="type")]
+    pub r#type: Type,
+    /// URLs to video content in order of preferred format.
+    #[serde(rename="urls")]
+    pub urls: Urls,
+}
+
+/// Corners of video specified in longitude, latitude pairs.
+#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+#[deprecated = "not_implemented"]
+struct Coordinates(serde_json::Value);
+
+/// The data type of the video source.
+#[derive(serde::Deserialize, PartialEq, Eq, Debug, Clone, Copy)]
+pub enum Type {
+    #[serde(rename="video")]
+    /// A video data source.
+    Video,
+}
+
+/// URLs to video content in order of preferred format.
+#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+#[deprecated = "not_implemented"]
+struct Urls(serde_json::Value);
+
+#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+pub struct Sources {
+    /// Specification of a data source. For vector and raster sources, either TileJSON or a URL to a TileJSON must be provided. For image and video sources, a URL must be provided. For GeoJSON sources, a URL or inline GeoJSON must be provided.
+    #[serde(rename="*")]
+    pub : ,
+}
+
+/// Specification of a data source. For vector and raster sources, either TileJSON or a URL to a TileJSON must be provided. For image and video sources, a URL must be provided. For GeoJSON sources, a URL or inline GeoJSON must be provided.
+#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+#[deprecated = "not_implemented"]
+struct (serde_json::Value);
+
+#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+pub struct Terrain {
+    /// The exaggeration of the terrain - how high it will look.
+    #[serde(rename="exaggeration")]
+    pub exaggeration: Exaggeration,
+    /// The source for the terrain data.
+    #[serde(rename="source")]
+    pub source: Source,
+}
+
+/// The exaggeration of the terrain - how high it will look.
+///
+/// # Range
+/// - Minimum: 0
+#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+pub struct Exaggeration(serde_json::Number);
+
+impl Default for Exaggeration {
+    fn default() {
+        1.0
+    }
+}
+
+/// The source for the terrain data.
+#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+#[deprecated = "not_implemented"]
+struct Source(serde_json::Value);
+
+#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+pub struct Transition {
+    /// Length of time before a transition begins.
+    #[serde(rename="delay")]
+    pub delay: Delay,
+    /// Time allotted for transitions to complete.
+    #[serde(rename="duration")]
+    pub duration: Duration,
+}
+
+/// Length of time before a transition begins.
+///
+/// # Range
+/// - Minimum: 0
+#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+pub struct Delay(serde_json::Number);
+
+impl Default for Delay {
+    fn default() {
+        0
+    }
+}
+
+/// Time allotted for transitions to complete.
+///
+/// # Range
+/// - Minimum: 0
+#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+pub struct Duration(serde_json::Number);
+
+impl Default for Duration {
+    fn default() {
+        300
     }
 }

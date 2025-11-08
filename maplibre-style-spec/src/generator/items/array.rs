@@ -18,6 +18,7 @@ pub fn generate(
         .new_struct(name)
         .doc(&common.doc)
         .attr("deprecated = \"not_implemented\"")
+        .derive("serde::Deserialize, PartialEq, Debug, Clone")
         .tuple_field("serde_json::Value");
 
     if let Some(default) = default {
@@ -56,6 +57,10 @@ mod tests {
             None,
             None,
         );
-        insta::assert_snapshot!(scope.to_string(), @"")
+        insta::assert_snapshot!(scope.to_string(), @r##"
+        #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+        #[deprecated = "not_implemented"]
+        struct Foo(serde_json::Value);
+        "##)
     }
 }

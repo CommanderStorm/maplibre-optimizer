@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 
 use serde::Deserialize;
 use serde_json::{Number, Value};
@@ -13,18 +13,18 @@ pub struct StyleReference {
 
     /// defines the layout of the style spec
     #[serde(rename = "$root")]
-    pub root: HashMap<String, ParsedItem>,
+    pub root: BTreeMap<String, ParsedItem>,
 
     /// definitions of the items referenced in the root
     #[serde(flatten)]
-    pub fields: HashMap<String, TopLevelItem>,
+    pub fields: BTreeMap<String, TopLevelItem>,
 }
 
 #[derive(Debug, PartialEq, Clone, Deserialize)]
 #[serde(untagged)]
 pub enum TopLevelItem {
     Item(Box<ParsedItem>),
-    Group(HashMap<String, ParsedItem>),
+    Group(BTreeMap<String, ParsedItem>),
     OneOf(Vec<String>),
 }
 
@@ -258,7 +258,7 @@ pub struct Expression {
 #[serde(untagged)]
 pub enum Requirement {
     Exists(String),
-    Equals(HashMap<String, Value>),
+    Equals(BTreeMap<String, Value>),
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Deserialize)]
@@ -271,7 +271,7 @@ pub struct EnumValue {
 pub enum EnumValues {
     Simple(Vec<String>),
     Numeric(Vec<Number>),
-    Complex(HashMap<String, EnumValue>),
+    Complex(BTreeMap<String, EnumValue>),
 }
 
 #[derive(Debug, PartialEq, Clone, Deserialize)]

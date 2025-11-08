@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 
 use maplibre_style_spec::decoder::{StyleReference, TopLevelItem};
 use serde_json::Value;
@@ -34,7 +34,7 @@ fn minimise_object(check_still_produces_error: fn(Value) -> bool, value: Value) 
 #[test]
 fn test_decode_top_level() {
     let content = include_str!("upstream/src/reference/v8.json");
-    let mut style: HashMap<String, Value> = serde_json::from_str(content).unwrap();
+    let mut style: BTreeMap<String, Value> = serde_json::from_str(content).unwrap();
     assert_eq!(style.remove("$version"), Some(Value::Number(8.into())));
 
     for (key, value) in style {
