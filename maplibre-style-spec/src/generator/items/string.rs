@@ -16,7 +16,7 @@ pub fn generate(scope: &mut Scope, name: &str, common: &Fields, default: Option<
             .impl_trait("Default")
             .new_fn("default")
             .ret("Self")
-            .line(default);
+            .line(format!("\"{default}\".to_string()"));
     }
 }
 

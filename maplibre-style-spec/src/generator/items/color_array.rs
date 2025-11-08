@@ -3,12 +3,16 @@ use codegen::Scope;
 use crate::decoder::Fields;
 
 pub fn generate(scope: &mut Scope, name: &str, common: &Fields, default: Option<&str>) {
-    scope
-        .new_struct(name)
+    let enu = scope
+        .new_enum(name)
         .doc(&common.doc)
-        .attr("deprecated = \"not_implemented\"")
-        .derive("serde::Deserialize, PartialEq, Debug, Clone")
-        .tuple_field("serde_json::Value");
+        .derive("serde::Deserialize, PartialEq, Debug, Clone");
+    enu.new_variant("One")
+        .tuple("color::DynamicColor")
+        .doc("A color");
+    enu.new_variant("Multiple")
+        .tuple("Vec<color::DynamicColor>")
+        .doc("A set of colors");
 
     if let Some(default) = default {
         scope
@@ -16,7 +20,7 @@ pub fn generate(scope: &mut Scope, name: &str, common: &Fields, default: Option<
             .impl_trait("Default")
             .new_fn("default")
             .ret("Self")
-            .line(default);
+            .line(format!("Self::One(color::parse_color(\"{default}\").expect(\"Invalid color specified as the default value\"))"));
     }
 }
 

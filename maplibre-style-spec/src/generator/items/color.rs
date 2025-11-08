@@ -7,9 +7,8 @@ pub fn generate(scope: &mut Scope, name: &str, common: &Fields, default: Option<
     scope
         .new_struct(name)
         .doc(&common.doc)
-        .attr("deprecated = \"not_implemented\"")
         .derive("serde::Deserialize, PartialEq, Debug, Clone")
-        .tuple_field("serde_json::Value");
+        .tuple_field("color::DynamicColor");
 
     if let Some(default) = default {
         scope
@@ -17,7 +16,7 @@ pub fn generate(scope: &mut Scope, name: &str, common: &Fields, default: Option<
             .impl_trait("Default")
             .new_fn("default")
             .ret("Self")
-            .line(default);
+            .line(format!("Self(color::parse_color({default}).expect(\"Invalid color specified as the default value\"))"));
     }
 }
 

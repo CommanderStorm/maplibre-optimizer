@@ -38,7 +38,7 @@ pub fn generate(
             .impl_trait("Default")
             .new_fn("default")
             .ret("Self")
-            .line(default);
+            .line(format!("Self({default})"));
     }
 }
 
