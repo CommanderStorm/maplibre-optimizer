@@ -76,37 +76,37 @@ pub enum ExpressionName {
     /// Logical negation. Returns `true` if the input is `false`, and `false` if the input is `true`.
 
      - [Create and style clusters](https://maplibre.org/maplibre-gl-js/docs/examples/create-and-style-clusters/)
-    ,
+    Not,
     #[serde(rename="!=")]
     /// Returns `true` if the input values are not equal, `false` otherwise. The comparison is strictly typed: values of different runtime types are always considered unequal. Cases where the types are known to be different at parse time are considered invalid and will produce a parse error. Accepts an optional `collator` argument to control locale-dependent string comparisons.
 
      - [Display HTML clusters with custom properties](https://maplibre.org/maplibre-gl-js/docs/examples/display-html-clusters-with-custom-properties/)
-    ,
+    Notequal,
     #[serde(rename="%")]
     /// Returns the remainder after integer division of the first input by the second.
-    ,
+    Percentage,
     #[serde(rename="*")]
     /// Returns the product of the inputs.
-    ,
+    Star,
     #[serde(rename="+")]
     /// Returns the sum of the inputs.
-    ,
+    Plus,
     #[serde(rename="-")]
     /// For two inputs, returns the result of subtracting the second input from the first. For a single input, returns the result of subtracting it from 0.
-    ,
+    Minus,
     #[serde(rename="/")]
     /// Returns the result of floating point division of the first input by the second.
 
      - [Visualize population density](https://maplibre.org/maplibre-gl-js/docs/examples/visualize-population-density/)
-    ,
+    Slash,
     #[serde(rename="<")]
     /// Returns `true` if the first input is strictly less than the second, `false` otherwise. The arguments are required to be either both strings or both numbers; if during evaluation they are not, expression evaluation produces an error. Cases where this constraint is known not to hold at parse time are considered in valid and will produce a parse error. Accepts an optional `collator` argument to control locale-dependent string comparisons.
 
      - [Display HTML clusters with custom properties](https://maplibre.org/maplibre-gl-js/docs/examples/display-html-clusters-with-custom-properties/)
-    ,
+    Less,
     #[serde(rename="<=")]
     /// Returns `true` if the first input is less than or equal to the second, `false` otherwise. The arguments are required to be either both strings or both numbers; if during evaluation they are not, expression evaluation produces an error. Cases where this constraint is known not to hold at parse time are considered in valid and will produce a parse error. Accepts an optional `collator` argument to control locale-dependent string comparisons.
-    ,
+    Lessequal,
     #[serde(rename="==")]
     /// Returns `true` if the input values are equal, `false` otherwise. The comparison is strictly typed: values of different runtime types are always considered unequal. Cases where the types are known to be different at parse time are considered invalid and will produce a parse error. Accepts an optional `collator` argument to control locale-dependent string comparisons.
 
@@ -117,27 +117,27 @@ pub enum ExpressionName {
      - [Display buildings in 3D](https://maplibre.org/maplibre-gl-js/docs/examples/display-buildings-in-3d/)
 
      - [Filter symbols by toggling a list](https://maplibre.org/maplibre-gl-js/docs/examples/filter-symbols-by-toggling-a-list/)
-    ,
+    Equal,
     #[serde(rename=">")]
     /// Returns `true` if the first input is strictly greater than the second, `false` otherwise. The arguments are required to be either both strings or both numbers; if during evaluation they are not, expression evaluation produces an error. Cases where this constraint is known not to hold at parse time are considered in valid and will produce a parse error. Accepts an optional `collator` argument to control locale-dependent string comparisons.
-    ,
+    Greater,
     #[serde(rename=">=")]
     /// Returns `true` if the first input is greater than or equal to the second, `false` otherwise. The arguments are required to be either both strings or both numbers; if during evaluation they are not, expression evaluation produces an error. Cases where this constraint is known not to hold at parse time are considered in valid and will produce a parse error. Accepts an optional `collator` argument to control locale-dependent string comparisons.
 
      - [Display HTML clusters with custom properties](https://maplibre.org/maplibre-gl-js/docs/examples/display-html-clusters-with-custom-properties/)
-    ,
+    Greaterequal,
     #[serde(rename="^")]
     /// Returns the result of raising the first input to the power specified by the second.
-    ,
+    Power,
     #[serde(rename="abs")]
     /// Returns the absolute value of the input.
-    Abs,
+    Absolute,
     #[serde(rename="accumulated")]
     /// Gets the value of a cluster property accumulated so far. Can only be used in the `clusterProperties` option of a clustered GeoJSON source.
     Accumulated,
     #[serde(rename="acos")]
     /// Returns the arccosine of the input.
-    Acos,
+    Arccosine,
     #[serde(rename="all")]
     /// Returns `true` if all the inputs are `true`, `false` otherwise. The inputs are evaluated in order, and evaluation is short-circuiting: once an input expression evaluates to `false`, the result is `false` and no further input expressions are evaluated.
 
@@ -454,7 +454,7 @@ struct Filter(serde_json::Value);
 pub enum FilterOperator {
     #[serde(rename="!=")]
     /// `["!=", key, value]` inequality: `feature[key] ≠ value`
-    ,
+    Notequal,
     #[serde(rename="!has")]
     /// `["!has", key]` `feature[key]` does not exist
     Has,
@@ -463,19 +463,19 @@ pub enum FilterOperator {
     In,
     #[serde(rename="<")]
     /// `["<", key, value]` less than: `feature[key] < value`
-    ,
+    Less,
     #[serde(rename="<=")]
     /// `["<=", key, value]` less than or equal: `feature[key] ≤ value`
-    ,
+    Lessequal,
     #[serde(rename="==")]
     /// `["==", key, value]` equality: `feature[key] = value`
-    ,
+    Equal,
     #[serde(rename=">")]
     /// `[">", key, value]` greater than: `feature[key] > value`
-    ,
+    Greater,
     #[serde(rename=">=")]
     /// `[">=", key, value]` greater than or equal: `feature[key] ≥ value`
-    ,
+    Greaterequal,
     #[serde(rename="all")]
     /// `["all", f0, ..., fn]` logical `AND`: `f0 ∧ ... ∧ fn`
     All,
@@ -3231,13 +3231,13 @@ impl Default for Type {
 pub struct Promoteid {
     /// A name of a feature property to use as ID for feature state.
     #[serde(rename="*")]
-    pub : ,
+    pub star: Star,
 }
 
 /// A name of a feature property to use as ID for feature state.
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
 #[deprecated = "not_implemented"]
-struct (serde_json::Value);
+struct Star(serde_json::Value);
 
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
 pub struct PropertyType {
@@ -3654,7 +3654,7 @@ struct Url(serde_json::Value);
 pub struct SourceRaster {
     /// Other keys to configure the data source.
     #[serde(rename="*")]
-    pub : ,
+    pub star: Star,
     /// Contains an attribution to be displayed when the map is shown to a user.
     #[serde(rename="attribution")]
     pub attribution: Attribution,
@@ -3690,7 +3690,7 @@ pub struct SourceRaster {
 /// Other keys to configure the data source.
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
 #[deprecated = "not_implemented"]
-struct (serde_json::Value);
+struct Star(serde_json::Value);
 
 /// Contains an attribution to be displayed when the map is shown to a user.
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
@@ -3788,7 +3788,7 @@ impl Default for Volatile {
 pub struct SourceRasterDem {
     /// Other keys to configure the data source.
     #[serde(rename="*")]
-    pub : ,
+    pub star: Star,
     /// Contains an attribution to be displayed when the map is shown to a user.
     #[serde(rename="attribution")]
     pub attribution: Attribution,
@@ -3836,7 +3836,7 @@ pub struct SourceRasterDem {
 /// Other keys to configure the data source.
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
 #[deprecated = "not_implemented"]
-struct (serde_json::Value);
+struct Star(serde_json::Value);
 
 /// Contains an attribution to be displayed when the map is shown to a user.
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
@@ -3977,7 +3977,7 @@ impl Default for Volatile {
 pub struct SourceVector {
     /// Other keys to configure the data source.
     #[serde(rename="*")]
-    pub : ,
+    pub star: Star,
     /// Contains an attribution to be displayed when the map is shown to a user.
     #[serde(rename="attribution")]
     pub attribution: Attribution,
@@ -4016,7 +4016,7 @@ pub struct SourceVector {
 /// Other keys to configure the data source.
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
 #[deprecated = "not_implemented"]
-struct (serde_json::Value);
+struct Star(serde_json::Value);
 
 /// Contains an attribution to be displayed when the map is shown to a user.
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
@@ -4157,13 +4157,13 @@ struct Urls(serde_json::Value);
 pub struct Sources {
     /// Specification of a data source. For vector and raster sources, either TileJSON or a URL to a TileJSON must be provided. For image and video sources, a URL must be provided. For GeoJSON sources, a URL or inline GeoJSON must be provided.
     #[serde(rename="*")]
-    pub : ,
+    pub star: Star,
 }
 
 /// Specification of a data source. For vector and raster sources, either TileJSON or a URL to a TileJSON must be provided. For image and video sources, a URL must be provided. For GeoJSON sources, a URL or inline GeoJSON must be provided.
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
 #[deprecated = "not_implemented"]
-struct (serde_json::Value);
+struct Star(serde_json::Value);
 
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
 pub struct Terrain {

@@ -1,6 +1,7 @@
 /// Converts a string to a valid Rust struct name (UpperCamelCase)
 pub fn to_upper_camel_case(name: &str) -> String {
-    let name = name
+    let name = prefilter_names(name);
+    let result = name
         .split(|c: char| !c.is_alphanumeric()) // split on non-alphanumeric
         .filter(|s| !s.is_empty()) // skip empty parts
         .map(|s| {
@@ -13,9 +14,12 @@ pub fn to_upper_camel_case(name: &str) -> String {
             }
         })
         .collect::<String>();
-    rustize(name)
+
+    debug_assert_ne!(result, "", "{name} should not result in an empty string after conversion to snake case");
+    rustize(result)
 }
 pub fn to_snake_case(name: &str) -> String {
+    let name = prefilter_names(name);
     let mut result = String::new();
     let mut prev_was_lower = false;
     let mut prev_was_underscore = false;
@@ -48,6 +52,7 @@ pub fn to_snake_case(name: &str) -> String {
         result.pop();
     }
 
+    debug_assert_ne!(result, "", "{name} should not result in an empty string after conversion to snake case");
     rustize(result)
 }
 
@@ -59,7 +64,28 @@ fn has_next_lower(s: &str, idx: usize) -> bool {
         .unwrap_or(false)
 }
 
-/// replace rust
+fn prefilter_names(name: &str) -> &str {
+    match name {
+        "!" => "Not",
+        "!=" => "NotEqual",
+        "%" => "Percentage",
+        "*" => "Star",
+        "+" => "Plus",
+        "-" => "Minus",
+        "/" => "Slash",
+        "<" => "Less",
+        "<=" => "LessEqual",
+        ">" => "Greater",
+        ">=" => "GreaterEqual",
+        "="|"==" => "Equal",
+        "abs" => "Absolute",
+        "acos" => "Arccosine",
+        "^" => "Power",
+        name => name,
+    }
+}
+
+/// replace rust names with r# prefix if they are reserved keywords
 fn rustize(name: String) -> String {
     if matches!(name.as_str(), "type" | "Default") {
         format!("r#{name}")
@@ -99,5 +125,12 @@ mod tests {
         // not reserved
         assert_eq!(to_upper_camel_case("type"), "Type");
         assert_eq!(to_snake_case("default"), "default");
+    }
+
+    #[test]
+    fn test_weird_names() {
+        assert_eq!(to_snake_case("!"), "not");
+        assert_eq!(to_snake_case("!="), "not_equal");
+        assert_eq!(rustize("Default".to_string()), "r#Default");
     }
 }

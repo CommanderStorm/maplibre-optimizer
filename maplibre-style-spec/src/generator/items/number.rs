@@ -56,7 +56,10 @@ mod tests {
             None,
             None,
         );
-        insta::assert_snapshot!(scope.to_string(), @"")
+        insta::assert_snapshot!(scope.to_string(), @r"
+        #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+        pub struct Foo(serde_json::Number);
+        ")
     }
     #[test]
     fn generate_number_min_max_period() {
@@ -70,7 +73,16 @@ mod tests {
             Some(&360.into()),
             Some(&360.into()),
         );
-        insta::assert_snapshot!(scope.to_string(), @"")
+        insta::assert_snapshot!(scope.to_string(), @r"
+        ///
+        ///
+        /// # Range
+        /// - Maximum: 1
+        /// - Minimum: 360
+        /// - Period: 360
+        #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+        pub struct Foo(serde_json::Number);
+        ")
     }
     #[test]
     fn generate_number_with_default() {
@@ -84,6 +96,15 @@ mod tests {
             None,
             None,
         );
-        insta::assert_snapshot!(scope.to_string(), @"")
+        insta::assert_snapshot!(scope.to_string(), @r"
+        #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+        pub struct Foo(serde_json::Number);
+
+        impl Default for Foo {
+            fn default() {
+                42
+            }
+        }
+        ")
     }
 }
