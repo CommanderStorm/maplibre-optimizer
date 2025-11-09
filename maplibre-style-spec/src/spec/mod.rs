@@ -228,13 +228,13 @@ pub enum ExpressionName {
     /// - `"font-scale"`: Applies a scaling factor on `text-size` as specified by the root layout property.
     ///
     /// - `"vertical-align"`: Aligns vertically text section or image in relation to the row it belongs to. Possible values are:
-    /// 	- `"bottom"` *default*: align the bottom of this section with the bottom of other sections.
+    ///     - `"bottom"` *default*: align the bottom of this section with the bottom of other sections.
     /// <img alt="Visual representation of bottom alignment" src="https://github.com/user-attachments/assets/0474a2fd-a4b2-417c-9187-7a13a28695bc"/>
-    /// 	- `"center"`: align the center of this section with the center of other sections.
+    ///     - `"center"`: align the center of this section with the center of other sections.
     /// <img alt="Visual representation of center alignment" src="https://github.com/user-attachments/assets/92237455-be6d-4c5d-b8f6-8127effc1950"/>
-    /// 	- `"top"`: align the top of this section with the top of other sections.
+    ///     - `"top"`: align the top of this section with the top of other sections.
     /// <img alt="Visual representation of top alignment" src="https://github.com/user-attachments/assets/45dccb28-d977-4abb-a006-4ea9792b7c53"/>
-    /// 	- Refer to [the design proposal](https://github.com/maplibre/maplibre-style-spec/issues/832) for more details.
+    ///     - Refer to [the design proposal](https://github.com/maplibre/maplibre-style-spec/issues/832) for more details.
     ///
     ///  - [Change the case of labels](https://maplibre.org/maplibre-gl-js/docs/examples/change-case-of-labels/)
     ///

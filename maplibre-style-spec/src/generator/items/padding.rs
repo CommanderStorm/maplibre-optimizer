@@ -65,7 +65,7 @@ mod tests {
         #[serde(untagged)]
         enum Foo {
             /// A single value applies to all four sides.
-            /// 
+            ///
             /// Only avaliable for backwards compatibility.
             #[deprecated = "Please see [`Self::One`] instead"]
             Unwrapped(serde_json::Number),
