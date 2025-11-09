@@ -260,7 +260,9 @@ impl Fields {
             if let Some(min) = min {
                 doc.push_str(&min.to_string());
             }
-            doc.push_str("..");
+            if min.is_some() || max.is_some() {
+                doc.push_str("..");
+            }
             if let Some(max) = max {
                 doc.push('=');
                 doc.push_str(&max.to_string());

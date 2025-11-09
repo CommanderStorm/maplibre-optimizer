@@ -119,7 +119,7 @@ pub enum ExpressionName {
     ///
     ///  - [Filter symbols by toggling a list](https://maplibre.org/maplibre-gl-js/docs/examples/filter-symbols-by-toggling-a-list/)
     #[serde(rename = "==")]
-    Equal,
+    EqualEqual,
     /// Returns `true` if the first input is strictly greater than the second, `false` otherwise. The arguments are required to be either both strings or both numbers; if during evaluation they are not, expression evaluation produces an error. Cases where this constraint is known not to hold at parse time are considered in valid and will produce a parse error. Accepts an optional `collator` argument to control locale-dependent string comparisons.
     #[serde(rename = ">")]
     Greater,
@@ -471,7 +471,7 @@ pub enum FilterOperator {
     LessEqual,
     /// `["==", key, value]` equality: `feature[key] = value`
     #[serde(rename = "==")]
-    Equal,
+    EqualEqual,
     /// `[">", key, value]` greater than: `feature[key] > value`
     #[serde(rename = ">")]
     Greater,
@@ -538,7 +538,10 @@ pub struct FunctionBase(serde_json::Number);
 
 impl Default for FunctionBase {
     fn default() -> Self {
-        Self(serde_json::Number::from_i128(1))
+        Self(
+            serde_json::Number::from_i128(1)
+                .expect("the number is serialised from a number and is thus always valid"),
+        )
     }
 }
 
@@ -1016,7 +1019,10 @@ pub struct LayoutLineLineMiterLimit(serde_json::Number);
 
 impl Default for LayoutLineLineMiterLimit {
     fn default() -> Self {
-        Self(serde_json::Number::from_i128(2))
+        Self(
+            serde_json::Number::from_i128(2)
+                .expect("the number is serialised from a number and is thus always valid"),
+        )
     }
 }
 
@@ -1026,7 +1032,10 @@ pub struct LayoutLineLineRoundLimit(serde_json::Number);
 
 impl Default for LayoutLineLineRoundLimit {
     fn default() -> Self {
-        Self(serde_json::Number::from_f64(1.05))
+        Self(
+            serde_json::Number::from_f64(1.05)
+                .expect("the number is serialised from a number and is thus always valid"),
+        )
     }
 }
 
@@ -1229,13 +1238,12 @@ pub struct LayoutSymbol {
 }
 
 /// If true, the icon will be visible even if it collides with other previously drawn symbols.
-#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-#[deprecated = "not_implemented"]
-struct LayoutSymbolIconAllowOverlap(serde_json::Value);
+#[derive(serde::Deserialize, PartialEq, Debug, Clone, Copy)]
+struct LayoutSymbolIconAllowOverlap(bool);
 
 impl Default for LayoutSymbolIconAllowOverlap {
     fn default() -> Self {
-        false
+        Self(false)
     }
 }
 
@@ -1278,13 +1286,12 @@ impl Default for LayoutSymbolIconAnchor {
 }
 
 /// If true, other symbols can be visible even if they collide with the icon.
-#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-#[deprecated = "not_implemented"]
-struct LayoutSymbolIconIgnorePlacement(serde_json::Value);
+#[derive(serde::Deserialize, PartialEq, Debug, Clone, Copy)]
+struct LayoutSymbolIconIgnorePlacement(bool);
 
 impl Default for LayoutSymbolIconIgnorePlacement {
     fn default() -> Self {
-        false
+        Self(false)
     }
 }
 
@@ -1294,13 +1301,12 @@ impl Default for LayoutSymbolIconIgnorePlacement {
 struct LayoutSymbolIconImage(serde_json::Value);
 
 /// If true, the icon may be flipped to prevent it from being rendered upside-down.
-#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-#[deprecated = "not_implemented"]
-struct LayoutSymbolIconKeepUpright(serde_json::Value);
+#[derive(serde::Deserialize, PartialEq, Debug, Clone, Copy)]
+struct LayoutSymbolIconKeepUpright(bool);
 
 impl Default for LayoutSymbolIconKeepUpright {
     fn default() -> Self {
-        false
+        Self(false)
     }
 }
 
@@ -1316,13 +1322,12 @@ impl Default for LayoutSymbolIconOffset {
 }
 
 /// If true, text will display without their corresponding icons when the icon collides with other symbols and the text does not.
-#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-#[deprecated = "not_implemented"]
-struct LayoutSymbolIconOptional(serde_json::Value);
+#[derive(serde::Deserialize, PartialEq, Debug, Clone, Copy)]
+struct LayoutSymbolIconOptional(bool);
 
 impl Default for LayoutSymbolIconOptional {
     fn default() -> Self {
-        false
+        Self(false)
     }
 }
 
@@ -1373,13 +1378,16 @@ impl Default for LayoutSymbolIconPitchAlignment {
 
 /// Rotates the icon clockwise.
 ///
-/// Range: .. every 360
+/// Range:  every 360
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
 pub struct LayoutSymbolIconRotate(serde_json::Number);
 
 impl Default for LayoutSymbolIconRotate {
     fn default() -> Self {
-        Self(serde_json::Number::from_i128(0))
+        Self(
+            serde_json::Number::from_i128(0)
+                .expect("the number is serialised from a number and is thus always valid"),
+        )
     }
 }
 
@@ -1411,7 +1419,10 @@ pub struct LayoutSymbolIconSize(serde_json::Number);
 
 impl Default for LayoutSymbolIconSize {
     fn default() -> Self {
-        Self(serde_json::Number::from_i128(1))
+        Self(
+            serde_json::Number::from_i128(1)
+                .expect("the number is serialised from a number and is thus always valid"),
+        )
     }
 }
 
@@ -1450,13 +1461,12 @@ impl Default for LayoutSymbolIconTextFitPadding {
 }
 
 /// If true, the symbols will not cross tile edges to avoid mutual collisions. Recommended in layers that don't have enough padding in the vector tile to prevent collisions, or if it is a point symbol layer placed after a line symbol layer. When using a client that supports global collision detection, like MapLibre GL JS version 0.42.0 or greater, enabling this property is not needed to prevent clipped labels at tile boundaries.
-#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-#[deprecated = "not_implemented"]
-struct LayoutSymbolSymbolAvoidEdges(serde_json::Value);
+#[derive(serde::Deserialize, PartialEq, Debug, Clone, Copy)]
+struct LayoutSymbolSymbolAvoidEdges(bool);
 
 impl Default for LayoutSymbolSymbolAvoidEdges {
     fn default() -> Self {
-        false
+        Self(false)
     }
 }
 
@@ -1492,7 +1502,10 @@ pub struct LayoutSymbolSymbolSpacing(serde_json::Number);
 
 impl Default for LayoutSymbolSymbolSpacing {
     fn default() -> Self {
-        Self(serde_json::Number::from_i128(250))
+        Self(
+            serde_json::Number::from_i128(250)
+                .expect("the number is serialised from a number and is thus always valid"),
+        )
     }
 }
 
@@ -1517,13 +1530,12 @@ impl Default for LayoutSymbolSymbolZOrder {
 }
 
 /// If true, the text will be visible even if it collides with other previously drawn symbols.
-#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-#[deprecated = "not_implemented"]
-struct LayoutSymbolTextAllowOverlap(serde_json::Value);
+#[derive(serde::Deserialize, PartialEq, Debug, Clone, Copy)]
+struct LayoutSymbolTextAllowOverlap(bool);
 
 impl Default for LayoutSymbolTextAllowOverlap {
     fn default() -> Self {
-        false
+        Self(false)
     }
 }
 
@@ -1586,13 +1598,12 @@ impl Default for LayoutSymbolTextFont {
 }
 
 /// If true, other symbols can be visible even if they collide with the text.
-#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-#[deprecated = "not_implemented"]
-struct LayoutSymbolTextIgnorePlacement(serde_json::Value);
+#[derive(serde::Deserialize, PartialEq, Debug, Clone, Copy)]
+struct LayoutSymbolTextIgnorePlacement(bool);
 
 impl Default for LayoutSymbolTextIgnorePlacement {
     fn default() -> Self {
-        false
+        Self(false)
     }
 }
 
@@ -1620,13 +1631,12 @@ impl Default for LayoutSymbolTextJustify {
 }
 
 /// If true, the text may be flipped vertically to prevent it from being rendered upside-down.
-#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-#[deprecated = "not_implemented"]
-struct LayoutSymbolTextKeepUpright(serde_json::Value);
+#[derive(serde::Deserialize, PartialEq, Debug, Clone, Copy)]
+struct LayoutSymbolTextKeepUpright(bool);
 
 impl Default for LayoutSymbolTextKeepUpright {
     fn default() -> Self {
-        true
+        Self(true)
     }
 }
 
@@ -1636,7 +1646,10 @@ pub struct LayoutSymbolTextLetterSpacing(serde_json::Number);
 
 impl Default for LayoutSymbolTextLetterSpacing {
     fn default() -> Self {
-        Self(serde_json::Number::from_i128(0))
+        Self(
+            serde_json::Number::from_i128(0)
+                .expect("the number is serialised from a number and is thus always valid"),
+        )
     }
 }
 
@@ -1646,7 +1659,10 @@ pub struct LayoutSymbolTextLineHeight(serde_json::Number);
 
 impl Default for LayoutSymbolTextLineHeight {
     fn default() -> Self {
-        Self(serde_json::Number::from_f64(1.2))
+        Self(
+            serde_json::Number::from_f64(1.2)
+                .expect("the number is serialised from a number and is thus always valid"),
+        )
     }
 }
 
@@ -1656,7 +1672,10 @@ pub struct LayoutSymbolTextMaxAngle(serde_json::Number);
 
 impl Default for LayoutSymbolTextMaxAngle {
     fn default() -> Self {
-        Self(serde_json::Number::from_i128(45))
+        Self(
+            serde_json::Number::from_i128(45)
+                .expect("the number is serialised from a number and is thus always valid"),
+        )
     }
 }
 
@@ -1668,7 +1687,10 @@ pub struct LayoutSymbolTextMaxWidth(serde_json::Number);
 
 impl Default for LayoutSymbolTextMaxWidth {
     fn default() -> Self {
-        Self(serde_json::Number::from_i128(10))
+        Self(
+            serde_json::Number::from_i128(10)
+                .expect("the number is serialised from a number and is thus always valid"),
+        )
     }
 }
 
@@ -1684,13 +1706,12 @@ impl Default for LayoutSymbolTextOffset {
 }
 
 /// If true, icons will display without their corresponding text when the text collides with other symbols and the icon does not.
-#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-#[deprecated = "not_implemented"]
-struct LayoutSymbolTextOptional(serde_json::Value);
+#[derive(serde::Deserialize, PartialEq, Debug, Clone, Copy)]
+struct LayoutSymbolTextOptional(bool);
 
 impl Default for LayoutSymbolTextOptional {
     fn default() -> Self {
-        false
+        Self(false)
     }
 }
 
@@ -1716,7 +1737,10 @@ pub struct LayoutSymbolTextPadding(serde_json::Number);
 
 impl Default for LayoutSymbolTextPadding {
     fn default() -> Self {
-        Self(serde_json::Number::from_i128(2))
+        Self(
+            serde_json::Number::from_i128(2)
+                .expect("the number is serialised from a number and is thus always valid"),
+        )
     }
 }
 
@@ -1746,19 +1770,25 @@ pub struct LayoutSymbolTextRadialOffset(serde_json::Number);
 
 impl Default for LayoutSymbolTextRadialOffset {
     fn default() -> Self {
-        Self(serde_json::Number::from_i128(0))
+        Self(
+            serde_json::Number::from_i128(0)
+                .expect("the number is serialised from a number and is thus always valid"),
+        )
     }
 }
 
 /// Rotates the text clockwise.
 ///
-/// Range: .. every 360
+/// Range:  every 360
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
 pub struct LayoutSymbolTextRotate(serde_json::Number);
 
 impl Default for LayoutSymbolTextRotate {
     fn default() -> Self {
-        Self(serde_json::Number::from_i128(0))
+        Self(
+            serde_json::Number::from_i128(0)
+                .expect("the number is serialised from a number and is thus always valid"),
+        )
     }
 }
 
@@ -1793,7 +1823,10 @@ pub struct LayoutSymbolTextSize(serde_json::Number);
 
 impl Default for LayoutSymbolTextSize {
     fn default() -> Self {
-        Self(serde_json::Number::from_i128(16))
+        Self(
+            serde_json::Number::from_i128(16)
+                .expect("the number is serialised from a number and is thus always valid"),
+        )
     }
 }
 
@@ -1914,7 +1947,10 @@ pub struct LightIntensity(serde_json::Number);
 
 impl Default for LightIntensity {
     fn default() -> Self {
-        Self(serde_json::Number::from_f64(0.5))
+        Self(
+            serde_json::Number::from_f64(0.5)
+                .expect("the number is serialised from a number and is thus always valid"),
+        )
     }
 }
 
@@ -1975,7 +2011,10 @@ pub struct PaintBackgroundBackgroundOpacity(serde_json::Number);
 
 impl Default for PaintBackgroundBackgroundOpacity {
     fn default() -> Self {
-        Self(serde_json::Number::from_i128(1))
+        Self(
+            serde_json::Number::from_i128(1)
+                .expect("the number is serialised from a number and is thus always valid"),
+        )
     }
 }
 
@@ -2027,7 +2066,10 @@ pub struct PaintCircleCircleBlur(serde_json::Number);
 
 impl Default for PaintCircleCircleBlur {
     fn default() -> Self {
-        Self(serde_json::Number::from_i128(0))
+        Self(
+            serde_json::Number::from_i128(0)
+                .expect("the number is serialised from a number and is thus always valid"),
+        )
     }
 }
 
@@ -2049,7 +2091,10 @@ pub struct PaintCircleCircleOpacity(serde_json::Number);
 
 impl Default for PaintCircleCircleOpacity {
     fn default() -> Self {
-        Self(serde_json::Number::from_i128(1))
+        Self(
+            serde_json::Number::from_i128(1)
+                .expect("the number is serialised from a number and is thus always valid"),
+        )
     }
 }
 
@@ -2095,7 +2140,10 @@ pub struct PaintCircleCircleRadius(serde_json::Number);
 
 impl Default for PaintCircleCircleRadius {
     fn default() -> Self {
-        Self(serde_json::Number::from_i128(5))
+        Self(
+            serde_json::Number::from_i128(5)
+                .expect("the number is serialised from a number and is thus always valid"),
+        )
     }
 }
 
@@ -2117,7 +2165,10 @@ pub struct PaintCircleCircleStrokeOpacity(serde_json::Number);
 
 impl Default for PaintCircleCircleStrokeOpacity {
     fn default() -> Self {
-        Self(serde_json::Number::from_i128(1))
+        Self(
+            serde_json::Number::from_i128(1)
+                .expect("the number is serialised from a number and is thus always valid"),
+        )
     }
 }
 
@@ -2129,7 +2180,10 @@ pub struct PaintCircleCircleStrokeWidth(serde_json::Number);
 
 impl Default for PaintCircleCircleStrokeWidth {
     fn default() -> Self {
-        Self(serde_json::Number::from_i128(0))
+        Self(
+            serde_json::Number::from_i128(0)
+                .expect("the number is serialised from a number and is thus always valid"),
+        )
     }
 }
 
@@ -2183,7 +2237,10 @@ pub struct PaintColorReliefColorReliefOpacity(serde_json::Number);
 
 impl Default for PaintColorReliefColorReliefOpacity {
     fn default() -> Self {
-        Self(serde_json::Number::from_i128(1))
+        Self(
+            serde_json::Number::from_i128(1)
+                .expect("the number is serialised from a number and is thus always valid"),
+        )
     }
 }
 
@@ -2213,13 +2270,12 @@ pub struct PaintFill {
 }
 
 /// Whether or not the fill should be antialiased.
-#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-#[deprecated = "not_implemented"]
-struct PaintFillFillAntialias(serde_json::Value);
+#[derive(serde::Deserialize, PartialEq, Debug, Clone, Copy)]
+struct PaintFillFillAntialias(bool);
 
 impl Default for PaintFillFillAntialias {
     fn default() -> Self {
-        true
+        Self(true)
     }
 }
 
@@ -2241,7 +2297,10 @@ pub struct PaintFillFillOpacity(serde_json::Number);
 
 impl Default for PaintFillFillOpacity {
     fn default() -> Self {
-        Self(serde_json::Number::from_i128(1))
+        Self(
+            serde_json::Number::from_i128(1)
+                .expect("the number is serialised from a number and is thus always valid"),
+        )
     }
 }
 
@@ -2318,7 +2377,10 @@ pub struct PaintFillExtrusionFillExtrusionBase(serde_json::Number);
 
 impl Default for PaintFillExtrusionFillExtrusionBase {
     fn default() -> Self {
-        Self(serde_json::Number::from_i128(0))
+        Self(
+            serde_json::Number::from_i128(0)
+                .expect("the number is serialised from a number and is thus always valid"),
+        )
     }
 }
 
@@ -2340,7 +2402,10 @@ pub struct PaintFillExtrusionFillExtrusionHeight(serde_json::Number);
 
 impl Default for PaintFillExtrusionFillExtrusionHeight {
     fn default() -> Self {
-        Self(serde_json::Number::from_i128(0))
+        Self(
+            serde_json::Number::from_i128(0)
+                .expect("the number is serialised from a number and is thus always valid"),
+        )
     }
 }
 
@@ -2352,7 +2417,10 @@ pub struct PaintFillExtrusionFillExtrusionOpacity(serde_json::Number);
 
 impl Default for PaintFillExtrusionFillExtrusionOpacity {
     fn default() -> Self {
-        Self(serde_json::Number::from_i128(1))
+        Self(
+            serde_json::Number::from_i128(1)
+                .expect("the number is serialised from a number and is thus always valid"),
+        )
     }
 }
 
@@ -2390,13 +2458,12 @@ impl Default for PaintFillExtrusionFillExtrusionTranslateAnchor {
 }
 
 /// Whether to apply a vertical gradient to the sides of a fill-extrusion layer. If true, sides will be shaded slightly darker farther down.
-#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-#[deprecated = "not_implemented"]
-struct PaintFillExtrusionFillExtrusionVerticalGradient(serde_json::Value);
+#[derive(serde::Deserialize, PartialEq, Debug, Clone, Copy)]
+struct PaintFillExtrusionFillExtrusionVerticalGradient(bool);
 
 impl Default for PaintFillExtrusionFillExtrusionVerticalGradient {
     fn default() -> Self {
-        true
+        Self(true)
     }
 }
 
@@ -2456,7 +2523,10 @@ pub struct PaintHeatmapHeatmapIntensity(serde_json::Number);
 
 impl Default for PaintHeatmapHeatmapIntensity {
     fn default() -> Self {
-        Self(serde_json::Number::from_i128(1))
+        Self(
+            serde_json::Number::from_i128(1)
+                .expect("the number is serialised from a number and is thus always valid"),
+        )
     }
 }
 
@@ -2468,7 +2538,10 @@ pub struct PaintHeatmapHeatmapOpacity(serde_json::Number);
 
 impl Default for PaintHeatmapHeatmapOpacity {
     fn default() -> Self {
-        Self(serde_json::Number::from_i128(1))
+        Self(
+            serde_json::Number::from_i128(1)
+                .expect("the number is serialised from a number and is thus always valid"),
+        )
     }
 }
 
@@ -2480,7 +2553,10 @@ pub struct PaintHeatmapHeatmapRadius(serde_json::Number);
 
 impl Default for PaintHeatmapHeatmapRadius {
     fn default() -> Self {
-        Self(serde_json::Number::from_i128(30))
+        Self(
+            serde_json::Number::from_i128(30)
+                .expect("the number is serialised from a number and is thus always valid"),
+        )
     }
 }
 
@@ -2492,7 +2568,10 @@ pub struct PaintHeatmapHeatmapWeight(serde_json::Number);
 
 impl Default for PaintHeatmapHeatmapWeight {
     fn default() -> Self {
-        Self(serde_json::Number::from_i128(1))
+        Self(
+            serde_json::Number::from_i128(1)
+                .expect("the number is serialised from a number and is thus always valid"),
+        )
     }
 }
 
@@ -2542,7 +2621,10 @@ pub struct PaintHillshadeHillshadeExaggeration(serde_json::Number);
 
 impl Default for PaintHillshadeHillshadeExaggeration {
     fn default() -> Self {
-        Self(serde_json::Number::from_f64(0.5))
+        Self(
+            serde_json::Number::from_f64(0.5)
+                .expect("the number is serialised from a number and is thus always valid"),
+        )
     }
 }
 
@@ -2696,7 +2778,10 @@ pub struct PaintLineLineBlur(serde_json::Number);
 
 impl Default for PaintLineLineBlur {
     fn default() -> Self {
-        Self(serde_json::Number::from_i128(0))
+        Self(
+            serde_json::Number::from_i128(0)
+                .expect("the number is serialised from a number and is thus always valid"),
+        )
     }
 }
 
@@ -2725,7 +2810,10 @@ pub struct PaintLineLineGapWidth(serde_json::Number);
 
 impl Default for PaintLineLineGapWidth {
     fn default() -> Self {
-        Self(serde_json::Number::from_i128(0))
+        Self(
+            serde_json::Number::from_i128(0)
+                .expect("the number is serialised from a number and is thus always valid"),
+        )
     }
 }
 
@@ -2739,7 +2827,10 @@ pub struct PaintLineLineOffset(serde_json::Number);
 
 impl Default for PaintLineLineOffset {
     fn default() -> Self {
-        Self(serde_json::Number::from_i128(0))
+        Self(
+            serde_json::Number::from_i128(0)
+                .expect("the number is serialised from a number and is thus always valid"),
+        )
     }
 }
 
@@ -2751,7 +2842,10 @@ pub struct PaintLineLineOpacity(serde_json::Number);
 
 impl Default for PaintLineLineOpacity {
     fn default() -> Self {
-        Self(serde_json::Number::from_i128(1))
+        Self(
+            serde_json::Number::from_i128(1)
+                .expect("the number is serialised from a number and is thus always valid"),
+        )
     }
 }
 
@@ -2796,7 +2890,10 @@ pub struct PaintLineLineWidth(serde_json::Number);
 
 impl Default for PaintLineLineWidth {
     fn default() -> Self {
-        Self(serde_json::Number::from_i128(1))
+        Self(
+            serde_json::Number::from_i128(1)
+                .expect("the number is serialised from a number and is thus always valid"),
+        )
     }
 }
 
@@ -2836,7 +2933,10 @@ pub struct PaintRasterRasterBrightnessMax(serde_json::Number);
 
 impl Default for PaintRasterRasterBrightnessMax {
     fn default() -> Self {
-        Self(serde_json::Number::from_i128(1))
+        Self(
+            serde_json::Number::from_i128(1)
+                .expect("the number is serialised from a number and is thus always valid"),
+        )
     }
 }
 
@@ -2848,7 +2948,10 @@ pub struct PaintRasterRasterBrightnessMin(serde_json::Number);
 
 impl Default for PaintRasterRasterBrightnessMin {
     fn default() -> Self {
-        Self(serde_json::Number::from_i128(0))
+        Self(
+            serde_json::Number::from_i128(0)
+                .expect("the number is serialised from a number and is thus always valid"),
+        )
     }
 }
 
@@ -2860,7 +2963,10 @@ pub struct PaintRasterRasterContrast(serde_json::Number);
 
 impl Default for PaintRasterRasterContrast {
     fn default() -> Self {
-        Self(serde_json::Number::from_i128(0))
+        Self(
+            serde_json::Number::from_i128(0)
+                .expect("the number is serialised from a number and is thus always valid"),
+        )
     }
 }
 
@@ -2872,19 +2978,25 @@ pub struct PaintRasterRasterFadeDuration(serde_json::Number);
 
 impl Default for PaintRasterRasterFadeDuration {
     fn default() -> Self {
-        Self(serde_json::Number::from_i128(300))
+        Self(
+            serde_json::Number::from_i128(300)
+                .expect("the number is serialised from a number and is thus always valid"),
+        )
     }
 }
 
 /// Rotates hues around the color wheel.
 ///
-/// Range: .. every 360
+/// Range:  every 360
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
 pub struct PaintRasterRasterHueRotate(serde_json::Number);
 
 impl Default for PaintRasterRasterHueRotate {
     fn default() -> Self {
-        Self(serde_json::Number::from_i128(0))
+        Self(
+            serde_json::Number::from_i128(0)
+                .expect("the number is serialised from a number and is thus always valid"),
+        )
     }
 }
 
@@ -2896,7 +3008,10 @@ pub struct PaintRasterRasterOpacity(serde_json::Number);
 
 impl Default for PaintRasterRasterOpacity {
     fn default() -> Self {
-        Self(serde_json::Number::from_i128(1))
+        Self(
+            serde_json::Number::from_i128(1)
+                .expect("the number is serialised from a number and is thus always valid"),
+        )
     }
 }
 
@@ -2925,7 +3040,10 @@ pub struct PaintRasterRasterSaturation(serde_json::Number);
 
 impl Default for PaintRasterRasterSaturation {
     fn default() -> Self {
-        Self(serde_json::Number::from_i128(0))
+        Self(
+            serde_json::Number::from_i128(0)
+                .expect("the number is serialised from a number and is thus always valid"),
+        )
     }
 }
 
@@ -2995,7 +3113,10 @@ pub struct PaintSymbolIconHaloBlur(serde_json::Number);
 
 impl Default for PaintSymbolIconHaloBlur {
     fn default() -> Self {
-        Self(serde_json::Number::from_i128(0))
+        Self(
+            serde_json::Number::from_i128(0)
+                .expect("the number is serialised from a number and is thus always valid"),
+        )
     }
 }
 
@@ -3022,7 +3143,10 @@ pub struct PaintSymbolIconHaloWidth(serde_json::Number);
 
 impl Default for PaintSymbolIconHaloWidth {
     fn default() -> Self {
-        Self(serde_json::Number::from_i128(0))
+        Self(
+            serde_json::Number::from_i128(0)
+                .expect("the number is serialised from a number and is thus always valid"),
+        )
     }
 }
 
@@ -3034,7 +3158,10 @@ pub struct PaintSymbolIconOpacity(serde_json::Number);
 
 impl Default for PaintSymbolIconOpacity {
     fn default() -> Self {
-        Self(serde_json::Number::from_i128(1))
+        Self(
+            serde_json::Number::from_i128(1)
+                .expect("the number is serialised from a number and is thus always valid"),
+        )
     }
 }
 
@@ -3084,7 +3211,10 @@ pub struct PaintSymbolTextHaloBlur(serde_json::Number);
 
 impl Default for PaintSymbolTextHaloBlur {
     fn default() -> Self {
-        Self(serde_json::Number::from_i128(0))
+        Self(
+            serde_json::Number::from_i128(0)
+                .expect("the number is serialised from a number and is thus always valid"),
+        )
     }
 }
 
@@ -3109,7 +3239,10 @@ pub struct PaintSymbolTextHaloWidth(serde_json::Number);
 
 impl Default for PaintSymbolTextHaloWidth {
     fn default() -> Self {
-        Self(serde_json::Number::from_i128(0))
+        Self(
+            serde_json::Number::from_i128(0)
+                .expect("the number is serialised from a number and is thus always valid"),
+        )
     }
 }
 
@@ -3121,7 +3254,10 @@ pub struct PaintSymbolTextOpacity(serde_json::Number);
 
 impl Default for PaintSymbolTextOpacity {
     fn default() -> Self {
-        Self(serde_json::Number::from_i128(1))
+        Self(
+            serde_json::Number::from_i128(1)
+                .expect("the number is serialised from a number and is thus always valid"),
+        )
     }
 }
 
@@ -3175,12 +3311,12 @@ impl Default for ProjectionType {
 pub struct PromoteId {
     /// A name of a feature property to use as ID for feature state.
     #[serde(rename = "*")]
-    pub star: PromoteId,
+    pub star: PromoteIdStar,
 }
 
 /// A name of a feature property to use as ID for feature state.
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-struct PromoteId(String);
+struct PromoteIdStar(String);
 
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
 pub struct PropertyType {
@@ -3267,7 +3403,10 @@ pub struct SkyAtmosphereBlend(serde_json::Number);
 
 impl Default for SkyAtmosphereBlend {
     fn default() -> Self {
-        Self(serde_json::Number::from_f64(0.8))
+        Self(
+            serde_json::Number::from_f64(0.8)
+                .expect("the number is serialised from a number and is thus always valid"),
+        )
     }
 }
 
@@ -3289,7 +3428,10 @@ pub struct SkyFogGroundBlend(serde_json::Number);
 
 impl Default for SkyFogGroundBlend {
     fn default() -> Self {
-        Self(serde_json::Number::from_f64(0.5))
+        Self(
+            serde_json::Number::from_f64(0.5)
+                .expect("the number is serialised from a number and is thus always valid"),
+        )
     }
 }
 
@@ -3311,7 +3453,10 @@ pub struct SkyHorizonFogBlend(serde_json::Number);
 
 impl Default for SkyHorizonFogBlend {
     fn default() -> Self {
-        Self(serde_json::Number::from_f64(0.8))
+        Self(
+            serde_json::Number::from_f64(0.8)
+                .expect("the number is serialised from a number and is thus always valid"),
+        )
     }
 }
 
@@ -3333,7 +3478,10 @@ pub struct SkySkyHorizonBlend(serde_json::Number);
 
 impl Default for SkySkyHorizonBlend {
     fn default() -> Self {
-        Self(serde_json::Number::from_f64(0.8))
+        Self(
+            serde_json::Number::from_f64(0.8)
+                .expect("the number is serialised from a number and is thus always valid"),
+        )
     }
 }
 
@@ -3423,7 +3571,10 @@ pub struct SourceGeojsonBuffer(serde_json::Number);
 
 impl Default for SourceGeojsonBuffer {
     fn default() -> Self {
-        Self(serde_json::Number::from_i128(128))
+        Self(
+            serde_json::Number::from_i128(128)
+                .expect("the number is serialised from a number and is thus always valid"),
+        )
     }
 }
 
@@ -3436,13 +3587,12 @@ impl Default for SourceGeojsonBuffer {
 ///  * `point_count` Number of original points grouped into this cluster
 ///
 ///  * `point_count_abbreviated` An abbreviated point count
-#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-#[deprecated = "not_implemented"]
-struct SourceGeojsonCluster(serde_json::Value);
+#[derive(serde::Deserialize, PartialEq, Debug, Clone, Copy)]
+struct SourceGeojsonCluster(bool);
 
 impl Default for SourceGeojsonCluster {
     fn default() -> Self {
-        false
+        Self(false)
     }
 }
 
@@ -3473,7 +3623,10 @@ pub struct SourceGeojsonClusterRadius(serde_json::Number);
 
 impl Default for SourceGeojsonClusterRadius {
     fn default() -> Self {
-        Self(serde_json::Number::from_i128(50))
+        Self(
+            serde_json::Number::from_i128(50)
+                .expect("the number is serialised from a number and is thus always valid"),
+        )
     }
 }
 
@@ -3488,24 +3641,22 @@ struct SourceGeojsonData(serde_json::Value);
 struct SourceGeojsonFilter(serde_json::Value);
 
 /// Whether to generate ids for the geojson features. When enabled, the `feature.id` property will be auto assigned based on its index in the `features` array, over-writing any previous values.
-#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-#[deprecated = "not_implemented"]
-struct SourceGeojsonGenerateId(serde_json::Value);
+#[derive(serde::Deserialize, PartialEq, Debug, Clone, Copy)]
+struct SourceGeojsonGenerateId(bool);
 
 impl Default for SourceGeojsonGenerateId {
     fn default() -> Self {
-        false
+        Self(false)
     }
 }
 
 /// Whether to calculate line distance metrics. This is required for line layers that specify `line-gradient` values.
-#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-#[deprecated = "not_implemented"]
-struct SourceGeojsonLineMetrics(serde_json::Value);
+#[derive(serde::Deserialize, PartialEq, Debug, Clone, Copy)]
+struct SourceGeojsonLineMetrics(bool);
 
 impl Default for SourceGeojsonLineMetrics {
     fn default() -> Self {
-        false
+        Self(false)
     }
 }
 
@@ -3515,7 +3666,10 @@ pub struct SourceGeojsonMaxzoom(serde_json::Number);
 
 impl Default for SourceGeojsonMaxzoom {
     fn default() -> Self {
-        Self(serde_json::Number::from_i128(18))
+        Self(
+            serde_json::Number::from_i128(18)
+                .expect("the number is serialised from a number and is thus always valid"),
+        )
     }
 }
 
@@ -3530,7 +3684,10 @@ pub struct SourceGeojsonTolerance(serde_json::Number);
 
 impl Default for SourceGeojsonTolerance {
     fn default() -> Self {
-        Self(serde_json::Number::from_f64(0.375))
+        Self(
+            serde_json::Number::from_f64(0.375)
+                .expect("the number is serialised from a number and is thus always valid"),
+        )
     }
 }
 
@@ -3576,7 +3733,7 @@ struct SourceImageUrl(String);
 pub struct SourceRaster {
     /// Other keys to configure the data source.
     #[serde(rename = "*")]
-    pub star: SourceRaster,
+    pub star: SourceRasterStar,
     /// Contains an attribution to be displayed when the map is shown to a user.
     #[serde(rename = "attribution")]
     pub attribution: SourceRasterAttribution,
@@ -3612,7 +3769,7 @@ pub struct SourceRaster {
 /// Other keys to configure the data source.
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
 #[deprecated = "not_implemented"]
-struct SourceRaster(serde_json::Value);
+struct SourceRasterStar(serde_json::Value);
 
 /// Contains an attribution to be displayed when the map is shown to a user.
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
@@ -3635,7 +3792,10 @@ pub struct SourceRasterMaxzoom(serde_json::Number);
 
 impl Default for SourceRasterMaxzoom {
     fn default() -> Self {
-        Self(serde_json::Number::from_i128(22))
+        Self(
+            serde_json::Number::from_i128(22)
+                .expect("the number is serialised from a number and is thus always valid"),
+        )
     }
 }
 
@@ -3645,7 +3805,10 @@ pub struct SourceRasterMinzoom(serde_json::Number);
 
 impl Default for SourceRasterMinzoom {
     fn default() -> Self {
-        Self(serde_json::Number::from_i128(0))
+        Self(
+            serde_json::Number::from_i128(0)
+                .expect("the number is serialised from a number and is thus always valid"),
+        )
     }
 }
 
@@ -3672,7 +3835,10 @@ pub struct SourceRasterTileSize(serde_json::Number);
 
 impl Default for SourceRasterTileSize {
     fn default() -> Self {
-        Self(serde_json::Number::from_i128(512))
+        Self(
+            serde_json::Number::from_i128(512)
+                .expect("the number is serialised from a number and is thus always valid"),
+        )
     }
 }
 
@@ -3694,13 +3860,12 @@ pub enum SourceRasterType {
 struct SourceRasterUrl(String);
 
 /// A setting to determine whether a source's tiles are cached locally.
-#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-#[deprecated = "not_implemented"]
-struct SourceRasterVolatile(serde_json::Value);
+#[derive(serde::Deserialize, PartialEq, Debug, Clone, Copy)]
+struct SourceRasterVolatile(bool);
 
 impl Default for SourceRasterVolatile {
     fn default() -> Self {
-        false
+        Self(false)
     }
 }
 
@@ -3708,7 +3873,7 @@ impl Default for SourceRasterVolatile {
 pub struct SourceRasterDem {
     /// Other keys to configure the data source.
     #[serde(rename = "*")]
-    pub star: SourceRasterDem,
+    pub star: SourceRasterDemStar,
     /// Contains an attribution to be displayed when the map is shown to a user.
     #[serde(rename = "attribution")]
     pub attribution: SourceRasterDemAttribution,
@@ -3756,7 +3921,7 @@ pub struct SourceRasterDem {
 /// Other keys to configure the data source.
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
 #[deprecated = "not_implemented"]
-struct SourceRasterDem(serde_json::Value);
+struct SourceRasterDemStar(serde_json::Value);
 
 /// Contains an attribution to be displayed when the map is shown to a user.
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
@@ -3768,7 +3933,10 @@ pub struct SourceRasterDemBaseShift(serde_json::Number);
 
 impl Default for SourceRasterDemBaseShift {
     fn default() -> Self {
-        Self(serde_json::Number::from_f64(0.0))
+        Self(
+            serde_json::Number::from_f64(0.0)
+                .expect("the number is serialised from a number and is thus always valid"),
+        )
     }
 }
 
@@ -3778,7 +3946,10 @@ pub struct SourceRasterDemBlueFactor(serde_json::Number);
 
 impl Default for SourceRasterDemBlueFactor {
     fn default() -> Self {
-        Self(serde_json::Number::from_f64(1.0))
+        Self(
+            serde_json::Number::from_f64(1.0)
+                .expect("the number is serialised from a number and is thus always valid"),
+        )
     }
 }
 
@@ -3819,7 +3990,10 @@ pub struct SourceRasterDemGreenFactor(serde_json::Number);
 
 impl Default for SourceRasterDemGreenFactor {
     fn default() -> Self {
-        Self(serde_json::Number::from_f64(1.0))
+        Self(
+            serde_json::Number::from_f64(1.0)
+                .expect("the number is serialised from a number and is thus always valid"),
+        )
     }
 }
 
@@ -3829,7 +4003,10 @@ pub struct SourceRasterDemMaxzoom(serde_json::Number);
 
 impl Default for SourceRasterDemMaxzoom {
     fn default() -> Self {
-        Self(serde_json::Number::from_i128(22))
+        Self(
+            serde_json::Number::from_i128(22)
+                .expect("the number is serialised from a number and is thus always valid"),
+        )
     }
 }
 
@@ -3839,7 +4016,10 @@ pub struct SourceRasterDemMinzoom(serde_json::Number);
 
 impl Default for SourceRasterDemMinzoom {
     fn default() -> Self {
-        Self(serde_json::Number::from_i128(0))
+        Self(
+            serde_json::Number::from_i128(0)
+                .expect("the number is serialised from a number and is thus always valid"),
+        )
     }
 }
 
@@ -3849,7 +4029,10 @@ pub struct SourceRasterDemRedFactor(serde_json::Number);
 
 impl Default for SourceRasterDemRedFactor {
     fn default() -> Self {
-        Self(serde_json::Number::from_f64(1.0))
+        Self(
+            serde_json::Number::from_f64(1.0)
+                .expect("the number is serialised from a number and is thus always valid"),
+        )
     }
 }
 
@@ -3859,7 +4042,10 @@ pub struct SourceRasterDemTileSize(serde_json::Number);
 
 impl Default for SourceRasterDemTileSize {
     fn default() -> Self {
-        Self(serde_json::Number::from_i128(512))
+        Self(
+            serde_json::Number::from_i128(512)
+                .expect("the number is serialised from a number and is thus always valid"),
+        )
     }
 }
 
@@ -3881,13 +4067,12 @@ pub enum SourceRasterDemType {
 struct SourceRasterDemUrl(String);
 
 /// A setting to determine whether a source's tiles are cached locally.
-#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-#[deprecated = "not_implemented"]
-struct SourceRasterDemVolatile(serde_json::Value);
+#[derive(serde::Deserialize, PartialEq, Debug, Clone, Copy)]
+struct SourceRasterDemVolatile(bool);
 
 impl Default for SourceRasterDemVolatile {
     fn default() -> Self {
-        false
+        Self(false)
     }
 }
 
@@ -3895,7 +4080,7 @@ impl Default for SourceRasterDemVolatile {
 pub struct SourceVector {
     /// Other keys to configure the data source.
     #[serde(rename = "*")]
-    pub star: SourceVector,
+    pub star: SourceVectorStar,
     /// Contains an attribution to be displayed when the map is shown to a user.
     #[serde(rename = "attribution")]
     pub attribution: SourceVectorAttribution,
@@ -3934,7 +4119,7 @@ pub struct SourceVector {
 /// Other keys to configure the data source.
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
 #[deprecated = "not_implemented"]
-struct SourceVector(serde_json::Value);
+struct SourceVectorStar(serde_json::Value);
 
 /// Contains an attribution to be displayed when the map is shown to a user.
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
@@ -3974,7 +4159,10 @@ pub struct SourceVectorMaxzoom(serde_json::Number);
 
 impl Default for SourceVectorMaxzoom {
     fn default() -> Self {
-        Self(serde_json::Number::from_i128(22))
+        Self(
+            serde_json::Number::from_i128(22)
+                .expect("the number is serialised from a number and is thus always valid"),
+        )
     }
 }
 
@@ -3984,7 +4172,10 @@ pub struct SourceVectorMinzoom(serde_json::Number);
 
 impl Default for SourceVectorMinzoom {
     fn default() -> Self {
-        Self(serde_json::Number::from_i128(0))
+        Self(
+            serde_json::Number::from_i128(0)
+                .expect("the number is serialised from a number and is thus always valid"),
+        )
     }
 }
 
@@ -4028,13 +4219,12 @@ pub enum SourceVectorType {
 struct SourceVectorUrl(String);
 
 /// A setting to determine whether a source's tiles are cached locally.
-#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-#[deprecated = "not_implemented"]
-struct SourceVectorVolatile(serde_json::Value);
+#[derive(serde::Deserialize, PartialEq, Debug, Clone, Copy)]
+struct SourceVectorVolatile(bool);
 
 impl Default for SourceVectorVolatile {
     fn default() -> Self {
-        false
+        Self(false)
     }
 }
 
@@ -4073,13 +4263,13 @@ struct SourceVideoUrls(serde_json::Value);
 pub struct Sources {
     /// Specification of a data source. For vector and raster sources, either TileJSON or a URL to a TileJSON must be provided. For image and video sources, a URL must be provided. For GeoJSON sources, a URL or inline GeoJSON must be provided.
     #[serde(rename = "*")]
-    pub star: Sources,
+    pub star: SourcesStar,
 }
 
 /// Specification of a data source. For vector and raster sources, either TileJSON or a URL to a TileJSON must be provided. For image and video sources, a URL must be provided. For GeoJSON sources, a URL or inline GeoJSON must be provided.
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
 #[deprecated = "not_implemented"]
-struct Sources(serde_json::Value);
+struct SourcesStar(serde_json::Value);
 
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
 pub struct Terrain {
@@ -4099,7 +4289,10 @@ pub struct TerrainExaggeration(serde_json::Number);
 
 impl Default for TerrainExaggeration {
     fn default() -> Self {
-        Self(serde_json::Number::from_f64(1.0))
+        Self(
+            serde_json::Number::from_f64(1.0)
+                .expect("the number is serialised from a number and is thus always valid"),
+        )
     }
 }
 
@@ -4125,7 +4318,10 @@ pub struct TransitionDelay(serde_json::Number);
 
 impl Default for TransitionDelay {
     fn default() -> Self {
-        Self(serde_json::Number::from_i128(0))
+        Self(
+            serde_json::Number::from_i128(0)
+                .expect("the number is serialised from a number and is thus always valid"),
+        )
     }
 }
 
@@ -4137,6 +4333,9 @@ pub struct TransitionDuration(serde_json::Number);
 
 impl Default for TransitionDuration {
     fn default() -> Self {
-        Self(serde_json::Number::from_i128(300))
+        Self(
+            serde_json::Number::from_i128(300)
+                .expect("the number is serialised from a number and is thus always valid"),
+        )
     }
 }

@@ -196,7 +196,7 @@ mod tests {
             }
         });
         let reference: StyleReference = serde_json::from_value(reference).unwrap();
-        insta::assert_snapshot!(generate_spec_scope(reference), @r"
+        insta::assert_snapshot!(generate_spec_scope(reference), @r#"
         /// This is a Maplibre Style Specification
         #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
         pub struct MaplibreStyleSpecification;
@@ -207,10 +207,10 @@ mod tests {
 
         impl Default for NumberOne {
             fn default() -> Self {
-                Self(serde_json::Number::from_i128(0))
+                Self(serde_json::Number::from_i128(0).expect("the number is serialised from a number and is thus always valid"))
             }
         }
-        ");
+        "#);
     }
 
     #[test]
@@ -246,7 +246,7 @@ mod tests {
 
         impl Default for NamesNameOne {
             fn default() -> Self {
-                Self(serde_json::Number::from_f64(1.0))
+                Self(serde_json::Number::from_f64(1.0).expect("the number is serialised from a number and is thus always valid"))
             }
         }
         "#);
@@ -271,7 +271,7 @@ mod tests {
             "numbers": ["number_one", "number_two"]
         });
         let reference: StyleReference = serde_json::from_value(reference).unwrap();
-        insta::assert_snapshot!(generate_spec_scope(reference), @r"
+        insta::assert_snapshot!(generate_spec_scope(reference), @r#"
         /// This is a Maplibre Style Specification
         #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
         pub struct MaplibreStyleSpecification;
@@ -284,7 +284,7 @@ mod tests {
 
         impl Default for NumberOne {
             fn default() -> Self {
-                Self(serde_json::Number::from_f64(1.0))
+                Self(serde_json::Number::from_f64(1.0).expect("the number is serialised from a number and is thus always valid"))
             }
         }
 
@@ -298,6 +298,6 @@ mod tests {
             NumberOne(NumberOne),
             NumberTwo(NumberTwo),
         }
-        ");
+        "#);
     }
 }

@@ -20,8 +20,14 @@ pub fn to_upper_camel_case(name: &str) -> String {
         })
         .collect::<String>();
 
-    debug_assert!(!result.starts_with('_'), "{name} should not start with an underscore but produced {result}");
-    debug_assert!(!result.ends_with('_'), "{name} should not end with an underscore but produced {result}");
+    debug_assert!(
+        !result.starts_with('_'),
+        "{name} should not start with an underscore but produced {result}"
+    );
+    debug_assert!(
+        !result.ends_with('_'),
+        "{name} should not end with an underscore but produced {result}"
+    );
     debug_assert!(
         !result.is_empty(),
         "{name} should not result in an empty string after conversion to snake case"
@@ -64,10 +70,16 @@ pub fn to_snake_case(name: &str) -> String {
         result.pop();
     }
 
-    debug_assert!(!result.starts_with('_'), "{name} should not start with an underscore but produced {result}");
-    debug_assert!(!result.ends_with('_'), "{name} should not end with an underscore but produced {result}");
-    debug_assert_ne!(
-        result, "",
+    debug_assert!(
+        !result.starts_with('_'),
+        "{name} should not start with an underscore but produced {result}"
+    );
+    debug_assert!(
+        !result.ends_with('_'),
+        "{name} should not end with an underscore but produced {result}"
+    );
+    debug_assert!(
+        !result.is_empty(),
         "{name} should not result in an empty string after conversion to snake case"
     );
     rustize(result)
@@ -90,10 +102,10 @@ fn prefilter_names(name: impl ToString) -> String {
         ("-", " Minus "),
     ] {
         if name.ends_with(&format!(" {val}")) {
-            let range_start = name.len() - val.len() -1;
+            let range_start = name.len() - val.len() - 1;
             name.replace_range(range_start.., absolute_replacement);
         } else if name == val {
-            name = val.to_string();
+            name = absolute_replacement.to_string();
         }
     }
 
@@ -112,7 +124,7 @@ fn prefilter_names(name: impl ToString) -> String {
         name = name.replace(val, replacement);
     }
 
-    name
+    name.trim().to_string()
 }
 
 /// replace rust names with r# prefix if they are reserved keywords
@@ -170,6 +182,7 @@ mod tests {
 
     #[test]
     fn test_weird_names_snake_case() {
+        assert_eq!(to_snake_case("-"), "minus");
         assert_eq!(to_snake_case("!"), "not");
         assert_eq!(to_snake_case("!="), "not_equal");
         assert_eq!(to_snake_case("!has"), "not_has");
