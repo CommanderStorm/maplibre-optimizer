@@ -32,7 +32,7 @@ pub fn generate(
             .new_fn("default")
             .ret("Self")
             .line(format!(
-                "Self(serde_json::Number::from_{underlying_datatype}({default}))"
+                "Self(serde_json::Number::from_{underlying_datatype}({default}).expect(\"the number is serialised from a number and is thus always valid\"))"
             ));
     }
 }

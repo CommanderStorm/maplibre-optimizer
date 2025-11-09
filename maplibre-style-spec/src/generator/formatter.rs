@@ -20,8 +20,10 @@ pub fn to_upper_camel_case(name: &str) -> String {
         })
         .collect::<String>();
 
-    debug_assert_ne!(
-        result, "",
+    debug_assert!(!result.starts_with('_'), "{name} should not start with an underscore but produced {result}");
+    debug_assert!(!result.ends_with('_'), "{name} should not end with an underscore but produced {result}");
+    debug_assert!(
+        !result.is_empty(),
         "{name} should not result in an empty string after conversion to snake case"
     );
     rustize(result)
@@ -62,6 +64,8 @@ pub fn to_snake_case(name: &str) -> String {
         result.pop();
     }
 
+    debug_assert!(!result.starts_with('_'), "{name} should not start with an underscore but produced {result}");
+    debug_assert!(!result.ends_with('_'), "{name} should not end with an underscore but produced {result}");
     debug_assert_ne!(
         result, "",
         "{name} should not result in an empty string after conversion to snake case"
@@ -79,25 +83,36 @@ fn has_next_lower(s: &str, idx: usize) -> bool {
 
 fn prefilter_names(name: impl ToString) -> String {
     let mut name = name.to_string();
-    if name.starts_with("!") {
-        name = format!("not {}", prefilter_names(name[1..].trim_start()));
+    // these are tricky because they may consivably occur in the middle of a word
+    for (val, absolute_replacement) in [
+        ("abs", " Absolute "),
+        ("acos", " Arccosine "),
+        ("-", " Minus "),
+    ] {
+        if name.ends_with(&format!(" {val}")) {
+            let range_start = name.len() - val.len() -1;
+            name.replace_range(range_start.., absolute_replacement);
+        } else if name == val {
+            name = val.to_string();
+        }
     }
-    match name.as_str() {
-        "%" => "Percentage".to_string(),
-        "*" => "Star".to_string(),
-        "+" => "Plus".to_string(),
-        "-" => "Minus".to_string(),
-        "/" => "Slash".to_string(),
-        "<" => "Less".to_string(),
-        "<=" => "LessEqual".to_string(),
-        ">" => "Greater".to_string(),
-        ">=" => "GreaterEqual".to_string(),
-        "=" | "==" => "Equal".to_string(),
-        "abs" => "Absolute".to_string(),
-        "acos" => "Arccosine".to_string(),
-        "^" => "Power".to_string(),
-        _ => name,
+
+    let any_place_replacements = [
+        ("%", " Percentage "),
+        ("*", " Star "),
+        ("!", " Not "),
+        ("+", " Plus "),
+        ("/", " Slash "),
+        ("<", " Less "),
+        (">", " Greater "),
+        ("=", " Equal "),
+        ("^", " Power "),
+    ];
+    for (val, replacement) in any_place_replacements {
+        name = name.replace(val, replacement);
     }
+
+    name
 }
 
 /// replace rust names with r# prefix if they are reserved keywords
@@ -166,5 +181,7 @@ mod tests {
         assert_eq!(to_upper_camel_case("!="), "NotEqual");
         assert_eq!(to_upper_camel_case("!has"), "NotHas");
         assert_eq!(to_upper_camel_case("%"), "Percentage");
+        assert_eq!(to_upper_camel_case("some prefix *"), "SomePrefixStar");
+        assert_eq!(to_upper_camel_case("absabs abs"), "AbsabsAbsolute");
     }
 }
