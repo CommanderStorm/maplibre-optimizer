@@ -4,28 +4,53 @@ use serde_json::Number;
 use crate::decoder::Fields;
 
 pub fn generate(scope: &mut Scope, name: &str, common: &Fields, default: &[Number]) {
-    scope
-        .new_struct(name)
+    let enu = scope
+        .new_enum(name)
+        .attr("serde(untagged)")
         .doc(&common.doc)
-        .attr("deprecated = \"not_implemented\"")
-        .derive("serde::Deserialize, PartialEq, Debug, Clone")
-        .tuple_field("serde_json::Value");
+        .derive("serde::Deserialize, PartialEq, Debug, Clone");
+    enu.new_variant("Unwrapped").annotation("#[deprecated = \"Please see [`Self::One`] instead\"]").doc("A single value applies to all four sides.\n\nOnly avaliable for backwards compatibility.").tuple("serde_json::Number");
+    enu.new_variant("One")
+        .doc("A single value applies to all four sides")
+        .tuple("Box<[serde_json::Number; 1]>");
+    enu.new_variant("Two")
+        .doc("two values apply to `[top/bottom, left/right]`")
+        .tuple("Box<[serde_json::Number; 2]>");
+    enu.new_variant("Three")
+        .doc("three values apply to `[top, left/right, bottom]`")
+        .tuple("Box<[serde_json::Number; 3]>");
+    enu.new_variant("Four")
+        .doc("four values apply to `[top, right, bottom, left]`")
+        .tuple("Box<[serde_json::Number; 4]>");
 
-    let mut line = String::from("vec![");
+    let mut items = String::from("Box::new([");
+
+    let mut needs_separator = false;
     for item in default {
-        if line.len() > "vec![".len() {
-            line.push_str(", ");
+        if needs_separator {
+            items.push_str(", ");
         }
-        line.push_str(&item.to_string());
+
+        items.push_str(&item.to_string());
+        items.push_str(".into()");
+        needs_separator = true;
     }
-    line.push(']');
+    items.push_str("])");
+
+    let enum_variant_name = match default.len() {
+        1 => "One",
+        2 => "Two",
+        3 => "Three",
+        4 => "Four",
+        _ => panic!("invalid padding length"),
+    };
 
     scope
         .new_impl(name)
         .impl_trait("Default")
         .new_fn("default")
         .ret("Self")
-        .line(line);
+        .line(format!("Self::{enum_variant_name}({items})"));
 }
 
 #[cfg(test)]
@@ -34,15 +59,29 @@ mod tests {
     #[test]
     fn generate_empty() {
         let mut scope = Scope::new();
-        generate(&mut scope, "Foo", &Fields::default(), &[]);
+        generate(&mut scope, "Foo", &Fields::default(), &[2.into()]);
         insta::assert_snapshot!(scope.to_string(), @r##"
         #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-        #[deprecated = "not_implemented"]
-        struct Foo(serde_json::Value);
+        #[serde(untagged)]
+        enum Foo {
+            /// A single value applies to all four sides.
+            /// 
+            /// Only avaliable for backwards compatibility.
+            #[deprecated = "Please see [`Self::One`] instead"]
+            Unwrapped(serde_json::Number),
+            /// A single value applies to all four sides
+            One(Box<[serde_json::Number; 1]>),
+            /// two values apply to `[top/bottom, left/right]`
+            Two(Box<[serde_json::Number; 2]>),
+            /// three values apply to `[top, left/right, bottom]`
+            Three(Box<[serde_json::Number; 3]>),
+            /// four values apply to `[top, right, bottom, left]`
+            Four(Box<[serde_json::Number; 4]>),
+        }
 
         impl Default for Foo {
             fn default() -> Self {
-                vec![]
+                Self::One(Box::new([2.into()]))
             }
         }
         "##)

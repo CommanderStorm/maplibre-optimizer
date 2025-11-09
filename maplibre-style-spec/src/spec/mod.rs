@@ -70,7 +70,7 @@ pub struct MaplibreStyleSpecification {
 /// Range: 1..
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
 #[deprecated = "not_implemented"]
-struct Expression(serde_json::Value);
+struct Expression(Vec<serde_json::Value>);
 
 #[derive(serde::Deserialize, PartialEq, Eq, Debug, Clone, Copy)]
 pub enum ExpressionName {
@@ -449,7 +449,7 @@ pub enum ExpressionName {
 /// A filter selects specific features from a layer.
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
 #[deprecated = "not_implemented"]
-struct Filter(serde_json::Value);
+struct Filter(Vec<serde_json::Value>);
 
 /// The filter operator.
 #[derive(serde::Deserialize, PartialEq, Eq, Debug, Clone, Copy)]
@@ -598,7 +598,7 @@ impl Default for FunctionProperty {
 /// An array of stops.
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
 #[deprecated = "not_implemented"]
-struct FunctionStops(serde_json::Value);
+struct FunctionStops(Vec<serde_json::Value>);
 
 /// The interpolation strategy to use in function evaluation.
 #[derive(serde::Deserialize, PartialEq, Eq, Debug, Clone, Copy)]
@@ -628,7 +628,7 @@ impl Default for FunctionType {
 /// Range: 0..=24
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
 #[deprecated = "not_implemented"]
-struct FunctionStop(serde_json::Value);
+struct FunctionStop(Box<[serde_json::Value; 2]>);
 
 /// The geometry type for the filter to select.
 #[derive(serde::Deserialize, PartialEq, Eq, Debug, Clone, Copy)]
@@ -1313,11 +1313,14 @@ impl Default for LayoutSymbolIconKeepUpright {
 /// Offset distance of icon from its anchor. Positive values indicate right and down, while negative values indicate left and up. Each component is multiplied by the value of `icon-size` to obtain the final offset in pixels. When combined with `icon-rotate` the offset will be as if the rotated direction was up.
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
 #[deprecated = "not_implemented"]
-struct LayoutSymbolIconOffset(serde_json::Value);
+struct LayoutSymbolIconOffset(Box<[serde_json::Value; 2]>);
 
 impl Default for LayoutSymbolIconOffset {
     fn default() -> Self {
-        vec![0, 0]
+        Self(Box::new([
+            serde_json::Value::from(0),
+            serde_json::Value::from(0),
+        ]))
     }
 }
 
@@ -1347,12 +1350,26 @@ pub enum LayoutSymbolIconOverlap {
 
 /// Size of additional area round the icon bounding box used for detecting symbol collisions.
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-#[deprecated = "not_implemented"]
-struct LayoutSymbolIconPadding(serde_json::Value);
+#[serde(untagged)]
+enum LayoutSymbolIconPadding {
+    /// A single value applies to all four sides.
+    ///
+    /// Only avaliable for backwards compatibility.
+    #[deprecated = "Please see [`Self::One`] instead"]
+    Unwrapped(serde_json::Number),
+    /// A single value applies to all four sides
+    One(Box<[serde_json::Number; 1]>),
+    /// two values apply to `[top/bottom, left/right]`
+    Two(Box<[serde_json::Number; 2]>),
+    /// three values apply to `[top, left/right, bottom]`
+    Three(Box<[serde_json::Number; 3]>),
+    /// four values apply to `[top, right, bottom, left]`
+    Four(Box<[serde_json::Number; 4]>),
+}
 
 impl Default for LayoutSymbolIconPadding {
     fn default() -> Self {
-        vec![2]
+        Self::One(Box::new([2.into()]))
     }
 }
 
@@ -1452,11 +1469,16 @@ impl Default for LayoutSymbolIconTextFit {
 /// Size of the additional area added to dimensions determined by `icon-text-fit`, in clockwise order: top, right, bottom, left.
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
 #[deprecated = "not_implemented"]
-struct LayoutSymbolIconTextFitPadding(serde_json::Value);
+struct LayoutSymbolIconTextFitPadding(Box<[serde_json::Value; 4]>);
 
 impl Default for LayoutSymbolIconTextFitPadding {
     fn default() -> Self {
-        vec![0, 0, 0, 0]
+        Self(Box::new([
+            serde_json::Value::from(0),
+            serde_json::Value::from(0),
+            serde_json::Value::from(0),
+            serde_json::Value::from(0),
+        ]))
     }
 }
 
@@ -1589,11 +1611,14 @@ impl Default for LayoutSymbolTextField {
 /// Fonts to use for displaying text. If the `glyphs` root property is specified, this array is joined together and interpreted as a font stack name. Otherwise, it is interpreted as a cascading fallback list of local font names.
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
 #[deprecated = "not_implemented"]
-struct LayoutSymbolTextFont(serde_json::Value);
+struct LayoutSymbolTextFont(Vec<serde_json::Value>);
 
 impl Default for LayoutSymbolTextFont {
     fn default() -> Self {
-        vec!["Open Sans Regular", "Arial Unicode MS Regular"]
+        Self(Vec::from([
+            serde_json::Value::from("Open Sans Regular"),
+            serde_json::Value::from("Arial Unicode MS Regular"),
+        ]))
     }
 }
 
@@ -1697,11 +1722,14 @@ impl Default for LayoutSymbolTextMaxWidth {
 /// Offset distance of text from its anchor. Positive values indicate right and down, while negative values indicate left and up. If used with text-variable-anchor, input values will be taken as absolute values. Offsets along the x- and y-axis will be applied automatically based on the anchor position.
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
 #[deprecated = "not_implemented"]
-struct LayoutSymbolTextOffset(serde_json::Value);
+struct LayoutSymbolTextOffset(Box<[serde_json::Value; 2]>);
 
 impl Default for LayoutSymbolTextOffset {
     fn default() -> Self {
-        vec![0, 0]
+        Self(Box::new([
+            serde_json::Value::from(0),
+            serde_json::Value::from(0),
+        ]))
     }
 }
 
@@ -1853,7 +1881,7 @@ impl Default for LayoutSymbolTextTransform {
 /// To increase the chance of placing high-priority labels on the map, you can provide an array of `text-anchor` locations: the renderer will attempt to place the label at each location, in order, before moving onto the next label. Use `text-justify: auto` to choose justification based on anchor position. To apply an offset, use the `text-radial-offset` or the two-dimensional `text-offset`.
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
 #[deprecated = "not_implemented"]
-struct LayoutSymbolTextVariableAnchor(serde_json::Value);
+struct LayoutSymbolTextVariableAnchor(Vec<serde_json::Value>);
 
 /// To increase the chance of placing high-priority labels on the map, you can provide an array of `text-anchor` locations, each paired with an offset value. The renderer will attempt to place the label at each location, in order, before moving on to the next location+offset. Use `text-justify: auto` to choose justification based on anchor position.
 ///
@@ -1877,7 +1905,7 @@ struct LayoutSymbolTextVariableAnchorOffset(serde_json::Value);
 /// The property allows control over a symbol's orientation. Note that the property values act as a hint, so that a symbol whose language doesn’t support the provided orientation will be laid out in its natural orientation. Example: English point symbol will be rendered horizontally even if array value contains single 'vertical' enum value. The order of elements in an array define priority order for the placement of an orientation variant.
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
 #[deprecated = "not_implemented"]
-struct LayoutSymbolTextWritingMode(serde_json::Value);
+struct LayoutSymbolTextWritingMode(Vec<serde_json::Value>);
 
 /// Whether this layer is displayed.
 #[derive(serde::Deserialize, PartialEq, Eq, Debug, Clone, Copy)]
@@ -1957,11 +1985,15 @@ impl Default for LightIntensity {
 /// Position of the light source relative to lit (extruded) geometries, in [r radial coordinate, a azimuthal angle, p polar angle] where r indicates the distance from the center of the base of an object to its light, a indicates the position of the light relative to 0° (0° when `light.anchor` is set to `viewport` corresponds to the top of the viewport, or 0° when `light.anchor` is set to `map` corresponds to due north, and degrees proceed clockwise), and p indicates the height of the light (from 0°, directly above, to 180°, directly below).
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
 #[deprecated = "not_implemented"]
-struct LightPosition(serde_json::Value);
+struct LightPosition(Box<[serde_json::Value; 3]>);
 
 impl Default for LightPosition {
     fn default() -> Self {
-        vec![1.15, 210, 30]
+        Self(Box::new([
+            serde_json::Value::from(1.15),
+            serde_json::Value::from(210),
+            serde_json::Value::from(30),
+        ]))
     }
 }
 
@@ -2190,11 +2222,14 @@ impl Default for PaintCircleCircleStrokeWidth {
 /// The geometry's offset. Values are [x, y] where negatives indicate left and up, respectively.
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
 #[deprecated = "not_implemented"]
-struct PaintCircleCircleTranslate(serde_json::Value);
+struct PaintCircleCircleTranslate(Box<[serde_json::Value; 2]>);
 
 impl Default for PaintCircleCircleTranslate {
     fn default() -> Self {
-        vec![0, 0]
+        Self(Box::new([
+            serde_json::Value::from(0),
+            serde_json::Value::from(0),
+        ]))
     }
 }
 
@@ -2316,11 +2351,14 @@ struct PaintFillFillPattern(serde_json::Value);
 /// The geometry's offset. Values are [x, y] where negatives indicate left and up, respectively.
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
 #[deprecated = "not_implemented"]
-struct PaintFillFillTranslate(serde_json::Value);
+struct PaintFillFillTranslate(Box<[serde_json::Value; 2]>);
 
 impl Default for PaintFillFillTranslate {
     fn default() -> Self {
-        vec![0, 0]
+        Self(Box::new([
+            serde_json::Value::from(0),
+            serde_json::Value::from(0),
+        ]))
     }
 }
 
@@ -2432,11 +2470,14 @@ struct PaintFillExtrusionFillExtrusionPattern(serde_json::Value);
 /// The geometry's offset. Values are [x, y] where negatives indicate left and up (on the flat plane), respectively.
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
 #[deprecated = "not_implemented"]
-struct PaintFillExtrusionFillExtrusionTranslate(serde_json::Value);
+struct PaintFillExtrusionFillExtrusionTranslate(Box<[serde_json::Value; 2]>);
 
 impl Default for PaintFillExtrusionFillExtrusionTranslate {
     fn default() -> Self {
-        vec![0, 0]
+        Self(Box::new([
+            serde_json::Value::from(0),
+            serde_json::Value::from(0),
+        ]))
     }
 }
 
@@ -2800,7 +2841,7 @@ impl Default for PaintLineLineColor {
 /// Range: 0..
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
 #[deprecated = "not_implemented"]
-struct PaintLineLineDasharray(serde_json::Value);
+struct PaintLineLineDasharray(Vec<serde_json::Value>);
 
 /// Draws a line casing outside of a line's actual path. Value indicates the width of the inner gap.
 ///
@@ -2857,11 +2898,14 @@ struct PaintLineLinePattern(serde_json::Value);
 /// The geometry's offset. Values are [x, y] where negatives indicate left and up, respectively.
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
 #[deprecated = "not_implemented"]
-struct PaintLineLineTranslate(serde_json::Value);
+struct PaintLineLineTranslate(Box<[serde_json::Value; 2]>);
 
 impl Default for PaintLineLineTranslate {
     fn default() -> Self {
-        vec![0, 0]
+        Self(Box::new([
+            serde_json::Value::from(0),
+            serde_json::Value::from(0),
+        ]))
     }
 }
 
@@ -3168,11 +3212,14 @@ impl Default for PaintSymbolIconOpacity {
 /// Distance that the icon's anchor is moved from its original placement. Positive values indicate right and down, while negative values indicate left and up.
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
 #[deprecated = "not_implemented"]
-struct PaintSymbolIconTranslate(serde_json::Value);
+struct PaintSymbolIconTranslate(Box<[serde_json::Value; 2]>);
 
 impl Default for PaintSymbolIconTranslate {
     fn default() -> Self {
-        vec![0, 0]
+        Self(Box::new([
+            serde_json::Value::from(0),
+            serde_json::Value::from(0),
+        ]))
     }
 }
 
@@ -3264,11 +3311,14 @@ impl Default for PaintSymbolTextOpacity {
 /// Distance that the text's anchor is moved from its original placement. Positive values indicate right and down, while negative values indicate left and up.
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
 #[deprecated = "not_implemented"]
-struct PaintSymbolTextTranslate(serde_json::Value);
+struct PaintSymbolTextTranslate(Box<[serde_json::Value; 2]>);
 
 impl Default for PaintSymbolTextTranslate {
     fn default() -> Self {
-        vec![0, 0]
+        Self(Box::new([
+            serde_json::Value::from(0),
+            serde_json::Value::from(0),
+        ]))
     }
 }
 
@@ -3721,7 +3771,7 @@ pub struct SourceImage {
 /// Corners of image specified in longitude, latitude pairs.
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
 #[deprecated = "not_implemented"]
-struct SourceImageCoordinates(serde_json::Value);
+struct SourceImageCoordinates(Box<[serde_json::Value; 4]>);
 
 /// The data type of the image source.
 #[derive(serde::Deserialize, PartialEq, Eq, Debug, Clone, Copy)]
@@ -3784,11 +3834,16 @@ struct SourceRasterAttribution(String);
 /// An array containing the longitude and latitude of the southwest and northeast corners of the source's bounding box in the following order: `[sw.lng, sw.lat, ne.lng, ne.lat]`. When this property is included in a source, no tiles outside of the given bounds are requested by MapLibre.
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
 #[deprecated = "not_implemented"]
-struct SourceRasterBounds(serde_json::Value);
+struct SourceRasterBounds(Box<[serde_json::Value; 4]>);
 
 impl Default for SourceRasterBounds {
     fn default() -> Self {
-        vec![-180, -85.051129, 180, 85.051129]
+        Self(Box::new([
+            serde_json::Value::from(-180),
+            serde_json::Value::from(-85.051129),
+            serde_json::Value::from(180),
+            serde_json::Value::from(85.051129),
+        ]))
     }
 }
 
@@ -3851,7 +3906,7 @@ impl Default for SourceRasterTileSize {
 /// An array of one or more tile source URLs, as in the TileJSON spec.
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
 #[deprecated = "not_implemented"]
-struct SourceRasterTiles(serde_json::Value);
+struct SourceRasterTiles(Vec<serde_json::Value>);
 
 /// The type of the source.
 #[derive(serde::Deserialize, PartialEq, Eq, Debug, Clone, Copy)]
@@ -3962,11 +4017,16 @@ impl Default for SourceRasterDemBlueFactor {
 /// An array containing the longitude and latitude of the southwest and northeast corners of the source's bounding box in the following order: `[sw.lng, sw.lat, ne.lng, ne.lat]`. When this property is included in a source, no tiles outside of the given bounds are requested by MapLibre.
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
 #[deprecated = "not_implemented"]
-struct SourceRasterDemBounds(serde_json::Value);
+struct SourceRasterDemBounds(Box<[serde_json::Value; 4]>);
 
 impl Default for SourceRasterDemBounds {
     fn default() -> Self {
-        vec![-180, -85.051129, 180, 85.051129]
+        Self(Box::new([
+            serde_json::Value::from(-180),
+            serde_json::Value::from(-85.051129),
+            serde_json::Value::from(180),
+            serde_json::Value::from(85.051129),
+        ]))
     }
 }
 
@@ -4058,7 +4118,7 @@ impl Default for SourceRasterDemTileSize {
 /// An array of one or more tile source URLs, as in the TileJSON spec.
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
 #[deprecated = "not_implemented"]
-struct SourceRasterDemTiles(serde_json::Value);
+struct SourceRasterDemTiles(Vec<serde_json::Value>);
 
 /// The type of the source.
 #[derive(serde::Deserialize, PartialEq, Eq, Debug, Clone, Copy)]
@@ -4134,11 +4194,16 @@ struct SourceVectorAttribution(String);
 /// An array containing the longitude and latitude of the southwest and northeast corners of the source's bounding box in the following order: `[sw.lng, sw.lat, ne.lng, ne.lat]`. When this property is included in a source, no tiles outside of the given bounds are requested by MapLibre.
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
 #[deprecated = "not_implemented"]
-struct SourceVectorBounds(serde_json::Value);
+struct SourceVectorBounds(Box<[serde_json::Value; 4]>);
 
 impl Default for SourceVectorBounds {
     fn default() -> Self {
-        vec![-180, -85.051129, 180, 85.051129]
+        Self(Box::new([
+            serde_json::Value::from(-180),
+            serde_json::Value::from(-85.051129),
+            serde_json::Value::from(180),
+            serde_json::Value::from(85.051129),
+        ]))
     }
 }
 
@@ -4210,7 +4275,7 @@ impl Default for SourceVectorScheme {
 /// An array of one or more tile source URLs, as in the TileJSON spec.
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
 #[deprecated = "not_implemented"]
-struct SourceVectorTiles(serde_json::Value);
+struct SourceVectorTiles(Vec<serde_json::Value>);
 
 /// The type of the source.
 #[derive(serde::Deserialize, PartialEq, Eq, Debug, Clone, Copy)]
@@ -4250,7 +4315,7 @@ pub struct SourceVideo {
 /// Corners of video specified in longitude, latitude pairs.
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
 #[deprecated = "not_implemented"]
-struct SourceVideoCoordinates(serde_json::Value);
+struct SourceVideoCoordinates(Box<[serde_json::Value; 4]>);
 
 /// The data type of the video source.
 #[derive(serde::Deserialize, PartialEq, Eq, Debug, Clone, Copy)]
@@ -4263,7 +4328,7 @@ pub enum SourceVideoType {
 /// URLs to video content in order of preferred format.
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
 #[deprecated = "not_implemented"]
-struct SourceVideoUrls(serde_json::Value);
+struct SourceVideoUrls(Vec<serde_json::Value>);
 
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
 pub struct Sources {
