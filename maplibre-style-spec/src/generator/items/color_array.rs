@@ -5,6 +5,7 @@ use crate::decoder::Fields;
 pub fn generate(scope: &mut Scope, name: &str, common: &Fields, default: Option<&str>) {
     let enu = scope
         .new_enum(name)
+        .vis("pub")
         .attr("serde(untagged)")
         .doc(&common.doc)
         .derive("serde::Deserialize, PartialEq, Debug, Clone");
@@ -35,7 +36,7 @@ mod tests {
         insta::assert_snapshot!(scope.to_string(), @r"
         #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
         #[serde(untagged)]
-        enum Foo {
+        pub enum Foo {
             /// A color
             One(color::DynamicColor),
             /// A set of colors

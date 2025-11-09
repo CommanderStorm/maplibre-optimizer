@@ -4,6 +4,7 @@ use serde_json::{Number, Value};
 use crate::decoder::{ArrayValue, EnumValues, Fields, SimpleArrayValue};
 use crate::generator::formatter::to_upper_camel_case;
 use crate::generator::generate_parsed_item;
+use crate::generator::items::number::generate_number_default;
 
 #[allow(clippy::too_many_arguments)]
 pub fn generate(
@@ -31,7 +32,6 @@ pub fn generate(
     scope
         .new_struct(name)
         .doc(&common.doc_with_range(max, min, None))
-        .attr("deprecated = \"not_implemented\"")
         .derive("serde::Deserialize, PartialEq, Debug, Clone")
         .tuple_field(field);
 
@@ -69,17 +69,7 @@ fn generate_value_default(buffer: &mut String, item: &Value) {
         Value::Null => buffer.push_str("None"),
         Value::Bool(b) => buffer.push_str(&b.to_string()),
         Value::Number(n) => {
-            let underlying_datatype = if n.is_f64() {
-                "f64"
-            } else if n.is_i64() {
-                "i128"
-            } else {
-                "u128"
-            };
-            let t = format!(
-                "serde_json::Number::from_{underlying_datatype}({n}).expect(\"the number is serialised from a number and is thus always valid\")"
-            );
-            buffer.push_str(&t);
+            buffer.push_str(&generate_number_default(n));
         }
         Value::String(s) => {
             buffer.push('"');
@@ -169,11 +159,10 @@ mod tests {
             None,
             None,
         );
-        insta::assert_snapshot!(scope.to_string(), @r##"
+        insta::assert_snapshot!(scope.to_string(), @r"
         #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-        #[deprecated = "not_implemented"]
         struct Foo(Vec<serde_json::Value>);
-        "##)
+        ")
     }
 
     #[test]
@@ -214,7 +203,6 @@ mod tests {
 
         /// Position of the light source relative to lit (extruded) geometries, in [r radial coordinate, a azimuthal angle, p polar angle] where r indicates the distance from the center of the base of an object to its light, a indicates the position of the light relative to 0° (0° when `light.anchor` is set to `viewport` corresponds to the top of the viewport, or 0° when `light.anchor` is set to `map` corresponds to due north, and degrees proceed clockwise), and p indicates the height of the light (from 0°, directly above, to 180°, directly below).
         #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-        #[deprecated = "not_implemented"]
         struct Position(Box<[serde_json::Number; 3]>);
 
         impl Default for Position {
@@ -249,7 +237,7 @@ mod tests {
             }
         });
         let reference: StyleReference = serde_json::from_value(reference).unwrap();
-        insta::assert_snapshot!(crate::generator::generate_spec_scope(reference), @r#"
+        insta::assert_snapshot!(crate::generator::generate_spec_scope(reference), @r"
         /// This is a Maplibre Style Specification
         #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
         pub struct MaplibreStyleSpecification;
@@ -258,8 +246,7 @@ mod tests {
         ///
         /// Except for layers of the `background` type, each layer needs to refer to a source. Layers take the data that they get from a source, optionally filter features, and then define how those features are styled.
         #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-        #[deprecated = "not_implemented"]
         struct Layers(Vec<Layer>);
-        "#);
+        ");
     }
 }

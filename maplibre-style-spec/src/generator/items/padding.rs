@@ -6,6 +6,7 @@ use crate::decoder::Fields;
 pub fn generate(scope: &mut Scope, name: &str, common: &Fields, default: &[Number]) {
     let enu = scope
         .new_enum(name)
+        .vis("pub")
         .attr("serde(untagged)")
         .doc(&common.doc)
         .derive("serde::Deserialize, PartialEq, Debug, Clone");
@@ -63,7 +64,7 @@ mod tests {
         insta::assert_snapshot!(scope.to_string(), @r#"
         #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
         #[serde(untagged)]
-        enum Foo {
+        pub enum Foo {
             /// A single value applies to all four sides.
             /// 
             /// Only avaliable for backwards compatibility.

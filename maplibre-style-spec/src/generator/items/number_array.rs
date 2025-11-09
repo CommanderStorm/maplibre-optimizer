@@ -2,6 +2,7 @@ use codegen::Scope;
 use serde_json::Number;
 
 use crate::decoder::Fields;
+use crate::generator::items::number::generate_number_default;
 
 pub fn generate(
     scope: &mut Scope,
@@ -11,12 +12,14 @@ pub fn generate(
     min: Option<&Number>,
     max: Option<&Number>,
 ) {
-    scope
-        .new_struct(name)
+    let enu = scope
+        .new_enum(name)
+        .vis("pub")
+        .attr("serde(untagged)")
         .doc(&common.doc_with_range(max, min, None))
-        .attr("deprecated = \"not_implemented\"")
-        .derive("serde::Deserialize, PartialEq, Debug, Clone")
-        .tuple_field("serde_json::Value");
+        .derive("serde::Deserialize, PartialEq, Debug, Clone");
+    enu.new_variant("One").tuple("serde_json::Number");
+    enu.new_variant("Many").tuple("Vec<serde_json::Number>");
 
     if let Some(default) = default {
         scope
@@ -24,7 +27,7 @@ pub fn generate(
             .impl_trait("Default")
             .new_fn("default")
             .ret("Self")
-            .line(default);
+            .line(format!("Self::One({})", generate_number_default(default)));
     }
 }
 
@@ -35,10 +38,13 @@ mod tests {
     fn generate_empty() {
         let mut scope = Scope::new();
         generate(&mut scope, "Foo", &Fields::default(), None, None, None);
-        insta::assert_snapshot!(scope.to_string(), @r##"
+        insta::assert_snapshot!(scope.to_string(), @r"
         #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-        #[deprecated = "not_implemented"]
-        struct Foo(serde_json::Value);
-        "##)
+        #[serde(untagged)]
+        pub enum Foo {
+            One(serde_json::Number),
+            Many(Vec<serde_json::Number>),
+        }
+        ")
     }
 }

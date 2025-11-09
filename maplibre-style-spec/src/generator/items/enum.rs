@@ -31,7 +31,7 @@ pub fn generate(
                     .all(|v| v.as_u64().is_some_and(|v| v <= u8::MAX as u64))
             );
         }
-        EnumValues::Emum(values) => {
+        EnumValues::Enum(values) => {
             let enu = scope
                 .new_enum(name)
                 .doc(&common.doc)

@@ -301,7 +301,7 @@ pub struct EnumDocs {
 #[serde(untagged)]
 pub enum EnumValues {
     Version(Vec<Number>),
-    Emum(BTreeMap<String, EnumDocs>),
+    Enum(BTreeMap<String, EnumDocs>),
 }
 
 #[derive(Debug, PartialEq, Clone, Deserialize)]
