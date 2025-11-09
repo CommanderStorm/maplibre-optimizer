@@ -123,12 +123,10 @@ struct RootLayers(Vec<serde_json::Value>);
 
 /// The global light source.
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-#[deprecated = "not_implemented"]
-struct RootLight(serde_json::Value);
+struct RootLight(Light);
 
 /// Arbitrary properties useful to track with the stylesheet, but do not influence rendering. Properties should be prefixed to avoid collisions, like 'maplibre:'.
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-#[deprecated = "not_implemented"]
 struct RootMetadata(serde_json::Value);
 
 /// A human-readable name for the style.
@@ -150,8 +148,7 @@ impl Default for RootPitch {
 
 /// The projection configuration
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-#[deprecated = "not_implemented"]
-struct RootProjection(serde_json::Value);
+struct RootProjection(Projection);
 
 /// Default roll, in degrees. The roll angle is measured counterclockwise about the camera boresight. The style roll will be used only if the map has not been positioned by other means (e.g. map options or user interaction).
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
@@ -168,8 +165,7 @@ impl Default for RootRoll {
 
 /// The map's sky configuration. **Note:** this definition is still experimental and is under development in maplibre-gl-js.
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-#[deprecated = "not_implemented"]
-struct RootSky(serde_json::Value);
+struct RootSky(Sky);
 
 /// Sources state which data the map should display. Specify the type of source with the `type` property. Adding a source isn't enough to make data appear on the map because sources don't contain styling details like color or width. Layers refer to a source and give it a visual representation. This makes it possible to style the same source in different ways, like differentiating between types of roads in a highways layer.
 ///
@@ -180,13 +176,11 @@ struct RootSources(serde_json::Value);
 
 /// An array of `{id: 'my-sprite', url: 'https://example.com/sprite'}` objects. Each object should represent a unique URL to load a sprite from and and a unique ID to use as a prefix when referencing images from that sprite (i.e. 'my-sprite:image'). All the URLs are internally extended to load both .json and .png files. If the `id` field is equal to 'default', the prefix is omitted (just 'image' instead of 'default:image'). All the IDs and URLs must be unique. For backwards compatibility, instead of an array, one can also provide a single string that represent a URL to load the sprite from. The images in this case won't be prefixed.
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-#[deprecated = "not_implemented"]
-struct RootSprite(serde_json::Value);
+struct RootSprite(Sprite);
 
 /// An object used to define default values when using the [`global-state`](https://maplibre.org/maplibre-style-spec/expressions/#global-state) expression.
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-#[deprecated = "not_implemented"]
-struct RootState(serde_json::Value);
+struct RootState(State);
 
 impl Default for RootState {
     fn default() -> Self {
@@ -196,8 +190,7 @@ impl Default for RootState {
 
 /// The terrain configuration.
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-#[deprecated = "not_implemented"]
-struct RootTerrain(serde_json::Value);
+struct RootTerrain(Terrain);
 
 /// A global transition definition to use as a default across properties, to be used for timing transitions between one value and the next when no property-specific transition is set. Collision-based symbol fading is controlled independently of the style's `transition` property.
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
@@ -727,7 +720,6 @@ impl Default for FunctionColorSpace {
 ///
 /// If no default is provided, the style property's default is used in these circumstances.
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-#[deprecated = "not_implemented"]
 struct FunctionDefault(serde_json::Value);
 
 /// An expression.
@@ -836,8 +828,7 @@ struct LayerId(String);
 
 /// Layout properties for the layer.
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-#[deprecated = "not_implemented"]
-struct LayerLayout(serde_json::Value);
+struct LayerLayout(Layout);
 
 /// The maximum zoom level for the layer. At zoom levels equal to or greater than the maxzoom, the layer will be hidden.
 ///
@@ -847,7 +838,6 @@ pub struct LayerMaxzoom(serde_json::Number);
 
 /// Arbitrary properties useful to track with the layer, but do not influence rendering. Properties should be prefixed to avoid collisions, like 'maplibre:'.
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-#[deprecated = "not_implemented"]
 struct LayerMetadata(serde_json::Value);
 
 /// The minimum zoom level for the layer. At zoom levels less than the minzoom, the layer will be hidden.
@@ -3766,7 +3756,6 @@ pub struct SourceGeojsonClusterMinPoints(serde_json::Number);
 ///
 /// `{"sum": [["+", ["accumulated"], ["get", "sum"]], ["get", "scalerank"]]}`
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-#[deprecated = "not_implemented"]
 struct SourceGeojsonClusterProperties(serde_json::Value);
 
 /// Radius of each cluster if clustering is enabled. A value of 512 indicates a radius equal to the width of a tile.
@@ -3786,12 +3775,10 @@ impl Default for SourceGeojsonClusterRadius {
 
 /// A URL to a GeoJSON file, or inline GeoJSON.
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-#[deprecated = "not_implemented"]
 struct SourceGeojsonData(serde_json::Value);
 
 /// An expression for filtering features prior to processing them for rendering.
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-#[deprecated = "not_implemented"]
 struct SourceGeojsonFilter(serde_json::Value);
 
 /// Whether to generate ids for the geojson features. When enabled, the `feature.id` property will be auto assigned based on its index in the `features` array, over-writing any previous values.
@@ -3922,7 +3909,6 @@ pub struct SourceRaster {
 
 /// Other keys to configure the data source.
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-#[deprecated = "not_implemented"]
 struct SourceRasterStar(serde_json::Value);
 
 /// Contains an attribution to be displayed when the map is shown to a user.
@@ -4079,7 +4065,6 @@ pub struct SourceRasterDem {
 
 /// Other keys to configure the data source.
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-#[deprecated = "not_implemented"]
 struct SourceRasterDemStar(serde_json::Value);
 
 /// Contains an attribution to be displayed when the map is shown to a user.
@@ -4282,7 +4267,6 @@ pub struct SourceVector {
 
 /// Other keys to configure the data source.
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-#[deprecated = "not_implemented"]
 struct SourceVectorStar(serde_json::Value);
 
 /// Contains an attribution to be displayed when the map is shown to a user.
