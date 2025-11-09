@@ -372,7 +372,7 @@ struct RootTerrain(Terrain);
 
 /// A global transition definition to use as a default across properties, to be used for timing transitions between one value and the next when no property-specific transition is set. Collision-based symbol fading is controlled independently of the style's `transition` property.
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-#[deprecated = "not_implemented"]
+#[deprecated = "transition not implemented"]
 struct RootTransition(serde_json::Value);
 
 /// Style specification version number. Must be 8.
@@ -548,13 +548,13 @@ pub enum ExpressionName {
     /// - `"font-scale"`: Applies a scaling factor on `text-size` as specified by the root layout property.
     ///
     /// - `"vertical-align"`: Aligns vertically text section or image in relation to the row it belongs to. Possible values are:
-    ///     - `"bottom"` *default*: align the bottom of this section with the bottom of other sections.
+    /// 	- `"bottom"` *default*: align the bottom of this section with the bottom of other sections.
     /// <img alt="Visual representation of bottom alignment" src="https://github.com/user-attachments/assets/0474a2fd-a4b2-417c-9187-7a13a28695bc"/>
-    ///     - `"center"`: align the center of this section with the center of other sections.
+    /// 	- `"center"`: align the center of this section with the center of other sections.
     /// <img alt="Visual representation of center alignment" src="https://github.com/user-attachments/assets/92237455-be6d-4c5d-b8f6-8127effc1950"/>
-    ///     - `"top"`: align the top of this section with the top of other sections.
+    /// 	- `"top"`: align the top of this section with the top of other sections.
     /// <img alt="Visual representation of top alignment" src="https://github.com/user-attachments/assets/45dccb28-d977-4abb-a006-4ea9792b7c53"/>
-    ///     - Refer to [the design proposal](https://github.com/maplibre/maplibre-style-spec/issues/832) for more details.
+    /// 	- Refer to [the design proposal](https://github.com/maplibre/maplibre-style-spec/issues/832) for more details.
     ///
     ///  - [Change the case of labels](https://maplibre.org/maplibre-gl-js/docs/examples/change-case-of-labels/)
     ///
@@ -895,7 +895,7 @@ struct FunctionDefault(serde_json::Value);
 
 /// An expression.
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-#[deprecated = "not_implemented"]
+#[deprecated = "expression not implemented"]
 struct FunctionExpression(serde_json::Value);
 
 /// The name of a feature property to use as the function input.
@@ -988,7 +988,7 @@ pub struct Layer {
 
 /// A expression specifying conditions on source features. Only features that match the filter are displayed. Zoom expressions in filters are only evaluated at integer zoom levels. The `feature-state` expression is not supported in filter expressions.
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-#[deprecated = "not_implemented"]
+#[deprecated = "filter not implemented"]
 struct LayerFilter(serde_json::Value);
 
 /// Unique layer name.
@@ -1017,7 +1017,7 @@ pub struct LayerMinzoom(serde_json::Number);
 
 /// Default paint properties for this layer.
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-#[deprecated = "not_implemented"]
+#[deprecated = "paint not implemented"]
 struct LayerPaint(serde_json::Value);
 
 /// Name of a source description to be used for this layer. Required for all layer types except `background`.
@@ -1596,7 +1596,7 @@ impl Default for LayoutSymbolIconIgnorePlacement {
 
 /// Name of image in sprite to use for drawing an image background.
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-#[deprecated = "not_implemented"]
+#[deprecated = "resolved_image not implemented"]
 struct LayoutSymbolIconImage(serde_json::Value);
 
 /// If true, the icon may be flipped to prevent it from being rendered upside-down.
@@ -2235,7 +2235,7 @@ struct LayoutSymbolTextVariableAnchor(Vec<LayoutSymbolTextVariableAnchorValue>);
 ///
 ///  When the renderer chooses the `left` anchor, `[3, 0]` will be used for `text-offset`; the text will be shifted right by 3 ems.
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-#[deprecated = "not_implemented"]
+#[deprecated = "var_anchor not implemented"]
 struct LayoutSymbolTextVariableAnchorOffset(serde_json::Value);
 
 /// The property allows control over a symbol's orientation. Note that the property values act as a hint, so that a symbol whose language doesn’t support the provided orientation will be laid out in its natural orientation. Example: English point symbol will be rendered horizontally even if array value contains single 'vertical' enum value. The order of elements in an array define priority order for the placement of an orientation variant.
@@ -2396,7 +2396,7 @@ impl Default for PaintBackgroundBackgroundOpacity {
 
 /// Name of image in sprite to use for drawing an image background. For seamless patterns, image width and height must be a factor of two (2, 4, 8, ..., 512). Note that zoom-dependent expressions will be evaluated only at integer zoom levels.
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-#[deprecated = "not_implemented"]
+#[deprecated = "resolved_image not implemented"]
 struct PaintBackgroundBackgroundPattern(serde_json::Value);
 
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
@@ -2690,7 +2690,7 @@ struct PaintFillFillOutlineColor(color::DynamicColor);
 
 /// Name of image in sprite to use for drawing image fills. For seamless patterns, image width and height must be a factor of two (2, 4, 8, ..., 512). Note that zoom-dependent expressions will be evaluated only at integer zoom levels.
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-#[deprecated = "not_implemented"]
+#[deprecated = "resolved_image not implemented"]
 struct PaintFillFillPattern(serde_json::Value);
 
 /// The geometry's offset. Values are [x, y] where negatives indicate left and up, respectively.
@@ -2810,7 +2810,7 @@ impl Default for PaintFillExtrusionFillExtrusionOpacity {
 
 /// Name of image in sprite to use for drawing images on extruded fills. For seamless patterns, image width and height must be a factor of two (2, 4, 8, ..., 512). Note that zoom-dependent expressions will be evaluated only at integer zoom levels.
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-#[deprecated = "not_implemented"]
+#[deprecated = "resolved_image not implemented"]
 struct PaintFillExtrusionFillExtrusionPattern(serde_json::Value);
 
 /// The geometry's offset. Values are [x, y] where negatives indicate left and up (on the flat plane), respectively.
@@ -3250,7 +3250,7 @@ impl Default for PaintLineLineOpacity {
 
 /// Name of image in sprite to use for drawing image lines. For seamless patterns, image width must be a factor of two (2, 4, 8, ..., 512). Note that zoom-dependent expressions will be evaluated only at integer zoom levels.
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-#[deprecated = "not_implemented"]
+#[deprecated = "resolved_image not implemented"]
 struct PaintLineLinePattern(serde_json::Value);
 
 /// The geometry's offset. Values are [x, y] where negatives indicate left and up, respectively.

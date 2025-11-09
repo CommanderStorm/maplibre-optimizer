@@ -7,7 +7,7 @@ pub fn generate(scope: &mut Scope, name: &str, common: &Fields) {
     scope
         .new_struct(name)
         .doc(&common.doc)
-        .attr("deprecated = \"not_implemented\"")
+        .attr("deprecated = \"transition not implemented\"")
         .derive("serde::Deserialize, PartialEq, Debug, Clone")
         .tuple_field("serde_json::Value");
     generate_test_from_example_if_present(scope, name, common);
@@ -20,10 +20,10 @@ mod tests {
     fn generate_empty() {
         let mut scope = Scope::new();
         generate(&mut scope, "Foo", &Fields::default());
-        insta::assert_snapshot!(scope.to_string(), @r##"
+        insta::assert_snapshot!(scope.to_string(), @r#"
         #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-        #[deprecated = "not_implemented"]
+        #[deprecated = "transition not implemented"]
         struct Foo(serde_json::Value);
-        "##)
+        "#)
     }
 }
