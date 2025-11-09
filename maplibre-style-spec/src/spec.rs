@@ -362,7 +362,7 @@ struct RootState(serde_json::Value);
 
 impl Default for RootState {
     fn default() -> Self {
-        serde_json::json!({})
+        Self(serde_json::json!({}))
     }
 }
 

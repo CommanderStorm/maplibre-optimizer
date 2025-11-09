@@ -16,7 +16,7 @@ pub fn generate(scope: &mut Scope, name: &str, common: &Fields, default: &Value)
         .impl_trait("Default")
         .new_fn("default")
         .ret("Self")
-        .line(format!("serde_json::json!({default})"));
+        .line(format!("Self(serde_json::json!({default}))"));
     generate_test_from_example_if_present(scope, name, common);
 }
 
@@ -38,7 +38,7 @@ mod tests {
 
         impl Default for Foo {
             fn default() -> Self {
-                serde_json::json!("hello_world")
+                Self(serde_json::json!("hello_world"))
             }
         }
         "#)
