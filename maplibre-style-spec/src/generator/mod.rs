@@ -28,12 +28,18 @@ fn generate_spec(scope: &mut Scope, root: &BTreeMap<String, ParsedItem>) {
         .derive("serde::Deserialize, PartialEq, Debug, Clone");
     for (key, field) in root {
         let fields = spec
-            .new_field(to_snake_case(key), to_upper_camel_case(key))
+            .new_field(
+                to_snake_case(key),
+                to_upper_camel_case(&format!("root {key}")),
+            )
             .vis("pub")
             .doc(field.doc());
         if &to_snake_case(key) != key {
             fields.annotation(format!("#[serde(rename=\"{key}\")]"));
         }
+    }
+    for (key, field) in root {
+        generate_parsed_item(scope, &field, &to_upper_camel_case(&format!("root {key}")));
     }
 }
 

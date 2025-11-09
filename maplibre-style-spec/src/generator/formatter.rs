@@ -100,6 +100,16 @@ fn prefilter_names(name: impl ToString) -> String {
         ("abs", " Absolute "),
         ("acos", " Arccosine "),
         ("-", " Minus "),
+        ("1", " One "),
+        ("2", " Two "),
+        ("3", " Three "),
+        ("4", " Four "),
+        ("5", " Five "),
+        ("6", " Six "),
+        ("7", " Seven "),
+        ("8", " Eight "),
+        ("9", " Nine "),
+        ("0", " Zero "),
     ] {
         if name.ends_with(&format!(" {val}")) {
             let range_start = name.len() - val.len() - 1;

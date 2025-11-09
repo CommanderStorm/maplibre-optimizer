@@ -2,12 +2,12 @@
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
 pub struct MaplibreStyleSpecification {
     /// Default bearing, in degrees. The bearing is the compass direction that is "up"; for example, a bearing of 90° orients the map so that east is up. This value will be used only if the map has not been positioned by other means (e.g. map options or user interaction).
-    pub bearing: Bearing,
+    pub bearing: RootBearing,
     /// Default map center in longitude and latitude.  The style center will be used only if the map has not been positioned by other means (e.g. map options or user interaction).
-    pub center: Center,
+    pub center: RootCenter,
     /// Default map center altitude in meters above sea level. The style center altitude defines the altitude where the camera is looking at and will be used only if the map has not been positioned by other means (e.g. map options or user interaction).
     #[serde(rename = "centerAltitude")]
-    pub center_altitude: CenterAltitude,
+    pub center_altitude: RootCenterAltitude,
     /// The `font-faces` property can be used to specify what font files to use for rendering text. Font faces contain information needed to render complex texts such as [Devanagari](https://en.wikipedia.org/wiki/Devanagari), [Khmer](https://en.wikipedia.org/wiki/Khmer_script) among many others.<h2>Unicode range</h2>The optional `unicode-range` property can be used to only use a particular font file for characters within the specified unicode range(s). Its value should be an array of strings, each indicating a start and end of a unicode range, similar to the [CSS descriptor with the same name](https://developer.mozilla.org/en-US/docs/Web/CSS/@font-face/unicode-range). This allows specifying multiple non-consecutive unicode ranges. When not specified, the default value is `U+0-10FFFF`, meaning the font file will be used for all unicode characters.
     ///
     /// Refer to the [Unicode Character Code Charts](https://www.unicode.org/charts/) to see ranges for scripts supported by Unicode. To see what unicode code-points are available in a font, use a tool like [FontDrop](https://fontdrop.info/).
@@ -16,7 +16,7 @@ pub struct MaplibreStyleSpecification {
     ///
     /// <h2>Supported Fonts</h2>What type of fonts are supported is implementation-defined. Unsupported fonts are ignored.
     #[serde(rename = "font-faces")]
-    pub font_faces: FontFaces,
+    pub font_faces: RootFontFaces,
     /// A URL template for loading signed-distance-field glyph sets in PBF format.
     ///
     /// If this property is set, any text in the `text-field` layout property is displayed in the font stack named by the `text-font` layout property based on glyphs located at the URL specified by this property. Otherwise, font faces will be determined by the `text-font` property based on the local environment.
@@ -28,42 +28,192 @@ pub struct MaplibreStyleSpecification {
     ///  - `{range}` - When requesting glyphs, this token is replaced with a range of 256 Unicode code points. For example, to load glyphs for the Unicode Basic Latin and Basic Latin-1 Supplement blocks, the range would be 0-255. The actual ranges that are loaded are determined at runtime based on what text needs to be displayed.
     ///
     /// The URL must be absolute, containing the [scheme, authority and path components](https://en.wikipedia.org/wiki/URL#Syntax).
-    pub glyphs: Glyphs,
+    pub glyphs: RootGlyphs,
     /// A style's `layers` property lists all the layers available in that style. The type of layer is specified by the `type` property, and must be one of `background`, `fill`, `line`, `symbol`, `raster`, `circle`, `fill-extrusion`, `heatmap`, `hillshade`, `color-relief`.
     ///
     /// Except for layers of the `background` type, each layer needs to refer to a source. Layers take the data that they get from a source, optionally filter features, and then define how those features are styled.
-    pub layers: Layers,
+    pub layers: RootLayers,
     /// The global light source.
-    pub light: Light,
+    pub light: RootLight,
     /// Arbitrary properties useful to track with the stylesheet, but do not influence rendering. Properties should be prefixed to avoid collisions, like 'maplibre:'.
-    pub metadata: Metadata,
+    pub metadata: RootMetadata,
     /// A human-readable name for the style.
-    pub name: Name,
+    pub name: RootName,
     /// Default pitch, in degrees. Zero is perpendicular to the surface, for a look straight down at the map, while a greater value like 60 looks ahead towards the horizon. The style pitch will be used only if the map has not been positioned by other means (e.g. map options or user interaction).
-    pub pitch: Pitch,
+    pub pitch: RootPitch,
     /// The projection configuration
-    pub projection: Projection,
+    pub projection: RootProjection,
     /// Default roll, in degrees. The roll angle is measured counterclockwise about the camera boresight. The style roll will be used only if the map has not been positioned by other means (e.g. map options or user interaction).
-    pub roll: Roll,
+    pub roll: RootRoll,
     /// The map's sky configuration. **Note:** this definition is still experimental and is under development in maplibre-gl-js.
-    pub sky: Sky,
+    pub sky: RootSky,
     /// Sources state which data the map should display. Specify the type of source with the `type` property. Adding a source isn't enough to make data appear on the map because sources don't contain styling details like color or width. Layers refer to a source and give it a visual representation. This makes it possible to style the same source in different ways, like differentiating between types of roads in a highways layer.
     ///
     /// Tiled sources (vector and raster) must specify their details according to the [TileJSON specification](https://github.com/mapbox/tilejson-spec).
-    pub sources: Sources,
+    pub sources: RootSources,
     /// An array of `{id: 'my-sprite', url: 'https://example.com/sprite'}` objects. Each object should represent a unique URL to load a sprite from and and a unique ID to use as a prefix when referencing images from that sprite (i.e. 'my-sprite:image'). All the URLs are internally extended to load both .json and .png files. If the `id` field is equal to 'default', the prefix is omitted (just 'image' instead of 'default:image'). All the IDs and URLs must be unique. For backwards compatibility, instead of an array, one can also provide a single string that represent a URL to load the sprite from. The images in this case won't be prefixed.
-    pub sprite: Sprite,
+    pub sprite: RootSprite,
     /// An object used to define default values when using the [`global-state`](https://maplibre.org/maplibre-style-spec/expressions/#global-state) expression.
-    pub state: State,
+    pub state: RootState,
     /// The terrain configuration.
-    pub terrain: Terrain,
+    pub terrain: RootTerrain,
     /// A global transition definition to use as a default across properties, to be used for timing transitions between one value and the next when no property-specific transition is set. Collision-based symbol fading is controlled independently of the style's `transition` property.
-    pub transition: Transition,
+    pub transition: RootTransition,
     /// Style specification version number. Must be 8.
-    pub version: Version,
+    pub version: RootVersion,
     /// Default zoom level.  The style zoom will be used only if the map has not been positioned by other means (e.g. map options or user interaction).
-    pub zoom: Zoom,
+    pub zoom: RootZoom,
 }
+
+/// Default bearing, in degrees. The bearing is the compass direction that is "up"; for example, a bearing of 90° orients the map so that east is up. This value will be used only if the map has not been positioned by other means (e.g. map options or user interaction).
+///
+/// Range: every 360
+#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+pub struct RootBearing(serde_json::Number);
+
+impl Default for RootBearing {
+    fn default() -> Self {
+        Self(
+            serde_json::Number::from_i128(0)
+                .expect("the number is serialised from a number and is thus always valid"),
+        )
+    }
+}
+
+/// Default map center in longitude and latitude.  The style center will be used only if the map has not been positioned by other means (e.g. map options or user interaction).
+#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+#[deprecated = "not_implemented"]
+struct RootCenter(Vec<serde_json::Value>);
+
+/// Default map center altitude in meters above sea level. The style center altitude defines the altitude where the camera is looking at and will be used only if the map has not been positioned by other means (e.g. map options or user interaction).
+#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+pub struct RootCenterAltitude(serde_json::Number);
+
+/// The `font-faces` property can be used to specify what font files to use for rendering text. Font faces contain information needed to render complex texts such as [Devanagari](https://en.wikipedia.org/wiki/Devanagari), [Khmer](https://en.wikipedia.org/wiki/Khmer_script) among many others.<h2>Unicode range</h2>The optional `unicode-range` property can be used to only use a particular font file for characters within the specified unicode range(s). Its value should be an array of strings, each indicating a start and end of a unicode range, similar to the [CSS descriptor with the same name](https://developer.mozilla.org/en-US/docs/Web/CSS/@font-face/unicode-range). This allows specifying multiple non-consecutive unicode ranges. When not specified, the default value is `U+0-10FFFF`, meaning the font file will be used for all unicode characters.
+///
+/// Refer to the [Unicode Character Code Charts](https://www.unicode.org/charts/) to see ranges for scripts supported by Unicode. To see what unicode code-points are available in a font, use a tool like [FontDrop](https://fontdrop.info/).
+///
+/// <h2>Font Resolution</h2>For every name in a symbol layer’s [`text-font`](./layers.md/#text-font) array, characters are matched if they are covered one of the by the font files in the corresponding entry of the `font-faces` map. Any still-unmatched characters then fall back to the [`glyphs`](./glyphs.md) URL if provided.
+///
+/// <h2>Supported Fonts</h2>What type of fonts are supported is implementation-defined. Unsupported fonts are ignored.
+#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+#[deprecated = "not_implemented"]
+struct RootFontFaces(Vec<serde_json::Value>);
+
+/// A URL template for loading signed-distance-field glyph sets in PBF format.
+///
+/// If this property is set, any text in the `text-field` layout property is displayed in the font stack named by the `text-font` layout property based on glyphs located at the URL specified by this property. Otherwise, font faces will be determined by the `text-font` property based on the local environment.
+///
+/// The URL must include:
+///
+///  - `{fontstack}` - When requesting glyphs, this token is replaced with a comma separated list of fonts from a font stack specified in the `text-font` property of a symbol layer.
+///
+///  - `{range}` - When requesting glyphs, this token is replaced with a range of 256 Unicode code points. For example, to load glyphs for the Unicode Basic Latin and Basic Latin-1 Supplement blocks, the range would be 0-255. The actual ranges that are loaded are determined at runtime based on what text needs to be displayed.
+///
+/// The URL must be absolute, containing the [scheme, authority and path components](https://en.wikipedia.org/wiki/URL#Syntax).
+#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+struct RootGlyphs(String);
+
+/// A style's `layers` property lists all the layers available in that style. The type of layer is specified by the `type` property, and must be one of `background`, `fill`, `line`, `symbol`, `raster`, `circle`, `fill-extrusion`, `heatmap`, `hillshade`, `color-relief`.
+///
+/// Except for layers of the `background` type, each layer needs to refer to a source. Layers take the data that they get from a source, optionally filter features, and then define how those features are styled.
+#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+#[deprecated = "not_implemented"]
+struct RootLayers(Vec<serde_json::Value>);
+
+/// The global light source.
+#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+#[deprecated = "not_implemented"]
+struct RootLight(serde_json::Value);
+
+/// Arbitrary properties useful to track with the stylesheet, but do not influence rendering. Properties should be prefixed to avoid collisions, like 'maplibre:'.
+#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+#[deprecated = "not_implemented"]
+struct RootMetadata(serde_json::Value);
+
+/// A human-readable name for the style.
+#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+struct RootName(String);
+
+/// Default pitch, in degrees. Zero is perpendicular to the surface, for a look straight down at the map, while a greater value like 60 looks ahead towards the horizon. The style pitch will be used only if the map has not been positioned by other means (e.g. map options or user interaction).
+#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+pub struct RootPitch(serde_json::Number);
+
+impl Default for RootPitch {
+    fn default() -> Self {
+        Self(
+            serde_json::Number::from_i128(0)
+                .expect("the number is serialised from a number and is thus always valid"),
+        )
+    }
+}
+
+/// The projection configuration
+#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+#[deprecated = "not_implemented"]
+struct RootProjection(serde_json::Value);
+
+/// Default roll, in degrees. The roll angle is measured counterclockwise about the camera boresight. The style roll will be used only if the map has not been positioned by other means (e.g. map options or user interaction).
+#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+pub struct RootRoll(serde_json::Number);
+
+impl Default for RootRoll {
+    fn default() -> Self {
+        Self(
+            serde_json::Number::from_i128(0)
+                .expect("the number is serialised from a number and is thus always valid"),
+        )
+    }
+}
+
+/// The map's sky configuration. **Note:** this definition is still experimental and is under development in maplibre-gl-js.
+#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+#[deprecated = "not_implemented"]
+struct RootSky(serde_json::Value);
+
+/// Sources state which data the map should display. Specify the type of source with the `type` property. Adding a source isn't enough to make data appear on the map because sources don't contain styling details like color or width. Layers refer to a source and give it a visual representation. This makes it possible to style the same source in different ways, like differentiating between types of roads in a highways layer.
+///
+/// Tiled sources (vector and raster) must specify their details according to the [TileJSON specification](https://github.com/mapbox/tilejson-spec).
+#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+#[deprecated = "not_implemented"]
+struct RootSources(serde_json::Value);
+
+/// An array of `{id: 'my-sprite', url: 'https://example.com/sprite'}` objects. Each object should represent a unique URL to load a sprite from and and a unique ID to use as a prefix when referencing images from that sprite (i.e. 'my-sprite:image'). All the URLs are internally extended to load both .json and .png files. If the `id` field is equal to 'default', the prefix is omitted (just 'image' instead of 'default:image'). All the IDs and URLs must be unique. For backwards compatibility, instead of an array, one can also provide a single string that represent a URL to load the sprite from. The images in this case won't be prefixed.
+#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+#[deprecated = "not_implemented"]
+struct RootSprite(serde_json::Value);
+
+/// An object used to define default values when using the [`global-state`](https://maplibre.org/maplibre-style-spec/expressions/#global-state) expression.
+#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+#[deprecated = "not_implemented"]
+struct RootState(serde_json::Value);
+
+impl Default for RootState {
+    fn default() -> Self {
+        {}
+    }
+}
+
+/// The terrain configuration.
+#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+#[deprecated = "not_implemented"]
+struct RootTerrain(serde_json::Value);
+
+/// A global transition definition to use as a default across properties, to be used for timing transitions between one value and the next when no property-specific transition is set. Collision-based symbol fading is controlled independently of the style's `transition` property.
+#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+#[deprecated = "not_implemented"]
+struct RootTransition(serde_json::Value);
+
+/// Style specification version number. Must be 8.
+#[derive(serde::Deserialize, PartialEq, Eq, Debug, Clone, Copy)]
+#[repr(u8)]
+pub enum RootVersion {
+    Eight = 8,
+}
+
+/// Default zoom level.  The style zoom will be used only if the map has not been positioned by other means (e.g. map options or user interaction).
+#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+pub struct RootZoom(serde_json::Number);
 
 /// An expression defines a function that can be used for data-driven style properties or feature filters.
 ///
