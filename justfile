@@ -170,8 +170,8 @@ clean-test:
 # Remove a previusly generated spec file
 [private]
 clean-gen:
-    rm maplibre-style-spec/src/spec/mod.rs
-    echo "pub struct MaplibreStyleSpecification;" > maplibre-style-spec/src/spec/mod.rs
+    rm maplibre-style-spec/src/spec.rs
+    echo "pub struct MaplibreStyleSpecification;" > maplibre-style-spec/src/spec.rs
 
 # Install SQLX cli if not already installed.
 [private]
