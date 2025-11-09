@@ -3525,58 +3525,6 @@ pub struct PromoteId {
 struct PromoteIdStar(String);
 
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-pub struct PropertyType {
-    /// Property should be specified using a color ramp from which the output color can be sampled based on a property calculation.
-    #[serde(rename = "color-ramp")]
-    pub color_ramp: PropertyTypeColorRamp,
-    /// Property is constant across all zoom levels and property values.
-    #[serde(rename = "constant")]
-    pub constant: PropertyTypeConstant,
-    /// Property is non-interpolable; rather, its values will be cross-faded to smoothly transition between integer zooms.
-    #[serde(rename = "cross-faded")]
-    pub cross_faded: PropertyTypeCrossFaded,
-    /// Property is non-interpolable; rather, its values will be cross-faded to smoothly transition between integer zooms. It can be represented using a property expression.
-    #[serde(rename = "cross-faded-data-driven")]
-    pub cross_faded_data_driven: PropertyTypeCrossFadedDataDriven,
-    /// Property is interpolable but cannot be represented using a property expression.
-    #[serde(rename = "data-constant")]
-    pub data_constant: PropertyTypeDataConstant,
-    /// Property is interpolable and can be represented using a property expression.
-    #[serde(rename = "data-driven")]
-    pub data_driven: PropertyTypeDataDriven,
-}
-
-/// Property should be specified using a color ramp from which the output color can be sampled based on a property calculation.
-#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-#[deprecated = "not_implemented"]
-struct PropertyTypeColorRamp(serde_json::Value);
-
-/// Property is constant across all zoom levels and property values.
-#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-#[deprecated = "not_implemented"]
-struct PropertyTypeConstant(serde_json::Value);
-
-/// Property is non-interpolable; rather, its values will be cross-faded to smoothly transition between integer zooms.
-#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-#[deprecated = "not_implemented"]
-struct PropertyTypeCrossFaded(serde_json::Value);
-
-/// Property is non-interpolable; rather, its values will be cross-faded to smoothly transition between integer zooms. It can be represented using a property expression.
-#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-#[deprecated = "not_implemented"]
-struct PropertyTypeCrossFadedDataDriven(serde_json::Value);
-
-/// Property is interpolable but cannot be represented using a property expression.
-#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-#[deprecated = "not_implemented"]
-struct PropertyTypeDataConstant(serde_json::Value);
-
-/// Property is interpolable and can be represented using a property expression.
-#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-#[deprecated = "not_implemented"]
-struct PropertyTypeDataDriven(serde_json::Value);
-
-#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
 pub struct Sky {
     /// How to blend the atmosphere. Where 1 is visible atmosphere and 0 is hidden. It is best to interpolate this expression when using globe projection.
     #[serde(rename = "atmosphere-blend")]

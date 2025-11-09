@@ -78,7 +78,7 @@ pub enum ParsedItem {
     #[serde(rename = "*")]
     Star(Fields),
     #[serde(rename = "property-type")]
-    PropertyType(Fields),
+    PropertyType(Value),
     ResolvedImage {
         #[serde(flatten)]
         common: Fields,
@@ -175,7 +175,7 @@ impl ParsedItem {
                 default: _default,
             } => &common.doc,
             ParsedItem::Star(common) => &common.doc,
-            ParsedItem::PropertyType(common) => &common.doc,
+            ParsedItem::PropertyType(_) => unreachable!(),
             ParsedItem::ResolvedImage {
                 common,
                 tokens: _tokens,
@@ -235,7 +235,7 @@ pub struct Fields {
     // data fields
     pub expression: Option<Expression>,
     #[serde(rename = "property-type")]
-    pub property_type: Option<String>,
+    pub property_type: Option<PropertyType>,
     #[serde(rename = "sdk-support")]
     pub sdk_support: Option<Value>,
 
@@ -325,4 +325,21 @@ pub enum SimpleArrayValue {
     Layer,
     Enum,
     Color,
+}
+
+#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+#[serde(rename_all = "kebab-case")]
+pub enum PropertyType {
+    /// Property should be specified using a color ramp from which the output color can be sampled based on a property calculation.
+    ColorRamp,
+    /// Property is constant across all zoom levels and property values.
+    Constant,
+    /// Property is non-interpolable; rather, its values will be cross-faded to smoothly transition between integer zooms.
+    CrossFaded,
+    /// Property is non-interpolable; rather, its values will be cross-faded to smoothly transition between integer zooms. It can be represented using a property expression.
+    CrossFadedDataDriven,
+    /// Property is interpolable but cannot be represented using a property expression.
+    DataConstant,
+    /// Property is interpolable and can be represented using a property expression.
+    DataDriven,
 }

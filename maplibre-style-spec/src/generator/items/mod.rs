@@ -15,7 +15,6 @@ pub mod paint;
 pub mod projection;
 pub mod projection_definition;
 pub mod promote_id;
-pub mod property_type;
 pub mod resolved_image;
 pub mod sky;
 pub mod source;

@@ -44,6 +44,9 @@ fn generate_spec(scope: &mut Scope, root: &BTreeMap<String, ParsedItem>) {
 }
 
 fn generate_top_level_item(scope: &mut Scope, item: TopLevelItem, name: &str) {
+    if name == "PropertyType" {
+        return; // bogus, not a style spec item, rather metadata about the item
+    }
     match item {
         TopLevelItem::Item(item) => generate_parsed_item(scope, &item, name),
         TopLevelItem::Group(items) => {
@@ -132,7 +135,7 @@ fn generate_parsed_item(scope: &mut Scope, item: &ParsedItem, name: &str) {
             items::boolean::generate(scope, name, common, default.as_ref())
         }
         ParsedItem::Star(fields) => items::star::generate(scope, name, fields),
-        ParsedItem::PropertyType(fields) => items::property_type::generate(scope, name, fields),
+        ParsedItem::PropertyType(_) => {} // a meta-type, not something to have in the decoding code
         ParsedItem::ResolvedImage { common, tokens } => {
             items::resolved_image::generate(scope, name, common, *tokens)
         }
