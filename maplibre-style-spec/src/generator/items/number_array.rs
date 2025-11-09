@@ -2,6 +2,7 @@ use codegen::Scope;
 use serde_json::Number;
 
 use crate::decoder::Fields;
+use crate::generator::autotest::generate_test_from_example_if_present;
 use crate::generator::items::number::generate_number_default;
 
 pub fn generate(
@@ -29,6 +30,7 @@ pub fn generate(
             .ret("Self")
             .line(format!("Self::One({})", generate_number_default(default)));
     }
+    generate_test_from_example_if_present(scope, name, common);
 }
 
 #[cfg(test)]

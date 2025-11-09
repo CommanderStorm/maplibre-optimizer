@@ -1,6 +1,7 @@
 use codegen::Scope;
 
 use crate::decoder::Fields;
+use crate::generator::autotest::generate_test_from_example_if_present;
 use crate::generator::formatter::to_upper_camel_case;
 
 pub fn generate(scope: &mut Scope, name: &str, common: &Fields, default: &str) {
@@ -39,6 +40,7 @@ pub fn generate(scope: &mut Scope, name: &str, common: &Fields, default: &str) {
             "Self::Raw(AvailableProjections::{})",
             to_upper_camel_case(default)
         ));
+    generate_test_from_example_if_present(scope, name, common);
 }
 
 #[cfg(test)]

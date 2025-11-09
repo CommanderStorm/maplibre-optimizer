@@ -2,6 +2,7 @@ use codegen::Scope;
 use serde_json::{Number, Value};
 
 use crate::decoder::{ArrayValue, EnumValues, Fields, SimpleArrayValue};
+use crate::generator::autotest::generate_test_from_example_if_present;
 use crate::generator::formatter::to_upper_camel_case;
 use crate::generator::generate_parsed_item;
 use crate::generator::items::number::generate_number_default;
@@ -45,6 +46,7 @@ pub fn generate(
             .ret("Self")
             .line(format!("Self({default_value})"));
     }
+    generate_test_from_example_if_present(scope, name, common);
 }
 
 fn generate_value_array_default(buffer: &mut String, items: &Vec<Value>, length: Option<&usize>) {
@@ -77,7 +79,10 @@ fn generate_value_default(buffer: &mut String, item: &Value) {
             buffer.push_str("\".to_string()");
         }
         Value::Array(a) => generate_value_array_default(buffer, a, None),
-        Value::Object(o) => unimplemented!("Object in default value.."),
+        Value::Object(o) => unimplemented!(
+            "Object {} in default value..",
+            serde_json::to_string(o).unwrap()
+        ),
     }
 }
 
@@ -210,6 +215,17 @@ mod tests {
                 Self(Box::new([serde_json::Number::from_f64(1.15).expect("the number is serialised from a number and is thus always valid"), serde_json::Number::from_i128(210).expect("the number is serialised from a number and is thus always valid"), serde_json::Number::from_i128(30).expect("the number is serialised from a number and is thus always valid")]))
             }
         }
+
+        #[cfg(test)] 
+        mod test {
+            use super::*;
+
+            #[test]
+            fn test_example_position_decodes() {
+                let example = serde_json::json!([1.5,90,80]);
+                let _ = serde_json::from_value::<Position>(example).expect("example should decode");
+            }
+        }
         "#);
     }
 
@@ -237,7 +253,7 @@ mod tests {
             }
         });
         let reference: StyleReference = serde_json::from_value(reference).unwrap();
-        insta::assert_snapshot!(crate::generator::generate_spec_scope(reference), @r"
+        insta::assert_snapshot!(crate::generator::generate_spec_scope(reference), @r##"
         /// This is a Maplibre Style Specification
         #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
         pub struct MaplibreStyleSpecification;
@@ -247,6 +263,17 @@ mod tests {
         /// Except for layers of the `background` type, each layer needs to refer to a source. Layers take the data that they get from a source, optionally filter features, and then define how those features are styled.
         #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
         struct Layers(Vec<Layer>);
-        ");
+
+        #[cfg(test)] 
+        mod test {
+            use super::*;
+
+            #[test]
+            fn test_example_layers_decodes() {
+                let example = serde_json::json!([{"id":"coastline","paint":{"line-color":"#198EC8"},"source":"maplibre","source-layer":"countries","type":"line"}]);
+                let _ = serde_json::from_value::<Layers>(example).expect("example should decode");
+            }
+        }
+        "##);
     }
 }

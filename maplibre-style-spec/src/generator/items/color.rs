@@ -2,6 +2,7 @@ use codegen::Scope;
 use serde_json::Value;
 
 use crate::decoder::Fields;
+use crate::generator::autotest::generate_test_from_example_if_present;
 
 pub fn generate(scope: &mut Scope, name: &str, common: &Fields, default: Option<&Value>) {
     scope
@@ -18,6 +19,7 @@ pub fn generate(scope: &mut Scope, name: &str, common: &Fields, default: Option<
             .ret("Self")
             .line(format!("Self(color::parse_color({default}).expect(\"Invalid color specified as the default value\"))"));
     }
+    generate_test_from_example_if_present(scope, name, common);
 }
 
 #[cfg(test)]

@@ -1,21 +1,22 @@
 use codegen::Scope;
 
 use crate::decoder::Fields;
+use crate::generator::autotest::generate_test_from_example_if_present;
 
-pub fn generate(scope: &mut Scope, name: &str, common: &Fields, default: &str, tokens: bool) {
+pub fn generate(scope: &mut Scope, name: &str, common: &Fields, default: &str, _tokens: bool) {
     scope
         .new_struct(name)
         .doc(&common.doc)
-        .attr("deprecated = \"not_implemented\"")
         .derive("serde::Deserialize, PartialEq, Debug, Clone")
-        .tuple_field("serde_json::Value");
+        .tuple_field("String");
 
     scope
         .new_impl(name)
         .impl_trait("Default")
         .new_fn("default")
         .ret("Self")
-        .line(format!("\"{default}\".to_string()"));
+        .line(format!("Self(\"{default}\".to_string())"));
+    generate_test_from_example_if_present(scope, name, common);
 }
 
 #[cfg(test)]

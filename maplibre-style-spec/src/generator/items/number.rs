@@ -1,9 +1,8 @@
-use std::default;
-
 use codegen::Scope;
 use serde_json::Number;
 
 use crate::decoder::Fields;
+use crate::generator::autotest::generate_test_from_example_if_present;
 
 pub fn generate(
     scope: &mut Scope,
@@ -29,6 +28,7 @@ pub fn generate(
             .ret("Self")
             .line(format!("Self({default})"));
     }
+    generate_test_from_example_if_present(scope, name, common);
 }
 
 pub fn generate_number_default(n: &Number) -> String {

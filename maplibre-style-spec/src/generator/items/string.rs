@@ -1,6 +1,7 @@
 use codegen::Scope;
 
 use crate::decoder::Fields;
+use crate::generator::autotest::generate_test_from_example_if_present;
 
 pub fn generate(scope: &mut Scope, name: &str, common: &Fields, default: Option<&str>) {
     scope
@@ -17,6 +18,7 @@ pub fn generate(scope: &mut Scope, name: &str, common: &Fields, default: Option<
             .ret("Self")
             .line(format!("Self(\"{default}\".to_string())"));
     }
+    generate_test_from_example_if_present(scope, name, common);
 }
 
 #[cfg(test)]
@@ -63,6 +65,12 @@ mod tests {
         /// The source for the terrain data.
         #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
         struct TerrainSource(String);
+
+        #[cfg(test)] 
+        mod test {
+            use super::*;
+
+        }
         ");
     }
 }

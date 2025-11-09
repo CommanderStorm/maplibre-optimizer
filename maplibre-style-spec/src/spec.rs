@@ -80,6 +80,167 @@ impl Default for RootBearing {
     }
 }
 
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn test_example_root_bearing_decodes() {
+        let example = serde_json::json!(29);
+        let _ = serde_json::from_value::<RootBearing>(example).expect("example should decode");
+    }
+
+    #[test]
+    fn test_example_root_center_decodes() {
+        let example = serde_json::json!([-73.9749, 40.7736]);
+        let _ = serde_json::from_value::<RootCenter>(example).expect("example should decode");
+    }
+
+    #[test]
+    fn test_example_root_center_altitude_decodes() {
+        let example = serde_json::json!(123.4);
+        let _ =
+            serde_json::from_value::<RootCenterAltitude>(example).expect("example should decode");
+    }
+
+    #[test]
+    fn test_example_root_font_faces_decodes() {
+        let example = serde_json::json!({"Noto Sans Regular":[{"unicode-range":["U+1780-17FF"],"url":"https://cdn.jsdelivr.net/gh/notofonts/notofonts.github.io/fonts/NotoSansKhmer/hinted/ttf/NotoSansKhmer-Regular.ttf"},{"unicode-range":["U+0900-097F"],"url":"https://cdn.jsdelivr.net/gh/notofonts/notofonts.github.io/fonts/NotoSansDevanagari/hinted/ttf/NotoSansDevanagari-Regular.ttf"},{"unicode-range":["U+1000-109F"],"url":"https://cdn.jsdelivr.net/gh/notofonts/notofonts.github.io/fonts/NotoSansMyanmar/hinted/ttf/NotoSansMyanmar-Regular.ttf"},{"unicode-range":["U+1200-137F"],"url":"https://cdn.jsdelivr.net/gh/notofonts/notofonts.github.io/fonts/NotoSansEthiopic/hinted/ttf/NotoSansEthiopic-Regular.ttf"}],"Unifont":"https://ftp.gnu.org/gnu/unifont/unifont-15.0.01/unifont-15.0.01.ttf"});
+        let _ = serde_json::from_value::<RootFontFaces>(example).expect("example should decode");
+    }
+
+    #[test]
+    fn test_example_root_glyphs_decodes() {
+        let example =
+            serde_json::json!("https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf");
+        let _ = serde_json::from_value::<RootGlyphs>(example).expect("example should decode");
+    }
+
+    #[test]
+    fn test_example_root_layers_decodes() {
+        let example = serde_json::json!([{"id":"coastline","paint":{"line-color":"#198EC8"},"source":"maplibre","source-layer":"countries","type":"line"}]);
+        let _ = serde_json::from_value::<RootLayers>(example).expect("example should decode");
+    }
+
+    #[test]
+    fn test_example_root_light_decodes() {
+        let example = serde_json::json!({"anchor":"viewport","color":"white","intensity":0.4});
+        let _ = serde_json::from_value::<RootLight>(example).expect("example should decode");
+    }
+
+    #[test]
+    fn test_example_root_metadata_decodes() {
+        let example = serde_json::json!({"example:object":{"Boolean":false,"Number":2,"String":"one"},"styleeditor:comment":"Style generated 1677776383","styleeditor:slimmode":true,"styleeditor:version":"3.14.159265"});
+        let _ = serde_json::from_value::<RootMetadata>(example).expect("example should decode");
+    }
+
+    #[test]
+    fn test_example_root_name_decodes() {
+        let example = serde_json::json!("Bright");
+        let _ = serde_json::from_value::<RootName>(example).expect("example should decode");
+    }
+
+    #[test]
+    fn test_example_root_pitch_decodes() {
+        let example = serde_json::json!(50);
+        let _ = serde_json::from_value::<RootPitch>(example).expect("example should decode");
+    }
+
+    #[test]
+    fn test_example_root_projection_decodes() {
+        let example = serde_json::json!({"type":["interpolate",["linear"],["zoom"],10,"vertical-perspective",12,"mercator"]});
+        let _ = serde_json::from_value::<RootProjection>(example).expect("example should decode");
+    }
+
+    #[test]
+    fn test_example_root_roll_decodes() {
+        let example = serde_json::json!(45);
+        let _ = serde_json::from_value::<RootRoll>(example).expect("example should decode");
+    }
+
+    #[test]
+    fn test_example_root_sky_decodes() {
+        let example = serde_json::json!({"atmosphere-blend":["interpolate",["linear"],["zoom"],0,1,10,1,12,0],"fog-color":"#0000ff","fog-ground-blend":0.5,"horizon-color":"#ffffff","horizon-fog-blend":0.5,"sky-color":"#199EF3","sky-horizon-blend":0.5});
+        let _ = serde_json::from_value::<RootSky>(example).expect("example should decode");
+    }
+
+    #[test]
+    fn test_example_root_sources_decodes() {
+        let example = serde_json::json!({"maplibre-demotiles":{"type":"vector","url":"https://demotiles.maplibre.org/tiles/tiles.json"},"maplibre-streets":{"maxzoom":14,"tiles":["http://a.example.com/tiles/{z}/{x}/{y}.pbf","http://b.example.com/tiles/{z}/{x}/{y}.pbf"],"type":"vector"},"maplibre-tilejson":{"type":"vector","url":"http://api.example.com/tilejson.json"},"wms-imagery":{"tileSize":256,"tiles":["http://a.example.com/wms?bbox={bbox-epsg-3857}&format=image/png&service=WMS&version=1.1.1&request=GetMap&srs=EPSG:3857&width=256&height=256&layers=example"],"type":"raster"}});
+        let _ = serde_json::from_value::<RootSources>(example).expect("example should decode");
+    }
+
+    #[test]
+    fn test_example_root_sprite_decodes() {
+        let example =
+            serde_json::json!("https://demotiles.maplibre.org/styles/osm-bright-gl-style/sprite");
+        let _ = serde_json::from_value::<RootSprite>(example).expect("example should decode");
+    }
+
+    #[test]
+    fn test_example_root_state_decodes() {
+        let example = serde_json::json!({"chargerType":{"default":["CCS","CHAdeMO","Type2"]},"minPreferredChargingSpeed":{"default":50}});
+        let _ = serde_json::from_value::<RootState>(example).expect("example should decode");
+    }
+
+    #[test]
+    fn test_example_root_terrain_decodes() {
+        let example = serde_json::json!({"exaggeration":0.5,"source":"raster-dem-source"});
+        let _ = serde_json::from_value::<RootTerrain>(example).expect("example should decode");
+    }
+
+    #[test]
+    fn test_example_root_transition_decodes() {
+        let example = serde_json::json!({"delay":0,"duration":300});
+        let _ = serde_json::from_value::<RootTransition>(example).expect("example should decode");
+    }
+
+    #[test]
+    fn test_example_root_version_decodes() {
+        let example = serde_json::json!(8);
+        let _ = serde_json::from_value::<RootVersion>(example).expect("example should decode");
+    }
+
+    #[test]
+    fn test_example_root_zoom_decodes() {
+        let example = serde_json::json!(12.5);
+        let _ = serde_json::from_value::<RootZoom>(example).expect("example should decode");
+    }
+
+    #[test]
+    fn test_example_layer_metadata_decodes() {
+        let example = serde_json::json!({"source:comment":"Hydrology FCCODE 460 - Narrow wash"});
+        let _ = serde_json::from_value::<LayerMetadata>(example).expect("example should decode");
+    }
+
+    #[test]
+    fn test_example_light_anchor_decodes() {
+        let example = serde_json::json!("map");
+        let _ = serde_json::from_value::<LightAnchor>(example).expect("example should decode");
+    }
+
+    #[test]
+    fn test_example_light_position_decodes() {
+        let example = serde_json::json!([1.5, 90, 80]);
+        let _ = serde_json::from_value::<LightPosition>(example).expect("example should decode");
+    }
+
+    #[test]
+    fn test_example_paint_color_relief_color_relief_color_decodes() {
+        let example = serde_json::json!([
+            "interpolate",
+            ["linear"],
+            ["elevation"],
+            0,
+            "black",
+            8849,
+            "white"
+        ]);
+        let _ = serde_json::from_value::<PaintColorReliefColorReliefColor>(example)
+            .expect("example should decode");
+    }
+}
+
 /// Default map center in longitude and latitude.  The style center will be used only if the map has not been positioned by other means (e.g. map options or user interaction).
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
 struct RootCenter(Vec<serde_json::Number>);
@@ -176,11 +337,11 @@ struct RootSprite(Sprite);
 
 /// An object used to define default values when using the [`global-state`](https://maplibre.org/maplibre-style-spec/expressions/#global-state) expression.
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-struct RootState(State);
+struct RootState(serde_json::Value);
 
 impl Default for RootState {
     fn default() -> Self {
-        {}
+        serde_json::json!({})
     }
 }
 

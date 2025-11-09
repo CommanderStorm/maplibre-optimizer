@@ -1,6 +1,7 @@
 use codegen::Scope;
 
 use crate::decoder::Fields;
+use crate::generator::autotest::generate_test_from_example_if_present;
 
 pub fn generate(scope: &mut Scope, name: &str, common: &Fields, default: Option<&str>) {
     let enu = scope
@@ -24,6 +25,7 @@ pub fn generate(scope: &mut Scope, name: &str, common: &Fields, default: Option<
             .ret("Self")
             .line(format!("Self::One(color::parse_color(\"{default}\").expect(\"Invalid color specified as the default value\"))"));
     }
+    generate_test_from_example_if_present(scope, name, common);
 }
 
 #[cfg(test)]

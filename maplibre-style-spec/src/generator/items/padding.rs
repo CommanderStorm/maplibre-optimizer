@@ -2,6 +2,7 @@ use codegen::Scope;
 use serde_json::Number;
 
 use crate::decoder::Fields;
+use crate::generator::autotest::generate_test_from_example_if_present;
 
 pub fn generate(scope: &mut Scope, name: &str, common: &Fields, default: &[Number]) {
     let enu = scope
@@ -53,6 +54,7 @@ pub fn generate(scope: &mut Scope, name: &str, common: &Fields, default: &[Numbe
         .new_fn("default")
         .ret("Self")
         .line(format!("Self::{enum_variant_name}({items})"));
+    generate_test_from_example_if_present(scope, name, common);
 }
 
 #[cfg(test)]

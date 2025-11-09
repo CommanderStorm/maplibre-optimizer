@@ -2,6 +2,7 @@ use codegen::Scope;
 use serde_json::Value;
 
 use crate::decoder::{EnumValues, Fields};
+use crate::generator::autotest::generate_test_from_example_if_present;
 use crate::generator::formatter::to_upper_camel_case;
 
 pub fn generate(
@@ -58,4 +59,5 @@ pub fn generate(
                 to_upper_camel_case(&default.to_string())
             ));
     }
+    generate_test_from_example_if_present(scope, name, common);
 }

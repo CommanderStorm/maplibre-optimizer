@@ -5,6 +5,7 @@ use codegen::Scope;
 use crate::decoder::{ParsedItem, StyleReference, TopLevelItem};
 use crate::generator::formatter::{to_snake_case, to_upper_camel_case};
 
+mod autotest;
 mod formatter;
 mod items;
 
@@ -17,6 +18,11 @@ pub fn generate_spec_scope(reference: StyleReference) -> String {
     for (key, item) in reference.fields.into_iter() {
         generate_top_level_item(&mut scope, item, &to_upper_camel_case(&key))
     }
+    scope
+        .get_or_new_module("test")
+        .attr("cfg(test)")
+        .import("super", "*");
+
     scope.to_string()
 }
 
@@ -243,6 +249,12 @@ mod tests {
                 Self(serde_json::Number::from_i128(0).expect("the number is serialised from a number and is thus always valid"))
             }
         }
+
+        #[cfg(test)] 
+        mod test {
+            use super::*;
+
+        }
         "#);
     }
 
@@ -280,6 +292,12 @@ mod tests {
             fn default() -> Self {
                 Self(serde_json::Number::from_f64(1.0).expect("the number is serialised from a number and is thus always valid"))
             }
+        }
+
+        #[cfg(test)] 
+        mod test {
+            use super::*;
+
         }
         "#);
     }
@@ -329,6 +347,12 @@ mod tests {
         pub enum Numbers {
             NumberOne(NumberOne),
             NumberTwo(NumberTwo),
+        }
+
+        #[cfg(test)] 
+        mod test {
+            use super::*;
+
         }
         "#);
     }
