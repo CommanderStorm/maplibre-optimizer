@@ -12,21 +12,7 @@ pub fn generate(
     values: &EnumValues,
 ) {
     match values {
-        EnumValues::Simple(values) => {
-            let enu = scope
-                .new_enum(name)
-                .doc(&common.doc)
-                .vis("pub")
-                .derive("serde::Deserialize, PartialEq, Eq, Debug, Clone, Copy");
-            for value in values {
-                let var_name = to_upper_camel_case(value);
-                let var = enu.new_variant(to_upper_camel_case(value));
-                if value != &var_name {
-                    var.annotation(format!("serde(rename=\"{value}\")"));
-                }
-            }
-        }
-        EnumValues::Numeric(values) => {
+        EnumValues::Version(values) => {
             assert!(values.len() <= u8::MAX as usize);
 
             let enu = scope
@@ -45,7 +31,7 @@ pub fn generate(
                     .all(|v| v.as_u64().is_some_and(|v| v <= u8::MAX as u64))
             );
         }
-        EnumValues::Complex(values) => {
+        EnumValues::Emum(values) => {
             let enu = scope
                 .new_enum(name)
                 .doc(&common.doc)

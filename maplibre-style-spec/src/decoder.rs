@@ -293,16 +293,15 @@ pub enum Requirement {
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Deserialize)]
-pub struct EnumValue {
+pub struct EnumDocs {
     pub doc: String,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Deserialize)]
 #[serde(untagged)]
 pub enum EnumValues {
-    Simple(Vec<String>),
-    Numeric(Vec<Number>),
-    Complex(BTreeMap<String, EnumValue>),
+    Version(Vec<Number>),
+    Emum(BTreeMap<String, EnumDocs>),
 }
 
 #[derive(Debug, PartialEq, Clone, Deserialize)]
