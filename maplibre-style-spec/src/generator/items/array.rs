@@ -1,7 +1,9 @@
 use codegen::Scope;
 use serde_json::{Number, Value};
 
-use crate::decoder::{ArrayValue, EnumValues, Fields};
+use crate::decoder::{ArrayValue, EnumValues, Fields, SimpleArrayValue};
+use crate::generator::formatter::to_upper_camel_case;
+use crate::generator::generate_parsed_item;
 
 #[allow(clippy::too_many_arguments)]
 pub fn generate(
@@ -17,10 +19,14 @@ pub fn generate(
     max: Option<&Number>,
     length: Option<&usize>,
 ) {
+    // some arrays might require a new type name
+    let new_type = to_upper_camel_case(&format!("{name} Value"));
+    let type_name = generate_array_value(scope, &new_type, common, value, values);
+
     let field = if let Some(length) = length {
-        format!("Box<[serde_json::Value; {}]>", length)
+        format!("Box<[{type_name}; {length}]>")
     } else {
-        "Vec<serde_json::Value>".to_string()
+        format!("Vec<{type_name}>")
     };
     scope
         .new_struct(name)
@@ -30,29 +36,116 @@ pub fn generate(
         .tuple_field(field);
 
     if let Some(default) = default {
-        let mut items = if length.is_some() {
-            "Box::new([".to_string()
-        } else {
-            "Vec::from([".to_string()
-        };
-        let mut needs_separator = false;
-        for item in default {
-            if needs_separator {
-                items.push_str(", ");
-            }
-            items.push_str("serde_json::Value::from("); // todo: remove this
-            items.push_str(&item.to_string());
-            items.push(')'); // todo: remove this
-            needs_separator = true;
-        }
-        items.push_str("])");
-
+        let mut default_value = String::new();
+        generate_value_array_default(&mut default_value, default, length);
         scope
             .new_impl(name)
             .impl_trait("Default")
             .new_fn("default")
             .ret("Self")
-            .line(format!("Self({items})"));
+            .line(format!("Self({default_value})"));
+    }
+}
+
+fn generate_value_array_default(buffer: &mut String, items: &Vec<Value>, length: Option<&usize>) {
+    if length.is_some() {
+        buffer.push_str("Box::new([")
+    } else {
+        buffer.push_str("Vec::from([")
+    };
+    let mut needs_separator = false;
+    for item in items {
+        if needs_separator {
+            buffer.push_str(", ");
+        }
+        generate_value_default(buffer, item);
+        needs_separator = true;
+    }
+    buffer.push_str("])");
+}
+
+fn generate_value_default(buffer: &mut String, item: &Value) {
+    match item {
+        Value::Null => buffer.push_str("None"),
+        Value::Bool(b) => buffer.push_str(&b.to_string()),
+        Value::Number(n) => {
+            let underlying_datatype = if n.is_f64() {
+                "f64"
+            } else if n.is_i64() {
+                "i128"
+            } else {
+                "u128"
+            };
+            let t = format!(
+                "serde_json::Number::from_{underlying_datatype}({n}).expect(\"the number is serialised from a number and is thus always valid\")"
+            );
+            buffer.push_str(&t);
+        }
+        Value::String(s) => {
+            buffer.push('"');
+            buffer.push_str(&s);
+            buffer.push_str("\".to_string()");
+        }
+        Value::Array(a) => generate_value_array_default(buffer, a, None),
+        Value::Object(o) => unimplemented!("Object in default value.."),
+    }
+}
+
+fn generate_array_value(
+    scope: &mut Scope,
+    name: &str,
+    common: &Fields,
+    value: &ArrayValue,
+    values: Option<&EnumValues>,
+) -> String {
+    match value {
+        ArrayValue::Simple(v) => match v {
+            SimpleArrayValue::String => "String".to_string(),
+            SimpleArrayValue::Number => "serde_json::Number".to_string(),
+            SimpleArrayValue::Star => "serde_json::Value".to_string(),
+            SimpleArrayValue::FontFaces => "FontFaces".to_string(),
+            SimpleArrayValue::FunctionStop => "FunctionStop".to_string(),
+            SimpleArrayValue::Layer => "Layer".to_string(),
+            SimpleArrayValue::Enum => {
+                crate::generator::items::r#enum::generate(
+                    scope,
+                    name,
+                    common,
+                    None,
+                    values.expect("EnumValues is required for SimpleArrayValue::Enum"),
+                );
+                name.to_string()
+            }
+            SimpleArrayValue::Color => "color::DynamicColor".to_string(),
+        },
+        ArrayValue::Either(options) => {
+            let mut variant_types = Vec::with_capacity(options.len());
+            for (i, option) in options.iter().enumerate() {
+                let enum_variant_name = to_upper_camel_case(&i.to_string());
+                let new_variant_type_name =
+                    to_upper_camel_case(&format!("{name} {enum_variant_name}"));
+                variant_types.push((
+                    enum_variant_name,
+                    generate_array_value(scope, &new_variant_type_name, common, option, values),
+                ));
+            }
+
+            let enu = scope
+                .new_enum(&name)
+                .doc(format!("{name} Values"))
+                .attr("serde(untagged)")
+                .derive("serde::Deserialize, PartialEq, Debug, Clone")
+                .vis("pub");
+
+            for (enum_variant_name, variant_type) in variant_types {
+                enu.new_variant(enum_variant_name).tuple(variant_type);
+            }
+            name.to_string()
+        }
+        ArrayValue::Complex(c) => {
+            generate_parsed_item(scope, c, &name);
+            name.to_string()
+        }
     }
 }
 
@@ -122,11 +215,11 @@ mod tests {
         /// Position of the light source relative to lit (extruded) geometries, in [r radial coordinate, a azimuthal angle, p polar angle] where r indicates the distance from the center of the base of an object to its light, a indicates the position of the light relative to 0° (0° when `light.anchor` is set to `viewport` corresponds to the top of the viewport, or 0° when `light.anchor` is set to `map` corresponds to due north, and degrees proceed clockwise), and p indicates the height of the light (from 0°, directly above, to 180°, directly below).
         #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
         #[deprecated = "not_implemented"]
-        struct Position(Box<[serde_json::Value; 3]>);
+        struct Position(Box<[serde_json::Number; 3]>);
 
         impl Default for Position {
             fn default() -> Self {
-                Self(Box::new([serde_json::Value::from(1.15), serde_json::Value::from(210), serde_json::Value::from(30)]))
+                Self(Box::new([serde_json::Number::from_f64(1.15).expect("the number is serialised from a number and is thus always valid"), serde_json::Number::from_i128(210).expect("the number is serialised from a number and is thus always valid"), serde_json::Number::from_i128(30).expect("the number is serialised from a number and is thus always valid")]))
             }
         }
         "#);
@@ -166,7 +259,7 @@ mod tests {
         /// Except for layers of the `background` type, each layer needs to refer to a source. Layers take the data that they get from a source, optionally filter features, and then define how those features are styled.
         #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
         #[deprecated = "not_implemented"]
-        struct Layers(Vec<serde_json::Value>);
+        struct Layers(Vec<Layer>);
         "#);
     }
 }

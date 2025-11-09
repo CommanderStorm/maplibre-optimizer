@@ -1,3 +1,5 @@
+use std::default;
+
 use codegen::Scope;
 use serde_json::Number;
 
@@ -19,22 +21,27 @@ pub fn generate(
         .derive("serde::Deserialize, PartialEq, Debug, Clone")
         .tuple_field("serde_json::Number");
     if let Some(default) = default {
-        let underlying_datatype = if default.is_f64() {
-            "f64"
-        } else if default.is_i64() {
-            "i128"
-        } else {
-            "u128"
-        };
+        let default = generate_number_default(default);
         scope
             .new_impl(name)
             .impl_trait("Default")
             .new_fn("default")
             .ret("Self")
-            .line(format!(
-                "Self(serde_json::Number::from_{underlying_datatype}({default}).expect(\"the number is serialised from a number and is thus always valid\"))"
-            ));
+            .line(format!("Self({default})"));
     }
+}
+
+pub fn generate_number_default(n: &Number) -> String {
+    let underlying_datatype = if n.is_f64() {
+        "f64"
+    } else if n.is_i64() {
+        "i128"
+    } else {
+        "u128"
+    };
+    format!(
+        "serde_json::Number::from_{underlying_datatype}({n}).expect(\"the number is serialised from a number and is thus always valid\")"
+    )
 }
 
 #[cfg(test)]
