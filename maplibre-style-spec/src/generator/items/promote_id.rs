@@ -5,10 +5,10 @@ use crate::decoder::Fields;
 pub fn generate(scope: &mut Scope, name: &str, common: &Fields) {
     scope
         .new_struct(name)
+        .vis("pub")
         .doc(&common.doc)
-        .attr("deprecated = \"not_implemented\"")
         .derive("serde::Deserialize, PartialEq, Debug, Clone")
-        .tuple_field("serde_json::Value");
+        .tuple_field("String");
 }
 
 #[cfg(test)]
@@ -18,10 +18,9 @@ mod tests {
     fn generate_empty() {
         let mut scope = Scope::new();
         generate(&mut scope, "Foo", &Fields::default());
-        insta::assert_snapshot!(scope.to_string(), @r##"
+        insta::assert_snapshot!(scope.to_string(), @r"
         #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-        #[deprecated = "not_implemented"]
-        struct Foo(serde_json::Value);
-        "##)
+        pub struct Foo(String);
+        ")
     }
 }

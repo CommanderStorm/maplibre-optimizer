@@ -10,7 +10,8 @@ pub fn generate(scope: &mut Scope, name: &str, common: &Fields, default: &[Numbe
         .attr("serde(untagged)")
         .doc(&common.doc)
         .derive("serde::Deserialize, PartialEq, Debug, Clone");
-    enu.new_variant("Unwrapped").annotation("#[deprecated = \"Please see [`Self::One`] instead\"]").doc("A single value applies to all four sides.\n\nOnly avaliable for backwards compatibility.").tuple("serde_json::Number");
+    enu.new_variant("Unwrapped")
+        .annotation("#[deprecated = \"Please see [`Self::One`] instead\"]").doc("A single value applies to all four sides.\n\nOnly avaliable for backwards compatibility.").tuple("serde_json::Number");
     enu.new_variant("One")
         .doc("A single value applies to all four sides")
         .tuple("Box<[serde_json::Number; 1]>");
