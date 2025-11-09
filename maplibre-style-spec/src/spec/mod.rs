@@ -3297,13 +3297,19 @@ pub struct Projection {
 }
 
 /// The projection definition type. Can be specified as a string, a transition state, or an expression.
-#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-#[deprecated = "not_implemented"]
-struct ProjectionType(serde_json::Value);
+#[derive(serde::Deserialize, PartialEq, Eq, Debug, Clone)]
+#[serde(untagged)]
+enum ProjectionType {
+    /// Preset for the Globe projection
+    #[serde(rename = "globe")]
+    Globe,
+    /// Preset for the Equirectangular projection
+    CameraExpression(Vec<CameraExpression>),
+}
 
 impl Default for ProjectionType {
     fn default() -> Self {
-        mercator
+        Self::Mercator
     }
 }
 
