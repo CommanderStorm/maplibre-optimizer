@@ -98,7 +98,7 @@ fmt:
     set -euo pipefail
     if (rustup toolchain list | grep nightly && rustup component list --toolchain nightly | grep rustfmt) &> /dev/null; then
         echo 'Reformatting Rust code using nightly Rust fmt to sort imports'
-        cargo +nightly fmt --all -- --config imports_granularity=Module,group_imports=StdExternalCrate
+        rustup run nightly cargo fmt --all -- --config imports_granularity=Module,group_imports=StdExternalCrate
     else
         echo 'Reformatting Rust with the stable cargo fmt.  Install nightly with `rustup install nightly` for better results'
         cargo fmt --all
@@ -133,7 +133,7 @@ test-fmt: (cargo-install 'cargo-sort') && (fmt-toml '--check' '--check-format')
 
 # Update all dependencies, including breaking changes. Requires nightly toolchain (install with `rustup install nightly`)
 update:
-    cargo +nightly -Z unstable-options update --breaking
+    rustup run nightly cargo -Z unstable-options update --breaking
     cargo update
 
 # Make sure the git repo has no uncommitted changes
