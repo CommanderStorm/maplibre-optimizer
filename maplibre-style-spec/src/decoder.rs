@@ -257,18 +257,21 @@ impl Fields {
         let mut doc = self.doc.clone();
         if max.is_some() || min.is_some() || period.is_some() {
             doc.push_str("\n\nRange: ");
-            if let Some(min) = min {
-                doc.push_str(&min.to_string());
-            }
             if min.is_some() || max.is_some() {
+                if let Some(min) = min {
+                    doc.push_str(&min.to_string());
+                }
                 doc.push_str("..");
-            }
-            if let Some(max) = max {
-                doc.push('=');
-                doc.push_str(&max.to_string());
+                if let Some(max) = max {
+                    doc.push('=');
+                    doc.push_str(&max.to_string());
+                }
+                if period.is_some() {
+                    doc.push(' ');
+                }
             }
             if let Some(period) = period {
-                doc.push_str(&format!(" every {period}\n"))
+                doc.push_str(&format!("every {period}\n"))
             }
         }
         doc
