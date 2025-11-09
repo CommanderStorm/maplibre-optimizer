@@ -14,7 +14,7 @@ fn main() {
     let code_bytes_cnt = generated_code.len();
     let code_lines_cnt = generated_code.lines().count();
 
-    let output_path = PathBuf::from("maplibre-style-spec/src/spec/mod.rs");
+    let output_path = PathBuf::from("maplibre-style-spec/src/spec.rs");
     println!("Generating spec code to {output_path:?}");
     if let Err(e) = fs::write(&output_path, &generated_code) {
         panic!(
