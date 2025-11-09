@@ -49,7 +49,7 @@ mod tests {
               }
         });
         let reference: StyleReference = serde_json::from_value(reference).unwrap();
-        insta::assert_snapshot!(crate::generator::generate_spec_scope(reference), @r#"
+        insta::assert_snapshot!(crate::generator::generate_spec_scope(reference), @r"
         /// This is a Maplibre Style Specification
         #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
         pub struct MaplibreStyleSpecification;
@@ -57,13 +57,12 @@ mod tests {
         #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
         pub struct Terrain {
             /// The source for the terrain data.
-            #[serde(rename="source")]
             pub source: TerrainSource,
         }
 
         /// The source for the terrain data.
         #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
         struct TerrainSource(String);
-        "#);
+        ");
     }
 }

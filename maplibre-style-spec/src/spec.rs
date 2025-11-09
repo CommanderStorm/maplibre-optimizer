@@ -168,8 +168,7 @@ struct RootSky(Sky);
 ///
 /// Tiled sources (vector and raster) must specify their details according to the [TileJSON specification](https://github.com/mapbox/tilejson-spec).
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-#[deprecated = "not_implemented"]
-struct RootSources(serde_json::Value);
+struct RootSources(Sources);
 
 /// An array of `{id: 'my-sprite', url: 'https://example.com/sprite'}` objects. Each object should represent a unique URL to load a sprite from and and a unique ID to use as a prefix when referencing images from that sprite (i.e. 'my-sprite:image'). All the URLs are internally extended to load both .json and .png files. If the `id` field is equal to 'default', the prefix is omitted (just 'image' instead of 'default:image'). All the IDs and URLs must be unique. For backwards compatibility, instead of an array, one can also provide a single string that represent a URL to load the sprite from. The images in this case won't be prefixed.
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
@@ -636,7 +635,6 @@ pub enum FilterOperator {
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
 pub struct Function {
     /// The exponential base of the interpolation curve. It controls the rate at which the result increases. Higher values make the result increase more towards the high end of the range. With `1` the stops are interpolated linearly.
-    #[serde(rename = "base")]
     pub base: FunctionBase,
     /// The color space in which colors interpolated. Interpolating colors in perceptual color spaces like LAB and HCL tend to produce color ramps that look more consistent and produce colors that can be differentiated more easily than those interpolated in RGB space.
     #[serde(rename = "colorSpace")]
@@ -652,16 +650,12 @@ pub struct Function {
     /// * In interval or exponential property and zoom-and-property functions, when the feature value is not numeric.
     ///
     /// If no default is provided, the style property's default is used in these circumstances.
-    #[serde(rename = "default")]
     pub default: FunctionDefault,
     /// An expression.
-    #[serde(rename = "expression")]
     pub expression: FunctionExpression,
     /// The name of a feature property to use as the function input.
-    #[serde(rename = "property")]
     pub property: FunctionProperty,
     /// An array of stops.
-    #[serde(rename = "stops")]
     pub stops: FunctionStops,
     /// The interpolation strategy to use in function evaluation.
     #[serde(rename = "type")]
@@ -787,28 +781,20 @@ pub enum GeometryType {
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
 pub struct Layer {
     /// A expression specifying conditions on source features. Only features that match the filter are displayed. Zoom expressions in filters are only evaluated at integer zoom levels. The `feature-state` expression is not supported in filter expressions.
-    #[serde(rename = "filter")]
     pub filter: LayerFilter,
     /// Unique layer name.
-    #[serde(rename = "id")]
     pub id: LayerId,
     /// Layout properties for the layer.
-    #[serde(rename = "layout")]
     pub layout: LayerLayout,
     /// The maximum zoom level for the layer. At zoom levels equal to or greater than the maxzoom, the layer will be hidden.
-    #[serde(rename = "maxzoom")]
     pub maxzoom: LayerMaxzoom,
     /// Arbitrary properties useful to track with the layer, but do not influence rendering. Properties should be prefixed to avoid collisions, like 'maplibre:'.
-    #[serde(rename = "metadata")]
     pub metadata: LayerMetadata,
     /// The minimum zoom level for the layer. At zoom levels less than the minzoom, the layer will be hidden.
-    #[serde(rename = "minzoom")]
     pub minzoom: LayerMinzoom,
     /// Default paint properties for this layer.
-    #[serde(rename = "paint")]
     pub paint: LayerPaint,
     /// Name of a source description to be used for this layer. Required for all layer types except `background`.
-    #[serde(rename = "source")]
     pub source: LayerSource,
     /// Layer to use from a vector tile source. Required for vector tile sources; prohibited for all other source types, including GeoJSON sources.
     #[serde(rename = "source-layer")]
@@ -913,7 +899,6 @@ pub enum Layout {
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
 pub struct LayoutBackground {
     /// Whether this layer is displayed.
-    #[serde(rename = "visibility")]
     pub visibility: LayoutBackgroundVisibility,
 }
 
@@ -940,7 +925,6 @@ pub struct LayoutCircle {
     #[serde(rename = "circle-sort-key")]
     pub circle_sort_key: LayoutCircleCircleSortKey,
     /// Whether this layer is displayed.
-    #[serde(rename = "visibility")]
     pub visibility: LayoutCircleVisibility,
 }
 
@@ -968,7 +952,6 @@ impl Default for LayoutCircleVisibility {
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
 pub struct LayoutColorRelief {
     /// Whether this layer is displayed.
-    #[serde(rename = "visibility")]
     pub visibility: LayoutColorReliefVisibility,
 }
 
@@ -995,7 +978,6 @@ pub struct LayoutFill {
     #[serde(rename = "fill-sort-key")]
     pub fill_sort_key: LayoutFillFillSortKey,
     /// Whether this layer is displayed.
-    #[serde(rename = "visibility")]
     pub visibility: LayoutFillVisibility,
 }
 
@@ -1023,7 +1005,6 @@ impl Default for LayoutFillVisibility {
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
 pub struct LayoutFillExtrusion {
     /// Whether this layer is displayed.
-    #[serde(rename = "visibility")]
     pub visibility: LayoutFillExtrusionVisibility,
 }
 
@@ -1047,7 +1028,6 @@ impl Default for LayoutFillExtrusionVisibility {
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
 pub struct LayoutHeatmap {
     /// Whether this layer is displayed.
-    #[serde(rename = "visibility")]
     pub visibility: LayoutHeatmapVisibility,
 }
 
@@ -1071,7 +1051,6 @@ impl Default for LayoutHeatmapVisibility {
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
 pub struct LayoutHillshade {
     /// Whether this layer is displayed.
-    #[serde(rename = "visibility")]
     pub visibility: LayoutHillshadeVisibility,
 }
 
@@ -1110,7 +1089,6 @@ pub struct LayoutLine {
     #[serde(rename = "line-sort-key")]
     pub line_sort_key: LayoutLineLineSortKey,
     /// Whether this layer is displayed.
-    #[serde(rename = "visibility")]
     pub visibility: LayoutLineVisibility,
 }
 
@@ -1204,7 +1182,6 @@ impl Default for LayoutLineVisibility {
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
 pub struct LayoutRaster {
     /// Whether this layer is displayed.
-    #[serde(rename = "visibility")]
     pub visibility: LayoutRasterVisibility,
 }
 
@@ -1374,7 +1351,6 @@ pub struct LayoutSymbol {
     #[serde(rename = "text-writing-mode")]
     pub text_writing_mode: LayoutSymbolTextWritingMode,
     /// Whether this layer is displayed.
-    #[serde(rename = "visibility")]
     pub visibility: LayoutSymbolVisibility,
 }
 
@@ -2115,16 +2091,12 @@ impl Default for LayoutSymbolVisibility {
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
 pub struct Light {
     /// Whether extruded geometries are lit relative to the map or viewport.
-    #[serde(rename = "anchor")]
     pub anchor: LightAnchor,
     /// Color tint for lighting extruded geometries.
-    #[serde(rename = "color")]
     pub color: LightColor,
     /// Intensity of lighting (on a scale from 0 to 1). Higher numbers will present as more extreme contrast.
-    #[serde(rename = "intensity")]
     pub intensity: LightIntensity,
     /// Position of the light source relative to lit (extruded) geometries, in [r radial coordinate, a azimuthal angle, p polar angle] where r indicates the distance from the center of the base of an object to its light, a indicates the position of the light relative to 0° (0° when `light.anchor` is set to `viewport` corresponds to the top of the viewport, or 0° when `light.anchor` is set to `map` corresponds to due north, and degrees proceed clockwise), and p indicates the height of the light (from 0°, directly above, to 180°, directly below).
-    #[serde(rename = "position")]
     pub position: LightPosition,
 }
 
@@ -3584,15 +3556,11 @@ impl Default for ProjectionType {
 }
 
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-pub struct PromoteId {
-    /// A name of a feature property to use as ID for feature state.
-    #[serde(rename = "*")]
-    pub star: PromoteIdStar,
-}
+pub struct PromoteId(std::collections::BTreeMap<String, InnerPromoteId>);
 
 /// A name of a feature property to use as ID for feature state.
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-struct PromoteIdStar(String);
+struct InnerPromoteId(String);
 
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
 pub struct Sky {
@@ -3723,10 +3691,8 @@ pub enum Source {
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
 pub struct SourceGeojson {
     /// Contains an attribution to be displayed when the map is shown to a user.
-    #[serde(rename = "attribution")]
     pub attribution: SourceGeojsonAttribution,
     /// Size of the tile buffer on each side. A value of 0 produces no buffer. A value of 512 produces a buffer as wide as the tile itself. Larger values produce fewer rendering artifacts near tile edges and slower performance.
-    #[serde(rename = "buffer")]
     pub buffer: SourceGeojsonBuffer,
     /// If the data is a collection of point features, setting this to true clusters the points by radius into groups. Cluster groups become new `Point` features in the source with additional properties:
     ///
@@ -3737,7 +3703,6 @@ pub struct SourceGeojson {
     ///  * `point_count` Number of original points grouped into this cluster
     ///
     ///  * `point_count_abbreviated` An abbreviated point count
-    #[serde(rename = "cluster")]
     pub cluster: SourceGeojsonCluster,
     /// Max zoom on which to cluster points if clustering is enabled. Defaults to one zoom less than maxzoom (so that last zoom features are not clustered). Clusters are re-evaluated at integer zoom levels so setting clusterMaxZoom to 14 means the clusters will be displayed until z15.
     #[serde(rename = "clusterMaxZoom")]
@@ -3758,10 +3723,8 @@ pub struct SourceGeojson {
     #[serde(rename = "clusterRadius")]
     pub cluster_radius: SourceGeojsonClusterRadius,
     /// A URL to a GeoJSON file, or inline GeoJSON.
-    #[serde(rename = "data")]
     pub data: SourceGeojsonData,
     /// An expression for filtering features prior to processing them for rendering.
-    #[serde(rename = "filter")]
     pub filter: SourceGeojsonFilter,
     /// Whether to generate ids for the geojson features. When enabled, the `feature.id` property will be auto assigned based on its index in the `features` array, over-writing any previous values.
     #[serde(rename = "generateId")]
@@ -3770,13 +3733,11 @@ pub struct SourceGeojson {
     #[serde(rename = "lineMetrics")]
     pub line_metrics: SourceGeojsonLineMetrics,
     /// Maximum zoom level at which to create vector tiles (higher means greater detail at high zoom levels).
-    #[serde(rename = "maxzoom")]
     pub maxzoom: SourceGeojsonMaxzoom,
     /// A property to use as a feature id (for feature state). Either a property name, or an object of the form `{<sourceLayer>: <propertyName>}`.
     #[serde(rename = "promoteId")]
     pub promote_id: SourceGeojsonPromoteId,
     /// Douglas-Peucker simplification tolerance (higher means simpler geometries and faster performance).
-    #[serde(rename = "tolerance")]
     pub tolerance: SourceGeojsonTolerance,
     /// The data type of the GeoJSON source.
     #[serde(rename = "type")]
@@ -3896,8 +3857,7 @@ impl Default for SourceGeojsonMaxzoom {
 
 /// A property to use as a feature id (for feature state). Either a property name, or an object of the form `{<sourceLayer>: <propertyName>}`.
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-#[deprecated = "not_implemented"]
-struct SourceGeojsonPromoteId(serde_json::Value);
+pub struct SourceGeojsonPromoteId(String);
 
 /// Douglas-Peucker simplification tolerance (higher means simpler geometries and faster performance).
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
@@ -3923,13 +3883,11 @@ pub enum SourceGeojsonType {
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
 pub struct SourceImage {
     /// Corners of image specified in longitude, latitude pairs.
-    #[serde(rename = "coordinates")]
     pub coordinates: SourceImageCoordinates,
     /// The data type of the image source.
     #[serde(rename = "type")]
     pub r#type: SourceImageType,
     /// URL that points to an image.
-    #[serde(rename = "url")]
     pub url: SourceImageUrl,
 }
 
@@ -3956,37 +3914,29 @@ struct SourceImageUrl(String);
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
 pub struct SourceRaster {
     /// Other keys to configure the data source.
-    #[serde(rename = "*")]
-    pub star: SourceRasterStar,
+    #[serde(flatten)]
+    pub star: std::collections::BTreeMap<String, SourceRasterStar>,
     /// Contains an attribution to be displayed when the map is shown to a user.
-    #[serde(rename = "attribution")]
     pub attribution: SourceRasterAttribution,
     /// An array containing the longitude and latitude of the southwest and northeast corners of the source's bounding box in the following order: `[sw.lng, sw.lat, ne.lng, ne.lat]`. When this property is included in a source, no tiles outside of the given bounds are requested by MapLibre.
-    #[serde(rename = "bounds")]
     pub bounds: SourceRasterBounds,
     /// Maximum zoom level for which tiles are available, as in the TileJSON spec. Data from tiles at the maxzoom are used when displaying the map at higher zoom levels.
-    #[serde(rename = "maxzoom")]
     pub maxzoom: SourceRasterMaxzoom,
     /// Minimum zoom level for which tiles are available, as in the TileJSON spec.
-    #[serde(rename = "minzoom")]
     pub minzoom: SourceRasterMinzoom,
     /// Influences the y direction of the tile coordinates. The global-mercator (aka Spherical Mercator) profile is assumed.
-    #[serde(rename = "scheme")]
     pub scheme: SourceRasterScheme,
     /// The minimum visual size to display tiles for this layer. Only configurable for raster layers.
     #[serde(rename = "tileSize")]
     pub tile_size: SourceRasterTileSize,
     /// An array of one or more tile source URLs, as in the TileJSON spec.
-    #[serde(rename = "tiles")]
     pub tiles: SourceRasterTiles,
     /// The type of the source.
     #[serde(rename = "type")]
     pub r#type: SourceRasterType,
     /// A URL to a TileJSON resource. Supported protocols are `http:` and `https:`.
-    #[serde(rename = "url")]
     pub url: SourceRasterUrl,
     /// A setting to determine whether a source's tiles are cached locally.
-    #[serde(rename = "volatile")]
     pub volatile: SourceRasterVolatile,
 }
 
@@ -4102,10 +4052,9 @@ impl Default for SourceRasterVolatile {
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
 pub struct SourceRasterDem {
     /// Other keys to configure the data source.
-    #[serde(rename = "*")]
-    pub star: SourceRasterDemStar,
+    #[serde(flatten)]
+    pub star: std::collections::BTreeMap<String, SourceRasterDemStar>,
     /// Contains an attribution to be displayed when the map is shown to a user.
-    #[serde(rename = "attribution")]
     pub attribution: SourceRasterDemAttribution,
     /// Value that will be added to the encoding mix when decoding. Only used on custom encodings.
     #[serde(rename = "baseShift")]
@@ -4114,19 +4063,15 @@ pub struct SourceRasterDem {
     #[serde(rename = "blueFactor")]
     pub blue_factor: SourceRasterDemBlueFactor,
     /// An array containing the longitude and latitude of the southwest and northeast corners of the source's bounding box in the following order: `[sw.lng, sw.lat, ne.lng, ne.lat]`. When this property is included in a source, no tiles outside of the given bounds are requested by MapLibre.
-    #[serde(rename = "bounds")]
     pub bounds: SourceRasterDemBounds,
     /// The encoding used by this source. Mapbox Terrain RGB is used by default.
-    #[serde(rename = "encoding")]
     pub encoding: SourceRasterDemEncoding,
     /// Value that will be multiplied by the green channel value when decoding. Only used on custom encodings.
     #[serde(rename = "greenFactor")]
     pub green_factor: SourceRasterDemGreenFactor,
     /// Maximum zoom level for which tiles are available, as in the TileJSON spec. Data from tiles at the maxzoom are used when displaying the map at higher zoom levels.
-    #[serde(rename = "maxzoom")]
     pub maxzoom: SourceRasterDemMaxzoom,
     /// Minimum zoom level for which tiles are available, as in the TileJSON spec.
-    #[serde(rename = "minzoom")]
     pub minzoom: SourceRasterDemMinzoom,
     /// Value that will be multiplied by the red channel value when decoding. Only used on custom encodings.
     #[serde(rename = "redFactor")]
@@ -4135,16 +4080,13 @@ pub struct SourceRasterDem {
     #[serde(rename = "tileSize")]
     pub tile_size: SourceRasterDemTileSize,
     /// An array of one or more tile source URLs, as in the TileJSON spec.
-    #[serde(rename = "tiles")]
     pub tiles: SourceRasterDemTiles,
     /// The type of the source.
     #[serde(rename = "type")]
     pub r#type: SourceRasterDemType,
     /// A URL to a TileJSON resource. Supported protocols are `http:` and `https:`.
-    #[serde(rename = "url")]
     pub url: SourceRasterDemUrl,
     /// A setting to determine whether a source's tiles are cached locally.
-    #[serde(rename = "volatile")]
     pub volatile: SourceRasterDemVolatile,
 }
 
@@ -4315,40 +4257,31 @@ impl Default for SourceRasterDemVolatile {
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
 pub struct SourceVector {
     /// Other keys to configure the data source.
-    #[serde(rename = "*")]
-    pub star: SourceVectorStar,
+    #[serde(flatten)]
+    pub star: std::collections::BTreeMap<String, SourceVectorStar>,
     /// Contains an attribution to be displayed when the map is shown to a user.
-    #[serde(rename = "attribution")]
     pub attribution: SourceVectorAttribution,
     /// An array containing the longitude and latitude of the southwest and northeast corners of the source's bounding box in the following order: `[sw.lng, sw.lat, ne.lng, ne.lat]`. When this property is included in a source, no tiles outside of the given bounds are requested by MapLibre.
-    #[serde(rename = "bounds")]
     pub bounds: SourceVectorBounds,
     /// The encoding used by this source. Mapbox Vector Tiles encoding is used by default.
-    #[serde(rename = "encoding")]
     pub encoding: SourceVectorEncoding,
     /// Maximum zoom level for which tiles are available, as in the TileJSON spec. Data from tiles at the maxzoom are used when displaying the map at higher zoom levels.
-    #[serde(rename = "maxzoom")]
     pub maxzoom: SourceVectorMaxzoom,
     /// Minimum zoom level for which tiles are available, as in the TileJSON spec.
-    #[serde(rename = "minzoom")]
     pub minzoom: SourceVectorMinzoom,
     /// A property to use as a feature id (for feature state). Either a property name, or an object of the form `{<sourceLayer>: <propertyName>}`. If specified as a string for a vector tile source, the same property is used across all its source layers.
     #[serde(rename = "promoteId")]
     pub promote_id: SourceVectorPromoteId,
     /// Influences the y direction of the tile coordinates. The global-mercator (aka Spherical Mercator) profile is assumed.
-    #[serde(rename = "scheme")]
     pub scheme: SourceVectorScheme,
     /// An array of one or more tile source URLs, as in the TileJSON spec.
-    #[serde(rename = "tiles")]
     pub tiles: SourceVectorTiles,
     /// The type of the source.
     #[serde(rename = "type")]
     pub r#type: SourceVectorType,
     /// A URL to a TileJSON resource. Supported protocols are `http:` and `https:`.
-    #[serde(rename = "url")]
     pub url: SourceVectorUrl,
     /// A setting to determine whether a source's tiles are cached locally.
-    #[serde(rename = "volatile")]
     pub volatile: SourceVectorVolatile,
 }
 
@@ -4424,8 +4357,7 @@ impl Default for SourceVectorMinzoom {
 
 /// A property to use as a feature id (for feature state). Either a property name, or an object of the form `{<sourceLayer>: <propertyName>}`. If specified as a string for a vector tile source, the same property is used across all its source layers.
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-#[deprecated = "not_implemented"]
-struct SourceVectorPromoteId(serde_json::Value);
+pub struct SourceVectorPromoteId(String);
 
 /// Influences the y direction of the tile coordinates. The global-mercator (aka Spherical Mercator) profile is assumed.
 #[derive(serde::Deserialize, PartialEq, Eq, Debug, Clone, Copy)]
@@ -4473,13 +4405,11 @@ impl Default for SourceVectorVolatile {
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
 pub struct SourceVideo {
     /// Corners of video specified in longitude, latitude pairs.
-    #[serde(rename = "coordinates")]
     pub coordinates: SourceVideoCoordinates,
     /// The data type of the video source.
     #[serde(rename = "type")]
     pub r#type: SourceVideoType,
     /// URLs to video content in order of preferred format.
-    #[serde(rename = "urls")]
     pub urls: SourceVideoUrls,
 }
 
@@ -4504,24 +4434,17 @@ pub enum SourceVideoType {
 struct SourceVideoUrls(Vec<String>);
 
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-pub struct Sources {
-    /// Specification of a data source. For vector and raster sources, either TileJSON or a URL to a TileJSON must be provided. For image and video sources, a URL must be provided. For GeoJSON sources, a URL or inline GeoJSON must be provided.
-    #[serde(rename = "*")]
-    pub star: SourcesStar,
-}
+pub struct Sources(std::collections::BTreeMap<String, InnerSources>);
 
 /// Specification of a data source. For vector and raster sources, either TileJSON or a URL to a TileJSON must be provided. For image and video sources, a URL must be provided. For GeoJSON sources, a URL or inline GeoJSON must be provided.
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-#[deprecated = "not_implemented"]
-struct SourcesStar(serde_json::Value);
+struct InnerSources(Source);
 
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
 pub struct Terrain {
     /// The exaggeration of the terrain - how high it will look.
-    #[serde(rename = "exaggeration")]
     pub exaggeration: TerrainExaggeration,
     /// The source for the terrain data.
-    #[serde(rename = "source")]
     pub source: TerrainSource,
 }
 
@@ -4547,10 +4470,8 @@ struct TerrainSource(String);
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
 pub struct Transition {
     /// Length of time before a transition begins.
-    #[serde(rename = "delay")]
     pub delay: TransitionDelay,
     /// Time allotted for transitions to complete.
-    #[serde(rename = "duration")]
     pub duration: TransitionDuration,
 }
 

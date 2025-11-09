@@ -50,20 +50,44 @@ fn generate_top_level_item(scope: &mut Scope, item: TopLevelItem, name: &str) {
     match item {
         TopLevelItem::Item(item) => generate_parsed_item(scope, &item, name),
         TopLevelItem::Group(items) => {
+            // special case for *:
+            if items.len() == 1
+                && let Some(item) = items.get("*")
+            {
+                let field_type_name = to_upper_camel_case(&format!("Inner {name}"));
+                scope
+                    .new_struct(name)
+                    .vis("pub")
+                    .derive("serde::Deserialize, PartialEq, Debug, Clone")
+                    .tuple_field(format!(
+                        "std::collections::BTreeMap<String,{field_type_name}>"
+                    ));
+                generate_parsed_item(scope, &item, &field_type_name);
+
+                return;
+            }
             {
                 let group = scope
                     .new_struct(name)
                     .vis("pub")
                     .derive("serde::Deserialize, PartialEq, Debug, Clone");
                 for (key, item) in &items {
-                    group
-                        .new_field(
-                            to_snake_case(key),
-                            to_upper_camel_case(&format!("{name} {key}")),
-                        )
-                        .annotation(format!("#[serde(rename=\"{key}\")]"))
+                    let mut field_type_name = to_upper_camel_case(&format!("{name} {key}"));
+                    if key == "*" {
+                        field_type_name =
+                            format!("std::collections::BTreeMap<String,{field_type_name}>");
+                    }
+                    let field = group
+                        .new_field(to_snake_case(key), field_type_name)
                         .doc(item.doc())
                         .vis("pub");
+                    if key == "*" {
+                        field.annotation("#[serde(flatten)]");
+                    } else {
+                        if &to_snake_case(key) != key {
+                            field.annotation(format!("#[serde(rename=\"{key}\")]"));
+                        }
+                    }
                 }
             }
             for (key, item) in items {
@@ -245,7 +269,6 @@ mod tests {
         #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
         pub struct Names {
             /// A number between 0 and 10.
-            #[serde(rename="name_one")]
             pub name_one: NamesNameOne,
         }
 
