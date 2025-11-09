@@ -331,9 +331,30 @@ struct RootSky(Sky);
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
 struct RootSources(Sources);
 
+/// URL where the sprite can be loaded from.
+///
+/// This is equivalent to the following multiple sprite definition:
+///
+/// ```json
+/// {
+///         "id": "default",
+///         "url": "https://example2.com/anotherurl"
+/// }
+/// ```
+#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+pub struct SpriteUrlAndId {
+    id: String,
+    url: url::Url,
+}
+
 /// An array of `{id: 'my-sprite', url: 'https://example.com/sprite'}` objects. Each object should represent a unique URL to load a sprite from and and a unique ID to use as a prefix when referencing images from that sprite (i.e. 'my-sprite:image'). All the URLs are internally extended to load both .json and .png files. If the `id` field is equal to 'default', the prefix is omitted (just 'image' instead of 'default:image'). All the IDs and URLs must be unique. For backwards compatibility, instead of an array, one can also provide a single string that represent a URL to load the sprite from. The images in this case won't be prefixed.
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-struct RootSprite(Sprite);
+pub enum RootSprite {
+    /// URL where the sprite can be loaded from
+    Url(url::Url),
+    /// Array of `{ id: ..., url: ... }` pairs to load multiple sprites
+    Multiple(Vec<SpriteUrlAndId>),
+}
 
 /// An object used to define default values when using the [`global-state`](https://maplibre.org/maplibre-style-spec/expressions/#global-state) expression.
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
