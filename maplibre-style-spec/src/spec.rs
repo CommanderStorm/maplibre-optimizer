@@ -1904,12 +1904,11 @@ impl Default for LayoutSymbolTextAnchor {
 
 /// Value to use for a text label. If a plain `string` is provided, it will be treated as a `formatted` with default/inherited formatting options.
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-#[deprecated = "not_implemented"]
-struct LayoutSymbolTextField(serde_json::Value);
+struct LayoutSymbolTextField(String);
 
 impl Default for LayoutSymbolTextField {
     fn default() -> Self {
-        "".to_string()
+        Self("".to_string())
     }
 }
 

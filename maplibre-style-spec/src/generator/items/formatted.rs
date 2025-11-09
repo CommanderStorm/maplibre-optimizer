@@ -28,12 +28,11 @@ mod tests {
         generate(&mut scope, "Foo", &Fields::default(), "some", false);
         insta::assert_snapshot!(scope.to_string(), @r#"
         #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-        #[deprecated = "not_implemented"]
-        struct Foo(serde_json::Value);
+        struct Foo(String);
 
         impl Default for Foo {
             fn default() -> Self {
-                "some".to_string()
+                Self("some".to_string())
             }
         }
         "#)
