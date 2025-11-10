@@ -250,7 +250,7 @@ mod tests {
             }
         }
 
-        #[cfg(test)]
+        #[cfg(test)] 
         mod test {
             use super::*;
 
@@ -294,7 +294,7 @@ mod tests {
             }
         }
 
-        #[cfg(test)]
+        #[cfg(test)] 
         mod test {
             use super::*;
 
@@ -349,7 +349,7 @@ mod tests {
             NumberTwo(NumberTwo),
         }
 
-        #[cfg(test)]
+        #[cfg(test)] 
         mod test {
             use super::*;
 

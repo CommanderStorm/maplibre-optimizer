@@ -12,12 +12,16 @@ pub fn generate(scope: &mut Scope, name: &str, common: &Fields, default: Option<
         .tuple_field("color::DynamicColor");
 
     if let Some(default) = default {
-        scope
+        let fun = scope
             .new_impl(name)
             .impl_trait("Default")
             .new_fn("default")
-            .ret("Self")
-            .line(format!("Self(color::parse_color({default}).expect(\"Invalid color specified as the default value\"))"));
+            .ret("Self");
+        if let Value::String(s) = default {
+            fun.line(format!("Self(color::parse_color({default}).expect(\"Invalid color specified as the default value\"))"));
+        } else {
+            fun.line("todo!(\"needs expressions to be expressed in the style spec\")");
+        }
     }
     generate_test_from_example_if_present(scope, name, common);
 }
