@@ -33,11 +33,13 @@ fn generate_spec(scope: &mut Scope, root: &BTreeMap<String, ParsedItem>) {
         .vis("pub")
         .derive("serde::Deserialize, PartialEq, Debug, Clone");
     for (key, field) in root {
+        let mut field_type_name = to_upper_camel_case(&format!("root {key}"));
+        if field.optional() {
+            field_type_name = format!("Option<{field_type_name}>");
+        }
+
         let fields = spec
-            .new_field(
-                to_snake_case(key),
-                to_upper_camel_case(&format!("root {key}")),
-            )
+            .new_field(to_snake_case(key), field_type_name)
             .vis("pub")
             .doc(field.doc());
         if &to_snake_case(key) != key {
@@ -82,6 +84,9 @@ fn generate_top_level_item(scope: &mut Scope, item: TopLevelItem, name: &str) {
                     if key == "*" {
                         field_type_name =
                             format!("std::collections::BTreeMap<String,{field_type_name}>");
+                    }
+                    if item.optional() {
+                        field_type_name = format!("Option<{field_type_name}>");
                     }
                     let field = group
                         .new_field(to_snake_case(key), field_type_name)
@@ -281,7 +286,7 @@ mod tests {
         #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
         pub struct Names {
             /// A number between 0 and 10.
-            pub name_one: NamesNameOne,
+            pub name_one: Option<NamesNameOne>,
         }
 
         /// A number between 0 and 10.

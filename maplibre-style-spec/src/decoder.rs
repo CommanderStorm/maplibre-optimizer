@@ -140,6 +140,12 @@ pub enum ParsedItem {
 
 impl ParsedItem {
     pub fn doc(&self) -> &str {
+        self.common().doc.as_str()
+    }
+    pub fn optional(&self) -> bool {
+        !self.common().required.unwrap_or(false)
+    }
+    fn common(&self) -> &Fields {
         match self {
             ParsedItem::Number {
                 common,
@@ -147,12 +153,12 @@ impl ParsedItem {
                 maximum: _maximum,
                 minimum: _minimum,
                 period: _period,
-            } => &common.doc,
+            } => common,
             ParsedItem::Enum {
                 common,
                 default: _default,
                 values: _values,
-            } => &common.doc,
+            } => common,
             ParsedItem::Array {
                 common,
                 default: _default,
@@ -161,66 +167,66 @@ impl ParsedItem {
                 minimum: _minimum,
                 maximum: _maximum,
                 length: _length,
-            } => &common.doc,
+            } => common,
             ParsedItem::Color {
                 common,
                 default: _default,
-            } => &common.doc,
+            } => common,
             ParsedItem::String {
                 common,
                 default: _default,
-            } => &common.doc,
+            } => common,
             ParsedItem::Boolean {
                 common,
                 default: _default,
-            } => &common.doc,
-            ParsedItem::Star(common) => &common.doc,
+            } => common,
+            ParsedItem::Star(common) => common,
             ParsedItem::PropertyType(_) => unreachable!(),
             ParsedItem::ResolvedImage {
                 common,
                 tokens: _tokens,
-            } => &common.doc,
-            ParsedItem::PromoteId(common) => &common.doc,
+            } => common,
+            ParsedItem::PromoteId(common) => common,
             ParsedItem::NumberArray {
                 common,
                 default: _default,
                 minimum: _minimum,
                 maximum: _maximum,
-            } => &common.doc,
+            } => common,
             ParsedItem::ColorArray {
                 common,
                 default: _default,
-            } => &common.doc,
-            ParsedItem::VariableAnchorOffsetCollection(common) => &common.doc,
-            ParsedItem::Transition(common) => &common.doc,
-            ParsedItem::Terrain(common) => &common.doc,
+            } => common,
+            ParsedItem::VariableAnchorOffsetCollection(common) => common,
+            ParsedItem::Transition(common) => common,
+            ParsedItem::Terrain(common) => common,
             ParsedItem::State {
                 common,
                 default: _default,
-            } => &common.doc,
-            ParsedItem::Sprite(common) => &common.doc,
-            ParsedItem::Sources(common) => &common.doc,
-            ParsedItem::Source(common) => &common.doc,
-            ParsedItem::Sky(common) => &common.doc,
+            } => common,
+            ParsedItem::Sprite(common) => common,
+            ParsedItem::Sources(common) => common,
+            ParsedItem::Source(common) => common,
+            ParsedItem::Sky(common) => common,
             ParsedItem::ProjectionDefinition {
                 common,
                 default: _default,
-            } => &common.doc,
-            ParsedItem::Projection(common) => &common.doc,
-            ParsedItem::Paint(common) => &common.doc,
+            } => common,
+            ParsedItem::Projection(common) => common,
+            ParsedItem::Paint(common) => common,
             ParsedItem::Padding {
                 common,
                 default: _default,
-            } => &common.doc,
-            ParsedItem::Light(common) => &common.doc,
-            ParsedItem::Layout(common) => &common.doc,
+            } => common,
+            ParsedItem::Light(common) => common,
+            ParsedItem::Layout(common) => common,
             ParsedItem::Formatted {
                 common,
                 tokens: _tokens,
                 default: _default,
-            } => &common.doc,
-            ParsedItem::Filter(common) => &common.doc,
-            ParsedItem::Expression(common) => &common.doc,
+            } => common,
+            ParsedItem::Filter(common) => common,
+            ParsedItem::Expression(common) => common,
         }
     }
 }
@@ -256,7 +262,10 @@ impl Fields {
     ) -> String {
         let mut doc = self.doc.clone();
         if max.is_some() || min.is_some() || period.is_some() {
-            doc.push_str("\n\nRange: ");
+            if !doc.is_empty() {
+                doc.push_str("\n\n");
+            }
+            doc.push_str("Range: ");
             if min.is_some() || max.is_some() {
                 if let Some(min) = min {
                     doc.push_str(&min.to_string());

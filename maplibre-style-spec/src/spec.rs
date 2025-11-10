@@ -2,12 +2,12 @@
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
 pub struct MaplibreStyleSpecification {
     /// Default bearing, in degrees. The bearing is the compass direction that is "up"; for example, a bearing of 90° orients the map so that east is up. This value will be used only if the map has not been positioned by other means (e.g. map options or user interaction).
-    pub bearing: RootBearing,
+    pub bearing: Option<RootBearing>,
     /// Default map center in longitude and latitude.  The style center will be used only if the map has not been positioned by other means (e.g. map options or user interaction).
-    pub center: RootCenter,
+    pub center: Option<RootCenter>,
     /// Default map center altitude in meters above sea level. The style center altitude defines the altitude where the camera is looking at and will be used only if the map has not been positioned by other means (e.g. map options or user interaction).
     #[serde(rename = "centerAltitude")]
-    pub center_altitude: RootCenterAltitude,
+    pub center_altitude: Option<RootCenterAltitude>,
     /// The `font-faces` property can be used to specify what font files to use for rendering text. Font faces contain information needed to render complex texts such as [Devanagari](https://en.wikipedia.org/wiki/Devanagari), [Khmer](https://en.wikipedia.org/wiki/Khmer_script) among many others.<h2>Unicode range</h2>The optional `unicode-range` property can be used to only use a particular font file for characters within the specified unicode range(s). Its value should be an array of strings, each indicating a start and end of a unicode range, similar to the [CSS descriptor with the same name](https://developer.mozilla.org/en-US/docs/Web/CSS/@font-face/unicode-range). This allows specifying multiple non-consecutive unicode ranges. When not specified, the default value is `U+0-10FFFF`, meaning the font file will be used for all unicode characters.
     ///
     /// Refer to the [Unicode Character Code Charts](https://www.unicode.org/charts/) to see ranges for scripts supported by Unicode. To see what unicode code-points are available in a font, use a tool like [FontDrop](https://fontdrop.info/).
@@ -16,7 +16,7 @@ pub struct MaplibreStyleSpecification {
     ///
     /// <h2>Supported Fonts</h2>What type of fonts are supported is implementation-defined. Unsupported fonts are ignored.
     #[serde(rename = "font-faces")]
-    pub font_faces: RootFontFaces,
+    pub font_faces: Option<RootFontFaces>,
     /// A URL template for loading signed-distance-field glyph sets in PBF format.
     ///
     /// If this property is set, any text in the `text-field` layout property is displayed in the font stack named by the `text-font` layout property based on glyphs located at the URL specified by this property. Otherwise, font faces will be determined by the `text-font` property based on the local environment.
@@ -28,41 +28,41 @@ pub struct MaplibreStyleSpecification {
     ///  - `{range}` - When requesting glyphs, this token is replaced with a range of 256 Unicode code points. For example, to load glyphs for the Unicode Basic Latin and Basic Latin-1 Supplement blocks, the range would be 0-255. The actual ranges that are loaded are determined at runtime based on what text needs to be displayed.
     ///
     /// The URL must be absolute, containing the [scheme, authority and path components](https://en.wikipedia.org/wiki/URL#Syntax).
-    pub glyphs: RootGlyphs,
+    pub glyphs: Option<RootGlyphs>,
     /// A style's `layers` property lists all the layers available in that style. The type of layer is specified by the `type` property, and must be one of `background`, `fill`, `line`, `symbol`, `raster`, `circle`, `fill-extrusion`, `heatmap`, `hillshade`, `color-relief`.
     ///
     /// Except for layers of the `background` type, each layer needs to refer to a source. Layers take the data that they get from a source, optionally filter features, and then define how those features are styled.
     pub layers: RootLayers,
     /// The global light source.
-    pub light: RootLight,
+    pub light: Option<RootLight>,
     /// Arbitrary properties useful to track with the stylesheet, but do not influence rendering. Properties should be prefixed to avoid collisions, like 'maplibre:'.
-    pub metadata: RootMetadata,
+    pub metadata: Option<RootMetadata>,
     /// A human-readable name for the style.
-    pub name: RootName,
+    pub name: Option<RootName>,
     /// Default pitch, in degrees. Zero is perpendicular to the surface, for a look straight down at the map, while a greater value like 60 looks ahead towards the horizon. The style pitch will be used only if the map has not been positioned by other means (e.g. map options or user interaction).
-    pub pitch: RootPitch,
+    pub pitch: Option<RootPitch>,
     /// The projection configuration
-    pub projection: RootProjection,
+    pub projection: Option<RootProjection>,
     /// Default roll, in degrees. The roll angle is measured counterclockwise about the camera boresight. The style roll will be used only if the map has not been positioned by other means (e.g. map options or user interaction).
-    pub roll: RootRoll,
+    pub roll: Option<RootRoll>,
     /// The map's sky configuration. **Note:** this definition is still experimental and is under development in maplibre-gl-js.
-    pub sky: RootSky,
+    pub sky: Option<RootSky>,
     /// Sources state which data the map should display. Specify the type of source with the `type` property. Adding a source isn't enough to make data appear on the map because sources don't contain styling details like color or width. Layers refer to a source and give it a visual representation. This makes it possible to style the same source in different ways, like differentiating between types of roads in a highways layer.
     ///
     /// Tiled sources (vector and raster) must specify their details according to the [TileJSON specification](https://github.com/mapbox/tilejson-spec).
     pub sources: RootSources,
     /// An array of `{id: 'my-sprite', url: 'https://example.com/sprite'}` objects. Each object should represent a unique URL to load a sprite from and and a unique ID to use as a prefix when referencing images from that sprite (i.e. 'my-sprite:image'). All the URLs are internally extended to load both .json and .png files. If the `id` field is equal to 'default', the prefix is omitted (just 'image' instead of 'default:image'). All the IDs and URLs must be unique. For backwards compatibility, instead of an array, one can also provide a single string that represent a URL to load the sprite from. The images in this case won't be prefixed.
-    pub sprite: RootSprite,
+    pub sprite: Option<RootSprite>,
     /// An object used to define default values when using the [`global-state`](https://maplibre.org/maplibre-style-spec/expressions/#global-state) expression.
-    pub state: RootState,
+    pub state: Option<RootState>,
     /// The terrain configuration.
-    pub terrain: RootTerrain,
+    pub terrain: Option<RootTerrain>,
     /// A global transition definition to use as a default across properties, to be used for timing transitions between one value and the next when no property-specific transition is set. Collision-based symbol fading is controlled independently of the style's `transition` property.
-    pub transition: RootTransition,
+    pub transition: Option<RootTransition>,
     /// Style specification version number. Must be 8.
     pub version: RootVersion,
     /// Default zoom level.  The style zoom will be used only if the map has not been positioned by other means (e.g. map options or user interaction).
-    pub zoom: RootZoom,
+    pub zoom: Option<RootZoom>,
 }
 
 /// Default bearing, in degrees. The bearing is the compass direction that is "up"; for example, a bearing of 90° orients the map so that east is up. This value will be used only if the map has not been positioned by other means (e.g. map options or user interaction).
@@ -817,10 +817,10 @@ pub enum FilterOperator {
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
 pub struct Function {
     /// The exponential base of the interpolation curve. It controls the rate at which the result increases. Higher values make the result increase more towards the high end of the range. With `1` the stops are interpolated linearly.
-    pub base: FunctionBase,
+    pub base: Option<FunctionBase>,
     /// The color space in which colors interpolated. Interpolating colors in perceptual color spaces like LAB and HCL tend to produce color ramps that look more consistent and produce colors that can be differentiated more easily than those interpolated in RGB space.
     #[serde(rename = "colorSpace")]
-    pub color_space: FunctionColorSpace,
+    pub color_space: Option<FunctionColorSpace>,
     /// A value to serve as a fallback function result when a value isn't otherwise available. It is used in the following circumstances:
     ///
     /// * In categorical functions, when the feature value does not match any of the stop domain values.
@@ -832,16 +832,16 @@ pub struct Function {
     /// * In interval or exponential property and zoom-and-property functions, when the feature value is not numeric.
     ///
     /// If no default is provided, the style property's default is used in these circumstances.
-    pub default: FunctionDefault,
+    pub default: Option<FunctionDefault>,
     /// An expression.
-    pub expression: FunctionExpression,
+    pub expression: Option<FunctionExpression>,
     /// The name of a feature property to use as the function input.
-    pub property: FunctionProperty,
+    pub property: Option<FunctionProperty>,
     /// An array of stops.
-    pub stops: FunctionStops,
+    pub stops: Option<FunctionStops>,
     /// The interpolation strategy to use in function evaluation.
     #[serde(rename = "type")]
-    pub r#type: FunctionType,
+    pub r#type: Option<FunctionType>,
 }
 
 /// The exponential base of the interpolation curve. It controls the rate at which the result increases. Higher values make the result increase more towards the high end of the range. With `1` the stops are interpolated linearly.
@@ -963,24 +963,24 @@ pub enum GeometryType {
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
 pub struct Layer {
     /// A expression specifying conditions on source features. Only features that match the filter are displayed. Zoom expressions in filters are only evaluated at integer zoom levels. The `feature-state` expression is not supported in filter expressions.
-    pub filter: LayerFilter,
+    pub filter: Option<LayerFilter>,
     /// Unique layer name.
     pub id: LayerId,
     /// Layout properties for the layer.
-    pub layout: LayerLayout,
+    pub layout: Option<LayerLayout>,
     /// The maximum zoom level for the layer. At zoom levels equal to or greater than the maxzoom, the layer will be hidden.
-    pub maxzoom: LayerMaxzoom,
+    pub maxzoom: Option<LayerMaxzoom>,
     /// Arbitrary properties useful to track with the layer, but do not influence rendering. Properties should be prefixed to avoid collisions, like 'maplibre:'.
-    pub metadata: LayerMetadata,
+    pub metadata: Option<LayerMetadata>,
     /// The minimum zoom level for the layer. At zoom levels less than the minzoom, the layer will be hidden.
-    pub minzoom: LayerMinzoom,
+    pub minzoom: Option<LayerMinzoom>,
     /// Default paint properties for this layer.
-    pub paint: LayerPaint,
+    pub paint: Option<LayerPaint>,
     /// Name of a source description to be used for this layer. Required for all layer types except `background`.
-    pub source: LayerSource,
+    pub source: Option<LayerSource>,
     /// Layer to use from a vector tile source. Required for vector tile sources; prohibited for all other source types, including GeoJSON sources.
     #[serde(rename = "source-layer")]
-    pub source_layer: LayerSourceLayer,
+    pub source_layer: Option<LayerSourceLayer>,
     /// Rendering type of this layer.
     #[serde(rename = "type")]
     pub r#type: LayerType,
@@ -1081,7 +1081,7 @@ pub enum Layout {
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
 pub struct LayoutBackground {
     /// Whether this layer is displayed.
-    pub visibility: LayoutBackgroundVisibility,
+    pub visibility: Option<LayoutBackgroundVisibility>,
 }
 
 /// Whether this layer is displayed.
@@ -1105,9 +1105,9 @@ impl Default for LayoutBackgroundVisibility {
 pub struct LayoutCircle {
     /// Sorts features in ascending order based on this value. Features with a higher sort key will appear above features with a lower sort key.
     #[serde(rename = "circle-sort-key")]
-    pub circle_sort_key: LayoutCircleCircleSortKey,
+    pub circle_sort_key: Option<LayoutCircleCircleSortKey>,
     /// Whether this layer is displayed.
-    pub visibility: LayoutCircleVisibility,
+    pub visibility: Option<LayoutCircleVisibility>,
 }
 
 /// Sorts features in ascending order based on this value. Features with a higher sort key will appear above features with a lower sort key.
@@ -1134,7 +1134,7 @@ impl Default for LayoutCircleVisibility {
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
 pub struct LayoutColorRelief {
     /// Whether this layer is displayed.
-    pub visibility: LayoutColorReliefVisibility,
+    pub visibility: Option<LayoutColorReliefVisibility>,
 }
 
 /// Whether this layer is displayed.
@@ -1158,9 +1158,9 @@ impl Default for LayoutColorReliefVisibility {
 pub struct LayoutFill {
     /// Sorts features in ascending order based on this value. Features with a higher sort key will appear above features with a lower sort key.
     #[serde(rename = "fill-sort-key")]
-    pub fill_sort_key: LayoutFillFillSortKey,
+    pub fill_sort_key: Option<LayoutFillFillSortKey>,
     /// Whether this layer is displayed.
-    pub visibility: LayoutFillVisibility,
+    pub visibility: Option<LayoutFillVisibility>,
 }
 
 /// Sorts features in ascending order based on this value. Features with a higher sort key will appear above features with a lower sort key.
@@ -1187,7 +1187,7 @@ impl Default for LayoutFillVisibility {
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
 pub struct LayoutFillExtrusion {
     /// Whether this layer is displayed.
-    pub visibility: LayoutFillExtrusionVisibility,
+    pub visibility: Option<LayoutFillExtrusionVisibility>,
 }
 
 /// Whether this layer is displayed.
@@ -1210,7 +1210,7 @@ impl Default for LayoutFillExtrusionVisibility {
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
 pub struct LayoutHeatmap {
     /// Whether this layer is displayed.
-    pub visibility: LayoutHeatmapVisibility,
+    pub visibility: Option<LayoutHeatmapVisibility>,
 }
 
 /// Whether this layer is displayed.
@@ -1233,7 +1233,7 @@ impl Default for LayoutHeatmapVisibility {
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
 pub struct LayoutHillshade {
     /// Whether this layer is displayed.
-    pub visibility: LayoutHillshadeVisibility,
+    pub visibility: Option<LayoutHillshadeVisibility>,
 }
 
 /// Whether this layer is displayed.
@@ -1257,21 +1257,21 @@ impl Default for LayoutHillshadeVisibility {
 pub struct LayoutLine {
     /// The display of line endings.
     #[serde(rename = "line-cap")]
-    pub line_cap: LayoutLineLineCap,
+    pub line_cap: Option<LayoutLineLineCap>,
     /// The display of lines when joining.
     #[serde(rename = "line-join")]
-    pub line_join: LayoutLineLineJoin,
+    pub line_join: Option<LayoutLineLineJoin>,
     /// Used to automatically convert miter joins to bevel joins for sharp angles.
     #[serde(rename = "line-miter-limit")]
-    pub line_miter_limit: LayoutLineLineMiterLimit,
+    pub line_miter_limit: Option<LayoutLineLineMiterLimit>,
     /// Used to automatically convert round joins to miter joins for shallow angles.
     #[serde(rename = "line-round-limit")]
-    pub line_round_limit: LayoutLineLineRoundLimit,
+    pub line_round_limit: Option<LayoutLineLineRoundLimit>,
     /// Sorts features in ascending order based on this value. Features with a higher sort key will appear above features with a lower sort key.
     #[serde(rename = "line-sort-key")]
-    pub line_sort_key: LayoutLineLineSortKey,
+    pub line_sort_key: Option<LayoutLineLineSortKey>,
     /// Whether this layer is displayed.
-    pub visibility: LayoutLineVisibility,
+    pub visibility: Option<LayoutLineVisibility>,
 }
 
 /// The display of line endings.
@@ -1364,7 +1364,7 @@ impl Default for LayoutLineVisibility {
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
 pub struct LayoutRaster {
     /// Whether this layer is displayed.
-    pub visibility: LayoutRasterVisibility,
+    pub visibility: Option<LayoutRasterVisibility>,
 }
 
 /// Whether this layer is displayed.
@@ -1388,130 +1388,130 @@ impl Default for LayoutRasterVisibility {
 pub struct LayoutSymbol {
     /// If true, the icon will be visible even if it collides with other previously drawn symbols.
     #[serde(rename = "icon-allow-overlap")]
-    pub icon_allow_overlap: LayoutSymbolIconAllowOverlap,
+    pub icon_allow_overlap: Option<LayoutSymbolIconAllowOverlap>,
     /// Part of the icon placed closest to the anchor.
     #[serde(rename = "icon-anchor")]
-    pub icon_anchor: LayoutSymbolIconAnchor,
+    pub icon_anchor: Option<LayoutSymbolIconAnchor>,
     /// If true, other symbols can be visible even if they collide with the icon.
     #[serde(rename = "icon-ignore-placement")]
-    pub icon_ignore_placement: LayoutSymbolIconIgnorePlacement,
+    pub icon_ignore_placement: Option<LayoutSymbolIconIgnorePlacement>,
     /// Name of image in sprite to use for drawing an image background.
     #[serde(rename = "icon-image")]
-    pub icon_image: LayoutSymbolIconImage,
+    pub icon_image: Option<LayoutSymbolIconImage>,
     /// If true, the icon may be flipped to prevent it from being rendered upside-down.
     #[serde(rename = "icon-keep-upright")]
-    pub icon_keep_upright: LayoutSymbolIconKeepUpright,
+    pub icon_keep_upright: Option<LayoutSymbolIconKeepUpright>,
     /// Offset distance of icon from its anchor. Positive values indicate right and down, while negative values indicate left and up. Each component is multiplied by the value of `icon-size` to obtain the final offset in pixels. When combined with `icon-rotate` the offset will be as if the rotated direction was up.
     #[serde(rename = "icon-offset")]
-    pub icon_offset: LayoutSymbolIconOffset,
+    pub icon_offset: Option<LayoutSymbolIconOffset>,
     /// If true, text will display without their corresponding icons when the icon collides with other symbols and the text does not.
     #[serde(rename = "icon-optional")]
-    pub icon_optional: LayoutSymbolIconOptional,
+    pub icon_optional: Option<LayoutSymbolIconOptional>,
     /// Allows for control over whether to show an icon when it overlaps other symbols on the map. If `icon-overlap` is not set, `icon-allow-overlap` is used instead.
     #[serde(rename = "icon-overlap")]
-    pub icon_overlap: LayoutSymbolIconOverlap,
+    pub icon_overlap: Option<LayoutSymbolIconOverlap>,
     /// Size of additional area round the icon bounding box used for detecting symbol collisions.
     #[serde(rename = "icon-padding")]
-    pub icon_padding: LayoutSymbolIconPadding,
+    pub icon_padding: Option<LayoutSymbolIconPadding>,
     /// Orientation of icon when map is pitched.
     #[serde(rename = "icon-pitch-alignment")]
-    pub icon_pitch_alignment: LayoutSymbolIconPitchAlignment,
+    pub icon_pitch_alignment: Option<LayoutSymbolIconPitchAlignment>,
     /// Rotates the icon clockwise.
     #[serde(rename = "icon-rotate")]
-    pub icon_rotate: LayoutSymbolIconRotate,
+    pub icon_rotate: Option<LayoutSymbolIconRotate>,
     /// In combination with `symbol-placement`, determines the rotation behavior of icons.
     #[serde(rename = "icon-rotation-alignment")]
-    pub icon_rotation_alignment: LayoutSymbolIconRotationAlignment,
+    pub icon_rotation_alignment: Option<LayoutSymbolIconRotationAlignment>,
     /// Scales the original size of the icon by the provided factor. The new pixel size of the image will be the original pixel size multiplied by `icon-size`. 1 is the original size; 3 triples the size of the image.
     #[serde(rename = "icon-size")]
-    pub icon_size: LayoutSymbolIconSize,
+    pub icon_size: Option<LayoutSymbolIconSize>,
     /// Scales the icon to fit around the associated text.
     #[serde(rename = "icon-text-fit")]
-    pub icon_text_fit: LayoutSymbolIconTextFit,
+    pub icon_text_fit: Option<LayoutSymbolIconTextFit>,
     /// Size of the additional area added to dimensions determined by `icon-text-fit`, in clockwise order: top, right, bottom, left.
     #[serde(rename = "icon-text-fit-padding")]
-    pub icon_text_fit_padding: LayoutSymbolIconTextFitPadding,
+    pub icon_text_fit_padding: Option<LayoutSymbolIconTextFitPadding>,
     /// If true, the symbols will not cross tile edges to avoid mutual collisions. Recommended in layers that don't have enough padding in the vector tile to prevent collisions, or if it is a point symbol layer placed after a line symbol layer. When using a client that supports global collision detection, like MapLibre GL JS version 0.42.0 or greater, enabling this property is not needed to prevent clipped labels at tile boundaries.
     #[serde(rename = "symbol-avoid-edges")]
-    pub symbol_avoid_edges: LayoutSymbolSymbolAvoidEdges,
+    pub symbol_avoid_edges: Option<LayoutSymbolSymbolAvoidEdges>,
     /// Label placement relative to its geometry.
     #[serde(rename = "symbol-placement")]
-    pub symbol_placement: LayoutSymbolSymbolPlacement,
+    pub symbol_placement: Option<LayoutSymbolSymbolPlacement>,
     /// Sorts features in ascending order based on this value. Features with lower sort keys are drawn and placed first.  When `icon-allow-overlap` or `text-allow-overlap` is `false`, features with a lower sort key will have priority during placement. When `icon-allow-overlap` or `text-allow-overlap` is set to `true`, features with a higher sort key will overlap over features with a lower sort key.
     #[serde(rename = "symbol-sort-key")]
-    pub symbol_sort_key: LayoutSymbolSymbolSortKey,
+    pub symbol_sort_key: Option<LayoutSymbolSymbolSortKey>,
     /// Distance between two symbol anchors.
     #[serde(rename = "symbol-spacing")]
-    pub symbol_spacing: LayoutSymbolSymbolSpacing,
+    pub symbol_spacing: Option<LayoutSymbolSymbolSpacing>,
     /// Determines whether overlapping symbols in the same layer are rendered in the order that they appear in the data source or by their y-position relative to the viewport. To control the order and prioritization of symbols otherwise, use `symbol-sort-key`.
     #[serde(rename = "symbol-z-order")]
-    pub symbol_z_order: LayoutSymbolSymbolZOrder,
+    pub symbol_z_order: Option<LayoutSymbolSymbolZOrder>,
     /// If true, the text will be visible even if it collides with other previously drawn symbols.
     #[serde(rename = "text-allow-overlap")]
-    pub text_allow_overlap: LayoutSymbolTextAllowOverlap,
+    pub text_allow_overlap: Option<LayoutSymbolTextAllowOverlap>,
     /// Part of the text placed closest to the anchor.
     #[serde(rename = "text-anchor")]
-    pub text_anchor: LayoutSymbolTextAnchor,
+    pub text_anchor: Option<LayoutSymbolTextAnchor>,
     /// Value to use for a text label. If a plain `string` is provided, it will be treated as a `formatted` with default/inherited formatting options.
     #[serde(rename = "text-field")]
-    pub text_field: LayoutSymbolTextField,
+    pub text_field: Option<LayoutSymbolTextField>,
     /// Fonts to use for displaying text. If the `glyphs` root property is specified, this array is joined together and interpreted as a font stack name. Otherwise, it is interpreted as a cascading fallback list of local font names.
     #[serde(rename = "text-font")]
-    pub text_font: LayoutSymbolTextFont,
+    pub text_font: Option<LayoutSymbolTextFont>,
     /// If true, other symbols can be visible even if they collide with the text.
     #[serde(rename = "text-ignore-placement")]
-    pub text_ignore_placement: LayoutSymbolTextIgnorePlacement,
+    pub text_ignore_placement: Option<LayoutSymbolTextIgnorePlacement>,
     /// Text justification options.
     #[serde(rename = "text-justify")]
-    pub text_justify: LayoutSymbolTextJustify,
+    pub text_justify: Option<LayoutSymbolTextJustify>,
     /// If true, the text may be flipped vertically to prevent it from being rendered upside-down.
     #[serde(rename = "text-keep-upright")]
-    pub text_keep_upright: LayoutSymbolTextKeepUpright,
+    pub text_keep_upright: Option<LayoutSymbolTextKeepUpright>,
     /// Text tracking amount.
     #[serde(rename = "text-letter-spacing")]
-    pub text_letter_spacing: LayoutSymbolTextLetterSpacing,
+    pub text_letter_spacing: Option<LayoutSymbolTextLetterSpacing>,
     /// Text leading value for multi-line text.
     #[serde(rename = "text-line-height")]
-    pub text_line_height: LayoutSymbolTextLineHeight,
+    pub text_line_height: Option<LayoutSymbolTextLineHeight>,
     /// Maximum angle change between adjacent characters.
     #[serde(rename = "text-max-angle")]
-    pub text_max_angle: LayoutSymbolTextMaxAngle,
+    pub text_max_angle: Option<LayoutSymbolTextMaxAngle>,
     /// The maximum line width for text wrapping.
     #[serde(rename = "text-max-width")]
-    pub text_max_width: LayoutSymbolTextMaxWidth,
+    pub text_max_width: Option<LayoutSymbolTextMaxWidth>,
     /// Offset distance of text from its anchor. Positive values indicate right and down, while negative values indicate left and up. If used with text-variable-anchor, input values will be taken as absolute values. Offsets along the x- and y-axis will be applied automatically based on the anchor position.
     #[serde(rename = "text-offset")]
-    pub text_offset: LayoutSymbolTextOffset,
+    pub text_offset: Option<LayoutSymbolTextOffset>,
     /// If true, icons will display without their corresponding text when the text collides with other symbols and the icon does not.
     #[serde(rename = "text-optional")]
-    pub text_optional: LayoutSymbolTextOptional,
+    pub text_optional: Option<LayoutSymbolTextOptional>,
     /// Allows for control over whether to show symbol text when it overlaps other symbols on the map. If `text-overlap` is not set, `text-allow-overlap` is used instead
     #[serde(rename = "text-overlap")]
-    pub text_overlap: LayoutSymbolTextOverlap,
+    pub text_overlap: Option<LayoutSymbolTextOverlap>,
     /// Size of the additional area around the text bounding box used for detecting symbol collisions.
     #[serde(rename = "text-padding")]
-    pub text_padding: LayoutSymbolTextPadding,
+    pub text_padding: Option<LayoutSymbolTextPadding>,
     /// Orientation of text when map is pitched.
     #[serde(rename = "text-pitch-alignment")]
-    pub text_pitch_alignment: LayoutSymbolTextPitchAlignment,
+    pub text_pitch_alignment: Option<LayoutSymbolTextPitchAlignment>,
     /// Radial offset of text, in the direction of the symbol's anchor. Useful in combination with `text-variable-anchor`, which defaults to using the two-dimensional `text-offset` if present.
     #[serde(rename = "text-radial-offset")]
-    pub text_radial_offset: LayoutSymbolTextRadialOffset,
+    pub text_radial_offset: Option<LayoutSymbolTextRadialOffset>,
     /// Rotates the text clockwise.
     #[serde(rename = "text-rotate")]
-    pub text_rotate: LayoutSymbolTextRotate,
+    pub text_rotate: Option<LayoutSymbolTextRotate>,
     /// In combination with `symbol-placement`, determines the rotation behavior of the individual glyphs forming the text.
     #[serde(rename = "text-rotation-alignment")]
-    pub text_rotation_alignment: LayoutSymbolTextRotationAlignment,
+    pub text_rotation_alignment: Option<LayoutSymbolTextRotationAlignment>,
     /// Font size.
     #[serde(rename = "text-size")]
-    pub text_size: LayoutSymbolTextSize,
+    pub text_size: Option<LayoutSymbolTextSize>,
     /// Specifies how to capitalize text, similar to the CSS `text-transform` property.
     #[serde(rename = "text-transform")]
-    pub text_transform: LayoutSymbolTextTransform,
+    pub text_transform: Option<LayoutSymbolTextTransform>,
     /// To increase the chance of placing high-priority labels on the map, you can provide an array of `text-anchor` locations: the renderer will attempt to place the label at each location, in order, before moving onto the next label. Use `text-justify: auto` to choose justification based on anchor position. To apply an offset, use the `text-radial-offset` or the two-dimensional `text-offset`.
     #[serde(rename = "text-variable-anchor")]
-    pub text_variable_anchor: LayoutSymbolTextVariableAnchor,
+    pub text_variable_anchor: Option<LayoutSymbolTextVariableAnchor>,
     /// To increase the chance of placing high-priority labels on the map, you can provide an array of `text-anchor` locations, each paired with an offset value. The renderer will attempt to place the label at each location, in order, before moving on to the next location+offset. Use `text-justify: auto` to choose justification based on anchor position.
     ///
     ///  The length of the array must be even, and must alternate between enum and point entries. i.e., each anchor location must be accompanied by a point, and that point defines the offset when the corresponding anchor location is used. Positive offset values indicate right and down, while negative values indicate left and up. Anchor locations may repeat, allowing the renderer to try multiple offsets to try and place a label using the same anchor.
@@ -1528,12 +1528,12 @@ pub struct LayoutSymbol {
     ///
     ///  When the renderer chooses the `left` anchor, `[3, 0]` will be used for `text-offset`; the text will be shifted right by 3 ems.
     #[serde(rename = "text-variable-anchor-offset")]
-    pub text_variable_anchor_offset: LayoutSymbolTextVariableAnchorOffset,
+    pub text_variable_anchor_offset: Option<LayoutSymbolTextVariableAnchorOffset>,
     /// The property allows control over a symbol's orientation. Note that the property values act as a hint, so that a symbol whose language doesn’t support the provided orientation will be laid out in its natural orientation. Example: English point symbol will be rendered horizontally even if array value contains single 'vertical' enum value. The order of elements in an array define priority order for the placement of an orientation variant.
     #[serde(rename = "text-writing-mode")]
-    pub text_writing_mode: LayoutSymbolTextWritingMode,
+    pub text_writing_mode: Option<LayoutSymbolTextWritingMode>,
     /// Whether this layer is displayed.
-    pub visibility: LayoutSymbolVisibility,
+    pub visibility: Option<LayoutSymbolVisibility>,
 }
 
 /// If true, the icon will be visible even if it collides with other previously drawn symbols.
@@ -2272,13 +2272,13 @@ impl Default for LayoutSymbolVisibility {
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
 pub struct Light {
     /// Whether extruded geometries are lit relative to the map or viewport.
-    pub anchor: LightAnchor,
+    pub anchor: Option<LightAnchor>,
     /// Color tint for lighting extruded geometries.
-    pub color: LightColor,
+    pub color: Option<LightColor>,
     /// Intensity of lighting (on a scale from 0 to 1). Higher numbers will present as more extreme contrast.
-    pub intensity: LightIntensity,
+    pub intensity: Option<LightIntensity>,
     /// Position of the light source relative to lit (extruded) geometries, in [r radial coordinate, a azimuthal angle, p polar angle] where r indicates the distance from the center of the base of an object to its light, a indicates the position of the light relative to 0° (0° when `light.anchor` is set to `viewport` corresponds to the top of the viewport, or 0° when `light.anchor` is set to `map` corresponds to due north, and degrees proceed clockwise), and p indicates the height of the light (from 0°, directly above, to 180°, directly below).
-    pub position: LightPosition,
+    pub position: Option<LightPosition>,
 }
 
 /// Whether extruded geometries are lit relative to the map or viewport.
@@ -2359,13 +2359,13 @@ pub enum Paint {
 pub struct PaintBackground {
     /// The color with which the background will be drawn.
     #[serde(rename = "background-color")]
-    pub background_color: PaintBackgroundBackgroundColor,
+    pub background_color: Option<PaintBackgroundBackgroundColor>,
     /// The opacity at which the background will be drawn.
     #[serde(rename = "background-opacity")]
-    pub background_opacity: PaintBackgroundBackgroundOpacity,
+    pub background_opacity: Option<PaintBackgroundBackgroundOpacity>,
     /// Name of image in sprite to use for drawing an image background. For seamless patterns, image width and height must be a factor of two (2, 4, 8, ..., 512). Note that zoom-dependent expressions will be evaluated only at integer zoom levels.
     #[serde(rename = "background-pattern")]
-    pub background_pattern: PaintBackgroundBackgroundPattern,
+    pub background_pattern: Option<PaintBackgroundBackgroundPattern>,
 }
 
 /// The color with which the background will be drawn.
@@ -2402,37 +2402,37 @@ struct PaintBackgroundBackgroundPattern(serde_json::Value);
 pub struct PaintCircle {
     /// Amount to blur the circle. 1 blurs the circle such that only the centerpoint is full opacity.
     #[serde(rename = "circle-blur")]
-    pub circle_blur: PaintCircleCircleBlur,
+    pub circle_blur: Option<PaintCircleCircleBlur>,
     /// The fill color of the circle.
     #[serde(rename = "circle-color")]
-    pub circle_color: PaintCircleCircleColor,
+    pub circle_color: Option<PaintCircleCircleColor>,
     /// The opacity at which the circle will be drawn.
     #[serde(rename = "circle-opacity")]
-    pub circle_opacity: PaintCircleCircleOpacity,
+    pub circle_opacity: Option<PaintCircleCircleOpacity>,
     /// Orientation of circle when map is pitched.
     #[serde(rename = "circle-pitch-alignment")]
-    pub circle_pitch_alignment: PaintCircleCirclePitchAlignment,
+    pub circle_pitch_alignment: Option<PaintCircleCirclePitchAlignment>,
     /// Controls the scaling behavior of the circle when the map is pitched.
     #[serde(rename = "circle-pitch-scale")]
-    pub circle_pitch_scale: PaintCircleCirclePitchScale,
+    pub circle_pitch_scale: Option<PaintCircleCirclePitchScale>,
     /// Circle radius.
     #[serde(rename = "circle-radius")]
-    pub circle_radius: PaintCircleCircleRadius,
+    pub circle_radius: Option<PaintCircleCircleRadius>,
     /// The stroke color of the circle.
     #[serde(rename = "circle-stroke-color")]
-    pub circle_stroke_color: PaintCircleCircleStrokeColor,
+    pub circle_stroke_color: Option<PaintCircleCircleStrokeColor>,
     /// The opacity of the circle's stroke.
     #[serde(rename = "circle-stroke-opacity")]
-    pub circle_stroke_opacity: PaintCircleCircleStrokeOpacity,
+    pub circle_stroke_opacity: Option<PaintCircleCircleStrokeOpacity>,
     /// The width of the circle's stroke. Strokes are placed outside of the `circle-radius`.
     #[serde(rename = "circle-stroke-width")]
-    pub circle_stroke_width: PaintCircleCircleStrokeWidth,
+    pub circle_stroke_width: Option<PaintCircleCircleStrokeWidth>,
     /// The geometry's offset. Values are [x, y] where negatives indicate left and up, respectively.
     #[serde(rename = "circle-translate")]
-    pub circle_translate: PaintCircleCircleTranslate,
+    pub circle_translate: Option<PaintCircleCircleTranslate>,
     /// Controls the frame of reference for `circle-translate`.
     #[serde(rename = "circle-translate-anchor")]
-    pub circle_translate_anchor: PaintCircleCircleTranslateAnchor,
+    pub circle_translate_anchor: Option<PaintCircleCircleTranslateAnchor>,
 }
 
 /// Amount to blur the circle. 1 blurs the circle such that only the centerpoint is full opacity.
@@ -2598,10 +2598,10 @@ impl Default for PaintCircleCircleTranslateAnchor {
 pub struct PaintColorRelief {
     /// Defines the color of each pixel based on its elevation. Should be an expression that uses `["elevation"]` as input.
     #[serde(rename = "color-relief-color")]
-    pub color_relief_color: PaintColorReliefColorReliefColor,
+    pub color_relief_color: Option<PaintColorReliefColorReliefColor>,
     /// The opacity at which the color-relief will be drawn.
     #[serde(rename = "color-relief-opacity")]
-    pub color_relief_opacity: PaintColorReliefColorReliefOpacity,
+    pub color_relief_opacity: Option<PaintColorReliefColorReliefOpacity>,
 }
 
 /// Defines the color of each pixel based on its elevation. Should be an expression that uses `["elevation"]` as input.
@@ -2627,25 +2627,25 @@ impl Default for PaintColorReliefColorReliefOpacity {
 pub struct PaintFill {
     /// Whether or not the fill should be antialiased.
     #[serde(rename = "fill-antialias")]
-    pub fill_antialias: PaintFillFillAntialias,
+    pub fill_antialias: Option<PaintFillFillAntialias>,
     /// The color of the filled part of this layer. This color can be specified as `rgba` with an alpha component and the color's opacity will not affect the opacity of the 1px stroke, if it is used.
     #[serde(rename = "fill-color")]
-    pub fill_color: PaintFillFillColor,
+    pub fill_color: Option<PaintFillFillColor>,
     /// The opacity of the entire fill layer. In contrast to the `fill-color`, this value will also affect the 1px stroke around the fill, if the stroke is used.
     #[serde(rename = "fill-opacity")]
-    pub fill_opacity: PaintFillFillOpacity,
+    pub fill_opacity: Option<PaintFillFillOpacity>,
     /// The outline color of the fill. Matches the value of `fill-color` if unspecified.
     #[serde(rename = "fill-outline-color")]
-    pub fill_outline_color: PaintFillFillOutlineColor,
+    pub fill_outline_color: Option<PaintFillFillOutlineColor>,
     /// Name of image in sprite to use for drawing image fills. For seamless patterns, image width and height must be a factor of two (2, 4, 8, ..., 512). Note that zoom-dependent expressions will be evaluated only at integer zoom levels.
     #[serde(rename = "fill-pattern")]
-    pub fill_pattern: PaintFillFillPattern,
+    pub fill_pattern: Option<PaintFillFillPattern>,
     /// The geometry's offset. Values are [x, y] where negatives indicate left and up, respectively.
     #[serde(rename = "fill-translate")]
-    pub fill_translate: PaintFillFillTranslate,
+    pub fill_translate: Option<PaintFillFillTranslate>,
     /// Controls the frame of reference for `fill-translate`.
     #[serde(rename = "fill-translate-anchor")]
-    pub fill_translate_anchor: PaintFillFillTranslateAnchor,
+    pub fill_translate_anchor: Option<PaintFillFillTranslateAnchor>,
 }
 
 /// Whether or not the fill should be antialiased.
@@ -2728,28 +2728,28 @@ impl Default for PaintFillFillTranslateAnchor {
 pub struct PaintFillExtrusion {
     /// The height with which to extrude the base of this layer. Must be less than or equal to `fill-extrusion-height`.
     #[serde(rename = "fill-extrusion-base")]
-    pub fill_extrusion_base: PaintFillExtrusionFillExtrusionBase,
+    pub fill_extrusion_base: Option<PaintFillExtrusionFillExtrusionBase>,
     /// The base color of the extruded fill. The extrusion's surfaces will be shaded differently based on this color in combination with the root `light` settings. If this color is specified as `rgba` with an alpha component, the alpha component will be ignored; use `fill-extrusion-opacity` to set layer opacity.
     #[serde(rename = "fill-extrusion-color")]
-    pub fill_extrusion_color: PaintFillExtrusionFillExtrusionColor,
+    pub fill_extrusion_color: Option<PaintFillExtrusionFillExtrusionColor>,
     /// The height with which to extrude this layer.
     #[serde(rename = "fill-extrusion-height")]
-    pub fill_extrusion_height: PaintFillExtrusionFillExtrusionHeight,
+    pub fill_extrusion_height: Option<PaintFillExtrusionFillExtrusionHeight>,
     /// The opacity of the entire fill extrusion layer. This is rendered on a per-layer, not per-feature, basis, and data-driven styling is not available.
     #[serde(rename = "fill-extrusion-opacity")]
-    pub fill_extrusion_opacity: PaintFillExtrusionFillExtrusionOpacity,
+    pub fill_extrusion_opacity: Option<PaintFillExtrusionFillExtrusionOpacity>,
     /// Name of image in sprite to use for drawing images on extruded fills. For seamless patterns, image width and height must be a factor of two (2, 4, 8, ..., 512). Note that zoom-dependent expressions will be evaluated only at integer zoom levels.
     #[serde(rename = "fill-extrusion-pattern")]
-    pub fill_extrusion_pattern: PaintFillExtrusionFillExtrusionPattern,
+    pub fill_extrusion_pattern: Option<PaintFillExtrusionFillExtrusionPattern>,
     /// The geometry's offset. Values are [x, y] where negatives indicate left and up (on the flat plane), respectively.
     #[serde(rename = "fill-extrusion-translate")]
-    pub fill_extrusion_translate: PaintFillExtrusionFillExtrusionTranslate,
+    pub fill_extrusion_translate: Option<PaintFillExtrusionFillExtrusionTranslate>,
     /// Controls the frame of reference for `fill-extrusion-translate`.
     #[serde(rename = "fill-extrusion-translate-anchor")]
-    pub fill_extrusion_translate_anchor: PaintFillExtrusionFillExtrusionTranslateAnchor,
+    pub fill_extrusion_translate_anchor: Option<PaintFillExtrusionFillExtrusionTranslateAnchor>,
     /// Whether to apply a vertical gradient to the sides of a fill-extrusion layer. If true, sides will be shaded slightly darker farther down.
     #[serde(rename = "fill-extrusion-vertical-gradient")]
-    pub fill_extrusion_vertical_gradient: PaintFillExtrusionFillExtrusionVerticalGradient,
+    pub fill_extrusion_vertical_gradient: Option<PaintFillExtrusionFillExtrusionVerticalGradient>,
 }
 
 /// The height with which to extrude the base of this layer. Must be less than or equal to `fill-extrusion-height`.
@@ -2858,19 +2858,19 @@ impl Default for PaintFillExtrusionFillExtrusionVerticalGradient {
 pub struct PaintHeatmap {
     /// Defines the color of each pixel based on its density value in a heatmap.  Should be an expression that uses `["heatmap-density"]` as input.
     #[serde(rename = "heatmap-color")]
-    pub heatmap_color: PaintHeatmapHeatmapColor,
+    pub heatmap_color: Option<PaintHeatmapHeatmapColor>,
     /// Similar to `heatmap-weight` but controls the intensity of the heatmap globally. Primarily used for adjusting the heatmap based on zoom level.
     #[serde(rename = "heatmap-intensity")]
-    pub heatmap_intensity: PaintHeatmapHeatmapIntensity,
+    pub heatmap_intensity: Option<PaintHeatmapHeatmapIntensity>,
     /// The global opacity at which the heatmap layer will be drawn.
     #[serde(rename = "heatmap-opacity")]
-    pub heatmap_opacity: PaintHeatmapHeatmapOpacity,
+    pub heatmap_opacity: Option<PaintHeatmapHeatmapOpacity>,
     /// Radius of influence of one heatmap point in pixels. Increasing the value makes the heatmap smoother, but less detailed.
     #[serde(rename = "heatmap-radius")]
-    pub heatmap_radius: PaintHeatmapHeatmapRadius,
+    pub heatmap_radius: Option<PaintHeatmapHeatmapRadius>,
     /// A measure of how much an individual point contributes to the heatmap. A value of 10 would be equivalent to having 10 points of weight 1 in the same spot. Especially useful when combined with clustering.
     #[serde(rename = "heatmap-weight")]
-    pub heatmap_weight: PaintHeatmapHeatmapWeight,
+    pub heatmap_weight: Option<PaintHeatmapHeatmapWeight>,
 }
 
 /// Defines the color of each pixel based on its density value in a heatmap.  Should be an expression that uses `["heatmap-density"]` as input.
@@ -2947,28 +2947,28 @@ impl Default for PaintHeatmapHeatmapWeight {
 pub struct PaintHillshade {
     /// The shading color used to accentuate rugged terrain like sharp cliffs and gorges.
     #[serde(rename = "hillshade-accent-color")]
-    pub hillshade_accent_color: PaintHillshadeHillshadeAccentColor,
+    pub hillshade_accent_color: Option<PaintHillshadeHillshadeAccentColor>,
     /// Intensity of the hillshade
     #[serde(rename = "hillshade-exaggeration")]
-    pub hillshade_exaggeration: PaintHillshadeHillshadeExaggeration,
+    pub hillshade_exaggeration: Option<PaintHillshadeHillshadeExaggeration>,
     /// The shading color of areas that faces towards the light source(s). Only when `hillshade-method` is set to `multidirectional` can you specify multiple light sources.
     #[serde(rename = "hillshade-highlight-color")]
-    pub hillshade_highlight_color: PaintHillshadeHillshadeHighlightColor,
+    pub hillshade_highlight_color: Option<PaintHillshadeHillshadeHighlightColor>,
     /// The altitude of the light source(s) used to generate the hillshading with 0 as sunset and 90 as noon. Only when `hillshade-method` is set to `multidirectional` can you specify multiple light sources.
     #[serde(rename = "hillshade-illumination-altitude")]
-    pub hillshade_illumination_altitude: PaintHillshadeHillshadeIlluminationAltitude,
+    pub hillshade_illumination_altitude: Option<PaintHillshadeHillshadeIlluminationAltitude>,
     /// Direction of light source when map is rotated.
     #[serde(rename = "hillshade-illumination-anchor")]
-    pub hillshade_illumination_anchor: PaintHillshadeHillshadeIlluminationAnchor,
+    pub hillshade_illumination_anchor: Option<PaintHillshadeHillshadeIlluminationAnchor>,
     /// The direction of the light source(s) used to generate the hillshading with 0 as the top of the viewport if `hillshade-illumination-anchor` is set to `viewport` and due north if `hillshade-illumination-anchor` is set to `map`. Only when `hillshade-method` is set to `multidirectional` can you specify multiple light sources.
     #[serde(rename = "hillshade-illumination-direction")]
-    pub hillshade_illumination_direction: PaintHillshadeHillshadeIlluminationDirection,
+    pub hillshade_illumination_direction: Option<PaintHillshadeHillshadeIlluminationDirection>,
     /// The hillshade algorithm to use, one of `standard`, `basic`, `combined`, `igor`, or `multidirectional`. ![image](assets/hillshade_methods.png)
     #[serde(rename = "hillshade-method")]
-    pub hillshade_method: PaintHillshadeHillshadeMethod,
+    pub hillshade_method: Option<PaintHillshadeHillshadeMethod>,
     /// The shading color of areas that face away from the light source(s). Only when `hillshade-method` is set to `multidirectional` can you specify multiple light sources.
     #[serde(rename = "hillshade-shadow-color")]
-    pub hillshade_shadow_color: PaintHillshadeHillshadeShadowColor,
+    pub hillshade_shadow_color: Option<PaintHillshadeHillshadeShadowColor>,
 }
 
 /// The shading color used to accentuate rugged terrain like sharp cliffs and gorges.
@@ -3117,37 +3117,37 @@ impl Default for PaintHillshadeHillshadeShadowColor {
 pub struct PaintLine {
     /// Blur applied to the line, in pixels.
     #[serde(rename = "line-blur")]
-    pub line_blur: PaintLineLineBlur,
+    pub line_blur: Option<PaintLineLineBlur>,
     /// The color with which the line will be drawn.
     #[serde(rename = "line-color")]
-    pub line_color: PaintLineLineColor,
+    pub line_color: Option<PaintLineLineColor>,
     /// Specifies the lengths of the alternating dashes and gaps that form the dash pattern. The lengths are later scaled by the line width. To convert a dash length to pixels, multiply the length by the current line width. GeoJSON sources with `lineMetrics: true` specified won't render dashed lines to the expected scale. Zoom-dependent expressions will be evaluated only at integer zoom levels. The only way to create an array value is using `["literal", [...]]`; arrays cannot be read from or derived from feature properties.
     #[serde(rename = "line-dasharray")]
-    pub line_dasharray: PaintLineLineDasharray,
+    pub line_dasharray: Option<PaintLineLineDasharray>,
     /// Draws a line casing outside of a line's actual path. Value indicates the width of the inner gap.
     #[serde(rename = "line-gap-width")]
-    pub line_gap_width: PaintLineLineGapWidth,
+    pub line_gap_width: Option<PaintLineLineGapWidth>,
     /// Defines a gradient with which to color a line feature. Can only be used with GeoJSON sources that specify `"lineMetrics": true`.
     #[serde(rename = "line-gradient")]
-    pub line_gradient: PaintLineLineGradient,
+    pub line_gradient: Option<PaintLineLineGradient>,
     /// The line's offset. For linear features, a positive value offsets the line to the right, relative to the direction of the line, and a negative value to the left. For polygon features, a positive value results in an inset, and a negative value results in an outset.
     #[serde(rename = "line-offset")]
-    pub line_offset: PaintLineLineOffset,
+    pub line_offset: Option<PaintLineLineOffset>,
     /// The opacity at which the line will be drawn.
     #[serde(rename = "line-opacity")]
-    pub line_opacity: PaintLineLineOpacity,
+    pub line_opacity: Option<PaintLineLineOpacity>,
     /// Name of image in sprite to use for drawing image lines. For seamless patterns, image width must be a factor of two (2, 4, 8, ..., 512). Note that zoom-dependent expressions will be evaluated only at integer zoom levels.
     #[serde(rename = "line-pattern")]
-    pub line_pattern: PaintLineLinePattern,
+    pub line_pattern: Option<PaintLineLinePattern>,
     /// The geometry's offset. Values are [x, y] where negatives indicate left and up, respectively.
     #[serde(rename = "line-translate")]
-    pub line_translate: PaintLineLineTranslate,
+    pub line_translate: Option<PaintLineLineTranslate>,
     /// Controls the frame of reference for `line-translate`.
     #[serde(rename = "line-translate-anchor")]
-    pub line_translate_anchor: PaintLineLineTranslateAnchor,
+    pub line_translate_anchor: Option<PaintLineLineTranslateAnchor>,
     /// Stroke thickness.
     #[serde(rename = "line-width")]
-    pub line_width: PaintLineLineWidth,
+    pub line_width: Option<PaintLineLineWidth>,
 }
 
 /// Blur applied to the line, in pixels.
@@ -3284,28 +3284,28 @@ impl Default for PaintLineLineWidth {
 pub struct PaintRaster {
     /// Increase or reduce the brightness of the image. The value is the maximum brightness.
     #[serde(rename = "raster-brightness-max")]
-    pub raster_brightness_max: PaintRasterRasterBrightnessMax,
+    pub raster_brightness_max: Option<PaintRasterRasterBrightnessMax>,
     /// Increase or reduce the brightness of the image. The value is the minimum brightness.
     #[serde(rename = "raster-brightness-min")]
-    pub raster_brightness_min: PaintRasterRasterBrightnessMin,
+    pub raster_brightness_min: Option<PaintRasterRasterBrightnessMin>,
     /// Increase or reduce the contrast of the image.
     #[serde(rename = "raster-contrast")]
-    pub raster_contrast: PaintRasterRasterContrast,
+    pub raster_contrast: Option<PaintRasterRasterContrast>,
     /// Fade duration when a new tile is added, or when a video is started or its coordinates are updated.
     #[serde(rename = "raster-fade-duration")]
-    pub raster_fade_duration: PaintRasterRasterFadeDuration,
+    pub raster_fade_duration: Option<PaintRasterRasterFadeDuration>,
     /// Rotates hues around the color wheel.
     #[serde(rename = "raster-hue-rotate")]
-    pub raster_hue_rotate: PaintRasterRasterHueRotate,
+    pub raster_hue_rotate: Option<PaintRasterRasterHueRotate>,
     /// The opacity at which the image will be drawn.
     #[serde(rename = "raster-opacity")]
-    pub raster_opacity: PaintRasterRasterOpacity,
+    pub raster_opacity: Option<PaintRasterRasterOpacity>,
     /// The resampling/interpolation method to use for overscaling, also known as texture magnification filter
     #[serde(rename = "raster-resampling")]
-    pub raster_resampling: PaintRasterRasterResampling,
+    pub raster_resampling: Option<PaintRasterRasterResampling>,
     /// Increase or reduce the saturation of the image.
     #[serde(rename = "raster-saturation")]
-    pub raster_saturation: PaintRasterRasterSaturation,
+    pub raster_saturation: Option<PaintRasterRasterSaturation>,
 }
 
 /// Increase or reduce the brightness of the image. The value is the maximum brightness.
@@ -3434,48 +3434,48 @@ impl Default for PaintRasterRasterSaturation {
 pub struct PaintSymbol {
     /// The color of the icon. This can only be used with SDF icons.
     #[serde(rename = "icon-color")]
-    pub icon_color: PaintSymbolIconColor,
+    pub icon_color: Option<PaintSymbolIconColor>,
     /// Fade out the halo towards the outside.
     #[serde(rename = "icon-halo-blur")]
-    pub icon_halo_blur: PaintSymbolIconHaloBlur,
+    pub icon_halo_blur: Option<PaintSymbolIconHaloBlur>,
     /// The color of the icon's halo. Icon halos can only be used with SDF icons.
     #[serde(rename = "icon-halo-color")]
-    pub icon_halo_color: PaintSymbolIconHaloColor,
+    pub icon_halo_color: Option<PaintSymbolIconHaloColor>,
     /// Distance of halo to the icon outline.
     ///
     /// The unit is in pixels only for SDF sprites that were created with a blur radius of 8, multiplied by the display density. I.e., the radius needs to be 16 for `@2x` sprites, etc.
     #[serde(rename = "icon-halo-width")]
-    pub icon_halo_width: PaintSymbolIconHaloWidth,
+    pub icon_halo_width: Option<PaintSymbolIconHaloWidth>,
     /// The opacity at which the icon will be drawn.
     #[serde(rename = "icon-opacity")]
-    pub icon_opacity: PaintSymbolIconOpacity,
+    pub icon_opacity: Option<PaintSymbolIconOpacity>,
     /// Distance that the icon's anchor is moved from its original placement. Positive values indicate right and down, while negative values indicate left and up.
     #[serde(rename = "icon-translate")]
-    pub icon_translate: PaintSymbolIconTranslate,
+    pub icon_translate: Option<PaintSymbolIconTranslate>,
     /// Controls the frame of reference for `icon-translate`.
     #[serde(rename = "icon-translate-anchor")]
-    pub icon_translate_anchor: PaintSymbolIconTranslateAnchor,
+    pub icon_translate_anchor: Option<PaintSymbolIconTranslateAnchor>,
     /// The color with which the text will be drawn.
     #[serde(rename = "text-color")]
-    pub text_color: PaintSymbolTextColor,
+    pub text_color: Option<PaintSymbolTextColor>,
     /// The halo's fadeout distance towards the outside.
     #[serde(rename = "text-halo-blur")]
-    pub text_halo_blur: PaintSymbolTextHaloBlur,
+    pub text_halo_blur: Option<PaintSymbolTextHaloBlur>,
     /// The color of the text's halo, which helps it stand out from backgrounds.
     #[serde(rename = "text-halo-color")]
-    pub text_halo_color: PaintSymbolTextHaloColor,
+    pub text_halo_color: Option<PaintSymbolTextHaloColor>,
     /// Distance of halo to the font outline. Max text halo width is 1/4 of the font-size.
     #[serde(rename = "text-halo-width")]
-    pub text_halo_width: PaintSymbolTextHaloWidth,
+    pub text_halo_width: Option<PaintSymbolTextHaloWidth>,
     /// The opacity at which the text will be drawn.
     #[serde(rename = "text-opacity")]
-    pub text_opacity: PaintSymbolTextOpacity,
+    pub text_opacity: Option<PaintSymbolTextOpacity>,
     /// Distance that the text's anchor is moved from its original placement. Positive values indicate right and down, while negative values indicate left and up.
     #[serde(rename = "text-translate")]
-    pub text_translate: PaintSymbolTextTranslate,
+    pub text_translate: Option<PaintSymbolTextTranslate>,
     /// Controls the frame of reference for `text-translate`.
     #[serde(rename = "text-translate-anchor")]
-    pub text_translate_anchor: PaintSymbolTextTranslateAnchor,
+    pub text_translate_anchor: Option<PaintSymbolTextTranslateAnchor>,
 }
 
 /// The color of the icon. This can only be used with SDF icons.
@@ -3684,7 +3684,7 @@ impl Default for PaintSymbolTextTranslateAnchor {
 pub struct Projection {
     /// The projection definition type. Can be specified as a string, a transition state, or an expression.
     #[serde(rename = "type")]
-    pub r#type: ProjectionType,
+    pub r#type: Option<ProjectionType>,
 }
 
 /// Available Projections
@@ -3728,25 +3728,25 @@ struct InnerPromoteId(String);
 pub struct Sky {
     /// How to blend the atmosphere. Where 1 is visible atmosphere and 0 is hidden. It is best to interpolate this expression when using globe projection.
     #[serde(rename = "atmosphere-blend")]
-    pub atmosphere_blend: SkyAtmosphereBlend,
+    pub atmosphere_blend: Option<SkyAtmosphereBlend>,
     /// The base color for the fog. Requires 3D terrain.
     #[serde(rename = "fog-color")]
-    pub fog_color: SkyFogColor,
+    pub fog_color: Option<SkyFogColor>,
     /// How to blend the fog over the 3D terrain. Where 0 is the map center and 1 is the horizon.
     #[serde(rename = "fog-ground-blend")]
-    pub fog_ground_blend: SkyFogGroundBlend,
+    pub fog_ground_blend: Option<SkyFogGroundBlend>,
     /// The base color at the horizon.
     #[serde(rename = "horizon-color")]
-    pub horizon_color: SkyHorizonColor,
+    pub horizon_color: Option<SkyHorizonColor>,
     /// How to blend the fog color and the horizon color. Where 0 is using the horizon color only and 1 is using the fog color only.
     #[serde(rename = "horizon-fog-blend")]
-    pub horizon_fog_blend: SkyHorizonFogBlend,
+    pub horizon_fog_blend: Option<SkyHorizonFogBlend>,
     /// The base color for the sky.
     #[serde(rename = "sky-color")]
-    pub sky_color: SkySkyColor,
+    pub sky_color: Option<SkySkyColor>,
     /// How to blend the sky color and the horizon color. Where 1 is blending the color at the middle of the sky and 0 is not blending at all and using the sky color only.
     #[serde(rename = "sky-horizon-blend")]
-    pub sky_horizon_blend: SkySkyHorizonBlend,
+    pub sky_horizon_blend: Option<SkySkyHorizonBlend>,
 }
 
 /// How to blend the atmosphere. Where 1 is visible atmosphere and 0 is hidden. It is best to interpolate this expression when using globe projection.
@@ -3853,9 +3853,9 @@ pub enum Source {
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
 pub struct SourceGeojson {
     /// Contains an attribution to be displayed when the map is shown to a user.
-    pub attribution: SourceGeojsonAttribution,
+    pub attribution: Option<SourceGeojsonAttribution>,
     /// Size of the tile buffer on each side. A value of 0 produces no buffer. A value of 512 produces a buffer as wide as the tile itself. Larger values produce fewer rendering artifacts near tile edges and slower performance.
-    pub buffer: SourceGeojsonBuffer,
+    pub buffer: Option<SourceGeojsonBuffer>,
     /// If the data is a collection of point features, setting this to true clusters the points by radius into groups. Cluster groups become new `Point` features in the source with additional properties:
     ///
     ///  * `cluster` Is `true` if the point is a cluster
@@ -3865,13 +3865,13 @@ pub struct SourceGeojson {
     ///  * `point_count` Number of original points grouped into this cluster
     ///
     ///  * `point_count_abbreviated` An abbreviated point count
-    pub cluster: SourceGeojsonCluster,
+    pub cluster: Option<SourceGeojsonCluster>,
     /// Max zoom on which to cluster points if clustering is enabled. Defaults to one zoom less than maxzoom (so that last zoom features are not clustered). Clusters are re-evaluated at integer zoom levels so setting clusterMaxZoom to 14 means the clusters will be displayed until z15.
     #[serde(rename = "clusterMaxZoom")]
-    pub cluster_max_zoom: SourceGeojsonClusterMaxZoom,
+    pub cluster_max_zoom: Option<SourceGeojsonClusterMaxZoom>,
     /// Minimum number of points necessary to form a cluster if clustering is enabled. Defaults to `2`.
     #[serde(rename = "clusterMinPoints")]
-    pub cluster_min_points: SourceGeojsonClusterMinPoints,
+    pub cluster_min_points: Option<SourceGeojsonClusterMinPoints>,
     /// An object defining custom properties on the generated clusters if clustering is enabled, aggregating values from clustered points. Has the form `{"property_name": [operator, map_expression]}`. `operator` is any expression function that accepts at least 2 operands (e.g. `"+"` or `"max"`) — it accumulates the property value from clusters/points the cluster contains; `map_expression` produces the value of a single point.
     ///
     /// Example: `{"sum": ["+", ["get", "scalerank"]]}`.
@@ -3880,27 +3880,27 @@ pub struct SourceGeojson {
     ///
     /// `{"sum": [["+", ["accumulated"], ["get", "sum"]], ["get", "scalerank"]]}`
     #[serde(rename = "clusterProperties")]
-    pub cluster_properties: SourceGeojsonClusterProperties,
+    pub cluster_properties: Option<SourceGeojsonClusterProperties>,
     /// Radius of each cluster if clustering is enabled. A value of 512 indicates a radius equal to the width of a tile.
     #[serde(rename = "clusterRadius")]
-    pub cluster_radius: SourceGeojsonClusterRadius,
+    pub cluster_radius: Option<SourceGeojsonClusterRadius>,
     /// A URL to a GeoJSON file, or inline GeoJSON.
     pub data: SourceGeojsonData,
     /// An expression for filtering features prior to processing them for rendering.
-    pub filter: SourceGeojsonFilter,
+    pub filter: Option<SourceGeojsonFilter>,
     /// Whether to generate ids for the geojson features. When enabled, the `feature.id` property will be auto assigned based on its index in the `features` array, over-writing any previous values.
     #[serde(rename = "generateId")]
-    pub generate_id: SourceGeojsonGenerateId,
+    pub generate_id: Option<SourceGeojsonGenerateId>,
     /// Whether to calculate line distance metrics. This is required for line layers that specify `line-gradient` values.
     #[serde(rename = "lineMetrics")]
-    pub line_metrics: SourceGeojsonLineMetrics,
+    pub line_metrics: Option<SourceGeojsonLineMetrics>,
     /// Maximum zoom level at which to create vector tiles (higher means greater detail at high zoom levels).
-    pub maxzoom: SourceGeojsonMaxzoom,
+    pub maxzoom: Option<SourceGeojsonMaxzoom>,
     /// A property to use as a feature id (for feature state). Either a property name, or an object of the form `{<sourceLayer>: <propertyName>}`.
     #[serde(rename = "promoteId")]
-    pub promote_id: SourceGeojsonPromoteId,
+    pub promote_id: Option<SourceGeojsonPromoteId>,
     /// Douglas-Peucker simplification tolerance (higher means simpler geometries and faster performance).
-    pub tolerance: SourceGeojsonTolerance,
+    pub tolerance: Option<SourceGeojsonTolerance>,
     /// The data type of the GeoJSON source.
     #[serde(rename = "type")]
     pub r#type: SourceGeojsonType,
@@ -4077,29 +4077,29 @@ struct SourceImageUrl(String);
 pub struct SourceRaster {
     /// Other keys to configure the data source.
     #[serde(flatten)]
-    pub star: std::collections::BTreeMap<String, SourceRasterStar>,
+    pub star: Option<std::collections::BTreeMap<String, SourceRasterStar>>,
     /// Contains an attribution to be displayed when the map is shown to a user.
-    pub attribution: SourceRasterAttribution,
+    pub attribution: Option<SourceRasterAttribution>,
     /// An array containing the longitude and latitude of the southwest and northeast corners of the source's bounding box in the following order: `[sw.lng, sw.lat, ne.lng, ne.lat]`. When this property is included in a source, no tiles outside of the given bounds are requested by MapLibre.
-    pub bounds: SourceRasterBounds,
+    pub bounds: Option<SourceRasterBounds>,
     /// Maximum zoom level for which tiles are available, as in the TileJSON spec. Data from tiles at the maxzoom are used when displaying the map at higher zoom levels.
-    pub maxzoom: SourceRasterMaxzoom,
+    pub maxzoom: Option<SourceRasterMaxzoom>,
     /// Minimum zoom level for which tiles are available, as in the TileJSON spec.
-    pub minzoom: SourceRasterMinzoom,
+    pub minzoom: Option<SourceRasterMinzoom>,
     /// Influences the y direction of the tile coordinates. The global-mercator (aka Spherical Mercator) profile is assumed.
-    pub scheme: SourceRasterScheme,
+    pub scheme: Option<SourceRasterScheme>,
     /// The minimum visual size to display tiles for this layer. Only configurable for raster layers.
     #[serde(rename = "tileSize")]
-    pub tile_size: SourceRasterTileSize,
+    pub tile_size: Option<SourceRasterTileSize>,
     /// An array of one or more tile source URLs, as in the TileJSON spec.
-    pub tiles: SourceRasterTiles,
+    pub tiles: Option<SourceRasterTiles>,
     /// The type of the source.
     #[serde(rename = "type")]
     pub r#type: SourceRasterType,
     /// A URL to a TileJSON resource. Supported protocols are `http:` and `https:`.
-    pub url: SourceRasterUrl,
+    pub url: Option<SourceRasterUrl>,
     /// A setting to determine whether a source's tiles are cached locally.
-    pub volatile: SourceRasterVolatile,
+    pub volatile: Option<SourceRasterVolatile>,
 }
 
 /// Other keys to configure the data source.
@@ -4215,41 +4215,41 @@ impl Default for SourceRasterVolatile {
 pub struct SourceRasterDem {
     /// Other keys to configure the data source.
     #[serde(flatten)]
-    pub star: std::collections::BTreeMap<String, SourceRasterDemStar>,
+    pub star: Option<std::collections::BTreeMap<String, SourceRasterDemStar>>,
     /// Contains an attribution to be displayed when the map is shown to a user.
-    pub attribution: SourceRasterDemAttribution,
+    pub attribution: Option<SourceRasterDemAttribution>,
     /// Value that will be added to the encoding mix when decoding. Only used on custom encodings.
     #[serde(rename = "baseShift")]
-    pub base_shift: SourceRasterDemBaseShift,
+    pub base_shift: Option<SourceRasterDemBaseShift>,
     /// Value that will be multiplied by the blue channel value when decoding. Only used on custom encodings.
     #[serde(rename = "blueFactor")]
-    pub blue_factor: SourceRasterDemBlueFactor,
+    pub blue_factor: Option<SourceRasterDemBlueFactor>,
     /// An array containing the longitude and latitude of the southwest and northeast corners of the source's bounding box in the following order: `[sw.lng, sw.lat, ne.lng, ne.lat]`. When this property is included in a source, no tiles outside of the given bounds are requested by MapLibre.
-    pub bounds: SourceRasterDemBounds,
+    pub bounds: Option<SourceRasterDemBounds>,
     /// The encoding used by this source. Mapbox Terrain RGB is used by default.
-    pub encoding: SourceRasterDemEncoding,
+    pub encoding: Option<SourceRasterDemEncoding>,
     /// Value that will be multiplied by the green channel value when decoding. Only used on custom encodings.
     #[serde(rename = "greenFactor")]
-    pub green_factor: SourceRasterDemGreenFactor,
+    pub green_factor: Option<SourceRasterDemGreenFactor>,
     /// Maximum zoom level for which tiles are available, as in the TileJSON spec. Data from tiles at the maxzoom are used when displaying the map at higher zoom levels.
-    pub maxzoom: SourceRasterDemMaxzoom,
+    pub maxzoom: Option<SourceRasterDemMaxzoom>,
     /// Minimum zoom level for which tiles are available, as in the TileJSON spec.
-    pub minzoom: SourceRasterDemMinzoom,
+    pub minzoom: Option<SourceRasterDemMinzoom>,
     /// Value that will be multiplied by the red channel value when decoding. Only used on custom encodings.
     #[serde(rename = "redFactor")]
-    pub red_factor: SourceRasterDemRedFactor,
+    pub red_factor: Option<SourceRasterDemRedFactor>,
     /// The minimum visual size to display tiles for this layer. Only configurable for raster layers.
     #[serde(rename = "tileSize")]
-    pub tile_size: SourceRasterDemTileSize,
+    pub tile_size: Option<SourceRasterDemTileSize>,
     /// An array of one or more tile source URLs, as in the TileJSON spec.
-    pub tiles: SourceRasterDemTiles,
+    pub tiles: Option<SourceRasterDemTiles>,
     /// The type of the source.
     #[serde(rename = "type")]
     pub r#type: SourceRasterDemType,
     /// A URL to a TileJSON resource. Supported protocols are `http:` and `https:`.
-    pub url: SourceRasterDemUrl,
+    pub url: Option<SourceRasterDemUrl>,
     /// A setting to determine whether a source's tiles are cached locally.
-    pub volatile: SourceRasterDemVolatile,
+    pub volatile: Option<SourceRasterDemVolatile>,
 }
 
 /// Other keys to configure the data source.
@@ -4420,31 +4420,31 @@ impl Default for SourceRasterDemVolatile {
 pub struct SourceVector {
     /// Other keys to configure the data source.
     #[serde(flatten)]
-    pub star: std::collections::BTreeMap<String, SourceVectorStar>,
+    pub star: Option<std::collections::BTreeMap<String, SourceVectorStar>>,
     /// Contains an attribution to be displayed when the map is shown to a user.
-    pub attribution: SourceVectorAttribution,
+    pub attribution: Option<SourceVectorAttribution>,
     /// An array containing the longitude and latitude of the southwest and northeast corners of the source's bounding box in the following order: `[sw.lng, sw.lat, ne.lng, ne.lat]`. When this property is included in a source, no tiles outside of the given bounds are requested by MapLibre.
-    pub bounds: SourceVectorBounds,
+    pub bounds: Option<SourceVectorBounds>,
     /// The encoding used by this source. Mapbox Vector Tiles encoding is used by default.
-    pub encoding: SourceVectorEncoding,
+    pub encoding: Option<SourceVectorEncoding>,
     /// Maximum zoom level for which tiles are available, as in the TileJSON spec. Data from tiles at the maxzoom are used when displaying the map at higher zoom levels.
-    pub maxzoom: SourceVectorMaxzoom,
+    pub maxzoom: Option<SourceVectorMaxzoom>,
     /// Minimum zoom level for which tiles are available, as in the TileJSON spec.
-    pub minzoom: SourceVectorMinzoom,
+    pub minzoom: Option<SourceVectorMinzoom>,
     /// A property to use as a feature id (for feature state). Either a property name, or an object of the form `{<sourceLayer>: <propertyName>}`. If specified as a string for a vector tile source, the same property is used across all its source layers.
     #[serde(rename = "promoteId")]
-    pub promote_id: SourceVectorPromoteId,
+    pub promote_id: Option<SourceVectorPromoteId>,
     /// Influences the y direction of the tile coordinates. The global-mercator (aka Spherical Mercator) profile is assumed.
-    pub scheme: SourceVectorScheme,
+    pub scheme: Option<SourceVectorScheme>,
     /// An array of one or more tile source URLs, as in the TileJSON spec.
-    pub tiles: SourceVectorTiles,
+    pub tiles: Option<SourceVectorTiles>,
     /// The type of the source.
     #[serde(rename = "type")]
     pub r#type: SourceVectorType,
     /// A URL to a TileJSON resource. Supported protocols are `http:` and `https:`.
-    pub url: SourceVectorUrl,
+    pub url: Option<SourceVectorUrl>,
     /// A setting to determine whether a source's tiles are cached locally.
-    pub volatile: SourceVectorVolatile,
+    pub volatile: Option<SourceVectorVolatile>,
 }
 
 /// Other keys to configure the data source.
@@ -4605,7 +4605,7 @@ struct InnerSources(Source);
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
 pub struct Terrain {
     /// The exaggeration of the terrain - how high it will look.
-    pub exaggeration: TerrainExaggeration,
+    pub exaggeration: Option<TerrainExaggeration>,
     /// The source for the terrain data.
     pub source: TerrainSource,
 }
@@ -4632,9 +4632,9 @@ struct TerrainSource(String);
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
 pub struct Transition {
     /// Length of time before a transition begins.
-    pub delay: TransitionDelay,
+    pub delay: Option<TransitionDelay>,
     /// Time allotted for transitions to complete.
-    pub duration: TransitionDuration,
+    pub duration: Option<TransitionDuration>,
 }
 
 /// Length of time before a transition begins.
