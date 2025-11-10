@@ -17,8 +17,8 @@ pub fn generate(scope: &mut Scope, name: &str, common: &Fields, default: Option<
             .impl_trait("Default")
             .new_fn("default")
             .ret("Self");
-        if let Value::String(s) = default {
-            fun.line(format!("Self(color::parse_color({default}).expect(\"Invalid color specified as the default value\"))"));
+        if let Value::String(default) = default {
+            fun.line(format!("Self(color::parse_color(\"{default}\").expect(\"Invalid color specified as the default value\"))"));
         } else {
             fun.line("todo!(\"needs expressions to be expressed in the style spec\")");
         }

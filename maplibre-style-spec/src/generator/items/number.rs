@@ -77,8 +77,6 @@ mod tests {
             Some(&360.into()),
         );
         insta::assert_snapshot!(scope.to_string(), @r"
-        ///
-        ///
         /// Range: 360..=1 every 360
         #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
         pub struct Foo(serde_json::Number);
