@@ -59,7 +59,10 @@ pub fn generate(scope: &mut Scope, name: &str, common: &Fields, default: &[Numbe
 
 #[cfg(test)]
 mod tests {
+    use serde_json::json;
+
     use super::*;
+    use crate::decoder::StyleReference;
     #[test]
     fn generate_empty() {
         let mut scope = Scope::new();
@@ -89,5 +92,79 @@ mod tests {
             }
         }
         "##)
+    }
+
+    #[test]
+    fn test_generate_spec() {
+        let reference = json!({
+        "$version": 8,
+        "$root": {},
+        "icon-padding": {
+          "type": "padding",
+          "default": [2],
+          "units": "pixels",
+          "doc": "Size of additional area round the icon bounding box used for detecting symbol collisions.",
+          "requires": [
+            "icon-image"
+          ],
+          "sdk-support": {
+            "basic functionality": {
+              "js": "0.10.0",
+              "android": "2.0.1",
+              "ios": "2.0.0"
+            },
+            "data-driven styling": {
+              "js": "2.2.0",
+              "android": "https://github.com/maplibre/maplibre-native/issues/2754",
+              "ios": "https://github.com/maplibre/maplibre-native/issues/2754"
+            }
+          },
+          "expression": {
+            "interpolated": true,
+            "parameters": [
+              "zoom",
+              "feature"
+            ]
+          },
+          "property-type": "data-driven"
+        },
+        });
+        let reference: StyleReference = serde_json::from_value(reference).unwrap();
+        insta::assert_snapshot!(crate::generator::generate_spec_scope(reference), @r#"
+            /// This is a Maplibre Style Specification
+            #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+            pub struct MaplibreStyleSpecification;
+
+            /// Size of additional area round the icon bounding box used for detecting symbol collisions.
+            #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+            #[serde(untagged)]
+            pub enum IconPadding {
+                /// A single value applies to all four sides.
+                /// 
+                /// Only avaliable for backwards compatibility.
+                #[deprecated = "Please see [`Self::One`] instead"]
+                Unwrapped(serde_json::Number),
+                /// A single value applies to all four sides
+                One(Box<[serde_json::Number; 1]>),
+                /// two values apply to `[top/bottom, left/right]`
+                Two(Box<[serde_json::Number; 2]>),
+                /// three values apply to `[top, left/right, bottom]`
+                Three(Box<[serde_json::Number; 3]>),
+                /// four values apply to `[top, right, bottom, left]`
+                Four(Box<[serde_json::Number; 4]>),
+            }
+
+            impl Default for IconPadding {
+                fn default() -> Self {
+                    Self::One(Box::new([2.into()]))
+                }
+            }
+
+            #[cfg(test)] 
+            mod test {
+                use super::*;
+
+            }
+            "#);
     }
 }

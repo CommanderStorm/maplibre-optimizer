@@ -14,7 +14,10 @@ pub fn generate(scope: &mut Scope, name: &str, common: &Fields) {
 
 #[cfg(test)]
 mod tests {
+    use serde_json::json;
+
     use super::*;
+    use crate::decoder::StyleReference;
     #[test]
     fn generate_empty() {
         let mut scope = Scope::new();
@@ -23,5 +26,37 @@ mod tests {
         #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
         struct Foo(Layout);
         ")
+    }
+
+    #[test]
+    fn test_generate_spec() {
+        let reference = json!({
+        "$version": 8,
+        "$root": {
+          "layout": {
+            "type": "layout",
+            "doc": "Layout properties for the layer."
+          },
+        },
+        });
+        let reference: StyleReference = serde_json::from_value(reference).unwrap();
+        insta::assert_snapshot!(crate::generator::generate_spec_scope(reference), @r"
+            /// This is a Maplibre Style Specification
+            #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+            pub struct MaplibreStyleSpecification {
+                /// Layout properties for the layer.
+                pub layout: Option<RootLayout>,
+            }
+
+            /// Layout properties for the layer.
+            #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+            struct RootLayout(Layout);
+
+            #[cfg(test)] 
+            mod test {
+                use super::*;
+
+            }
+            ");
     }
 }

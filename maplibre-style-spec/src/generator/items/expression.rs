@@ -15,7 +15,10 @@ pub fn generate(scope: &mut Scope, name: &str, common: &Fields) {
 
 #[cfg(test)]
 mod tests {
+    use serde_json::json;
+
     use super::*;
+    use crate::decoder::StyleReference;
     #[test]
     fn generate_empty() {
         let mut scope = Scope::new();
@@ -25,5 +28,42 @@ mod tests {
         #[deprecated = "expression not implemented"]
         struct Foo(serde_json::Value);
         "#)
+    }
+
+    #[test]
+    fn test_generate_spec() {
+        let reference = json!({
+        "$version": 8,
+        "$root": {},
+        "function": {
+          "expression": {
+            "type": "expression",
+            "doc": "An expression."
+          },
+        },
+        });
+        let reference: StyleReference = serde_json::from_value(reference).unwrap();
+        insta::assert_snapshot!(crate::generator::generate_spec_scope(reference), @r#"
+        /// This is a Maplibre Style Specification
+        #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+        pub struct MaplibreStyleSpecification;
+
+        #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+        pub struct Function {
+            /// An expression.
+            pub expression: Option<FunctionExpression>,
+        }
+
+        /// An expression.
+        #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+        #[deprecated = "expression not implemented"]
+        struct FunctionExpression(serde_json::Value);
+
+        #[cfg(test)] 
+        mod test {
+            use super::*;
+
+        }
+        "#);
     }
 }

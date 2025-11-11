@@ -15,7 +15,10 @@ pub fn generate(scope: &mut Scope, name: &str, common: &Fields) {
 
 #[cfg(test)]
 mod tests {
+    use serde_json::json;
+
     use super::*;
+    use crate::decoder::StyleReference;
     #[test]
     fn generate_empty() {
         let mut scope = Scope::new();
@@ -25,5 +28,38 @@ mod tests {
         #[deprecated = "filter not implemented"]
         struct Foo(serde_json::Value);
         "#)
+    }
+
+    #[test]
+    fn test_generate_spec() {
+        let reference = json!({
+        "$version": 8,
+        "$root": {
+          "filter": {
+            "type": "filter",
+            "doc": "A expression specifying conditions on source features. Only features that match the filter are displayed. Zoom expressions in filters are only evaluated at integer zoom levels. The `feature-state` expression is not supported in filter expressions."
+          },
+        },
+        });
+        let reference: StyleReference = serde_json::from_value(reference).unwrap();
+        insta::assert_snapshot!(crate::generator::generate_spec_scope(reference), @r#"
+        /// This is a Maplibre Style Specification
+        #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+        pub struct MaplibreStyleSpecification {
+            /// A expression specifying conditions on source features. Only features that match the filter are displayed. Zoom expressions in filters are only evaluated at integer zoom levels. The `feature-state` expression is not supported in filter expressions.
+            pub filter: Option<RootFilter>,
+        }
+
+        /// A expression specifying conditions on source features. Only features that match the filter are displayed. Zoom expressions in filters are only evaluated at integer zoom levels. The `feature-state` expression is not supported in filter expressions.
+        #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+        #[deprecated = "filter not implemented"]
+        struct RootFilter(serde_json::Value);
+
+        #[cfg(test)] 
+        mod test {
+            use super::*;
+
+        }
+        "#);
     }
 }

@@ -171,7 +171,7 @@ mod tests {
     }
 
     #[test]
-    fn test_generate_spec_number() {
+    fn test_generate_spec() {
         let reference = json!({
         "$version": 8,
         "$root": {},

@@ -22,7 +22,10 @@ pub fn generate(scope: &mut Scope, name: &str, common: &Fields, default: &Value)
 
 #[cfg(test)]
 mod tests {
+    use serde_json::json;
+
     use super::*;
+    use crate::decoder::StyleReference;
     #[test]
     fn generate_empty() {
         let mut scope = Scope::new();
@@ -42,5 +45,60 @@ mod tests {
             }
         }
         "#)
+    }
+
+    #[test]
+    fn test_generate_spec() {
+        let reference = json!({
+        "$version": 8,
+        "$root": {},
+        "state": {
+          "type": "state",
+          "default": {},
+          "doc": "An object used to define default values when using the [`global-state`](https://maplibre.org/maplibre-style-spec/expressions/#global-state) expression.",
+          "example": {
+            "chargerType": {
+              "default": ["CCS", "CHAdeMO", "Type2"]
+            },
+            "minPreferredChargingSpeed": {
+              "default": 50
+            }
+          },
+          "sdk-support": {
+            "basic functionality": {
+              "js": "5.6.0",
+              "android": "https://github.com/maplibre/maplibre-native/issues/3302",
+              "ios": "https://github.com/maplibre/maplibre-native/issues/3302"
+            }
+          }
+        },
+        });
+        let reference: StyleReference = serde_json::from_value(reference).unwrap();
+        insta::assert_snapshot!(crate::generator::generate_spec_scope(reference), @r#"
+            /// This is a Maplibre Style Specification
+            #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+            pub struct MaplibreStyleSpecification;
+
+            /// An object used to define default values when using the [`global-state`](https://maplibre.org/maplibre-style-spec/expressions/#global-state) expression.
+            #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+            struct State(serde_json::Value);
+
+            impl Default for State {
+                fn default() -> Self {
+                    Self(serde_json::json!({}))
+                }
+            }
+
+            #[cfg(test)] 
+            mod test {
+                use super::*;
+
+                #[test]
+                fn test_example_state_decodes() {
+                    let example = serde_json::json!({"chargerType":{"default":["CCS","CHAdeMO","Type2"]},"minPreferredChargingSpeed":{"default":50}});
+                    let _ = serde_json::from_value::<State>(example).expect("example should decode");
+                }
+            }
+            "#);
     }
 }
