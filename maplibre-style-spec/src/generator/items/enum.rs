@@ -1,4 +1,5 @@
 use std::collections::BTreeMap;
+
 use codegen::Scope;
 use serde_json::{Number, Value};
 
@@ -36,8 +37,12 @@ pub fn generate(
     generate_test_from_example_if_present(scope, name, common);
 }
 
-
-fn generate_regular_enum(scope: &mut Scope, name: &str, common: &&Fields, values: &BTreeMap<String, EnumDocs>) {
+fn generate_regular_enum(
+    scope: &mut Scope,
+    name: &str,
+    common: &&Fields,
+    values: &BTreeMap<String, EnumDocs>,
+) {
     let enu = scope
         .new_enum(name)
         .doc(&common.doc)

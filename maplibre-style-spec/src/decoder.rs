@@ -302,8 +302,113 @@ pub enum Requirement {
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct EnumDocs {
     pub doc: String,
+    #[serde(rename = "sdk-support")]
+    pub sdk_support: Option<Value>,
+    // for expression only
+    pub syntax: Option<Syntax>,
+    pub example: Option<Value>,
+    pub group: Option<String>,
+}
+
+#[derive(Debug, PartialEq, Eq, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Syntax {
+    pub overloads: Vec<Overload>,
+    #[serde(default)]
+    pub parameters: Vec<Parameter>,
+}
+
+#[derive(Debug, PartialEq, Eq, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Overload {
+    parameters: Vec<String>,
+    #[serde(rename = "output-type")]
+    output_type: ParameterType,
+}
+#[derive(Debug, PartialEq, Eq, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Parameter {
+    name: String,
+    r#type: ParameterType,
+    description: Option<String>,
+}
+
+#[derive(Debug, PartialEq, Eq, Clone, Deserialize)]
+pub enum ParameterType {
+    #[serde(rename = "number literal")]
+    NumberLiteral,
+    #[serde(rename = "string literal")]
+    StringLiteral,
+    #[serde(rename = "any")]
+    Any,
+    #[serde(rename = "boolean")]
+    Boolean,
+    #[serde(rename = "GeoJSON object")]
+    GeoJSONObject,
+    #[serde(rename = "JSON object")]
+    JSONObject,
+    #[serde(rename = "JSON array")]
+    JSONArray,
+    #[serde(rename = "number")]
+    Number,
+    #[serde(rename = "string")]
+    String,
+    #[serde(rename = "collator")]
+    Collator,
+    #[serde(rename = "array")]
+    Array,
+    #[serde(rename = "array<type>", alias = "array<T>")]
+    ArrayType,
+    #[serde(rename = "T")]
+    Type,
+    #[serde(rename = "array<type, length>")]
+    ArrayTypeLength,
+    #[serde(rename = "array | string")]
+    ArrayOrString,
+    #[serde(rename = "string | number")]
+    StringOrNumber,
+    #[serde(rename = "formatted")]
+    Formatted,
+    #[serde(rename = "string | image")]
+    StringOrImage,
+    #[serde(rename = "image")]
+    Image,
+    #[serde(rename = "object")]
+    Object,
+    #[serde(
+        rename = "number | array<number> | color | array<color> | projection | array<projection>"
+    )]
+    NumberOrArrayNumberOrColorOrArrayColorOrProjectionOrArrayProjection,
+    #[serde(rename = "number | array<number> | color | array<color> | projection")]
+    NumberOrArrayNumberOrColorOrArrayColorOrProjectionOrProjection,
+    #[serde(rename = "color | array<color>")]
+    ColorOrColorArray,
+    #[serde(rename = "color")]
+    Color,
+    #[serde(
+        rename = "string literal | number literal | array<string literal> | array<number literal>"
+    )]
+    StringLiteralOrNumberLiteralOrArrayStringLiteralOrArrayNumberLiteral,
+    // below are variants which are ts defintions-ish
+    #[serde(rename = "\"string\" | \"number\" | \"boolean\"")]
+    StringOrNumberOrBoolean,
+    #[serde(
+        rename = "{ \"case-sensitive\"?: boolean, \"diacritic-sensitive\"?: boolean, \"locale\"?: string }"
+    )]
+    CollatorOptions,
+    #[serde(
+        rename = "{ \"text-font\"?: string, \"text-color\"?: color, \"font-scale\"?: number, \"vertical-align\"?: \"bottom\" | \"center\" | \"top\" }"
+    )]
+    FormattingOptions,
+    #[serde(rename = "[\"linear\"] | [\"exponential\", base] | [\"cubic-bezier\", x1, y1, x2, y2]")]
+    InterpolationType,
+    #[serde(
+        rename = "{ \"locale\"?: string, \"currency\"?: string, \"min-fraction-digits\"?: number, \"max-fraction-digits\"?: number }"
+    )]
+    LocaleOptions,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Deserialize)]
@@ -351,4 +456,34 @@ pub enum PropertyType {
     DataConstant,
     /// Property is interpolable and can be represented using a property expression.
     DataDriven,
+}
+
+#[cfg(test)]
+mod tests {
+    use std::collections::HashMap;
+
+    use super::*;
+    // expressions are a bit weird, so having a duplicate testcase for them is better debugging
+    #[test]
+    fn decode_within_expression() {
+        let content = include_str!("../tests/upstream/src/reference/v8.json");
+        let top: HashMap<String, Value> = serde_json::from_str(content).unwrap();
+        let expression_name = top.get("expression_name").unwrap().as_object().unwrap();
+        let values = expression_name.get("values").unwrap().as_object().unwrap();
+        for (k, v) in values {
+            let _: EnumDocs = serde_json::from_value(v.clone())
+                .expect(&format!("Failed to decode EnumDocs of {k}"));
+        }
+    }
+
+    // expressions are a bit weird, so having a duplicate testcase for them is better debugging
+    #[test]
+    fn decode_property_types() {
+        let content = include_str!("../tests/upstream/src/reference/v8.json");
+        let top: HashMap<String, Value> = serde_json::from_str(content).unwrap();
+        let property_type = top.get("property-type").unwrap().as_object().unwrap();
+        for k in property_type.keys() {
+            let _: PropertyType = serde_json::from_str(&format!("\"{k}\"")).unwrap();
+        }
+    }
 }
