@@ -2233,9 +2233,22 @@ struct LayoutSymbolTextVariableAnchor(Vec<LayoutSymbolTextVariableAnchorValue>);
 ///  When the renderer chooses the `top` anchor, `[0, 4]` will be used for `text-offset`; the text will be shifted down by 4 ems.
 ///
 ///  When the renderer chooses the `left` anchor, `[3, 0]` will be used for `text-offset`; the text will be shifted right by 3 ems.
-#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-#[deprecated = "var_anchor not implemented"]
-struct LayoutSymbolTextVariableAnchorOffset(serde_json::Value);
+#[derive(PartialEq, Debug, Clone)]
+pub struct LayoutSymbolTextVariableAnchorOffset(
+    Vec<(
+        LayoutSymbolTextVariableAnchorValue,
+        (serde_json::Number, serde_json::Number),
+    )>,
+);
+
+impl<'de> serde::Deserialize<'de> for LayoutSymbolTextVariableAnchorOffset {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        todo!()
+    }
+}
 
 /// The property allows control over a symbol's orientation. Note that the property values act as a hint, so that a symbol whose language doesn’t support the provided orientation will be laid out in its natural orientation. Example: English point symbol will be rendered horizontally even if array value contains single 'vertical' enum value. The order of elements in an array define priority order for the placement of an orientation variant.
 #[derive(serde::Deserialize, PartialEq, Eq, Debug, Clone, Copy)]
