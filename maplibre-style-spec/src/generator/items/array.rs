@@ -98,7 +98,6 @@ fn generate_array_value(
             SimpleArrayValue::String => "String".to_string(),
             SimpleArrayValue::Number => "serde_json::Number".to_string(),
             SimpleArrayValue::Star => "serde_json::Value".to_string(),
-            SimpleArrayValue::FontFaces => "FontFaces".to_string(),
             SimpleArrayValue::FunctionStop => "FunctionStop".to_string(),
             SimpleArrayValue::Layer => "Layer".to_string(),
             SimpleArrayValue::Enum => {

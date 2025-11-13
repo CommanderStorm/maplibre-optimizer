@@ -309,6 +309,7 @@ fn generate_parsed_item(scope: &mut Scope, item: &ParsedItem, name: &str) {
         } => items::formatted::generate(scope, name, common, default, *tokens),
         ParsedItem::Filter(fields) => items::filter::generate(scope, name, fields),
         ParsedItem::Expression(fields) => items::expression::generate(scope, name, fields),
+        ParsedItem::FontFaces(fields) => items::font_faces::generate(scope, name, fields),
     }
 }
 

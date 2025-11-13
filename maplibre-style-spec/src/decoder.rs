@@ -136,6 +136,7 @@ pub enum ParsedItem {
     },
     Filter(Fields),
     Expression(Fields),
+    FontFaces(Fields),
 }
 
 impl ParsedItem {
@@ -227,6 +228,7 @@ impl ParsedItem {
             } => common,
             ParsedItem::Filter(common) => common,
             ParsedItem::Expression(common) => common,
+            ParsedItem::FontFaces(common) => common,
         }
     }
 }
@@ -442,7 +444,6 @@ pub enum SimpleArrayValue {
     Number,
     #[serde(rename = "*")]
     Star,
-    FontFaces,
     #[serde(rename = "function_stop")]
     FunctionStop,
     Layer,
