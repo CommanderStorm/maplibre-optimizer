@@ -34,7 +34,7 @@ pub fn generate(
                 to_upper_camel_case(&default.to_string())
             ));
     }
-    generate_test_from_example_if_present(scope, name, common);
+    generate_test_from_example_if_present(scope, name, common.example.as_ref());
 }
 
 fn generate_regular_enum(

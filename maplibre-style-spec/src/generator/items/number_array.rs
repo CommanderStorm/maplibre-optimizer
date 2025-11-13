@@ -30,7 +30,7 @@ pub fn generate(
             .ret("Self")
             .line(format!("Self::One({})", generate_number_default(default)));
     }
-    generate_test_from_example_if_present(scope, name, common);
+    generate_test_from_example_if_present(scope, name, common.example.as_ref());
 }
 
 #[cfg(test)]

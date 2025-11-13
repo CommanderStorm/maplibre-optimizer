@@ -1,10 +1,14 @@
 use codegen::Scope;
+use serde_json::Value;
 
-use crate::decoder::Fields;
 use crate::generator::formatter::to_snake_case;
 
-pub fn generate_test_from_example_if_present(scope: &mut Scope, name: &str, fields: &Fields) {
-    let Some(example) = &fields.example else {
+pub fn generate_test_from_example_if_present(
+    scope: &mut Scope,
+    name: &str,
+    example: Option<&Value>,
+) {
+    let Some(example) = &example else {
         return;
     };
     let fun = scope

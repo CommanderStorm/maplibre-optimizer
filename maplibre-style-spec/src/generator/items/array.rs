@@ -46,7 +46,7 @@ pub fn generate(
             .ret("Self")
             .line(format!("Self({default_value})"));
     }
-    generate_test_from_example_if_present(scope, name, common);
+    generate_test_from_example_if_present(scope, name, common.example.as_ref());
 }
 
 fn generate_value_array_default(buffer: &mut String, items: &Vec<Value>, length: Option<&usize>) {

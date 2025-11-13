@@ -9,7 +9,7 @@ pub fn generate(scope: &mut Scope, name: &str, common: &Fields) {
         .doc(&common.doc)
         .derive("serde::Deserialize, PartialEq, Debug, Clone")
         .tuple_field("Sources");
-    generate_test_from_example_if_present(scope, name, common);
+    generate_test_from_example_if_present(scope, name, common.example.as_ref());
 }
 
 #[cfg(test)]

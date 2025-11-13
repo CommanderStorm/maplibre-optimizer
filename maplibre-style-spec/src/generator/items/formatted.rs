@@ -16,7 +16,7 @@ pub fn generate(scope: &mut Scope, name: &str, common: &Fields, default: &str, _
         .new_fn("default")
         .ret("Self")
         .line(format!("Self(\"{default}\".to_string())"));
-    generate_test_from_example_if_present(scope, name, common);
+    generate_test_from_example_if_present(scope, name, common.example.as_ref());
 }
 
 #[cfg(test)]

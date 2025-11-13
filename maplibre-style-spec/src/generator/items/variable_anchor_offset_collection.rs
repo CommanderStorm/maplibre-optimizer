@@ -24,7 +24,7 @@ pub fn generate(scope: &mut Scope, name: &str, common: &Fields) {
         .ret("Result<Self, D::Error>");
     des.line("todo!()");
 
-    generate_test_from_example_if_present(scope, name, common);
+    generate_test_from_example_if_present(scope, name, common.example.as_ref());
 }
 
 #[cfg(test)]

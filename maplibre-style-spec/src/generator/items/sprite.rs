@@ -68,7 +68,7 @@ This is equivalent to the following multiple sprite definition:
         .doc("Array of `{ id: ..., url: ... }` pairs to load multiple sprites")
         .tuple("Vec<SpriteUrlAndId>");
 
-    generate_test_from_example_if_present(scope, name, common);
+    generate_test_from_example_if_present(scope, name, common.example.as_ref());
 }
 
 #[cfg(test)]
