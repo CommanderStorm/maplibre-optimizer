@@ -7,9 +7,8 @@ pub fn generate(scope: &mut Scope, name: &str, common: &Fields) {
     scope
         .new_struct(name)
         .doc(&common.doc)
-        .attr("deprecated = \"paint not implemented\"")
         .derive("serde::Deserialize, PartialEq, Debug, Clone")
-        .tuple_field("serde_json::Value");
+        .tuple_field("Paint");
     generate_test_from_example_if_present(scope, name, common.example.as_ref());
 }
 
@@ -23,11 +22,10 @@ mod tests {
     fn generate_empty() {
         let mut scope = Scope::new();
         generate(&mut scope, "Foo", &Fields::default());
-        insta::assert_snapshot!(scope.to_string(), @r#"
+        insta::assert_snapshot!(scope.to_string(), @r"
         #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-        #[deprecated = "paint not implemented"]
-        struct Foo(serde_json::Value);
-        "#)
+        struct Foo(Paint);
+        ")
     }
 
     #[test]
@@ -43,27 +41,26 @@ mod tests {
         },
         });
         let reference: StyleReference = serde_json::from_value(reference).unwrap();
-        insta::assert_snapshot!(crate::generator::generate_spec_scope(reference), @r#"
-            /// This is a Maplibre Style Specification
-            #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-            pub struct MaplibreStyleSpecification;
+        insta::assert_snapshot!(crate::generator::generate_spec_scope(reference), @r"
+        /// This is a Maplibre Style Specification
+        #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+        pub struct MaplibreStyleSpecification;
 
-            #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-            pub struct Layer {
-                /// Default paint properties for this layer.
-                pub paint: Option<LayerPaint>,
-            }
-
+        #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+        pub struct Layer {
             /// Default paint properties for this layer.
-            #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-            #[deprecated = "paint not implemented"]
-            struct LayerPaint(serde_json::Value);
+            pub paint: Option<LayerPaint>,
+        }
 
-            #[cfg(test)] 
-            mod test {
-                use super::*;
+        /// Default paint properties for this layer.
+        #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+        struct LayerPaint(Paint);
 
-            }
-            "#);
+        #[cfg(test)] 
+        mod test {
+            use super::*;
+
+        }
+        ");
     }
 }

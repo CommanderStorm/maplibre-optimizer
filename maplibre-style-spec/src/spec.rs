@@ -214,6 +214,27 @@ mod test {
     }
 
     #[test]
+    fn test_example_layout_symbol_text_variable_anchor_value_decodes() {
+        let example = serde_json::json!(["center", "left", "right"]);
+        let _ = serde_json::from_value::<LayoutSymbolTextVariableAnchorValue>(example)
+            .expect("example should decode");
+    }
+
+    #[test]
+    fn test_example_layout_symbol_text_variable_anchor_decodes() {
+        let example = serde_json::json!(["center", "left", "right"]);
+        let _ = serde_json::from_value::<LayoutSymbolTextVariableAnchor>(example)
+            .expect("example should decode");
+    }
+
+    #[test]
+    fn test_example_layout_symbol_text_variable_anchor_offset_decodes() {
+        let example = serde_json::json!(["top", [0, 4], "left", [3, 0], "bottom", [1, 1]]);
+        let _ = serde_json::from_value::<LayoutSymbolTextVariableAnchorOffset>(example)
+            .expect("example should decode");
+    }
+
+    #[test]
     fn test_example_light_anchor_decodes() {
         let example = serde_json::json!("map");
         let _ = serde_json::from_value::<LightAnchor>(example).expect("example should decode");
@@ -243,7 +264,7 @@ mod test {
 
 /// Default map center in longitude and latitude.  The style center will be used only if the map has not been positioned by other means (e.g. map options or user interaction).
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-struct RootCenter(Vec<serde_json::Number>);
+struct RootCenter(Box<[serde_json::Number; 2]>);
 
 /// Default map center altitude in meters above sea level. The style center altitude defines the altitude where the camera is looking at and will be used only if the map has not been positioned by other means (e.g. map options or user interaction).
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
@@ -391,8 +412,7 @@ struct RootTerrain(Terrain);
 
 /// A global transition definition to use as a default across properties, to be used for timing transitions between one value and the next when no property-specific transition is set. Collision-based symbol fading is controlled independently of the style's `transition` property.
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-#[deprecated = "transition not implemented"]
-struct RootTransition(serde_json::Value);
+struct RootTransition(Transition);
 
 /// Style specification version number. Must be 8.
 #[derive(serde::Deserialize, PartialEq, Eq, Debug, Clone, Copy)]
@@ -1007,8 +1027,7 @@ pub struct Layer {
 
 /// A expression specifying conditions on source features. Only features that match the filter are displayed. Zoom expressions in filters are only evaluated at integer zoom levels. The `feature-state` expression is not supported in filter expressions.
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-#[deprecated = "filter not implemented"]
-struct LayerFilter(serde_json::Value);
+struct LayerFilter(BooleanExpression);
 
 /// Unique layer name.
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
@@ -1036,8 +1055,7 @@ pub struct LayerMinzoom(serde_json::Number);
 
 /// Default paint properties for this layer.
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-#[deprecated = "paint not implemented"]
-struct LayerPaint(serde_json::Value);
+struct LayerPaint(Paint);
 
 /// Name of a source description to be used for this layer. Required for all layer types except `background`.
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
@@ -2261,7 +2279,7 @@ pub struct LayoutSymbolTextVariableAnchorOffset(
 );
 
 impl<'de> serde::Deserialize<'de> for LayoutSymbolTextVariableAnchorOffset {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    fn deserialize<D>(_deserializer: D) -> Result<Self, D::Error>
     where
         D: serde::Deserializer<'de>,
     {
