@@ -3840,13 +3840,19 @@ impl Default for SkySkyHorizonBlend {
 }
 
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-#[serde(untagged)]
+#[serde(tag = "type")]
 pub enum Source {
+    #[serde(rename = "vector")]
     SourceVector(SourceVector),
+    #[serde(rename = "raster")]
     SourceRaster(SourceRaster),
+    #[serde(rename = "raster-dem")]
     SourceRasterDem(SourceRasterDem),
+    #[serde(rename = "geojson")]
     SourceGeojson(SourceGeojson),
+    #[serde(rename = "video")]
     SourceVideo(SourceVideo),
+    #[serde(rename = "image")]
     SourceImage(SourceImage),
 }
 
@@ -3901,9 +3907,6 @@ pub struct SourceGeojson {
     pub promote_id: Option<SourceGeojsonPromoteId>,
     /// Douglas-Peucker simplification tolerance (higher means simpler geometries and faster performance).
     pub tolerance: Option<SourceGeojsonTolerance>,
-    /// The data type of the GeoJSON source.
-    #[serde(rename = "type")]
-    pub r#type: SourceGeojsonType,
 }
 
 /// Contains an attribution to be displayed when the map is shown to a user.
@@ -4034,21 +4037,10 @@ impl Default for SourceGeojsonTolerance {
     }
 }
 
-/// The data type of the GeoJSON source.
-#[derive(serde::Deserialize, PartialEq, Eq, Debug, Clone, Copy)]
-pub enum SourceGeojsonType {
-    /// A GeoJSON data source.
-    #[serde(rename = "geojson")]
-    Geojson,
-}
-
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
 pub struct SourceImage {
     /// Corners of image specified in longitude, latitude pairs.
     pub coordinates: SourceImageCoordinates,
-    /// The data type of the image source.
-    #[serde(rename = "type")]
-    pub r#type: SourceImageType,
     /// URL that points to an image.
     pub url: SourceImageUrl,
 }
@@ -4060,14 +4052,6 @@ struct SourceImageCoordinatesValue(Box<[serde_json::Number; 2]>);
 /// Corners of image specified in longitude, latitude pairs.
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
 struct SourceImageCoordinates(Box<[SourceImageCoordinatesValue; 4]>);
-
-/// The data type of the image source.
-#[derive(serde::Deserialize, PartialEq, Eq, Debug, Clone, Copy)]
-pub enum SourceImageType {
-    /// An image data source.
-    #[serde(rename = "image")]
-    Image,
-}
 
 /// URL that points to an image.
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
@@ -4093,9 +4077,6 @@ pub struct SourceRaster {
     pub tile_size: Option<SourceRasterTileSize>,
     /// An array of one or more tile source URLs, as in the TileJSON spec.
     pub tiles: Option<SourceRasterTiles>,
-    /// The type of the source.
-    #[serde(rename = "type")]
-    pub r#type: SourceRasterType,
     /// A URL to a TileJSON resource. Supported protocols are `http:` and `https:`.
     pub url: Option<SourceRasterUrl>,
     /// A setting to determine whether a source's tiles are cached locally.
@@ -4189,14 +4170,6 @@ impl Default for SourceRasterTileSize {
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
 struct SourceRasterTiles(Vec<String>);
 
-/// The type of the source.
-#[derive(serde::Deserialize, PartialEq, Eq, Debug, Clone, Copy)]
-pub enum SourceRasterType {
-    /// A raster tile source.
-    #[serde(rename = "raster")]
-    Raster,
-}
-
 /// A URL to a TileJSON resource. Supported protocols are `http:` and `https:`.
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
 struct SourceRasterUrl(String);
@@ -4243,9 +4216,6 @@ pub struct SourceRasterDem {
     pub tile_size: Option<SourceRasterDemTileSize>,
     /// An array of one or more tile source URLs, as in the TileJSON spec.
     pub tiles: Option<SourceRasterDemTiles>,
-    /// The type of the source.
-    #[serde(rename = "type")]
-    pub r#type: SourceRasterDemType,
     /// A URL to a TileJSON resource. Supported protocols are `http:` and `https:`.
     pub url: Option<SourceRasterDemUrl>,
     /// A setting to determine whether a source's tiles are cached locally.
@@ -4394,14 +4364,6 @@ impl Default for SourceRasterDemTileSize {
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
 struct SourceRasterDemTiles(Vec<String>);
 
-/// The type of the source.
-#[derive(serde::Deserialize, PartialEq, Eq, Debug, Clone, Copy)]
-pub enum SourceRasterDemType {
-    /// A RGB-encoded raster DEM source
-    #[serde(rename = "raster-dem")]
-    RasterDem,
-}
-
 /// A URL to a TileJSON resource. Supported protocols are `http:` and `https:`.
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
 struct SourceRasterDemUrl(String);
@@ -4438,9 +4400,6 @@ pub struct SourceVector {
     pub scheme: Option<SourceVectorScheme>,
     /// An array of one or more tile source URLs, as in the TileJSON spec.
     pub tiles: Option<SourceVectorTiles>,
-    /// The type of the source.
-    #[serde(rename = "type")]
-    pub r#type: SourceVectorType,
     /// A URL to a TileJSON resource. Supported protocols are `http:` and `https:`.
     pub url: Option<SourceVectorUrl>,
     /// A setting to determine whether a source's tiles are cached locally.
@@ -4542,14 +4501,6 @@ impl Default for SourceVectorScheme {
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
 struct SourceVectorTiles(Vec<String>);
 
-/// The type of the source.
-#[derive(serde::Deserialize, PartialEq, Eq, Debug, Clone, Copy)]
-pub enum SourceVectorType {
-    /// A vector tile source.
-    #[serde(rename = "vector")]
-    Vector,
-}
-
 /// A URL to a TileJSON resource. Supported protocols are `http:` and `https:`.
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
 struct SourceVectorUrl(String);
@@ -4568,9 +4519,6 @@ impl Default for SourceVectorVolatile {
 pub struct SourceVideo {
     /// Corners of video specified in longitude, latitude pairs.
     pub coordinates: SourceVideoCoordinates,
-    /// The data type of the video source.
-    #[serde(rename = "type")]
-    pub r#type: SourceVideoType,
     /// URLs to video content in order of preferred format.
     pub urls: SourceVideoUrls,
 }
@@ -4582,14 +4530,6 @@ struct SourceVideoCoordinatesValue(Box<[serde_json::Number; 2]>);
 /// Corners of video specified in longitude, latitude pairs.
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
 struct SourceVideoCoordinates(Box<[SourceVideoCoordinatesValue; 4]>);
-
-/// The data type of the video source.
-#[derive(serde::Deserialize, PartialEq, Eq, Debug, Clone, Copy)]
-pub enum SourceVideoType {
-    /// A video data source.
-    #[serde(rename = "video")]
-    Video,
-}
 
 /// URLs to video content in order of preferred format.
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]

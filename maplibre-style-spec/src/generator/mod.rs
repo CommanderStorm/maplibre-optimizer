@@ -1,22 +1,25 @@
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap};
 
 use codegen::Scope;
 
-use crate::decoder::{ParsedItem, StyleReference, TopLevelItem};
+use crate::decoder::{EnumValues, ParsedItem, StyleReference, TopLevelItem};
 use crate::generator::formatter::{to_snake_case, to_upper_camel_case};
 
 mod autotest;
 mod formatter;
 mod items;
 
-pub fn generate_spec_scope(reference: StyleReference) -> String {
+pub fn generate_spec_scope(mut reference: StyleReference) -> String {
     let mut scope = Scope::new();
 
     assert_eq!(reference.version, 8);
 
     generate_spec(&mut scope, &reference.root);
-    for (key, item) in reference.fields.into_iter() {
-        generate_top_level_item(&mut scope, item, &to_upper_camel_case(&key))
+    let discriminants = extract_and_remove_discriminants(&mut reference.fields);
+
+    for (key, item) in &reference.fields {
+        let name = to_upper_camel_case(&key);
+        generate_top_level_item(&mut scope, &item, &name, &discriminants)
     }
     scope
         .get_or_new_module("test")
@@ -24,6 +27,57 @@ pub fn generate_spec_scope(reference: StyleReference) -> String {
         .import("super", "*");
 
     scope.to_string()
+}
+
+fn extract_and_remove_discriminants(
+    fields: &mut BTreeMap<String, TopLevelItem>,
+) -> Vec<(String, String, String, String)> {
+    // collect where to search
+    let anyof_top_level_fields = fields.iter().filter_map(|f| match f {
+        (k, TopLevelItem::OneOf(i)) => Some((k.clone(), i.clone())),
+        _ => None,
+    });
+
+    // collect discriminants at the search places
+    let mut discriminants = Vec::new();
+    for (top_name, join_keys) in anyof_top_level_fields {
+        let variant_name = to_upper_camel_case(&top_name);
+        for join_key in join_keys {
+            let joined_top_level =fields.get(&join_key).expect(&format!("anyof {top_name} does refer to its variant {join_key}, but there is no join partner"));
+            let TopLevelItem::Group(btree_map) = joined_top_level else {
+                // cannot possibly contain a discriminant
+                continue;
+            };
+            for (descriminant, item) in btree_map {
+                if let ParsedItem::Enum { values, .. } = item
+                    && values.len() == 1
+                {
+                    let EnumValues::Enum(enum_values) = values else {
+                        unreachable!("the version is not referenced in an anyof")
+                    };
+                    let value = enum_values.keys().next().expect("value length is 1");
+                    discriminants.push((
+                        variant_name.clone(),
+                        join_key.clone(),
+                        descriminant.clone(),
+                        value.clone(),
+                    ));
+                }
+            }
+        }
+    }
+
+    // now remove the discriminants
+    for (k, v) in fields.iter_mut() {
+        if let TopLevelItem::Group(i) = v {
+            for (_, k2, tag, _) in &discriminants {
+                if k == k2 {
+                    let _ = i.remove(tag);
+                }
+            }
+        }
+    }
+    discriminants
 }
 
 fn generate_spec(scope: &mut Scope, root: &BTreeMap<String, ParsedItem>) {
@@ -51,70 +105,105 @@ fn generate_spec(scope: &mut Scope, root: &BTreeMap<String, ParsedItem>) {
     }
 }
 
-fn generate_top_level_item(scope: &mut Scope, item: TopLevelItem, name: &str) {
+fn generate_top_level_item(
+    scope: &mut Scope,
+    item: &TopLevelItem,
+    name: &str,
+    discriminants: &[(String, String, String, String)],
+) {
     if name == "PropertyType" {
         return; // bogus, not a style spec item, rather metadata about the item
     }
     match item {
         TopLevelItem::Item(item) => generate_parsed_item(scope, &item, name),
-        TopLevelItem::Group(items) => {
-            // special case for *:
-            if items.len() == 1
-                && let Some(item) = items.get("*")
-            {
-                let field_type_name = to_upper_camel_case(&format!("Inner {name}"));
-                scope
-                    .new_struct(name)
-                    .vis("pub")
-                    .derive("serde::Deserialize, PartialEq, Debug, Clone")
-                    .tuple_field(format!(
-                        "std::collections::BTreeMap<String,{field_type_name}>"
-                    ));
-                generate_parsed_item(scope, &item, &field_type_name);
+        TopLevelItem::Group(items) => generate_top_level_group(scope, items, name),
+        TopLevelItem::OneOf(items) => generate_top_level_oneof(scope, items, name, discriminants),
+    }
+}
 
-                return;
-            }
-            {
-                let group = scope
-                    .new_struct(name)
-                    .vis("pub")
-                    .derive("serde::Deserialize, PartialEq, Debug, Clone");
-                for (key, item) in &items {
-                    let mut field_type_name = to_upper_camel_case(&format!("{name} {key}"));
-                    if key == "*" {
-                        field_type_name =
-                            format!("std::collections::BTreeMap<String,{field_type_name}>");
-                    }
-                    if item.optional() {
-                        field_type_name = format!("Option<{field_type_name}>");
-                    }
-                    let field = group
-                        .new_field(to_snake_case(key), field_type_name)
-                        .doc(item.doc())
-                        .vis("pub");
-                    if key == "*" {
-                        field.annotation("#[serde(flatten)]");
-                    } else {
-                        if &to_snake_case(key) != key {
-                            field.annotation(format!("#[serde(rename=\"{key}\")]"));
-                        }
-                    }
-                }
-            }
-            for (key, item) in items {
-                generate_parsed_item(scope, &item, &to_upper_camel_case(&format!("{name} {key}")));
+fn generate_top_level_group(scope: &mut Scope, items: &BTreeMap<String, ParsedItem>, name: &str) {
+    // special case for *:
+    if items.len() == 1
+        && let Some(item) = items.get("*")
+    {
+        let field_type_name = to_upper_camel_case(&format!("Inner {name}"));
+        scope
+            .new_struct(name)
+            .vis("pub")
+            .derive("serde::Deserialize, PartialEq, Debug, Clone")
+            .tuple_field(format!(
+                "std::collections::BTreeMap<String,{field_type_name}>"
+            ));
+        generate_parsed_item(scope, &item, &field_type_name);
+
+        return;
+    }
+
+    let group = scope
+        .new_struct(name)
+        .vis("pub")
+        .derive("serde::Deserialize, PartialEq, Debug, Clone");
+    for (key, item) in items {
+        let mut field_type_name = to_upper_camel_case(&format!("{name} {key}"));
+        if key == "*" {
+            field_type_name = format!("std::collections::BTreeMap<String,{field_type_name}>");
+        }
+        if item.optional() {
+            field_type_name = format!("Option<{field_type_name}>");
+        }
+        let field = group
+            .new_field(to_snake_case(key), field_type_name)
+            .doc(item.doc())
+            .vis("pub");
+        if key == "*" {
+            field.annotation("#[serde(flatten)]");
+        } else {
+            if &to_snake_case(key) != key {
+                field.annotation(format!("#[serde(rename=\"{key}\")]"));
             }
         }
-        TopLevelItem::OneOf(items) => {
-            let enu = scope
-                .new_enum(name)
-                .attr("serde(untagged)")
-                .vis("pub")
-                .derive("serde::Deserialize, PartialEq, Debug, Clone");
-            for key in items {
-                let var = to_upper_camel_case(&key);
-                enu.new_variant(&var).tuple(&var);
-            }
+    }
+
+    for (key, item) in items {
+        generate_parsed_item(scope, &item, &to_upper_camel_case(&format!("{name} {key}")));
+    }
+}
+
+fn generate_top_level_oneof(
+    scope: &mut Scope,
+    items: &Vec<String>,
+    name: &str,
+    discriminants: &[(String, String, String, String)],
+) {
+    let enu = scope
+        .new_enum(name)
+        .vis("pub")
+        .derive("serde::Deserialize, PartialEq, Debug, Clone");
+
+    let enum_variant_key = discriminants
+        .iter()
+        .filter(|d| &d.0 == name)
+        .next()
+        .map(|d| d.2.clone());
+    let descriminants = discriminants
+        .iter()
+        .filter(|d| &d.0 == name)
+        .cloned()
+        .map(|d| (d.1, d.3))
+        .collect::<HashMap<_, _>>();
+
+    if let Some(enum_variant_key) = enum_variant_key {
+        enu.attr(format!("serde(tag=\"{enum_variant_key}\")"));
+    } else {
+        enu.attr("serde(untagged)");
+    }
+    for key in items {
+        let var_name = to_upper_camel_case(&key);
+        let var = enu.new_variant(&var_name).tuple(&var_name);
+        if &var_name != key
+            && let Some(descriminant_key) = descriminants.get(key)
+        {
+            var.annotation(format!("#[serde(rename=\"{descriminant_key}\")]"));
         }
     }
 }

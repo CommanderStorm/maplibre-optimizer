@@ -417,6 +417,15 @@ pub enum EnumValues {
     Version(Vec<Number>),
     Enum(BTreeMap<String, EnumDocs>),
 }
+impl EnumValues {
+    /// number of variants this enum contains
+    pub fn len(&self) -> usize {
+        match self {
+            EnumValues::Version(numbers) => numbers.len(),
+            EnumValues::Enum(btree_map) => btree_map.len(),
+        }
+    }
+}
 
 #[derive(Debug, PartialEq, Clone, Deserialize)]
 #[serde(untagged)]
