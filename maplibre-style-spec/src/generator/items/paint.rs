@@ -56,7 +56,7 @@ mod tests {
         #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
         struct LayerPaint(Paint);
 
-        #[cfg(test)] 
+        #[cfg(test)]
         mod test {
             use super::*;
 

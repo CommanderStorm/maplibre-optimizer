@@ -57,7 +57,7 @@ mod tests {
             #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
             struct Projection(Projection);
 
-            #[cfg(test)] 
+            #[cfg(test)]
             mod test {
                 use super::*;
 

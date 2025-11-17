@@ -54,7 +54,7 @@ mod tests {
             #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
             struct InnerSources(Source);
 
-            #[cfg(test)] 
+            #[cfg(test)]
             mod test {
                 use super::*;
 

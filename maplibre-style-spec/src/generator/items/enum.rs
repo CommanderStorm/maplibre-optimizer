@@ -131,7 +131,7 @@ mod tests {
             }
         }
 
-        #[cfg(test)] 
+        #[cfg(test)]
         mod test {
             use super::*;
 
@@ -186,7 +186,7 @@ mod tests {
             GreaterEqual,
         }
 
-        #[cfg(test)] 
+        #[cfg(test)]
         mod test {
             use super::*;
 
@@ -226,7 +226,7 @@ mod tests {
             Eight = 8,
         }
 
-        #[cfg(test)] 
+        #[cfg(test)]
         mod test {
             use super::*;
 
@@ -297,13 +297,13 @@ mod tests {
         #[derive(serde::Deserialize, PartialEq, Eq, Debug, Clone, Copy)]
         pub enum ExpressionName {
             /// Binds expressions to named variables, which can then be referenced in the result expression using `["var", "variable_name"]`.
-            /// 
+            ///
             ///  - [Visualize population density](https://maplibre.org/maplibre-gl-js/docs/examples/visualize-population-density/)
             #[serde(rename="let")]
             Let,
         }
 
-        #[cfg(test)] 
+        #[cfg(test)]
         mod test {
             use super::*;
 

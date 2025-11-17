@@ -57,7 +57,7 @@ mod tests {
             #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
             struct RootLight(Light);
 
-            #[cfg(test)] 
+            #[cfg(test)]
             mod test {
                 use super::*;
 

@@ -85,7 +85,7 @@ mod tests {
             #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
             struct ColorReliefColor(color::DynamicColor);
 
-            #[cfg(test)] 
+            #[cfg(test)]
             mod test {
                 use super::*;
 

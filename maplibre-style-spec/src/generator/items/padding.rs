@@ -140,7 +140,7 @@ mod tests {
             #[serde(untagged)]
             pub enum IconPadding {
                 /// A single value applies to all four sides.
-                /// 
+                ///
                 /// Only avaliable for backwards compatibility.
                 #[deprecated = "Please see [`Self::One`] instead"]
                 Unwrapped(serde_json::Number),
@@ -160,7 +160,7 @@ mod tests {
                 }
             }
 
-            #[cfg(test)] 
+            #[cfg(test)]
             mod test {
                 use super::*;
 
