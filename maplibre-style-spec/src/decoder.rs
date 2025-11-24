@@ -326,9 +326,9 @@ pub struct Syntax {
 #[derive(Debug, PartialEq, Eq, Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Overload {
-    parameters: Vec<String>,
+    pub parameters: Vec<String>,
     #[serde(rename = "output-type")]
-    output_type: ParameterType,
+    pub output_type: ParameterType,
 }
 #[derive(Debug, PartialEq, Eq, Clone, Deserialize)]
 #[serde(deny_unknown_fields)]

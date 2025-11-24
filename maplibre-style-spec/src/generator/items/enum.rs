@@ -19,6 +19,10 @@ pub fn generate(
             generate_version(scope, name, &common, values);
         }
         EnumValues::Enum(values) => {
+            let has_syntax = values.values().any(|v| v.syntax.is_some());
+            if has_syntax {
+                generate_syntax_enum(scope, name, &common, values);
+            }
             generate_regular_enum(scope, name, &common, values);
         }
     }
@@ -35,6 +39,109 @@ pub fn generate(
             ));
     }
     generate_test_from_example_if_present(scope, name, common.example.as_ref());
+}
+
+fn generate_syntax_enum(
+    scope: &mut Scope,
+    name: &str,
+    common: &&Fields,
+    values: &BTreeMap<String, EnumDocs>,
+) {
+    let enu = scope
+        .new_enum(name)
+        .doc(&common.doc)
+        .vis("pub")
+        .derive("PartialEq, Eq, Debug, Clone, Copy");
+    for (key, value) in values {
+        let var_name = to_upper_camel_case(key);
+        let var = enu.new_variant(&var_name).doc(&value.doc);
+        let group = value.group.as_ref().expect(&format!(
+            "syntax enum should have a group, but {key} does not have one"
+        ));
+        let syntax = value.syntax.as_ref().expect(&format!(
+            "syntax enum should have a syntax, but {key} does not have one"
+        ));
+        assert!(
+            !syntax.overloads.is_empty(),
+            "{key} in {name} (group={group}) does not have a single overload"
+        );
+        if syntax.overloads.len() == 1 {
+            // not overloaded, above the Option<T> level
+            let overload = &syntax.overloads[0];
+            for p in &overload.parameters {
+                let tuple_identifier =
+                    if let Some(non_optional_string) = p.clone().strip_suffix('?') {
+                        let v = to_upper_camel_case(non_optional_string);
+                        format!("Option<{v}>")
+                    } else {
+                        to_upper_camel_case(&p)
+                    };
+                var.tuple(tuple_identifier);
+            }
+        } else {
+            // actually overloaded
+            let options_name = format!("{var_name}Options");
+            var.tuple(options_name);
+            scope
+                .new_enum(options_name)
+                .doc("Options for deserializing the syntax enum variant [`{name}::var_name`]");
+            // todo: enumerate options
+        }
+    }
+
+    let visitor_name = format!("{name}Visitor");
+    scope
+        .new_impl(name)
+        .generic("'de")
+        .impl_trait("serde::Deserialize<'de>")
+        .new_fn("deserialize")
+        .arg("deserializer", "D")
+        .generic("D")
+        .bound("D", "serde::Deserializer<'de>")
+        .ret("Result<Self, D::Error>")
+        .line(format!("deserializer.deserialize_any({visitor_name})"));
+
+    scope
+        .new_struct(&visitor_name)
+        .doc("Visitor for deserializing the syntax enum [`{name}`]");
+
+    let vis = scope
+        .new_impl(&visitor_name)
+        .generic("'de")
+        .impl_trait("serde::Visitor<'de>")
+        .associate_type("Value", &name);
+    vis.new_fn("expecting")
+        .arg_ref_self()
+        .arg("formatter", "&mut std::fmt::Formatter")
+        .ret("std::fmt::Result")
+        .line("formatter.write_str(r#\"an expression array like [\"==\", 1, 2]\"#))");
+
+    let visit_seq = vis
+        .new_fn("visit_seq")
+        .generic("A: serde::de::SeqAccess<'de>")
+        .arg_self()
+        .arg("mut seq", "A")
+        .ret("Result<Self::Value, A::Error>");
+    visit_seq.line("// First element: operator string");
+    visit_seq.line("let op: String = seq.next_element()?.ok_or_else(|| de::Error::custom(\"missing operator\"))?;");
+    visit_seq.line("match op.as_str() {");
+    for (key, _value) in values {
+        let variant_name = to_upper_camel_case(key);
+        visit_seq.line(format!(
+            "\"{key}\" => todo!(\"{name}::{variant_name} decoding is not currently implemented\"),"
+        ));
+    }
+
+    visit_seq.line("_ => Err(de::Error::custom(&format!(\"unknown operator {op} in expression. Please check the documentation for the avaliable expressions.\")))");
+    visit_seq.line("}");
+
+    for (key, value) in values {
+        generate_test_from_example_if_present(
+            scope,
+            &format!("{name} {key} syntax"),
+            value.example.as_ref(),
+        );
+    }
 }
 
 fn generate_regular_enum(
