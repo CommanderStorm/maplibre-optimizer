@@ -1,10 +1,9 @@
 use std::fmt;
 
 use crate::formatter::Formatter;
+use crate::r#type::Type;
 use crate::type_def::TypeDef;
 use crate::variant::Variant;
-
-use crate::r#type::Type;
 
 /// Defines an enumeration.
 #[derive(Debug, Clone)]

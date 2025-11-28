@@ -192,7 +192,7 @@ impl Function {
     /// // add a `#[test]` attribute
     /// func.attr("test");
     /// ```
-    pub fn attr(&mut self, attribute: &str) -> &mut Self {
+    pub fn attr(&mut self, attribute: impl ToString) -> &mut Self {
         self.attributes.push(attribute.to_string());
         self
     }
