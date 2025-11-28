@@ -63,7 +63,7 @@ mod tests {
         #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
         struct Sky(Sky);
 
-        #[cfg(test)] 
+        #[cfg(test)]
         mod test {
             use super::*;
 

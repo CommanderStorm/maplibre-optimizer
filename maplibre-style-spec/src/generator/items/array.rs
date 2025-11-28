@@ -216,7 +216,7 @@ mod tests {
             }
         }
 
-        #[cfg(test)] 
+        #[cfg(test)]
         mod test {
             use super::*;
 
@@ -264,7 +264,7 @@ mod tests {
         #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
         struct Layers(Vec<Layer>);
 
-        #[cfg(test)] 
+        #[cfg(test)]
         mod test {
             use super::*;
 

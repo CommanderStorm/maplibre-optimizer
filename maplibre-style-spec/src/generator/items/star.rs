@@ -78,7 +78,7 @@ mod tests {
             Geojson,
         }
 
-        #[cfg(test)] 
+        #[cfg(test)]
         mod test {
             use super::*;
 

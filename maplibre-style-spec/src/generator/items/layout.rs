@@ -52,7 +52,7 @@ mod tests {
         #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
         struct RootLayout(Layout);
 
-        #[cfg(test)] 
+        #[cfg(test)]
         mod test {
             use super::*;
 

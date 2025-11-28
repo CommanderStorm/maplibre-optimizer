@@ -72,7 +72,7 @@ mod tests {
         #[deprecated = "resolved_image not implemented"]
         struct IconImage(serde_json::Value);
 
-        #[cfg(test)] 
+        #[cfg(test)]
         mod test {
             use super::*;
 

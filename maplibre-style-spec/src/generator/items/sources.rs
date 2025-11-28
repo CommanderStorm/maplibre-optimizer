@@ -76,7 +76,7 @@ mod tests {
         #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
         struct Sources(Sources);
 
-        #[cfg(test)] 
+        #[cfg(test)]
         mod test {
             use super::*;
 
