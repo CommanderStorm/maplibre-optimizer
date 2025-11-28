@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["maplibre-style-spec"]
+members = ["maplibre-style-spec", "codegen2"]
 
 [workspace.package]
 edition = "2024"
@@ -32,7 +32,7 @@ struct_field_names = "allow"
 [workspace.dependencies]
 anyhow = "1.0"
 clap = { version = "4", features = ["derive", "unstable-markdown", "wrap_help"] }
-codegen = { git = "https://gitlab.com/Commanderstorm/codegen.git", branch = "attr" }
+codegen2 = {version = "0.3.0", path = "codegen2"}
 criterion = { version = "0.7", features = ["async_futures", "async_tokio", "html_reports"] }
 image = "0.25.8"
 insta = "1.43"
