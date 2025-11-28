@@ -1,6 +1,6 @@
 use std::collections::BTreeMap;
 
-use codegen::Scope;
+use codegen2::Scope;
 use serde_json::{Number, Value};
 
 use crate::decoder::{EnumDocs, EnumValues, Fields};
@@ -22,8 +22,9 @@ pub fn generate(
             let has_syntax = values.values().any(|v| v.syntax.is_some());
             if has_syntax {
                 generate_syntax_enum(scope, name, &common, values);
+            } else {
+                generate_regular_enum(scope, name, &common, values);
             }
-            generate_regular_enum(scope, name, &common, values);
         }
     }
 
@@ -51,7 +52,7 @@ fn generate_syntax_enum(
         .new_enum(name)
         .doc(&common.doc)
         .vis("pub")
-        .derive("PartialEq, Eq, Debug, Clone, Copy");
+        .derive("PartialEq, Eq, Debug, Clone");
     for (key, value) in values {
         let var_name = to_upper_camel_case(key);
         let var = enu.new_variant(&var_name).doc(&value.doc);
@@ -68,14 +69,19 @@ fn generate_syntax_enum(
         if syntax.overloads.len() == 1 {
             // not overloaded, above the Option<T> level
             let overload = &syntax.overloads[0];
+            if overload.parameters.iter().any(|p| p == "...") {
+                var.tuple("Vec<WeirdVariadic>");
+                continue;
+            }
             for p in &overload.parameters {
-                let tuple_identifier =
-                    if let Some(non_optional_string) = p.clone().strip_suffix('?') {
-                        let v = to_upper_camel_case(non_optional_string);
-                        format!("Option<{v}>")
-                    } else {
-                        to_upper_camel_case(&p)
-                    };
+                let param = p.clone();
+                let tuple_identifier = if let Some(non_optional_string) = param.strip_suffix('?') {
+                    let v = to_upper_camel_case(non_optional_string);
+                    format!("Option<{v}>")
+                } else {
+                    to_upper_camel_case(&p)
+                };
+
                 var.tuple(tuple_identifier);
             }
         } else {
@@ -102,7 +108,9 @@ fn generate_syntax_enum(
 
             let _enu = scope
                 .new_enum(&options_name)
-                .doc("Options for deserializing the syntax enum variant [`{name}::var_name`]");
+                .doc("Options for deserializing the syntax enum variant [`{name}::var_name`]")
+                .vis("pub")
+                .derive("serde::Deserialize, PartialEq, Eq, Debug, Clone");
             // todo: enumerate options
         }
     }
@@ -126,13 +134,13 @@ fn generate_syntax_enum(
     let vis = scope
         .new_impl(&visitor_name)
         .generic("'de")
-        .impl_trait("serde::Visitor<'de>")
+        .impl_trait("serde::de::Visitor<'de>")
         .associate_type("Value", &name);
     vis.new_fn("expecting")
         .arg_ref_self()
         .arg("formatter", "&mut std::fmt::Formatter")
         .ret("std::fmt::Result")
-        .line("formatter.write_str(r#\"an expression array like [\"==\", 1, 2]\"#))");
+        .line("formatter.write_str(r#\"an expression array like [\"==\", 1, 2]\"#)");
 
     let visit_seq = vis
         .new_fn("visit_seq")
@@ -141,7 +149,7 @@ fn generate_syntax_enum(
         .arg("mut seq", "A")
         .ret("Result<Self::Value, A::Error>");
     visit_seq.line("// First element: operator string");
-    visit_seq.line("let op: String = seq.next_element()?.ok_or_else(|| de::Error::custom(\"missing operator\"))?;");
+    visit_seq.line("let op: String = seq.next_element()?.ok_or_else(|| serde::de::Error::custom(\"missing operator\"))?;");
     visit_seq.line("match op.as_str() {");
     for (key, _value) in values {
         let variant_name = to_upper_camel_case(key);
@@ -150,13 +158,13 @@ fn generate_syntax_enum(
         ));
     }
 
-    visit_seq.line("_ => Err(de::Error::custom(&format!(\"unknown operator {op} in expression. Please check the documentation for the avaliable expressions.\")))");
+    visit_seq.line("_ => Err(serde::de::Error::custom(&format!(\"unknown operator {op} in expression. Please check the documentation for the avaliable expressions.\")))");
     visit_seq.line("}");
 
     for (key, value) in values {
         generate_test_from_example_if_present(
             scope,
-            &format!("{name} {key} syntax"),
+            &to_upper_camel_case(&format!("{name} {key} syntax")),
             value.example.as_ref(),
         );
     }
@@ -414,25 +422,57 @@ mod tests {
         },
         });
         let reference: StyleReference = serde_json::from_value(reference).unwrap();
-        insta::assert_snapshot!(crate::generator::generate_spec_scope(reference), @r#"
+        insta::assert_snapshot!(crate::generator::generate_spec_scope(reference), @r##"
         /// This is a Maplibre Style Specification
         #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
         pub struct MaplibreStyleSpecification;
 
-        #[derive(serde::Deserialize, PartialEq, Eq, Debug, Clone, Copy)]
+        #[derive(PartialEq, Eq, Debug, Clone)]
         pub enum ExpressionName {
             /// Binds expressions to named variables, which can then be referenced in the result expression using `["var", "variable_name"]`.
-            ///
+            /// 
             ///  - [Visualize population density](https://maplibre.org/maplibre-gl-js/docs/examples/visualize-population-density/)
-            #[serde(rename="let")]
-            Let,
+            Let(Vec<WeirdVariadic>),
         }
 
-        #[cfg(test)]
+        impl<'de> serde::Deserialize<'de> for ExpressionName {
+            fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+            where D: serde::Deserializer<'de>,
+            {
+                deserializer.deserialize_any(ExpressionNameVisitor)
+            }
+        }
+
+        /// Visitor for deserializing the syntax enum [`{name}`]
+        struct ExpressionNameVisitor;
+
+        impl<'de> serde::de::Visitor<'de> for ExpressionNameVisitor {
+            type Value = ExpressionName;
+
+            fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+                formatter.write_str(r#"an expression array like ["==", 1, 2]"#)
+            }
+
+            fn visit_seq<A: serde::de::SeqAccess<'de>>(self, mut seq: A) -> Result<Self::Value, A::Error> {
+                // First element: operator string
+                let op: String = seq.next_element()?.ok_or_else(|| serde::de::Error::custom("missing operator"))?;
+                match op.as_str() {
+                "let" => todo!("ExpressionName::Let decoding is not currently implemented"),
+                _ => Err(serde::de::Error::custom(&format!("unknown operator {op} in expression. Please check the documentation for the avaliable expressions.")))
+                }
+            }
+        }
+
+        #[cfg(test)] 
         mod test {
             use super::*;
 
+            #[test]
+            fn test_example_expression_name_let_syntax_decodes() {
+                let example = serde_json::json!(["let","someNumber",500,["interpolate",["linear"],["var","someNumber"],274,"#edf8e9",1551,"#006d2c"]]);
+                let _ = serde_json::from_value::<ExpressionNameLetSyntax>(example).expect("example should decode");
+            }
         }
-        "#);
+        "##);
     }
 }

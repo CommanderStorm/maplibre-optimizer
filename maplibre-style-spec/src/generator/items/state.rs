@@ -1,4 +1,4 @@
-use codegen::Scope;
+use codegen2::Scope;
 use serde_json::Value;
 
 use crate::decoder::Fields;

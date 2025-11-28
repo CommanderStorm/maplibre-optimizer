@@ -1,4 +1,4 @@
-use codegen::Scope;
+use codegen2::Scope;
 
 use crate::decoder::Fields;
 use crate::generator::autotest::generate_test_from_example_if_present;

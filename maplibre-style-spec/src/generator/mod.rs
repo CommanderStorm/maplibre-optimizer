@@ -1,6 +1,6 @@
 use std::collections::{BTreeMap, HashMap};
 
-use codegen::Scope;
+use codegen2::Scope;
 
 use crate::decoder::{EnumValues, ParsedItem, StyleReference, TopLevelItem};
 use crate::generator::formatter::{to_snake_case, to_upper_camel_case};

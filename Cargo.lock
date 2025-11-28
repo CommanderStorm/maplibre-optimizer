@@ -3,9 +3,8 @@
 version = 4
 
 [[package]]
-name = "codegen"
+name = "codegen2"
 version = "0.3.0"
-source = "git+https://gitlab.com/Commanderstorm/codegen.git?branch=attr#79bab7c24b2f2e53c5a206b4fed7e2993304d034"
 dependencies = [
  "indexmap",
 ]
@@ -214,7 +213,7 @@ checksum = "6373607a59f0be73a39b6fe456b8192fcc3585f602af20751600e974dd455e77"
 name = "maplibre-style-spec"
 version = "0.1.0"
 dependencies = [
- "codegen",
+ "codegen2",
  "color",
  "insta",
  "serde",

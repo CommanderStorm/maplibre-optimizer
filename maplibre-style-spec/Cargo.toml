@@ -8,7 +8,7 @@ name = "generate_spec"
 path = "src/bin/generate_spec.rs"
 
 [dependencies]
-codegen.workspace = true
+codegen2.workspace = true
 color = { workspace = true, features = ["serde"] }
 serde.workspace = true
 serde_json.workspace = true
