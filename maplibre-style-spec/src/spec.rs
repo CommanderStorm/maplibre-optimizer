@@ -3940,7 +3940,7 @@ pub enum ProjectionType {
     /// Preset for the Globe projection
     Raw(AvailableProjections),
     /// Preset for the Equirectangular projection
-    CameraExpression(Vec<CameraExpression<AvailableProjections>>),
+    CameraExpression(Vec<CameraExpression>),
 }
 
 impl Default for ProjectionType {

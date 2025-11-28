@@ -29,7 +29,7 @@ pub fn generate(scope: &mut Scope, name: &str, common: &Fields, default: &str) {
         .tuple("AvailableProjections");
     enu.new_variant("CameraExpression")
         .doc("Preset for the Equirectangular projection")
-        .tuple("Vec<CameraExpression<AvailableProjections>>");
+        .tuple("Vec<CameraExpression>");
 
     scope
         .new_impl(name)
@@ -74,7 +74,7 @@ mod tests {
             /// Preset for the Globe projection
             Raw(AvailableProjections),
             /// Preset for the Equirectangular projection
-            CameraExpression(Vec<CameraExpression<AvailableProjections>>),
+            CameraExpression(Vec<CameraExpression>),
         }
 
         impl Default for Foo {
@@ -140,7 +140,7 @@ mod tests {
             /// Preset for the Globe projection
             Raw(AvailableProjections),
             /// Preset for the Equirectangular projection
-            CameraExpression(Vec<CameraExpression<AvailableProjections>>),
+            CameraExpression(Vec<CameraExpression>),
         }
 
         impl Default for ProjectionType {
