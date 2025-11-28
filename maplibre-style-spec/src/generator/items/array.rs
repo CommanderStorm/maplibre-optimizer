@@ -25,7 +25,9 @@ pub fn generate(
     let new_type = to_upper_camel_case(&format!("{name} Value"));
     let type_name = generate_array_value(scope, &new_type, common, value, values);
 
-    let field = if let Some(length) = length {
+    let field = if value == &ArrayValue::Simple(SimpleArrayValue::FontFaces) {
+        type_name
+    } else if let Some(length) = length {
         format!("Box<[{type_name}; {length}]>")
     } else {
         format!("Vec<{type_name}>")
@@ -111,7 +113,36 @@ fn generate_array_value(
                 name.to_string()
             }
             SimpleArrayValue::Color => "color::DynamicColor".to_string(),
-            SimpleArrayValue::FontFaces => "FontFaces".to_string(),
+            SimpleArrayValue::FontFaces => {
+                let font_with_range = scope
+                    .new_struct("FontWithRange")
+                    .vis("pub")
+                    .doc("Font file URL and the unicode-range at which it can be used")
+                    .derive("serde::Deserialize, PartialEq, Eq, Debug, Clone");
+                font_with_range
+                    .new_field("url", "url::Url")
+                    .vis("pub")
+                    .doc("URL the font can retrieved under");
+                font_with_range
+                    .new_field("unicode_range", "String")
+                    .vis("pub")
+                    .doc("Unicode characters where this font should be used")
+                    .annotation("#[serde(rename=\"unicode-range\")]");
+
+                let enu = scope
+                    .new_enum("FontFace")
+                    .vis("pub")
+                    .attr("serde(untagged)")
+                    .derive("serde::Deserialize, PartialEq, Eq, Debug, Clone");
+                enu.new_variant("Url")
+                    .doc("A single global font file URL")
+                    .tuple("url::Url");
+                enu.new_variant("FontRange")
+                    .doc("Load different fonts depending on the unicode range")
+                    .tuple("Vec<FontWithRange>");
+
+                "std::collections::BTreeMap<String,FontFace>".to_string()
+            }
         },
         ArrayValue::Either(options) => {
             let mut variant_types = Vec::with_capacity(options.len());

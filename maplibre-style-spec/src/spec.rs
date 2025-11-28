@@ -339,6 +339,25 @@ struct RootCenter(Vec<serde_json::Number>);
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
 pub struct RootCenterAltitude(serde_json::Number);
 
+/// Font file URL and the unicode-range at which it can be used
+#[derive(serde::Deserialize, PartialEq, Eq, Debug, Clone)]
+pub struct FontWithRange {
+    /// URL the font can retrieved under
+    pub url: url::Url,
+    /// Unicode characters where this font should be used
+    #[serde(rename = "unicode-range")]
+    pub unicode_range: String,
+}
+
+#[derive(serde::Deserialize, PartialEq, Eq, Debug, Clone)]
+#[serde(untagged)]
+pub enum FontFace {
+    /// A single global font file URL
+    Url(url::Url),
+    /// Load different fonts depending on the unicode range
+    FontRange(Vec<FontWithRange>),
+}
+
 /// The `font-faces` property can be used to specify what font files to use for rendering text. Font faces contain information needed to render complex texts such as [Devanagari](https://en.wikipedia.org/wiki/Devanagari), [Khmer](https://en.wikipedia.org/wiki/Khmer_script) among many others.<h2>Unicode range</h2>The optional `unicode-range` property can be used to only use a particular font file for characters within the specified unicode range(s). Its value should be an array of strings, each indicating a start and end of a unicode range, similar to the [CSS descriptor with the same name](https://developer.mozilla.org/en-US/docs/Web/CSS/@font-face/unicode-range). This allows specifying multiple non-consecutive unicode ranges. When not specified, the default value is `U+0-10FFFF`, meaning the font file will be used for all unicode characters.
 ///
 /// Refer to the [Unicode Character Code Charts](https://www.unicode.org/charts/) to see ranges for scripts supported by Unicode. To see what unicode code-points are available in a font, use a tool like [FontDrop](https://fontdrop.info/).
@@ -347,7 +366,7 @@ pub struct RootCenterAltitude(serde_json::Number);
 ///
 /// <h2>Supported Fonts</h2>What type of fonts are supported is implementation-defined. Unsupported fonts are ignored.
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-struct RootFontFaces(Vec<FontFaces>);
+struct RootFontFaces(std::collections::BTreeMap<String, FontFace>);
 
 /// A URL template for loading signed-distance-field glyph sets in PBF format.
 ///
@@ -610,13 +629,13 @@ pub enum ExpressionName {
     /// - `"font-scale"`: Applies a scaling factor on `text-size` as specified by the root layout property.
     ///
     /// - `"vertical-align"`: Aligns vertically text section or image in relation to the row it belongs to. Possible values are:
-    ///     - `"bottom"` *default*: align the bottom of this section with the bottom of other sections.
+    /// 	- `"bottom"` *default*: align the bottom of this section with the bottom of other sections.
     /// <img alt="Visual representation of bottom alignment" src="https://github.com/user-attachments/assets/0474a2fd-a4b2-417c-9187-7a13a28695bc"/>
-    ///     - `"center"`: align the center of this section with the center of other sections.
+    /// 	- `"center"`: align the center of this section with the center of other sections.
     /// <img alt="Visual representation of center alignment" src="https://github.com/user-attachments/assets/92237455-be6d-4c5d-b8f6-8127effc1950"/>
-    ///     - `"top"`: align the top of this section with the top of other sections.
+    /// 	- `"top"`: align the top of this section with the top of other sections.
     /// <img alt="Visual representation of top alignment" src="https://github.com/user-attachments/assets/45dccb28-d977-4abb-a006-4ea9792b7c53"/>
-    ///     - Refer to [the design proposal](https://github.com/maplibre/maplibre-style-spec/issues/832) for more details.
+    /// 	- Refer to [the design proposal](https://github.com/maplibre/maplibre-style-spec/issues/832) for more details.
     ///
     ///  - [Change the case of labels](https://maplibre.org/maplibre-gl-js/docs/examples/change-case-of-labels/)
     ///

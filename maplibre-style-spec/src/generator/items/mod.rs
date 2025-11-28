@@ -5,7 +5,6 @@ pub mod color_array;
 pub mod r#enum;
 pub mod expression;
 pub mod filter;
-pub mod font_faces;
 pub mod formatted;
 pub mod layout;
 pub mod light;
