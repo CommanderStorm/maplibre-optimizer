@@ -81,9 +81,27 @@ fn generate_syntax_enum(
         } else {
             // actually overloaded
             let options_name = format!("{var_name}Options");
-            var.tuple(options_name);
-            scope
-                .new_enum(options_name)
+            var.tuple(&options_name);
+        }
+    }
+    for (key, value) in values {
+        let var_name = to_upper_camel_case(key);
+        let group = value.group.as_ref().expect(&format!(
+            "syntax enum should have a group, but {key} does not have one"
+        ));
+        let syntax = value.syntax.as_ref().expect(&format!(
+            "syntax enum should have a syntax, but {key} does not have one"
+        ));
+        assert!(
+            !syntax.overloads.is_empty(),
+            "{key} in {name} (group={group}) does not have a single overload"
+        );
+        if syntax.overloads.len() != 1 {
+            // actually overloaded
+            let options_name = format!("{var_name}Options");
+
+            let _enu = scope
+                .new_enum(&options_name)
                 .doc("Options for deserializing the syntax enum variant [`{name}::var_name`]");
             // todo: enumerate options
         }
@@ -238,7 +256,7 @@ mod tests {
             }
         }
 
-        #[cfg(test)]
+        #[cfg(test)] 
         mod test {
             use super::*;
 
@@ -293,7 +311,7 @@ mod tests {
             GreaterEqual,
         }
 
-        #[cfg(test)]
+        #[cfg(test)] 
         mod test {
             use super::*;
 
@@ -333,7 +351,7 @@ mod tests {
             Eight = 8,
         }
 
-        #[cfg(test)]
+        #[cfg(test)] 
         mod test {
             use super::*;
 

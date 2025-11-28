@@ -147,7 +147,7 @@ mod tests {
         #[derive(serde::Deserialize, PartialEq, Eq, Debug, Clone)]
         pub struct FontFaces(std::collections::BTreeMap<String,FontFace>);
 
-        #[cfg(test)]
+        #[cfg(test)] 
         mod test {
             use super::*;
 

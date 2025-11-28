@@ -43,22 +43,22 @@ mod tests {
         });
         let reference: StyleReference = serde_json::from_value(reference).unwrap();
         insta::assert_snapshot!(crate::generator::generate_spec_scope(reference), @r"
-            /// This is a Maplibre Style Specification
-            #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-            pub struct MaplibreStyleSpecification;
+        /// This is a Maplibre Style Specification
+        #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+        pub struct MaplibreStyleSpecification;
 
-            #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-            pub struct Sources(std::collections::BTreeMap<String,InnerSources>);
+        #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+        pub struct Sources(std::collections::BTreeMap<String,InnerSources>);
 
-            /// Specification of a data source. For vector and raster sources, either TileJSON or a URL to a TileJSON must be provided. For image and video sources, a URL must be provided. For GeoJSON sources, a URL or inline GeoJSON must be provided.
-            #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-            struct InnerSources(Source);
+        /// Specification of a data source. For vector and raster sources, either TileJSON or a URL to a TileJSON must be provided. For image and video sources, a URL must be provided. For GeoJSON sources, a URL or inline GeoJSON must be provided.
+        #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+        struct InnerSources(Source);
 
-            #[cfg(test)]
-            mod test {
-                use super::*;
+        #[cfg(test)] 
+        mod test {
+            use super::*;
 
-            }
-            ");
+        }
+        ");
     }
 }

@@ -53,37 +53,37 @@ mod tests {
         });
         let reference: StyleReference = serde_json::from_value(reference).unwrap();
         insta::assert_snapshot!(crate::generator::generate_spec_scope(reference), @r#"
-            /// This is a Maplibre Style Specification
-            #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-            pub struct MaplibreStyleSpecification;
+        /// This is a Maplibre Style Specification
+        #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+        pub struct MaplibreStyleSpecification;
 
-            #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-            pub struct SourceGeojson {
-                /// A property to use as a feature id (for feature state). Either a property name, or an object of the form `{<sourceLayer>: <propertyName>}`.
-                #[serde(rename="promoteId")]
-                pub promote_id: Option<SourceGeojsonPromoteId>,
-                /// The data type of the GeoJSON source.
-                #[serde(rename="type")]
-                pub r#type: SourceGeojsonType,
-            }
-
+        #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+        pub struct SourceGeojson {
             /// A property to use as a feature id (for feature state). Either a property name, or an object of the form `{<sourceLayer>: <propertyName>}`.
-            #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-            pub struct SourceGeojsonPromoteId(String);
-
+            #[serde(rename="promoteId")]
+            pub promote_id: Option<SourceGeojsonPromoteId>,
             /// The data type of the GeoJSON source.
-            #[derive(serde::Deserialize, PartialEq, Eq, Debug, Clone, Copy)]
-            pub enum SourceGeojsonType {
-                /// A GeoJSON data source.
-                #[serde(rename="geojson")]
-                Geojson,
-            }
+            #[serde(rename="type")]
+            pub r#type: SourceGeojsonType,
+        }
 
-            #[cfg(test)]
-            mod test {
-                use super::*;
+        /// A property to use as a feature id (for feature state). Either a property name, or an object of the form `{<sourceLayer>: <propertyName>}`.
+        #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+        pub struct SourceGeojsonPromoteId(String);
 
-            }
-            "#);
+        /// The data type of the GeoJSON source.
+        #[derive(serde::Deserialize, PartialEq, Eq, Debug, Clone, Copy)]
+        pub enum SourceGeojsonType {
+            /// A GeoJSON data source.
+            #[serde(rename="geojson")]
+            Geojson,
+        }
+
+        #[cfg(test)] 
+        mod test {
+            use super::*;
+
+        }
+        "#);
     }
 }

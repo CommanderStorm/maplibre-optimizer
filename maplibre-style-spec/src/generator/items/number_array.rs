@@ -90,38 +90,38 @@ mod tests {
         });
         let reference: StyleReference = serde_json::from_value(reference).unwrap();
         insta::assert_snapshot!(crate::generator::generate_spec_scope(reference), @r#"
-            /// This is a Maplibre Style Specification
-            #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-            pub struct MaplibreStyleSpecification;
+        /// This is a Maplibre Style Specification
+        #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+        pub struct MaplibreStyleSpecification;
 
-            #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-            pub struct PaintHillshade {
-                /// The direction of the light source(s) used to generate the hillshading with 0 as the top of the viewport if `hillshade-illumination-anchor` is set to `viewport` and due north if `hillshade-illumination-anchor` is set to `map`. Only when `hillshade-method` is set to `multidirectional` can you specify multiple light sources.
-                #[serde(rename="hillshade-illumination-direction")]
-                pub hillshade_illumination_direction: Option<PaintHillshadeHillshadeIlluminationDirection>,
-            }
-
+        #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+        pub struct PaintHillshade {
             /// The direction of the light source(s) used to generate the hillshading with 0 as the top of the viewport if `hillshade-illumination-anchor` is set to `viewport` and due north if `hillshade-illumination-anchor` is set to `map`. Only when `hillshade-method` is set to `multidirectional` can you specify multiple light sources.
-            ///
-            /// Range: 0..=359
-            #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-            #[serde(untagged)]
-            pub enum PaintHillshadeHillshadeIlluminationDirection {
-                One(serde_json::Number),
-                Many(Vec<serde_json::Number>),
-            }
+            #[serde(rename="hillshade-illumination-direction")]
+            pub hillshade_illumination_direction: Option<PaintHillshadeHillshadeIlluminationDirection>,
+        }
 
-            impl Default for PaintHillshadeHillshadeIlluminationDirection {
-                fn default() -> Self {
-                    Self::One(serde_json::Number::from_i128(335).expect("the number is serialised from a number and is thus always valid"))
-                }
-            }
+        /// The direction of the light source(s) used to generate the hillshading with 0 as the top of the viewport if `hillshade-illumination-anchor` is set to `viewport` and due north if `hillshade-illumination-anchor` is set to `map`. Only when `hillshade-method` is set to `multidirectional` can you specify multiple light sources.
+        ///
+        /// Range: 0..=359
+        #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+        #[serde(untagged)]
+        pub enum PaintHillshadeHillshadeIlluminationDirection {
+            One(serde_json::Number),
+            Many(Vec<serde_json::Number>),
+        }
 
-            #[cfg(test)]
-            mod test {
-                use super::*;
-
+        impl Default for PaintHillshadeHillshadeIlluminationDirection {
+            fn default() -> Self {
+                Self::One(serde_json::Number::from_i128(335).expect("the number is serialised from a number and is thus always valid"))
             }
-            "#);
+        }
+
+        #[cfg(test)] 
+        mod test {
+            use super::*;
+
+        }
+        "#);
     }
 }

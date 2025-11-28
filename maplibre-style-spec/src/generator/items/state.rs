@@ -75,30 +75,30 @@ mod tests {
         });
         let reference: StyleReference = serde_json::from_value(reference).unwrap();
         insta::assert_snapshot!(crate::generator::generate_spec_scope(reference), @r#"
-            /// This is a Maplibre Style Specification
-            #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-            pub struct MaplibreStyleSpecification;
+        /// This is a Maplibre Style Specification
+        #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+        pub struct MaplibreStyleSpecification;
 
-            /// An object used to define default values when using the [`global-state`](https://maplibre.org/maplibre-style-spec/expressions/#global-state) expression.
-            #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-            struct State(serde_json::Value);
+        /// An object used to define default values when using the [`global-state`](https://maplibre.org/maplibre-style-spec/expressions/#global-state) expression.
+        #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+        struct State(serde_json::Value);
 
-            impl Default for State {
-                fn default() -> Self {
-                    Self(serde_json::json!({}))
-                }
+        impl Default for State {
+            fn default() -> Self {
+                Self(serde_json::json!({}))
             }
+        }
 
-            #[cfg(test)]
-            mod test {
-                use super::*;
+        #[cfg(test)] 
+        mod test {
+            use super::*;
 
-                #[test]
-                fn test_example_state_decodes() {
-                    let example = serde_json::json!({"chargerType":{"default":["CCS","CHAdeMO","Type2"]},"minPreferredChargingSpeed":{"default":50}});
-                    let _ = serde_json::from_value::<State>(example).expect("example should decode");
-                }
+            #[test]
+            fn test_example_state_decodes() {
+                let example = serde_json::json!({"chargerType":{"default":["CCS","CHAdeMO","Type2"]},"minPreferredChargingSpeed":{"default":50}});
+                let _ = serde_json::from_value::<State>(example).expect("example should decode");
             }
-            "#);
+        }
+        "#);
     }
 }

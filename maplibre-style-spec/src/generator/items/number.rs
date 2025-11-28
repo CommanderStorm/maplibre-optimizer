@@ -144,30 +144,30 @@ mod tests {
         });
         let reference: StyleReference = serde_json::from_value(reference).unwrap();
         insta::assert_snapshot!(crate::generator::generate_spec_scope(reference), @r#"
-            /// This is a Maplibre Style Specification
-            #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-            pub struct MaplibreStyleSpecification;
+        /// This is a Maplibre Style Specification
+        #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+        pub struct MaplibreStyleSpecification;
 
-            /// Position of the light source relative to lit (extruded) geometries, in [r radial coordinate, a azimuthal angle, p polar angle] where r indicates the distance from the center of the base of an object to its light, a indicates the position of the light relative to 0° (0° when `light.anchor` is set to `viewport` corresponds to the top of the viewport, or 0° when `light.anchor` is set to `map` corresponds to due north, and degrees proceed clockwise), and p indicates the height of the light (from 0°, directly above, to 180°, directly below).
-            #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-            struct Position(Box<[serde_json::Number; 3]>);
+        /// Position of the light source relative to lit (extruded) geometries, in [r radial coordinate, a azimuthal angle, p polar angle] where r indicates the distance from the center of the base of an object to its light, a indicates the position of the light relative to 0° (0° when `light.anchor` is set to `viewport` corresponds to the top of the viewport, or 0° when `light.anchor` is set to `map` corresponds to due north, and degrees proceed clockwise), and p indicates the height of the light (from 0°, directly above, to 180°, directly below).
+        #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+        struct Position(Box<[serde_json::Number; 3]>);
 
-            impl Default for Position {
-                fn default() -> Self {
-                    Self(Box::new([serde_json::Number::from_f64(1.15).expect("the number is serialised from a number and is thus always valid"), serde_json::Number::from_i128(210).expect("the number is serialised from a number and is thus always valid"), serde_json::Number::from_i128(30).expect("the number is serialised from a number and is thus always valid")]))
-                }
+        impl Default for Position {
+            fn default() -> Self {
+                Self(Box::new([serde_json::Number::from_f64(1.15).expect("the number is serialised from a number and is thus always valid"), serde_json::Number::from_i128(210).expect("the number is serialised from a number and is thus always valid"), serde_json::Number::from_i128(30).expect("the number is serialised from a number and is thus always valid")]))
             }
+        }
 
-            #[cfg(test)]
-            mod test {
-                use super::*;
+        #[cfg(test)] 
+        mod test {
+            use super::*;
 
-                #[test]
-                fn test_example_position_decodes() {
-                    let example = serde_json::json!([1.5,90,80]);
-                    let _ = serde_json::from_value::<Position>(example).expect("example should decode");
-                }
+            #[test]
+            fn test_example_position_decodes() {
+                let example = serde_json::json!([1.5,90,80]);
+                let _ = serde_json::from_value::<Position>(example).expect("example should decode");
             }
-            "#);
+        }
+        "#);
     }
 }

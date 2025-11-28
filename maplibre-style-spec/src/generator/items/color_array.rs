@@ -83,31 +83,31 @@ mod tests {
         });
         let reference: StyleReference = serde_json::from_value(reference).unwrap();
         insta::assert_snapshot!(crate::generator::generate_spec_scope(reference), @r##"
-            /// This is a Maplibre Style Specification
-            #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-            pub struct MaplibreStyleSpecification;
+        /// This is a Maplibre Style Specification
+        #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+        pub struct MaplibreStyleSpecification;
 
-            /// The shading color of areas that face away from the light source(s). Only when `hillshade-method` is set to `multidirectional` can you specify multiple light sources.
-            #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-            #[serde(untagged)]
-            pub enum HillshadeShadowColor {
-                /// A color
-                One(color::DynamicColor),
-                /// A set of colors
-                Multiple(Vec<color::DynamicColor>),
+        /// The shading color of areas that face away from the light source(s). Only when `hillshade-method` is set to `multidirectional` can you specify multiple light sources.
+        #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+        #[serde(untagged)]
+        pub enum HillshadeShadowColor {
+            /// A color
+            One(color::DynamicColor),
+            /// A set of colors
+            Multiple(Vec<color::DynamicColor>),
+        }
+
+        impl Default for HillshadeShadowColor {
+            fn default() -> Self {
+                Self::One(color::parse_color("#000000").expect("Invalid color specified as the default value"))
             }
+        }
 
-            impl Default for HillshadeShadowColor {
-                fn default() -> Self {
-                    Self::One(color::parse_color("#000000").expect("Invalid color specified as the default value"))
-                }
-            }
+        #[cfg(test)] 
+        mod test {
+            use super::*;
 
-            #[cfg(test)]
-            mod test {
-                use super::*;
-
-            }
-            "##);
+        }
+        "##);
     }
 }

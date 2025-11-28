@@ -41,22 +41,22 @@ mod tests {
         });
         let reference: StyleReference = serde_json::from_value(reference).unwrap();
         insta::assert_snapshot!(crate::generator::generate_spec_scope(reference), @r"
-            /// This is a Maplibre Style Specification
-            #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-            pub struct MaplibreStyleSpecification {
-                /// Layout properties for the layer.
-                pub layout: Option<RootLayout>,
-            }
-
+        /// This is a Maplibre Style Specification
+        #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+        pub struct MaplibreStyleSpecification {
             /// Layout properties for the layer.
-            #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-            struct RootLayout(Layout);
+            pub layout: Option<RootLayout>,
+        }
 
-            #[cfg(test)]
-            mod test {
-                use super::*;
+        /// Layout properties for the layer.
+        #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+        struct RootLayout(Layout);
 
-            }
-            ");
+        #[cfg(test)] 
+        mod test {
+            use super::*;
+
+        }
+        ");
     }
 }

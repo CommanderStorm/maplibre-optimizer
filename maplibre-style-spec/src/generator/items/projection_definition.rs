@@ -108,52 +108,52 @@ mod tests {
         });
         let reference: StyleReference = serde_json::from_value(reference).unwrap();
         insta::assert_snapshot!(crate::generator::generate_spec_scope(reference), @r#"
-            /// This is a Maplibre Style Specification
-            #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-            pub struct MaplibreStyleSpecification;
+        /// This is a Maplibre Style Specification
+        #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+        pub struct MaplibreStyleSpecification;
 
-            #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-            pub struct Projection {
-                /// The projection definition type. Can be specified as a string, a transition state, or an expression.
-                #[serde(rename="type")]
-                pub r#type: Option<ProjectionType>,
-            }
-
-            /// Available Projections
-            #[derive(serde::Deserialize, PartialEq, Eq, Debug, Clone)]
-            pub enum AvailableProjections {
-                /// [Web Mercator projection](https://en.wikipedia.org/wiki/Web_Mercator_projection)
-                #[serde(rename="mercator")]
-                Mercator,
-                /// [Vertical Perspective projection](https://en.wikipedia.org/wiki/General_Perspective_projection)
-                #[serde(rename="vertical-perspective")]
-                VerticalPerspective,
-            }
-
+        #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+        pub struct Projection {
             /// The projection definition type. Can be specified as a string, a transition state, or an expression.
-            #[derive(serde::Deserialize, PartialEq, Eq, Debug, Clone)]
-            #[serde(untagged)]
-            pub enum ProjectionType {
-                /// Preset for the Globe projection
-                #[serde(rename = "globe")]
-                Globe,
-                /// Preset for the Globe projection
-                Raw(AvailableProjections),
-                /// Preset for the Equirectangular projection
-                CameraExpression(Vec<CameraExpression<AvailableProjections>>),
-            }
+            #[serde(rename="type")]
+            pub r#type: Option<ProjectionType>,
+        }
 
-            impl Default for ProjectionType {
-                fn default() -> Self {
-                    Self::Raw(AvailableProjections::Mercator)
-                }
-            }
+        /// Available Projections
+        #[derive(serde::Deserialize, PartialEq, Eq, Debug, Clone)]
+        pub enum AvailableProjections {
+            /// [Web Mercator projection](https://en.wikipedia.org/wiki/Web_Mercator_projection)
+            #[serde(rename="mercator")]
+            Mercator,
+            /// [Vertical Perspective projection](https://en.wikipedia.org/wiki/General_Perspective_projection)
+            #[serde(rename="vertical-perspective")]
+            VerticalPerspective,
+        }
 
-            #[cfg(test)]
-            mod test {
-                use super::*;
+        /// The projection definition type. Can be specified as a string, a transition state, or an expression.
+        #[derive(serde::Deserialize, PartialEq, Eq, Debug, Clone)]
+        #[serde(untagged)]
+        pub enum ProjectionType {
+            /// Preset for the Globe projection
+            #[serde(rename = "globe")]
+            Globe,
+            /// Preset for the Globe projection
+            Raw(AvailableProjections),
+            /// Preset for the Equirectangular projection
+            CameraExpression(Vec<CameraExpression<AvailableProjections>>),
+        }
 
+        impl Default for ProjectionType {
+            fn default() -> Self {
+                Self::Raw(AvailableProjections::Mercator)
             }
-            "#);
+        }
+
+        #[cfg(test)] 
+        mod test {
+            use super::*;
+
+        }
+        "#);
     }
 }

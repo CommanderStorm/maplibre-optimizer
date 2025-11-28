@@ -51,7 +51,7 @@ mod tests {
         #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
         struct Transition(Transition);
 
-        #[cfg(test)]
+        #[cfg(test)] 
         mod test {
             use super::*;
 

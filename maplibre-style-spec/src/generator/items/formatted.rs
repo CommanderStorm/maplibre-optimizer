@@ -75,25 +75,25 @@ mod tests {
         });
         let reference: StyleReference = serde_json::from_value(reference).unwrap();
         insta::assert_snapshot!(crate::generator::generate_spec_scope(reference), @r#"
-            /// This is a Maplibre Style Specification
-            #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-            pub struct MaplibreStyleSpecification;
+        /// This is a Maplibre Style Specification
+        #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+        pub struct MaplibreStyleSpecification;
 
-            /// Value to use for a text label. If a plain `string` is provided, it will be treated as a `formatted` with default/inherited formatting options.
-            #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-            struct TextField(String);
+        /// Value to use for a text label. If a plain `string` is provided, it will be treated as a `formatted` with default/inherited formatting options.
+        #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+        struct TextField(String);
 
-            impl Default for TextField {
-                fn default() -> Self {
-                    Self("".to_string())
-                }
+        impl Default for TextField {
+            fn default() -> Self {
+                Self("".to_string())
             }
+        }
 
-            #[cfg(test)]
-            mod test {
-                use super::*;
+        #[cfg(test)] 
+        mod test {
+            use super::*;
 
-            }
-            "#);
+        }
+        "#);
     }
 }

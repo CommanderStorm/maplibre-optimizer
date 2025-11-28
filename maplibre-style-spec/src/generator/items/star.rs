@@ -53,36 +53,36 @@ mod tests {
         });
         let reference: StyleReference = serde_json::from_value(reference).unwrap();
         insta::assert_snapshot!(crate::generator::generate_spec_scope(reference), @r#"
-            /// This is a Maplibre Style Specification
-            #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-            pub struct MaplibreStyleSpecification;
+        /// This is a Maplibre Style Specification
+        #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+        pub struct MaplibreStyleSpecification;
 
-            #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-            pub struct SourceGeojson {
-                /// A URL to a GeoJSON file, or inline GeoJSON.
-                pub data: SourceGeojsonData,
-                /// The data type of the GeoJSON source.
-                #[serde(rename="type")]
-                pub r#type: SourceGeojsonType,
-            }
-
+        #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+        pub struct SourceGeojson {
             /// A URL to a GeoJSON file, or inline GeoJSON.
-            #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-            struct SourceGeojsonData(serde_json::Value);
-
+            pub data: SourceGeojsonData,
             /// The data type of the GeoJSON source.
-            #[derive(serde::Deserialize, PartialEq, Eq, Debug, Clone, Copy)]
-            pub enum SourceGeojsonType {
-                /// A GeoJSON data source.
-                #[serde(rename="geojson")]
-                Geojson,
-            }
+            #[serde(rename="type")]
+            pub r#type: SourceGeojsonType,
+        }
 
-            #[cfg(test)]
-            mod test {
-                use super::*;
+        /// A URL to a GeoJSON file, or inline GeoJSON.
+        #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+        struct SourceGeojsonData(serde_json::Value);
 
-            }
-            "#);
+        /// The data type of the GeoJSON source.
+        #[derive(serde::Deserialize, PartialEq, Eq, Debug, Clone, Copy)]
+        pub enum SourceGeojsonType {
+            /// A GeoJSON data source.
+            #[serde(rename="geojson")]
+            Geojson,
+        }
+
+        #[cfg(test)] 
+        mod test {
+            use super::*;
+
+        }
+        "#);
     }
 }

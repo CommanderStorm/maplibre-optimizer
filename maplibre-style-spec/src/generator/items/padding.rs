@@ -72,7 +72,7 @@ mod tests {
         #[serde(untagged)]
         pub enum Foo {
             /// A single value applies to all four sides.
-            ///
+            /// 
             /// Only avaliable for backwards compatibility.
             #[deprecated = "Please see [`Self::One`] instead"]
             Unwrapped(serde_json::Number),
@@ -131,40 +131,40 @@ mod tests {
         });
         let reference: StyleReference = serde_json::from_value(reference).unwrap();
         insta::assert_snapshot!(crate::generator::generate_spec_scope(reference), @r#"
-            /// This is a Maplibre Style Specification
-            #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-            pub struct MaplibreStyleSpecification;
+        /// This is a Maplibre Style Specification
+        #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+        pub struct MaplibreStyleSpecification;
 
-            /// Size of additional area round the icon bounding box used for detecting symbol collisions.
-            #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-            #[serde(untagged)]
-            pub enum IconPadding {
-                /// A single value applies to all four sides.
-                ///
-                /// Only avaliable for backwards compatibility.
-                #[deprecated = "Please see [`Self::One`] instead"]
-                Unwrapped(serde_json::Number),
-                /// A single value applies to all four sides
-                One(Box<[serde_json::Number; 1]>),
-                /// two values apply to `[top/bottom, left/right]`
-                Two(Box<[serde_json::Number; 2]>),
-                /// three values apply to `[top, left/right, bottom]`
-                Three(Box<[serde_json::Number; 3]>),
-                /// four values apply to `[top, right, bottom, left]`
-                Four(Box<[serde_json::Number; 4]>),
+        /// Size of additional area round the icon bounding box used for detecting symbol collisions.
+        #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+        #[serde(untagged)]
+        pub enum IconPadding {
+            /// A single value applies to all four sides.
+            /// 
+            /// Only avaliable for backwards compatibility.
+            #[deprecated = "Please see [`Self::One`] instead"]
+            Unwrapped(serde_json::Number),
+            /// A single value applies to all four sides
+            One(Box<[serde_json::Number; 1]>),
+            /// two values apply to `[top/bottom, left/right]`
+            Two(Box<[serde_json::Number; 2]>),
+            /// three values apply to `[top, left/right, bottom]`
+            Three(Box<[serde_json::Number; 3]>),
+            /// four values apply to `[top, right, bottom, left]`
+            Four(Box<[serde_json::Number; 4]>),
+        }
+
+        impl Default for IconPadding {
+            fn default() -> Self {
+                Self::One(Box::new([2.into()]))
             }
+        }
 
-            impl Default for IconPadding {
-                fn default() -> Self {
-                    Self::One(Box::new([2.into()]))
-                }
-            }
+        #[cfg(test)] 
+        mod test {
+            use super::*;
 
-            #[cfg(test)]
-            mod test {
-                use super::*;
-
-            }
-            "#);
+        }
+        "#);
     }
 }

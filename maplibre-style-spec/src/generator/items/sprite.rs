@@ -150,7 +150,7 @@ mod tests {
             Multiple(Vec<SpriteUrlAndId>),
         }
 
-        #[cfg(test)]
+        #[cfg(test)] 
         mod test {
             use super::*;
 

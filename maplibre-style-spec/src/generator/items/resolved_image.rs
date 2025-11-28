@@ -63,20 +63,20 @@ mod tests {
         });
         let reference: StyleReference = serde_json::from_value(reference).unwrap();
         insta::assert_snapshot!(crate::generator::generate_spec_scope(reference), @r#"
-            /// This is a Maplibre Style Specification
-            #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-            pub struct MaplibreStyleSpecification;
+        /// This is a Maplibre Style Specification
+        #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+        pub struct MaplibreStyleSpecification;
 
-            /// Name of image in sprite to use for drawing an image background.
-            #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-            #[deprecated = "resolved_image not implemented"]
-            struct IconImage(serde_json::Value);
+        /// Name of image in sprite to use for drawing an image background.
+        #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+        #[deprecated = "resolved_image not implemented"]
+        struct IconImage(serde_json::Value);
 
-            #[cfg(test)]
-            mod test {
-                use super::*;
+        #[cfg(test)] 
+        mod test {
+            use super::*;
 
-            }
-            "#);
+        }
+        "#);
     }
 }

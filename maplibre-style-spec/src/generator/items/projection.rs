@@ -49,24 +49,24 @@ mod tests {
         });
         let reference: StyleReference = serde_json::from_value(reference).unwrap();
         insta::assert_snapshot!(crate::generator::generate_spec_scope(reference), @r#"
-            /// This is a Maplibre Style Specification
-            #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-            pub struct MaplibreStyleSpecification;
+        /// This is a Maplibre Style Specification
+        #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+        pub struct MaplibreStyleSpecification;
 
-            /// The projection configuration
-            #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-            struct Projection(Projection);
+        /// The projection configuration
+        #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+        struct Projection(Projection);
 
-            #[cfg(test)]
-            mod test {
-                use super::*;
+        #[cfg(test)] 
+        mod test {
+            use super::*;
 
-                #[test]
-                fn test_example_projection_decodes() {
-                    let example = serde_json::json!({"type":["interpolate",["linear"],["zoom"],10,"vertical-perspective",12,"mercator"]});
-                    let _ = serde_json::from_value::<Projection>(example).expect("example should decode");
-                }
+            #[test]
+            fn test_example_projection_decodes() {
+                let example = serde_json::json!({"type":["interpolate",["linear"],["zoom"],10,"vertical-perspective",12,"mercator"]});
+                let _ = serde_json::from_value::<Projection>(example).expect("example should decode");
             }
-            "#);
+        }
+        "#);
     }
 }

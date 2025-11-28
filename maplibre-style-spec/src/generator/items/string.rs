@@ -66,7 +66,7 @@ mod tests {
         #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
         struct TerrainSource(String);
 
-        #[cfg(test)]
+        #[cfg(test)] 
         mod test {
             use super::*;
 

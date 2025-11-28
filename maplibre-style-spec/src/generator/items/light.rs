@@ -46,27 +46,27 @@ mod tests {
         });
         let reference: StyleReference = serde_json::from_value(reference).unwrap();
         insta::assert_snapshot!(crate::generator::generate_spec_scope(reference), @r#"
-            /// This is a Maplibre Style Specification
-            #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-            pub struct MaplibreStyleSpecification {
-                /// The global light source.
-                pub light: Option<RootLight>,
-            }
-
+        /// This is a Maplibre Style Specification
+        #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+        pub struct MaplibreStyleSpecification {
             /// The global light source.
-            #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-            struct RootLight(Light);
+            pub light: Option<RootLight>,
+        }
 
-            #[cfg(test)]
-            mod test {
-                use super::*;
+        /// The global light source.
+        #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+        struct RootLight(Light);
 
-                #[test]
-                fn test_example_root_light_decodes() {
-                    let example = serde_json::json!({"anchor":"viewport","color":"white","intensity":0.4});
-                    let _ = serde_json::from_value::<RootLight>(example).expect("example should decode");
-                }
+        #[cfg(test)] 
+        mod test {
+            use super::*;
+
+            #[test]
+            fn test_example_root_light_decodes() {
+                let example = serde_json::json!({"anchor":"viewport","color":"white","intensity":0.4});
+                let _ = serde_json::from_value::<RootLight>(example).expect("example should decode");
             }
-            "#);
+        }
+        "#);
     }
 }

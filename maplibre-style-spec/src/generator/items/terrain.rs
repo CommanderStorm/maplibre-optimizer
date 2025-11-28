@@ -44,24 +44,24 @@ mod tests {
         });
         let reference: StyleReference = serde_json::from_value(reference).unwrap();
         insta::assert_snapshot!(crate::generator::generate_spec_scope(reference), @r#"
-            /// This is a Maplibre Style Specification
-            #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-            pub struct MaplibreStyleSpecification;
+        /// This is a Maplibre Style Specification
+        #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+        pub struct MaplibreStyleSpecification;
 
-            /// The terrain configuration.
-            #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-            struct Terrain(Terrain);
+        /// The terrain configuration.
+        #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+        struct Terrain(Terrain);
 
-            #[cfg(test)]
-            mod test {
-                use super::*;
+        #[cfg(test)] 
+        mod test {
+            use super::*;
 
-                #[test]
-                fn test_example_terrain_decodes() {
-                    let example = serde_json::json!({"exaggeration":0.5,"source":"raster-dem-source"});
-                    let _ = serde_json::from_value::<Terrain>(example).expect("example should decode");
-                }
+            #[test]
+            fn test_example_terrain_decodes() {
+                let example = serde_json::json!({"exaggeration":0.5,"source":"raster-dem-source"});
+                let _ = serde_json::from_value::<Terrain>(example).expect("example should decode");
             }
-            "#);
+        }
+        "#);
     }
 }

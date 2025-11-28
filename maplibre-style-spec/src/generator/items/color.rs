@@ -77,24 +77,24 @@ mod tests {
         });
         let reference: StyleReference = serde_json::from_value(reference).unwrap();
         insta::assert_snapshot!(crate::generator::generate_spec_scope(reference), @r#"
-            /// This is a Maplibre Style Specification
-            #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-            pub struct MaplibreStyleSpecification;
+        /// This is a Maplibre Style Specification
+        #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+        pub struct MaplibreStyleSpecification;
 
-            /// Defines the color of each pixel based on its elevation. Should be an expression that uses `["elevation"]` as input.
-            #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-            struct ColorReliefColor(color::DynamicColor);
+        /// Defines the color of each pixel based on its elevation. Should be an expression that uses `["elevation"]` as input.
+        #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+        struct ColorReliefColor(color::DynamicColor);
 
-            #[cfg(test)]
-            mod test {
-                use super::*;
+        #[cfg(test)] 
+        mod test {
+            use super::*;
 
-                #[test]
-                fn test_example_color_relief_color_decodes() {
-                    let example = serde_json::json!(["interpolate",["linear"],["elevation"],0,"black",8849,"white"]);
-                    let _ = serde_json::from_value::<ColorReliefColor>(example).expect("example should decode");
-                }
+            #[test]
+            fn test_example_color_relief_color_decodes() {
+                let example = serde_json::json!(["interpolate",["linear"],["elevation"],0,"black",8849,"white"]);
+                let _ = serde_json::from_value::<ColorReliefColor>(example).expect("example should decode");
             }
-            "#);
+        }
+        "#);
     }
 }
