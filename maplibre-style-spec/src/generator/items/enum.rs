@@ -72,16 +72,15 @@ fn generate_syntax_enum(
             // not overloaded, above the Option<T> level
             let overload = &syntax.overloads[0];
             if overload.parameters.iter().any(|p| p == "...") {
-                var.tuple("Vec<WeirdVariadic>");
+                var.tuple("Vec<serde_json::Value>");
                 continue;
             }
             for p in &overload.parameters {
                 let param = p.clone();
-                let tuple_identifier = if let Some(non_optional_string) = param.strip_suffix('?') {
-                    let v = to_upper_camel_case(non_optional_string);
-                    format!("Option<{v}>")
+                let tuple_identifier = if let Some(_) = param.strip_suffix('?') {
+                    format!("Option<serde_json::Value>")
                 } else {
-                    to_upper_camel_case(&p)
+                    "serde_json::Value".to_string()
                 };
 
                 var.tuple(tuple_identifier);
@@ -110,7 +109,9 @@ fn generate_syntax_enum(
 
             let _enu = scope
                 .new_enum(&options_name)
-                .doc("Options for deserializing the syntax enum variant [`{name}::var_name`]")
+                .doc(format!(
+                    "Options for deserializing the syntax enum variant [`{name}::{var_name}`]"
+                ))
                 .vis("pub")
                 .derive("serde::Deserialize, PartialEq, Eq, Debug, Clone");
             // todo: enumerate options
@@ -429,7 +430,7 @@ mod tests {
             /// Binds expressions to named variables, which can then be referenced in the result expression using `["var", "variable_name"]`.
             ///
             ///  - [Visualize population density](https://maplibre.org/maplibre-gl-js/docs/examples/visualize-population-density/)
-            Let(Vec<WeirdVariadic>),
+            Let(Vec<serde_json::Value>),
         }
 
         impl<'de> serde::Deserialize<'de> for ExpressionName {
