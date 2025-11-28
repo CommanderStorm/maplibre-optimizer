@@ -4,7 +4,9 @@ use codegen2::Scope;
 use serde_json::{Number, Value};
 
 use crate::decoder::{EnumDocs, EnumValues, Fields};
-use crate::generator::autotest::generate_test_from_example_if_present;
+use crate::generator::autotest::{
+    generate_test_from_example_if_present, generate_test_from_examples_if_present,
+};
 use crate::generator::formatter::to_upper_camel_case;
 
 pub fn generate(
@@ -161,13 +163,8 @@ fn generate_syntax_enum(
     visit_seq.line("_ => Err(serde::de::Error::custom(&format!(\"unknown operator {op} in expression. Please check the documentation for the avaliable expressions.\")))");
     visit_seq.line("}");
 
-    for (key, value) in values {
-        generate_test_from_example_if_present(
-            scope,
-            &to_upper_camel_case(&format!("{name} {key} syntax")),
-            value.example.as_ref(),
-        );
-    }
+    let examples = values.values().filter_map(|e| e.example.as_ref()).collect();
+    generate_test_from_examples_if_present(scope, &name, examples);
 }
 
 fn generate_regular_enum(
@@ -264,7 +261,7 @@ mod tests {
             }
         }
 
-        #[cfg(test)] 
+        #[cfg(test)]
         mod test {
             use super::*;
 
@@ -319,7 +316,7 @@ mod tests {
             GreaterEqual,
         }
 
-        #[cfg(test)] 
+        #[cfg(test)]
         mod test {
             use super::*;
 
@@ -359,7 +356,7 @@ mod tests {
             Eight = 8,
         }
 
-        #[cfg(test)] 
+        #[cfg(test)]
         mod test {
             use super::*;
 
@@ -463,14 +460,14 @@ mod tests {
             }
         }
 
-        #[cfg(test)] 
+        #[cfg(test)]
         mod test {
             use super::*;
 
-            #[test]
-            fn test_example_expression_name_let_syntax_decodes() {
-                let example = serde_json::json!(["let","someNumber",500,["interpolate",["linear"],["var","someNumber"],274,"#edf8e9",1551,"#006d2c"]]);
-                let _ = serde_json::from_value::<ExpressionNameLetSyntax>(example).expect("example should decode");
+            #[rstest::rstest]
+            #[case(serde_json::json!(["let","someNumber",500,["interpolate",["linear"],["var","someNumber"],274,"#edf8e9",1551,"#006d2c"]]))]
+            fn test_example_expression_name_decodes(#[case] example: serde_json::Value) {
+                let _ = serde_json::from_value::<ExpressionName>(example).expect("example should decode");
             }
         }
         "##);

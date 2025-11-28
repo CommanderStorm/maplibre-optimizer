@@ -20,3 +20,21 @@ pub fn generate_test_from_example_if_present(
         "let _ = serde_json::from_value::<{name}>(example).expect(\"example should decode\");"
     ));
 }
+
+pub fn generate_test_from_examples_if_present(
+    scope: &mut Scope,
+    name: &str,
+    examples: Vec<&Value>,
+) {
+    let fun = scope
+        .get_or_new_module("test")
+        .new_fn(to_snake_case(&format!("test_example_{name}_decodes")))
+        .arg("#[case] example", "serde_json::Value")
+        .attr("rstest::rstest");
+    for example in examples {
+        fun.attr(format!("case(serde_json::json!({example}))"));
+    }
+    fun.line(format!(
+        "let _ = serde_json::from_value::<{name}>(example).expect(\"example should decode\");"
+    ));
+}

@@ -16,3 +16,4 @@ url = { workspace = true, features = ["serde"] }
 
 [dev-dependencies]
 insta.workspace = true
+rstest.workspace = true
