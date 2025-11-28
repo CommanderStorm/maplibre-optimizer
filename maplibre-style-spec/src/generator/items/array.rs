@@ -1,4 +1,4 @@
-use codegen::Scope;
+use codegen2::Scope;
 use serde_json::{Number, Value};
 
 use crate::decoder::{ArrayValue, EnumValues, Fields, SimpleArrayValue};
@@ -111,6 +111,7 @@ fn generate_array_value(
                 name.to_string()
             }
             SimpleArrayValue::Color => "color::DynamicColor".to_string(),
+            SimpleArrayValue::FontFaces => "FontFaces".to_string(),
         },
         ArrayValue::Either(options) => {
             let mut variant_types = Vec::with_capacity(options.len());

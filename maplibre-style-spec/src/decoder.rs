@@ -449,6 +449,8 @@ pub enum SimpleArrayValue {
     Layer,
     Enum,
     Color,
+    #[serde(rename = "fontFaces")]
+    FontFaces,
 }
 
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
