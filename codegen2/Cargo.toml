@@ -12,3 +12,6 @@ edition = "2024"
 
 [dependencies]
 indexmap = "2.11"
+
+[dev-dependencies]
+insta.workspace = true

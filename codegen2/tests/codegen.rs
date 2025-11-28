@@ -16,13 +16,12 @@ fn single_struct() {
         .field("one", "usize")
         .field("two", "String");
 
-    let expect = r#"
-struct Foo {
-    one: usize,
-    two: String,
-}"#;
-
-    assert_eq!(scope.to_string(), &expect[1..]);
+    insta::assert_snapshot!(scope.to_string(), @r"
+    struct Foo {
+        one: usize,
+        two: String,
+    }
+    ");
 }
 #[test]
 fn type_alias() {
@@ -30,9 +29,7 @@ fn type_alias() {
 
     scope.new_type_alias("hello", "world").vis("pub");
 
-    let expect = r#"pub type hello = world;"#;
-
-    assert_eq!(scope.to_string(), expect);
+    insta::assert_snapshot!(scope.to_string(), @"pub type hello = world;");
 }
 
 #[test]
@@ -43,12 +40,11 @@ fn struct_with_pushed_field() {
     struct_.push_field(field);
     scope.push_struct(struct_);
 
-    let expect = r#"
-struct Foo {
-    one: usize,
-}"#;
-
-    assert_eq!(scope.to_string(), &expect[1..]);
+    insta::assert_snapshot!(scope.to_string(), @r"
+    struct Foo {
+        one: usize,
+    }
+    ");
 }
 
 // Carter 8/13/22 I found this test broken because both annotation and documentation do not support vectors
@@ -77,21 +73,20 @@ fn single_struct_documented_field() {
 
     scope.push_struct(struct_);
 
-    let expect = r#"
-struct Foo {
-    /// Field's documentation
-    /// Second line
-    one: usize,
-    #[serde(rename = "bar")]
-    two: usize,
-    /// Field's documentation
-    /// Second line
-    #[serde(skip_serializing)]
-    #[serde(skip_deserializing)]
-    three: usize,
-}"#;
-
-    assert_eq!(scope.to_string(), &expect[1..]);
+    insta::assert_snapshot!(scope.to_string(), @r#"
+    struct Foo {
+        /// Field's documentation
+        /// Second line
+        one: usize,
+        #[serde(rename = "bar")]
+        two: usize,
+        /// Field's documentation
+        /// Second line
+        #[serde(skip_serializing)]
+        #[serde(skip_deserializing)]
+        three: usize,
+    }
+    "#);
 }
 
 #[test]
@@ -105,13 +100,12 @@ fn single_fn() {
         .line("let res = foo + 1;")
         .line("res");
 
-    let expect = r#"
-pub fn my_fn(foo: uint) -> uint {
-    let res = foo + 1;
-    res
-}"#;
-
-    assert_eq!(scope.to_string(), &expect[1..]);
+    insta::assert_snapshot!(scope.to_string(), @r"
+    pub fn my_fn(foo: uint) -> uint {
+        let res = foo + 1;
+        res
+    }
+    ");
 }
 
 #[test]
@@ -120,10 +114,7 @@ fn empty_struct() {
 
     scope.new_struct("Foo");
 
-    let expect = r#"
-struct Foo;"#;
-
-    assert_eq!(scope.to_string(), &expect[1..]);
+    insta::assert_snapshot!(scope.to_string(), @"struct Foo;");
 }
 
 #[test]
@@ -137,17 +128,16 @@ fn two_structs() {
 
     scope.new_struct("Bar").field("hello", "World");
 
-    let expect = r#"
-struct Foo {
-    one: usize,
-    two: String,
-}
+    insta::assert_snapshot!(scope.to_string(), @r"
+    struct Foo {
+        one: usize,
+        two: String,
+    }
 
-struct Bar {
-    hello: World,
-}"#;
-
-    assert_eq!(scope.to_string(), &expect[1..]);
+    struct Bar {
+        hello: World,
+    }
+    ");
 }
 
 #[test]
@@ -161,14 +151,13 @@ fn struct_with_derive() {
         .field("one", "usize")
         .field("two", "String");
 
-    let expect = r#"
-#[derive(Debug, Clone)]
-struct Foo {
-    one: usize,
-    two: String,
-}"#;
-
-    assert_eq!(scope.to_string(), &expect[1..]);
+    insta::assert_snapshot!(scope.to_string(), @r"
+    #[derive(Debug, Clone)]
+    struct Foo {
+        one: usize,
+        two: String,
+    }
+    ");
 }
 
 #[test]
@@ -181,14 +170,13 @@ fn struct_with_repr() {
         .field("one", "u8")
         .field("two", "u8");
 
-    let expect = r#"
-#[repr(C)]
-struct Foo {
-    one: u8,
-    two: u8,
-}"#;
-
-    assert_eq!(scope.to_string(), &expect[1..]);
+    insta::assert_snapshot!(scope.to_string(), @r"
+    #[repr(C)]
+    struct Foo {
+        one: u8,
+        two: u8,
+    }
+    ");
 }
 
 #[test]
@@ -201,14 +189,13 @@ fn struct_with_allow() {
         .field("one", "u8")
         .field("two", "u8");
 
-    let expect = r#"
-#[allow(dead_code)]
-struct Foo {
-    one: u8,
-    two: u8,
-}"#;
-
-    assert_eq!(scope.to_string(), &expect[1..]);
+    insta::assert_snapshot!(scope.to_string(), @r"
+    #[allow(dead_code)]
+    struct Foo {
+        one: u8,
+        two: u8,
+    }
+    ");
 }
 
 #[test]
@@ -222,13 +209,12 @@ fn struct_with_generics_1() {
         .field("one", "T")
         .field("two", "U");
 
-    let expect = r#"
-struct Foo<T, U> {
-    one: T,
-    two: U,
-}"#;
-
-    assert_eq!(scope.to_string(), &expect[1..]);
+    insta::assert_snapshot!(scope.to_string(), @r"
+    struct Foo<T, U> {
+        one: T,
+        two: U,
+    }
+    ");
 }
 
 #[test]
@@ -241,13 +227,12 @@ fn struct_with_generics_2() {
         .field("one", "T")
         .field("two", "U");
 
-    let expect = r#"
-struct Foo<T, U> {
-    one: T,
-    two: U,
-}"#;
-
-    assert_eq!(scope.to_string(), &expect[1..]);
+    insta::assert_snapshot!(scope.to_string(), @r"
+    struct Foo<T, U> {
+        one: T,
+        two: U,
+    }
+    ");
 }
 
 #[test]
@@ -260,13 +245,12 @@ fn struct_with_generics_3() {
         .field("one", "T")
         .field("two", "U");
 
-    let expect = r#"
-struct Foo<T: Win, U> {
-    one: T,
-    two: U,
-}"#;
-
-    assert_eq!(scope.to_string(), &expect[1..]);
+    insta::assert_snapshot!(scope.to_string(), @r"
+    struct Foo<T: Win, U> {
+        one: T,
+        two: U,
+    }
+    ");
 }
 
 #[test]
@@ -279,14 +263,13 @@ fn struct_where_clause_1() {
         .bound("T", "Foo")
         .field("one", "T");
 
-    let expect = r#"
-struct Foo<T>
-where T: Foo,
-{
-    one: T,
-}"#;
-
-    assert_eq!(scope.to_string(), &expect[1..]);
+    insta::assert_snapshot!(scope.to_string(), @r"
+    struct Foo<T>
+    where T: Foo,
+    {
+        one: T,
+    }
+    ");
 }
 
 #[test]
@@ -301,16 +284,15 @@ fn struct_where_clause_2() {
         .field("one", "T")
         .field("two", "U");
 
-    let expect = r#"
-struct Foo<T, U>
-where T: Foo,
-      U: Baz,
-{
-    one: T,
-    two: U,
-}"#;
-
-    assert_eq!(scope.to_string(), &expect[1..]);
+    insta::assert_snapshot!(scope.to_string(), @r"
+    struct Foo<T, U>
+    where T: Foo,
+          U: Baz,
+    {
+        one: T,
+        two: U,
+    }
+    ");
 }
 
 #[test]
@@ -325,14 +307,13 @@ fn struct_doc() {
         )
         .field("one", "T");
 
-    let expect = r#"
-/// Hello, this is a doc string
-/// that continues on another line.
-struct Foo {
-    one: T,
-}"#;
-
-    assert_eq!(scope.to_string(), &expect[1..]);
+    insta::assert_snapshot!(scope.to_string(), @r"
+    /// Hello, this is a doc string
+    /// that continues on another line.
+    struct Foo {
+        one: T,
+    }
+    ");
 }
 
 #[test]
@@ -343,23 +324,23 @@ fn function_doc() {
     f.line("println!(\"petting Toby many times because he is such a good boi\");");
     f.doc("This is a function comment.");
 
-    let expect = r#"
-/// This is a function comment.
-fn pet_toby() {
-    println!("petting Toby many times because he is such a good boi");
-}"#;
-
-    assert_eq!(scope.to_string(), &expect[1..]);
+    insta::assert_snapshot!(scope.to_string(), @r#"
+    /// This is a function comment.
+    fn pet_toby() {
+        println!("petting Toby many times because he is such a good boi");
+    }
+    "#);
 }
 
 #[test]
 fn scope_doc() {
     let mut scope = Scope::new();
     scope.doc("This is a scope comment.\nThis is a newline");
-    let expect = r#"
-/// This is a scope comment.
-/// This is a newline"#;
-    assert_eq!(scope.to_string(), &expect[1..]);
+
+    insta::assert_snapshot!(scope.to_string(), @r"
+    /// This is a scope comment.
+    /// This is a newline
+    ");
 }
 
 #[test]
@@ -367,11 +348,12 @@ fn module_doc() {
     let mut scope = Scope::new();
     let m = scope.new_module("toby");
     m.doc("This is a module comment.");
-    let expect = r#"
-/// This is a module comment.
-mod toby {
-}"#;
-    assert_eq!(scope.to_string(), &expect[1..]);
+
+    insta::assert_snapshot!(scope.to_string(), @r"
+    /// This is a module comment.
+    mod toby {
+    }
+    ");
 }
 
 #[test]
@@ -391,20 +373,19 @@ fn struct_in_mod() {
             .field("two", "U");
     }
 
-    let expect = r#"
-mod foo {
-    /// Hello some docs
-    #[derive(Debug)]
-    struct Foo<T, U>
-    where T: SomeBound,
-          U: SomeOtherBound,
-    {
-        one: T,
-        two: U,
+    insta::assert_snapshot!(scope.to_string(), @r"
+    mod foo {
+        /// Hello some docs
+        #[derive(Debug)]
+        struct Foo<T, U>
+        where T: SomeBound,
+              U: SomeOtherBound,
+        {
+            one: T,
+            two: U,
+        }
     }
-}"#;
-
-    assert_eq!(scope.to_string(), &expect[1..]);
+    ");
 }
 
 #[test]
@@ -416,16 +397,15 @@ fn struct_mod_import() {
         .new_struct("Foo")
         .field("bar", "Bar");
 
-    let expect = r#"
-mod foo {
-    use bar::Bar;
+    insta::assert_snapshot!(scope.to_string(), @r"
+    mod foo {
+        use bar::Bar;
 
-    struct Foo {
-        bar: Bar,
+        struct Foo {
+            bar: Bar,
+        }
     }
-}"#;
-
-    assert_eq!(scope.to_string(), &expect[1..]);
+    ");
 }
 #[test]
 fn type_alias_in_mod() {
@@ -436,12 +416,11 @@ fn type_alias_in_mod() {
         module.new_type_alias("hello", "world").vis("pub");
     }
 
-    let expect = r#"
-mod foo {
-    pub type hello = world;
-}"#;
-
-    assert_eq!(scope.to_string(), &expect[1..]);
+    insta::assert_snapshot!(scope.to_string(), @r"
+    mod foo {
+        pub type hello = world;
+    }
+    ");
 }
 
 #[test]
@@ -454,14 +433,13 @@ fn enum_with_repr() {
         .push_variant(Variant::new("V4"))
         .push_variant(Variant::new("V6"));
 
-    let expect = r#"
-#[repr(u8)]
-enum IpAddrKind {
-    V4,
-    V6,
-}"#;
-
-    assert_eq!(scope.to_string(), &expect[1..]);
+    insta::assert_snapshot!(scope.to_string(), @r"
+    #[repr(u8)]
+    enum IpAddrKind {
+        V4,
+        V6,
+    }
+    ");
 }
 
 #[test]
@@ -479,22 +457,21 @@ fn enum_variant_with_doc() {
         .doc("Documentation for Bazinga variant")
         .tuple("String");
 
-    let expect = r#"
-enum Foo {
-    /// Documentation for Bar variant
-    Bar {
-        /// Documentation for the named bo field
-        bo: bool,
+    insta::assert_snapshot!(scope.to_string(), @r"
+    enum Foo {
+        /// Documentation for Bar variant
+        Bar {
+            /// Documentation for the named bo field
+            bo: bool,
+        }
+        ,
+        /// Documentation for Baz variant
+        /// With multiple lines
+        Baz,
+        /// Documentation for Bazinga variant
+        Bazinga(String),
     }
-    ,
-    /// Documentation for Baz variant
-    /// With multiple lines
-    Baz,
-    /// Documentation for Bazinga variant
-    Bazinga(String),
-}"#;
-
-    assert_eq!(scope.to_string(), &expect[1..]);
+    ");
 }
 
 #[test]
@@ -505,14 +482,13 @@ fn enum_with_discriminants() {
     enu.new_variant("V4").discriminant("4");
     enu.new_variant("V6").discriminant("6");
 
-    let expect = r#"
-#[repr(u8)]
-enum IpAddrKind {
-    V4 = 4,
-    V6 = 6,
-}"#;
-
-    assert_eq!(scope.to_string(), &expect[1..]);
+    insta::assert_snapshot!(scope.to_string(), @r"
+    #[repr(u8)]
+    enum IpAddrKind {
+        V4 = 4,
+        V6 = 6,
+    }
+    ");
 }
 
 #[test]
@@ -525,14 +501,13 @@ fn enum_with_allow() {
         .push_variant(Variant::new("V4"))
         .push_variant(Variant::new("V6"));
 
-    let expect = r#"
-#[allow(dead_code)]
-enum IpAddrKind {
-    V4,
-    V6,
-}"#;
-
-    assert_eq!(scope.to_string(), &expect[1..]);
+    insta::assert_snapshot!(scope.to_string(), @r"
+    #[allow(dead_code)]
+    enum IpAddrKind {
+        V4,
+        V6,
+    }
+    ");
 }
 
 #[test]
@@ -548,19 +523,18 @@ fn scoped_imports() {
         .field("baz", "baz::Baz")
         .field("quuuux", "quuux::Quuuux");
 
-    let expect = r#"
-mod foo {
-    use bar::{Bar, baz};
-    use bar::quux::quuux;
+    insta::assert_snapshot!(scope.to_string(), @r"
+    mod foo {
+        use bar::{Bar, baz};
+        use bar::quux::quuux;
 
-    struct Foo {
-        bar: Bar,
-        baz: baz::Baz,
-        quuuux: quuux::Quuuux,
+        struct Foo {
+            bar: Bar,
+            baz: baz::Baz,
+            quuuux: quuux::Quuuux,
+        }
     }
-}"#;
-
-    assert_eq!(scope.to_string(), &expect[1..]);
+    ");
 }
 
 #[test]
@@ -574,16 +548,15 @@ fn module_mut() {
         .new_struct("Foo")
         .field("bar", "Bar");
 
-    let expect = r#"
-mod foo {
-    use bar::Bar;
+    insta::assert_snapshot!(scope.to_string(), @r"
+    mod foo {
+        use bar::Bar;
 
-    struct Foo {
-        bar: Bar,
+        struct Foo {
+            bar: Bar,
+        }
     }
-}"#;
-
-    assert_eq!(scope.to_string(), &expect[1..]);
+    ");
 }
 
 #[test]
@@ -598,16 +571,15 @@ fn get_or_new_module() {
         .new_struct("Foo")
         .field("bar", "Bar");
 
-    let expect = r#"
-mod foo {
-    use bar::Bar;
+    insta::assert_snapshot!(scope.to_string(), @r"
+    mod foo {
+        use bar::Bar;
 
-    struct Foo {
-        bar: Bar,
+        struct Foo {
+            bar: Bar,
+        }
     }
-}"#;
-
-    assert_eq!(scope.to_string(), &expect[1..]);
+    ");
 }
 
 #[test]
@@ -619,14 +591,13 @@ fn function_with_async() {
     f.set_async(true);
     f.line("println!(\"petting toby because he is a good boi\");");
 
-    let expect = r#"
-trait Foo {
-    async fn pet_toby() {
-        println!("petting toby because he is a good boi");
+    insta::assert_snapshot!(scope.to_string(), @r#"
+    trait Foo {
+        async fn pet_toby() {
+            println!("petting toby because he is a good boi");
+        }
     }
-}"#;
-
-    assert_eq!(scope.to_string(), &expect[1..]);
+    "#);
 }
 
 #[test]
@@ -639,12 +610,11 @@ fn function_with_const() {
         .ret("u32")
         .line("1 + 1");
 
-    let expect = r#"
-const fn one_plus_one() -> u32 {
-    1 + 1
-}"#;
-
-    assert_eq!(scope.to_string(), &expect[1..]);
+    insta::assert_snapshot!(scope.to_string(), @r"
+    const fn one_plus_one() -> u32 {
+        1 + 1
+    }
+    ");
 }
 
 #[test]
@@ -658,16 +628,15 @@ fn trait_with_macros() {
     f.set_async(true);
     f.line("println!(\"petting toby because he is a good boi\");");
 
-    let expect = r#"
-#[async_trait]
-#[toby_is_cute]
-trait Foo {
-    async fn pet_toby() {
-        println!("petting toby because he is a good boi");
+    insta::assert_snapshot!(scope.to_string(), @r##"
+    #[async_trait]
+    #[toby_is_cute]
+    trait Foo {
+        async fn pet_toby() {
+            println!("petting toby because he is a good boi");
+        }
     }
-}"#;
-
-    assert_eq!(scope.to_string(), &expect[1..]);
+    "##);
 }
 
 #[test]
@@ -683,18 +652,17 @@ fn impl_with_macros() {
     f.set_async(true);
     f.line("println!(\"petting Toby many times because he is such a good boi\");");
 
-    let expect = r#"
-struct Bar;
+    insta::assert_snapshot!(scope.to_string(), @r#"
+    struct Bar;
 
-#[async_trait]
-#[toby_is_cute]
-impl Foo for Bar {
-    async fn pet_toby() {
-        println!("petting Toby many times because he is such a good boi");
+    #[async_trait]
+    #[toby_is_cute]
+    impl Foo for Bar {
+        async fn pet_toby() {
+            println!("petting Toby many times because he is such a good boi");
+        }
     }
-}"#;
-
-    assert_eq!(scope.to_string(), &expect[1..]);
+    "#);
 }
 
 #[test]
@@ -708,15 +676,14 @@ fn struct_with_multiple_allow() {
         .field("one", "u8")
         .field("two", "u8");
 
-    let expect = r#"
-#[allow(dead_code)]
-#[allow(clippy::all)]
-struct Foo {
-    one: u8,
-    two: u8,
-}"#;
-
-    assert_eq!(scope.to_string(), &expect[1..]);
+    insta::assert_snapshot!(scope.to_string(), @r"
+    #[allow(dead_code)]
+    #[allow(clippy::all)]
+    struct Foo {
+        one: u8,
+        two: u8,
+    }
+    ");
 }
 
 #[test]
@@ -730,15 +697,14 @@ fn enum_with_multiple_allow() {
         .push_variant(Variant::new("V4"))
         .push_variant(Variant::new("V6"));
 
-    let expect = r#"
-#[allow(dead_code)]
-#[allow(clippy::all)]
-enum IpAddrKind {
-    V4,
-    V6,
-}"#;
-
-    assert_eq!(scope.to_string(), &expect[1..]);
+    insta::assert_snapshot!(scope.to_string(), @r"
+    #[allow(dead_code)]
+    #[allow(clippy::all)]
+    enum IpAddrKind {
+        V4,
+        V6,
+    }
+    ");
 }
 
 #[test]
@@ -754,18 +720,17 @@ fn impl_with_associated_const() {
     foo_impl.impl_trait("Bar");
     foo_impl.associate_const("CONST_NAME", Type::new("f32"), "0.0", "pub");
 
-    let expect = r#"
-trait Bar {
-    const CONST_NAME: f32;
-}
+    insta::assert_snapshot!(scope.to_string(), @r"
+    trait Bar {
+        const CONST_NAME: f32;
+    }
 
-struct Foo;
+    struct Foo;
 
-impl Bar for Foo {
-    pub const CONST_NAME: f32 = 0.0;
-}"#;
-
-    assert_eq!(scope.to_string(), &expect[1..]);
+    impl Bar for Foo {
+        pub const CONST_NAME: f32 = 0.0;
+    }
+    ");
 }
 
 #[test]
@@ -780,11 +745,10 @@ fn struct_with_member_visibility() {
     struct_description.push_field(bar);
     struct_description.new_field("baz", "i16").vis("pub(crate)");
 
-    let expect = r#"
-struct Foo {
-    pub bar: usize,
-    pub(crate) baz: i16,
-}"#;
-
-    assert_eq!(scope.to_string(), &expect[1..]);
+    insta::assert_snapshot!(scope.to_string(), @r"
+    struct Foo {
+        pub bar: usize,
+        pub(crate) baz: i16,
+    }
+    ");
 }
