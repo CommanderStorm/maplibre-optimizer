@@ -1,6 +1,7 @@
-use maplibre_style_spec::spec::decoder::{StyleReference, TopLevelItem};
+use std::collections::BTreeMap;
+
+use maplibre_style_spec::decoder::{ParsedItem, StyleReference, TopLevelItem};
 use serde_json::Value;
-use std::{collections::HashMap, path::PathBuf};
 
 // objects produced by errors here are too large to review
 // to produce better error messages, we need to remove keys that don't cause errors
@@ -32,11 +33,18 @@ fn minimise_object(check_still_produces_error: fn(Value) -> bool, value: Value) 
 
 #[test]
 fn test_decode_top_level() {
-    let v8_path = PathBuf::from("tests/upstream/src/reference/v8.json");
-
-    let content = std::fs::read_to_string(v8_path).unwrap();
-    let mut style: HashMap<String, Value> = serde_json::from_str(&content).unwrap();
+    let content = include_str!("upstream/src/reference/v8.json");
+    let mut style: BTreeMap<String, Value> = serde_json::from_str(content).unwrap();
     assert_eq!(style.remove("$version"), Some(Value::Number(8.into())));
+    if let Some(root) = style.remove("$root") {
+        let root_items = serde_json::from_value::<BTreeMap<String, Value>>(root.clone())
+            .expect("$root is a valid map of top level items.");
+        for (key, root_item) in root_items {
+            serde_json::from_value::<ParsedItem>(root_item.clone()).expect(&format!(
+                "$root.{key} is not a valid ParsedItem\n{root_item:#?}"
+            ));
+        }
+    }
 
     for (key, value) in style {
         if let Err(e) = serde_json::from_value::<TopLevelItem>(value.clone()) {
@@ -55,9 +63,9 @@ fn test_decode_top_level() {
 
 #[test]
 fn test_decode_whole_reference() {
-    let v8_path = PathBuf::from("tests/upstream/src/reference/v8.json");
-
-    let content = std::fs::read_to_string(v8_path).unwrap();
-    let style: StyleReference = serde_json::from_str(&content).unwrap();
+    let content = include_str!("upstream/src/reference/v8.json");
+    let style: StyleReference = serde_json::from_str(content).unwrap();
     assert_eq!(style.version, 8);
+    assert!(!style.root.is_empty());
+    assert!(!style.fields.is_empty())
 }

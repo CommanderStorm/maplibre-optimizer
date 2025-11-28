@@ -25,11 +25,12 @@ export RUST_BACKTRACE := env('RUST_BACKTRACE', if ci_mode == '1' {'1'} else {''}
     {{just_executable()}} --list
 
 # Run integration tests and save its output as the new expected output (ordering is important)
-bless: clean-test bless-insta
+bless: clean-gen clean-test bless-insta gen
 
 # Run integration tests and save its output as the new expected output
 bless-insta *args:  (cargo-install 'cargo-insta')
     cargo insta test --accept --workspace {{args}}
+    {{just_executable()}} gen
 
 # Quick compile without building a binary
 check: (cargo-install 'cargo-hack')
@@ -97,7 +98,7 @@ fmt:
     set -euo pipefail
     if (rustup toolchain list | grep nightly && rustup component list --toolchain nightly | grep rustfmt) &> /dev/null; then
         echo 'Reformatting Rust code using nightly Rust fmt to sort imports'
-        cargo +nightly fmt --all -- --config imports_granularity=Module,group_imports=StdExternalCrate
+        rustup run nightly cargo fmt --all -- --config imports_granularity=Module,group_imports=StdExternalCrate
     else
         echo 'Reformatting Rust with the stable cargo fmt.  Install nightly with `rustup install nightly` for better results'
         cargo fmt --all
@@ -107,10 +108,10 @@ fmt:
 fmt-toml *args: (cargo-install 'cargo-sort')
     cargo sort --workspace --order package,lib,bin,bench,features,dependencies,build-dependencies,dev-dependencies {{args}}
 
-# Do any git command, ensuring that the testing environment is set up. Accepts the same arguments as git.
-[no-exit-message]
-git *args:
-    git {{args}}
+# Generate a new spec file
+gen: clean-gen
+    cargo run --bin generate_spec
+    {{ just_executable() }} fmt
 
 # Run cargo fmt and cargo clippy
 lint: fmt clippy
@@ -132,7 +133,7 @@ test-fmt: (cargo-install 'cargo-sort') && (fmt-toml '--check' '--check-format')
 
 # Update all dependencies, including breaking changes. Requires nightly toolchain (install with `rustup install nightly`)
 update:
-    cargo +nightly -Z unstable-options update --breaking
+    rustup run nightly cargo -Z unstable-options update --breaking
     cargo update
 
 # Make sure the git repo has no uncommitted changes
@@ -165,6 +166,12 @@ cargo-install $COMMAND $INSTALL_CMD='' *args='':
 [private]
 clean-test:
     rm -rf tests/output
+
+# Remove a previusly generated spec file
+[private]
+clean-gen:
+    rm maplibre-style-spec/src/spec.rs
+    echo "pub struct MaplibreStyleSpecification;" > maplibre-style-spec/src/spec.rs
 
 # Install SQLX cli if not already installed.
 [private]
