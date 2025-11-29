@@ -3,7 +3,7 @@ use std::collections::BTreeMap;
 use maplibre_style_spec::decoder::{ParsedItem, StyleReference, TopLevelItem};
 use serde_json::Value;
 
-// objects produced by errors here are too large to review
+// objects produced by errors here are too large to review;
 // to produce better error messages, we need to remove keys that don't cause errors
 fn minimise_object(check_still_produces_error: fn(Value) -> bool, value: Value) -> Value {
     let values_to_try_to_remove = if let Value::Object(o) = value.clone() {
@@ -19,7 +19,7 @@ fn minimise_object(check_still_produces_error: fn(Value) -> bool, value: Value) 
             .remove(&outer_key)
             .unwrap();
         if !check_still_produces_error(minimized.clone()) {
-            // current object must be causing the mishap
+            // the current object must be causing the mishap
             minimized.as_object_mut().unwrap().clear();
             let _ = minimized
                 .as_object_mut()
@@ -33,7 +33,7 @@ fn minimise_object(check_still_produces_error: fn(Value) -> bool, value: Value) 
 
 #[test]
 fn test_decode_top_level() {
-    let content = include_str!("upstream/src/reference/v8.json");
+    let content = include_str!("../../upstream/src/reference/v8.json");
     let mut style: BTreeMap<String, Value> = serde_json::from_str(content).unwrap();
     assert_eq!(style.remove("$version"), Some(Value::Number(8.into())));
     if let Some(root) = style.remove("$root") {
@@ -63,7 +63,7 @@ fn test_decode_top_level() {
 
 #[test]
 fn test_decode_whole_reference() {
-    let content = include_str!("upstream/src/reference/v8.json");
+    let content = include_str!("../../upstream/src/reference/v8.json");
     let style: StyleReference = serde_json::from_str(content).unwrap();
     assert_eq!(style.version, 8);
     assert!(!style.root.is_empty());

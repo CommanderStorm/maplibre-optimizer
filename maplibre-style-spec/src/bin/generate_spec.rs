@@ -5,7 +5,7 @@ use maplibre_style_spec::decoder::StyleReference;
 use maplibre_style_spec::generator::generate_spec_scope;
 
 fn main() {
-    let json_content = include_str!("../../tests/upstream/src/reference/v8.json");
+    let json_content = include_str!("../../../upstream/src/reference/v8.json");
 
     let reference: StyleReference =
         serde_json::from_str(json_content).expect("Failed to parse v8.json into StyleReference");

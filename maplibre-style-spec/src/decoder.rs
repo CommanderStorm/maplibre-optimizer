@@ -476,7 +476,7 @@ mod tests {
     // expressions are a bit weird, so having a duplicate testcase for them is better debugging
     #[test]
     fn decode_within_expression() {
-        let content = include_str!("../tests/upstream/src/reference/v8.json");
+        let content = include_str!("../../upstream/src/reference/v8.json");
         let top: HashMap<String, Value> = serde_json::from_str(content).unwrap();
         let expression_name = top.get("expression_name").unwrap().as_object().unwrap();
         let values = expression_name.get("values").unwrap().as_object().unwrap();
@@ -489,7 +489,7 @@ mod tests {
     // expressions are a bit weird, so having a duplicate testcase for them is better debugging
     #[test]
     fn decode_property_types() {
-        let content = include_str!("../tests/upstream/src/reference/v8.json");
+        let content = include_str!("../../upstream/src/reference/v8.json");
         let top: HashMap<String, Value> = serde_json::from_str(content).unwrap();
         let property_type = top.get("property-type").unwrap().as_object().unwrap();
         for k in property_type.keys() {

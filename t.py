@@ -1,7 +1,7 @@
 from collections import Counter
 import json
 
-with open("maplibre-style-spec/tests/upstream/src/reference/v8.json") as f:
+with open("upstream/src/reference/v8.json") as f:
     data = json.load(f)
 
 def get_type(value) -> list[str]:
