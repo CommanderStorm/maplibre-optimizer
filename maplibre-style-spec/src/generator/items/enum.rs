@@ -78,7 +78,7 @@ fn generate_syntax_enum(
             for p in &overload.parameters {
                 let param = p.clone();
                 let tuple_identifier = if let Some(_) = param.strip_suffix('?') {
-                    format!("Option<serde_json::Value>")
+                    "Option<serde_json::Value>".to_string()
                 } else {
                     "serde_json::Value".to_string()
                 };
@@ -118,6 +118,17 @@ fn generate_syntax_enum(
         }
     }
 
+    generate_syntax_enum_deserializer(scope, &name, values);
+
+    let examples = values.values().filter_map(|e| e.example.as_ref()).collect();
+    generate_test_from_examples_if_present(scope, &name, examples);
+}
+
+fn generate_syntax_enum_deserializer(
+    scope: &mut Scope,
+    name: &&str,
+    values: &BTreeMap<String, EnumDocs>,
+) {
     let visitor_name = format!("{name}Visitor");
     scope
         .new_impl(name)
@@ -163,9 +174,6 @@ fn generate_syntax_enum(
 
     visit_seq.line("_ => Err(serde::de::Error::custom(&format!(\"unknown operator {op} in expression. Please check the documentation for the avaliable expressions.\")))");
     visit_seq.line("}");
-
-    let examples = values.values().filter_map(|e| e.example.as_ref()).collect();
-    generate_test_from_examples_if_present(scope, &name, examples);
 }
 
 fn generate_regular_enum(
