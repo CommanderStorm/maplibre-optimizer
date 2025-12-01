@@ -478,8 +478,8 @@ mod tests {
     fn decode_within_expression() {
         let content = include_str!("../../upstream/src/reference/v8.json");
         let top: HashMap<String, Value> = serde_json::from_str(content).unwrap();
-        let expression_name = top.get("expression_name").unwrap().as_object().unwrap();
-        let values = expression_name.get("values").unwrap().as_object().unwrap();
+        let expression = top.get("expression").unwrap().as_object().unwrap();
+        let values = expression.get("values").unwrap().as_object().unwrap();
         for (k, v) in values {
             let _: EnumDocs = serde_json::from_value(v.clone())
                 .expect(&format!("Failed to decode EnumDocs of {k}"));

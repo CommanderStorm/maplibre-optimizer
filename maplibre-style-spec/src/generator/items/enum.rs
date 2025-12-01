@@ -383,7 +383,7 @@ mod tests {
         let reference = json!({
         "$version": 8,
         "$root": {},
-        "expression_name": {
+        "expression": {
           "doc": "",
           "type": "enum",
           "values": {
@@ -475,7 +475,7 @@ mod tests {
 
             #[rstest::rstest]
             #[case(serde_json::json!(["let","someNumber",500,["interpolate",["linear"],["var","someNumber"],274,"#edf8e9",1551,"#006d2c"]]))]
-            fn test_example_expression_name_decodes(#[case] example: serde_json::Value) {
+            fn test_example_expression_decodes(#[case] example: serde_json::Value) {
                 let _ = serde_json::from_value::<ExpressionName>(example).expect("example should decode");
             }
         }

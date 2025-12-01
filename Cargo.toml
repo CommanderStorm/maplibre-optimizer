@@ -32,7 +32,7 @@ struct_field_names = "allow"
 [workspace.dependencies]
 anyhow = "1.0"
 clap = { version = "4", features = ["derive", "unstable-markdown", "wrap_help"] }
-codegen2 = {version = "0.3.0", path = "codegen2"}
+codegen2 = { version = "0.3.0", path = "codegen2" }
 criterion = { version = "0.7", features = ["async_futures", "async_tokio", "html_reports"] }
 image = "0.25.8"
 insta = "1.43"
@@ -44,7 +44,7 @@ serde_json = "1.0"
 serde_with = "3.15"
 thiserror = "2.0"
 color = "0.3.2"
-url = "2.5"
+url = "2.5<"
 
 [profile.dev.package]
 # See https://docs.rs/insta/latest/insta/#optional-faster-runs
