@@ -20,7 +20,7 @@ jobs:
     steps:
       - run: rustup update stable && rustup default stable
       - name: Checkout sources
-        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
         with: { persist-credentials: false, submodules: true }
       - run: cargo test
       - run: cargo test --doc
@@ -33,7 +33,7 @@ jobs:
       - run: rustup update stable && rustup default stable
       - run: rustup component add clippy rustfmt
       - name: Checkout sources
-        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
         with: { persist-credentials: false, submodules: true }
       - uses: taiki-e/install-action@44c6d64aa62cd779e873306675c7a58e86d6d532 # v2.62.49
         # TODO: add cargo-sort once https://github.com/taiki-e/install-action/pull/997 is resolved
@@ -51,7 +51,7 @@ jobs:
     steps:
       - run: rustup update stable && rustup default stable
       - name: Checkout sources
-        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
         with: { persist-credentials: false, submodules: true }
       - uses: taiki-e/install-action@44c6d64aa62cd779e873306675c7a58e86d6d532 # v2.62.49
         with: { tool: 'just' }
