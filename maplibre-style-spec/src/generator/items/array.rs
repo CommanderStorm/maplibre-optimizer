@@ -27,7 +27,13 @@ pub fn generate(
     let new_type = to_upper_camel_case(&format!("{name} Value"));
     let type_name = generate_array_value(scope, &new_type, common, value, values);
 
-    let field = if value == &ArrayValue::Simple(SimpleArrayValue::FontFaces) {
+    let field = if let ArrayValue::Simple(simp) = value
+        && matches!(
+            simp,
+            SimpleArrayValue::FontFaces
+                | SimpleArrayValue::ExpressionName
+                | SimpleArrayValue::InterpolationName
+        ) {
         type_name
     } else if let Some(length) = length {
         format!("Box<[{type_name}; {length}]>")
@@ -145,6 +151,8 @@ fn generate_array_value(
 
                 "std::collections::BTreeMap<String,FontFace>".to_string()
             }
+            SimpleArrayValue::InterpolationName => "InterpolationName".to_string(),
+            SimpleArrayValue::ExpressionName => "ExpressionName".to_string(),
         },
         ArrayValue::Either(options) => {
             let mut variant_types = Vec::with_capacity(options.len());
@@ -310,5 +318,37 @@ mod tests {
             }
         }
         "##);
+    }
+
+    #[test]
+    fn test_generate_spec_interpolation() {
+        let reference = json!({
+            "$version": 8,
+            "$root": {},
+            "interpolation": {
+              "type": "array",
+              "value": "interpolation_name",
+              "minimum": 1,
+              "doc": "An interpolation defines how to transition between items. The first element of an interpolation array is a string naming the interpolation operator, e.g. `\"linear\"` or `\"exponential\"`. Elements that follow (if any) are the _arguments_ to the interpolation."
+            },
+        });
+        let reference: StyleReference = serde_json::from_value(reference).unwrap();
+        insta::assert_snapshot!(crate::generator::generate_spec_scope(reference), @r#"
+        /// This is a Maplibre Style Specification
+        #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+        pub struct MaplibreStyleSpecification;
+
+        /// An interpolation defines how to transition between items. The first element of an interpolation array is a string naming the interpolation operator, e.g. `"linear"` or `"exponential"`. Elements that follow (if any) are the _arguments_ to the interpolation.
+        ///
+        /// Range: 1..
+        #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+        struct Interpolation(InterpolationName);
+
+        #[cfg(test)]
+        mod test {
+            use super::*;
+
+        }
+        "#);
     }
 }

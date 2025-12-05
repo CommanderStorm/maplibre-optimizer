@@ -497,8 +497,10 @@ pub enum RootVersion {
 pub struct RootZoom(serde_json::Number);
 
 /// An expression defines a function that can be used for data-driven style properties or feature filters. The first element of an expression array is a string naming the expression operator, e.g. `"*"` or `"case"`. Elements that follow (if any) are the _arguments_ to the expression. Each argument is either a literal value (a string, number, boolean, or `null`), or another expression array.
+///
+/// Range: 1..
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-struct Expression(Array);
+struct Expression(ExpressionName);
 
 /// First element in an expression array. May be followed by a number of arguments.
 #[derive(PartialEq, Eq, Debug, Clone)]
@@ -1159,8 +1161,10 @@ pub enum GeometryType {
 }
 
 /// An interpolation defines how to transition between items. The first element of an interpolation array is a string naming the interpolation operator, e.g. `"linear"` or `"exponential"`. Elements that follow (if any) are the _arguments_ to the interpolation.
+///
+/// Range: 1..
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-struct Interpolation(Array);
+struct Interpolation(InterpolationName);
 
 /// First element in an interpolation array. May be followed by a number of arguments.
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]

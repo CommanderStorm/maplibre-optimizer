@@ -24,4 +24,8 @@ pub enum SimpleArrayValue {
     Color,
     #[serde(rename = "fontFaces")]
     FontFaces,
+    #[serde(rename = "expression_name")]
+    ExpressionName,
+    #[serde(rename = "interpolation_name")]
+    InterpolationName,
 }

@@ -1,4 +1,4 @@
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap};
 
 use maplibre_style_spec::decoder::{ParsedItem, StyleReference, TopLevelItem};
 use serde_json::Value;
@@ -67,5 +67,45 @@ fn test_decode_whole_reference() {
     let style: StyleReference = serde_json::from_str(content).unwrap();
     assert_eq!(style.version, 8);
     assert!(!style.root.is_empty());
-    assert!(!style.fields.is_empty())
+    assert!(!style.fields.is_empty());
+
+    let references = collect_referencs(&style);
+    for (reference, first_occurance) in references {
+        if !style.fields.contains_key(&reference) {
+            panic!("{first_occurance} references {reference} which does not exist.");
+        }
+    }
+}
+
+/// collect all references in the style spec to ensure they are valid in a second step
+fn collect_referencs(style: &StyleReference) -> HashMap<String, String> {
+    let mut ht = HashMap::new();
+    for (k, field) in &style.fields {
+        match field {
+            TopLevelItem::Item(p) => {
+                if let ParsedItem::Reference { references, .. } = p.as_ref() {
+                    if !ht.contains_key(references) {
+                        ht.insert(references.clone(), k.clone());
+                    }
+                }
+            }
+            TopLevelItem::Group(g) => {
+                for (key2, p) in g {
+                    if let ParsedItem::Reference { references, .. } = p {
+                        if !ht.contains_key(references) {
+                            ht.insert(references.clone(), format!("{k}.{key2}"));
+                        }
+                    }
+                }
+            }
+            TopLevelItem::OneOf(rs) => {
+                for reference in rs {
+                    if !ht.contains_key(reference) {
+                        ht.insert(reference.clone(), k.clone());
+                    }
+                }
+            }
+        }
+    }
+    ht
 }
