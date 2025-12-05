@@ -45,7 +45,7 @@ pub struct SyntaxEnum {
 
     pub syntax: Syntax,
     pub example: Option<Value>,
-    pub group: String,
+    pub group: Option<String>,
 }
 
 #[derive(Debug, PartialEq, Clone, Deserialize)]
@@ -195,6 +195,7 @@ mod tests {
     use std::collections::HashMap;
 
     use rstest::rstest;
+    use serde_json::json;
 
     use super::*;
 
@@ -273,5 +274,24 @@ mod tests {
             let _: SyntaxEnum = serde_json::from_value(v.clone())
                 .unwrap_or_else(|e| panic!("Failed to decode SyntaxEnum from \"{k}\" because {e:?}\nSerialised form was {v}"));
         }
+    }
+    #[test]
+    fn can_decode_interpolation() {
+        let reference = json!({
+            "linear": {
+                "doc": "Interpolates linearly between the pair of stops just less than and just greater than the input",
+                "syntax": {
+                    "overloads": [
+                    {
+                        "parameters": [],
+                        "output-type": "interpolation"
+                    }
+                    ],
+                    "parameters": []
+                },
+                "sdk-support": {},
+            }
+        });
+        let _: BTreeMap<String, SyntaxEnum> = serde_json::from_value(reference).unwrap();
     }
 }

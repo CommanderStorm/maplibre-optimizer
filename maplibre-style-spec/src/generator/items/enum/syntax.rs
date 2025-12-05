@@ -22,10 +22,14 @@ pub fn generate_syntax_enum(
         let var_name = to_upper_camel_case(key);
         let var = enu.new_variant(&var_name).doc(&value.doc);
         let syntax = &value.syntax;
+        let name_and_possibly_group = if let Some(group) = &value.group {
+            format!("{name} (group={group})")
+        } else {
+            name.to_string()
+        };
         assert!(
             !syntax.overloads.is_empty(),
-            "{key} in {name} (group={group}) does not have a single overload",
-            group = value.group
+            "{key} in {name_and_possibly_group} does not have a single overload"
         );
         if syntax.overloads.len() == 1 {
             // not overloaded, above the Option<T> level
@@ -53,10 +57,14 @@ pub fn generate_syntax_enum(
     for (key, value) in values {
         let var_name = to_upper_camel_case(key);
         let syntax = &value.syntax;
+        let name_and_possibly_group = if let Some(group) = &value.group {
+            format!("{name} (group={group})")
+        } else {
+            name.to_string()
+        };
         assert!(
             !syntax.overloads.is_empty(),
-            "{key} in {name} (group={group}) does not have a single overload",
-            group = value.group
+            "{key} in {name_and_possibly_group} does not have a single overload"
         );
         if syntax.overloads.len() != 1 {
             // actually overloaded
@@ -235,6 +243,133 @@ mod tests {
             #[case(serde_json::json!(["let","someNumber",500,["interpolate",["linear"],["var","someNumber"],274,"#edf8e9",1551,"#006d2c"]]))]
             fn test_example_expression_decodes(#[case] example: serde_json::Value) {
                 let _ = serde_json::from_value::<Expression>(example).expect("example should decode");
+            }
+        }
+        "##);
+    }
+    #[test]
+    fn test_generate_spec_interpolation() {
+        let reference = json!({
+        "$version": 8,
+        "$root": {},
+        "interpolation_name": {
+          "doc": "First element in an interpolation array. May be followed by a number of arguments.",
+          "type": "enum",
+          "values": {
+            "linear": {
+              "doc": "Interpolates linearly between the pair of stops just less than and just greater than the input",
+              "syntax": {
+                "overloads": [
+                  {
+                    "parameters": [],
+                    "output-type": "interpolation"
+                  }
+                ],
+                "parameters": []
+              },
+              "sdk-support": {},
+              }
+            },
+          }
+        });
+        let reference: StyleReference = serde_json::from_value(reference).unwrap();
+        insta::assert_debug_snapshot!(reference,@r#"
+        StyleReference {
+            version: 8,
+            root: {},
+            fields: {
+                "interpolation_name": Item(
+                    Primitive(
+                        Enum {
+                            common: Fields {
+                                doc: "First element in an interpolation array. May be followed by a number of arguments.",
+                                example: None,
+                                units: None,
+                                expression: None,
+                                property_type: None,
+                                sdk_support: None,
+                                transition: None,
+                                required: None,
+                                overridable: None,
+                                requires: None,
+                            },
+                            default: None,
+                            values: SyntaxEnum(
+                                {
+                                    "linear": SyntaxEnum {
+                                        doc: "Interpolates linearly between the pair of stops just less than and just greater than the input",
+                                        sdk_support: Some(
+                                            Object {},
+                                        ),
+                                        syntax: Syntax {
+                                            overloads: [
+                                                Overload {
+                                                    parameters: [],
+                                                    output_type: Reference(
+                                                        "interpolation",
+                                                    ),
+                                                },
+                                            ],
+                                            parameters: [],
+                                        },
+                                        example: None,
+                                        group: None,
+                                    },
+                                },
+                            ),
+                        },
+                    ),
+                ),
+            },
+        }
+        "#);
+        insta::assert_snapshot!(crate::generator::generate_spec_scope(reference), @r##"
+        /// This is a Maplibre Style Specification
+        #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+        pub struct MaplibreStyleSpecification;
+
+        /// First element in an interpolation array. May be followed by a number of arguments.
+        #[derive(PartialEq, Eq, Debug, Clone)]
+        pub enum InterpolationName {
+            /// Interpolates linearly between the pair of stops just less than and just greater than the input
+            Linear,
+        }
+
+        impl<'de> serde::Deserialize<'de> for InterpolationName {
+            fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+            where D: serde::Deserializer<'de>,
+            {
+                deserializer.deserialize_any(InterpolationNameVisitor)
+            }
+        }
+
+        /// Visitor for deserializing the syntax enum [`{name}`]
+        struct InterpolationNameVisitor;
+
+        impl<'de> serde::de::Visitor<'de> for InterpolationNameVisitor {
+            type Value = InterpolationName;
+
+            fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+                formatter.write_str(r#"an expression array like ["==", 1, 2]"#)
+            }
+
+            fn visit_seq<A: serde::de::SeqAccess<'de>>(self, mut seq: A) -> Result<Self::Value, A::Error> {
+                // First element: operator string
+                let op: String = seq.next_element()?.ok_or_else(|| serde::de::Error::custom("missing operator"))?;
+                match op.as_str() {
+                "linear" => todo!("InterpolationName::Linear decoding is not currently implemented"),
+                _ => Err(serde::de::Error::custom(&format!("unknown operator {op} in expression. Please check the documentation for the avaliable expressions.")))
+                }
+            }
+        }
+
+        #[cfg(test)]
+        mod test {
+            use super::*;
+
+            #[rstest::rstest]
+            fn test_example_interpolation_name_decodes(#[case] example: serde_json::Value) {
+                let _ = serde_json::from_value::<InterpolationName>(example).expect("example should decode");
             }
         }
         "##);

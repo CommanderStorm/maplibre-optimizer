@@ -297,6 +297,15 @@ mod test {
         let _ = serde_json::from_value::<ExpressionName>(example).expect("example should decode");
     }
 
+    #[rstest::rstest]
+    #[case(serde_json::json!(["cubic-bezier",2,3,2,3]))]
+    #[case(serde_json::json!(["exponential",2]))]
+    #[case(serde_json::json!(["linear"]))]
+    fn test_example_interpolation_name_decodes(#[case] example: serde_json::Value) {
+        let _ =
+            serde_json::from_value::<InterpolationName>(example).expect("example should decode");
+    }
+
     #[test]
     fn test_example_layer_metadata_decodes() {
         let example = serde_json::json!({"source:comment":"Hydrology FCCODE 460 - Narrow wash"});
@@ -1167,8 +1176,59 @@ pub enum GeometryType {
 struct Interpolation(InterpolationName);
 
 /// First element in an interpolation array. May be followed by a number of arguments.
-#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-struct InterpolationName(Enum);
+#[derive(PartialEq, Eq, Debug, Clone)]
+pub enum InterpolationName {
+    /// Interpolates using the cubic bézier curve defined by the given control points.
+    CubicBezier(
+        serde_json::Value,
+        serde_json::Value,
+        serde_json::Value,
+        serde_json::Value,
+    ),
+    /// Interpolates exponentially between the stops just less than and just greater than the input.
+    Exponential(serde_json::Value),
+    /// Interpolates linearly between the pair of stops just less than and just greater than the input
+    Linear,
+}
+
+impl<'de> serde::Deserialize<'de> for InterpolationName {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        deserializer.deserialize_any(InterpolationNameVisitor)
+    }
+}
+
+/// Visitor for deserializing the syntax enum [`{name}`]
+struct InterpolationNameVisitor;
+
+impl<'de> serde::de::Visitor<'de> for InterpolationNameVisitor {
+    type Value = InterpolationName;
+
+    fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+        formatter.write_str(r#"an expression array like ["==", 1, 2]"#)
+    }
+
+    fn visit_seq<A: serde::de::SeqAccess<'de>>(self, mut seq: A) -> Result<Self::Value, A::Error> {
+        // First element: operator string
+        let op: String = seq
+            .next_element()?
+            .ok_or_else(|| serde::de::Error::custom("missing operator"))?;
+        match op.as_str() {
+            "cubic-bezier" => {
+                todo!("InterpolationName::CubicBezier decoding is not currently implemented")
+            }
+            "exponential" => {
+                todo!("InterpolationName::Exponential decoding is not currently implemented")
+            }
+            "linear" => todo!("InterpolationName::Linear decoding is not currently implemented"),
+            _ => Err(serde::de::Error::custom(&format!(
+                "unknown operator {op} in expression. Please check the documentation for the avaliable expressions."
+            ))),
+        }
+    }
+}
 
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
 pub struct Layer {
