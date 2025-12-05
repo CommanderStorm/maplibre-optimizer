@@ -67,12 +67,12 @@ mod tests {
     fn generate_empty() {
         let mut scope = Scope::new();
         generate(&mut scope, "Foo", &Fields::default(), &[2.into()]);
-        insta::assert_snapshot!(scope.to_string(), @r##"
+        insta::assert_snapshot!(scope.to_string(), @r#"
         #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
         #[serde(untagged)]
         pub enum Foo {
             /// A single value applies to all four sides.
-            ///
+            /// 
             /// Only avaliable for backwards compatibility.
             #[deprecated = "Please see [`Self::One`] instead"]
             Unwrapped(serde_json::Number),
@@ -91,7 +91,7 @@ mod tests {
                 Self::One(Box::new([2.into()]))
             }
         }
-        "##)
+        "#)
     }
 
     #[test]
@@ -140,7 +140,7 @@ mod tests {
         #[serde(untagged)]
         pub enum IconPadding {
             /// A single value applies to all four sides.
-            ///
+            /// 
             /// Only avaliable for backwards compatibility.
             #[deprecated = "Please see [`Self::One`] instead"]
             Unwrapped(serde_json::Number),

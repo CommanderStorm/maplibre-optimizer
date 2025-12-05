@@ -2,7 +2,7 @@ use std::collections::{BTreeMap, HashMap};
 
 use codegen2::Scope;
 
-use crate::decoder::{EnumValues, ParsedItem, StyleReference, TopLevelItem};
+use crate::decoder::{EnumValues, ParsedItem, PrimitiveType, StyleReference, TopLevelItem};
 use crate::generator::formatter::{to_snake_case, to_upper_camel_case};
 
 mod autotest;
@@ -49,7 +49,7 @@ fn extract_and_remove_discriminants(
                 continue;
             };
             for (descriminant, item) in btree_map {
-                if let ParsedItem::Enum { values, .. } = item
+                if let ParsedItem::Primitive(PrimitiveType::Enum { values, .. }) = item
                     && values.len() == 1
                 {
                     let EnumValues::Enum(enum_values) = values else {
@@ -210,105 +210,104 @@ fn generate_top_level_oneof(
 
 fn generate_parsed_item(scope: &mut Scope, item: &ParsedItem, name: &str) {
     match item {
-        ParsedItem::Number {
-            common,
-            default,
-            maximum,
-            minimum,
-            period,
-        } => items::number::generate(
-            scope,
-            name,
-            common,
-            default.as_ref(),
-            maximum.as_ref(),
-            minimum.as_ref(),
-            period.as_ref(),
-        ),
-        ParsedItem::Enum {
-            common,
-            default,
-            values,
-        } => items::r#enum::generate(scope, name, common, default.as_ref(), values),
-        ParsedItem::Array {
-            common,
-            default,
-            value,
-            values,
-            minimum,
-            maximum,
-            length,
-        } => items::array::generate(
-            scope,
-            name,
-            common,
-            default.as_ref(),
-            value,
-            values.as_ref(),
-            minimum.as_ref(),
-            maximum.as_ref(),
-            length.as_ref(),
-        ),
-        ParsedItem::Color { common, default } => {
-            items::color::generate(scope, name, common, default.as_ref())
+        ParsedItem::Primitive(p) => match p {
+            PrimitiveType::Number {
+                common,
+                default,
+                maximum,
+                minimum,
+                period,
+            } => items::number::generate(
+                scope,
+                name,
+                common,
+                default.as_ref(),
+                maximum.as_ref(),
+                minimum.as_ref(),
+                period.as_ref(),
+            ),
+            PrimitiveType::Enum {
+                common,
+                default,
+                values,
+            } => items::r#enum::generate(scope, name, common, default.as_ref(), values),
+            PrimitiveType::Array {
+                common,
+                default,
+                value,
+                values,
+                minimum,
+                maximum,
+                length,
+            } => items::array::generate(
+                scope,
+                name,
+                common,
+                default.as_ref(),
+                value,
+                values.as_ref(),
+                minimum.as_ref(),
+                maximum.as_ref(),
+                length.as_ref(),
+            ),
+            PrimitiveType::Color { common, default } => {
+                items::color::generate(scope, name, common, default.as_ref())
+            }
+            PrimitiveType::String { common, default } => {
+                items::string::generate(scope, name, common, default.as_deref())
+            }
+            PrimitiveType::Boolean { common, default } => {
+                items::boolean::generate(scope, name, common, default.as_ref())
+            }
+            PrimitiveType::ResolvedImage { common, tokens } => {
+                items::resolved_image::generate(scope, name, common, *tokens)
+            }
+            PrimitiveType::NumberArray {
+                common,
+                default,
+                minimum,
+                maximum,
+            } => items::number_array::generate(
+                scope,
+                name,
+                common,
+                default.as_ref(),
+                minimum.as_ref(),
+                maximum.as_ref(),
+            ),
+            PrimitiveType::ColorArray { common, default } => {
+                items::color_array::generate(scope, name, common, default.as_deref())
+            }
+
+            PrimitiveType::Padding { common, default } => {
+                items::padding::generate(scope, name, common, default.as_ref())
+            }
+            PrimitiveType::Formatted {
+                common,
+                tokens,
+                default,
+            } => items::formatted::generate(scope, name, common, default, *tokens),
+
+            // meta-types, not something proper but still useful to handle explicitly
+            PrimitiveType::Star(fields) => items::star::generate(scope, name, fields),
+            PrimitiveType::State { common, default } => {
+                items::state::generate(scope, name, common, default)
+            }
+            PrimitiveType::PropertyType(_) => {}
+
+            // below are types which are only primitives due to bad spec work upstream
+            PrimitiveType::ProjectionDefinition { common, default } => {
+                items::projection_definition::generate(scope, name, common, default.as_str())
+            }
+            PrimitiveType::VariableAnchorOffsetCollection(fields) => {
+                items::variable_anchor_offset_collection::generate(scope, name, fields)
+            }
+            PrimitiveType::Sprite(fields) => items::sprite::generate(scope, name, fields),
+            PrimitiveType::PromoteId(fields) => items::promote_id::generate(scope, name, fields),
+        },
+        ParsedItem::Reference { references, common } => {
+            items::reference::generate(scope, name, references, common)
         }
-        ParsedItem::String { common, default } => {
-            items::string::generate(scope, name, common, default.as_deref())
-        }
-        ParsedItem::Boolean { common, default } => {
-            items::boolean::generate(scope, name, common, default.as_ref())
-        }
-        ParsedItem::Star(fields) => items::star::generate(scope, name, fields),
-        ParsedItem::PropertyType(_) => {} // a meta-type, not something to have in the decoding code
-        ParsedItem::ResolvedImage { common, tokens } => {
-            items::resolved_image::generate(scope, name, common, *tokens)
-        }
-        ParsedItem::PromoteId(fields) => items::promote_id::generate(scope, name, fields),
-        ParsedItem::NumberArray {
-            common,
-            default,
-            minimum,
-            maximum,
-        } => items::number_array::generate(
-            scope,
-            name,
-            common,
-            default.as_ref(),
-            minimum.as_ref(),
-            maximum.as_ref(),
-        ),
-        ParsedItem::ColorArray { common, default } => {
-            items::color_array::generate(scope, name, common, default.as_deref())
-        }
-        ParsedItem::VariableAnchorOffsetCollection(fields) => {
-            items::variable_anchor_offset_collection::generate(scope, name, fields)
-        }
-        ParsedItem::Transition(fields) => items::transition::generate(scope, name, fields),
-        ParsedItem::Terrain(fields) => items::terrain::generate(scope, name, fields),
-        ParsedItem::State { common, default } => {
-            items::state::generate(scope, name, common, default)
-        }
-        ParsedItem::Sprite(fields) => items::sprite::generate(scope, name, fields),
-        ParsedItem::Sources(fields) => items::sources::generate(scope, name, fields),
-        ParsedItem::Source(fields) => items::source::generate(scope, name, fields),
-        ParsedItem::Sky(fields) => items::sky::generate(scope, name, fields),
-        ParsedItem::ProjectionDefinition { common, default } => {
-            items::projection_definition::generate(scope, name, common, default.as_str())
-        }
-        ParsedItem::Projection(fields) => items::projection::generate(scope, name, fields),
-        ParsedItem::Paint(fields) => items::paint::generate(scope, name, fields),
-        ParsedItem::Padding { common, default } => {
-            items::padding::generate(scope, name, common, default.as_ref())
-        }
-        ParsedItem::Light(fields) => items::light::generate(scope, name, fields),
-        ParsedItem::Layout(fields) => items::layout::generate(scope, name, fields),
-        ParsedItem::Formatted {
-            common,
-            tokens,
-            default,
-        } => items::formatted::generate(scope, name, common, default, *tokens),
-        ParsedItem::Filter(fields) => items::filter::generate(scope, name, fields),
-        ParsedItem::Expression(fields) => items::expression::generate(scope, name, fields),
     }
 }
 

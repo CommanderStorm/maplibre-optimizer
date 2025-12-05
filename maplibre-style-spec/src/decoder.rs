@@ -31,7 +31,7 @@ pub enum TopLevelItem {
 #[derive(Debug, PartialEq, Clone, Deserialize)]
 #[serde(tag = "type", rename_all = "camelCase")]
 #[serde(deny_unknown_fields)]
-pub enum ParsedItem {
+pub enum PrimitiveType {
     Number {
         #[serde(flatten)]
         common: Fields,
@@ -75,10 +75,6 @@ pub enum ParsedItem {
         common: Fields,
         default: Option<bool>,
     },
-    #[serde(rename = "*")]
-    Star(Fields),
-    #[serde(rename = "property-type")]
-    PropertyType(Value),
     ResolvedImage {
         #[serde(flatten)]
         common: Fields,
@@ -86,7 +82,6 @@ pub enum ParsedItem {
         /// can autocomplete fields from layers
         tokens: Option<bool>,
     },
-    PromoteId(Fields),
     NumberArray {
         #[serde(flatten)]
         common: Fields,
@@ -101,32 +96,16 @@ pub enum ParsedItem {
 
         default: Option<String>,
     },
-    VariableAnchorOffsetCollection(Fields),
-    Transition(Fields),
-    Terrain(Fields),
     State {
         #[serde(flatten)]
         common: Fields,
         default: Value,
     },
-    Sprite(Fields),
-    Sources(Fields),
-    Source(Fields),
-    Sky(Fields),
-    ProjectionDefinition {
-        #[serde(flatten)]
-        common: Fields,
-        default: String,
-    },
-    Projection(Fields),
-    Paint(Fields),
     Padding {
         #[serde(flatten)]
         common: Fields,
         default: Vec<Number>,
     },
-    Light(Fields),
-    Layout(Fields),
     Formatted {
         #[serde(flatten)]
         common: Fields,
@@ -134,8 +113,61 @@ pub enum ParsedItem {
         tokens: bool,
         default: String,
     },
-    Filter(Fields),
-    Expression(Fields),
+
+    // meta types
+    #[serde(rename = "*")]
+    Star(Fields),
+    #[serde(rename = "property-type")]
+    PropertyType(Value),
+
+    // below are types which are only primitives due to bad spec work upstream
+    ProjectionDefinition {
+        #[serde(flatten)]
+        common: Fields,
+        default: String,
+    },
+    VariableAnchorOffsetCollection(Fields),
+    Sprite(Fields),
+    PromoteId(Fields),
+}
+
+impl PrimitiveType {
+    fn common(&self) -> &Fields {
+        match self {
+            Self::Number { common, .. } => common,
+            Self::Enum { common, .. } => common,
+            Self::Array { common, .. } => common,
+            Self::Color { common, .. } => common,
+            Self::String { common, .. } => common,
+            Self::Boolean { common, .. } => common,
+            Self::ResolvedImage { common, .. } => common,
+            Self::NumberArray { common, .. } => common,
+            Self::ColorArray { common, .. } => common,
+            Self::Padding { common, .. } => common,
+            Self::Formatted { common, .. } => common,
+            // meta-types, not something proper but still useful to handle explicitly
+            Self::Star(common) => common,
+            Self::State { common, .. } => common,
+            Self::PropertyType(_) => unreachable!(),
+            // below are types which are only primitives due to bad spec work upstream
+            Self::ProjectionDefinition { common, .. } => common,
+            Self::VariableAnchorOffsetCollection(common) => common,
+            Self::Sprite(common) => common,
+            Self::PromoteId(common) => common,
+        }
+    }
+}
+
+#[derive(Debug, PartialEq, Clone, Deserialize)]
+#[serde(untagged)]
+pub enum ParsedItem {
+    Primitive(PrimitiveType),
+    Reference {
+        #[serde(rename = "type")]
+        references: String,
+        #[serde(flatten)]
+        common: Fields,
+    },
 }
 
 impl ParsedItem {
@@ -147,86 +179,8 @@ impl ParsedItem {
     }
     fn common(&self) -> &Fields {
         match self {
-            ParsedItem::Number {
-                common,
-                default: _default,
-                maximum: _maximum,
-                minimum: _minimum,
-                period: _period,
-            } => common,
-            ParsedItem::Enum {
-                common,
-                default: _default,
-                values: _values,
-            } => common,
-            ParsedItem::Array {
-                common,
-                default: _default,
-                value: _value,
-                values: _values,
-                minimum: _minimum,
-                maximum: _maximum,
-                length: _length,
-            } => common,
-            ParsedItem::Color {
-                common,
-                default: _default,
-            } => common,
-            ParsedItem::String {
-                common,
-                default: _default,
-            } => common,
-            ParsedItem::Boolean {
-                common,
-                default: _default,
-            } => common,
-            ParsedItem::Star(common) => common,
-            ParsedItem::PropertyType(_) => unreachable!(),
-            ParsedItem::ResolvedImage {
-                common,
-                tokens: _tokens,
-            } => common,
-            ParsedItem::PromoteId(common) => common,
-            ParsedItem::NumberArray {
-                common,
-                default: _default,
-                minimum: _minimum,
-                maximum: _maximum,
-            } => common,
-            ParsedItem::ColorArray {
-                common,
-                default: _default,
-            } => common,
-            ParsedItem::VariableAnchorOffsetCollection(common) => common,
-            ParsedItem::Transition(common) => common,
-            ParsedItem::Terrain(common) => common,
-            ParsedItem::State {
-                common,
-                default: _default,
-            } => common,
-            ParsedItem::Sprite(common) => common,
-            ParsedItem::Sources(common) => common,
-            ParsedItem::Source(common) => common,
-            ParsedItem::Sky(common) => common,
-            ParsedItem::ProjectionDefinition {
-                common,
-                default: _default,
-            } => common,
-            ParsedItem::Projection(common) => common,
-            ParsedItem::Paint(common) => common,
-            ParsedItem::Padding {
-                common,
-                default: _default,
-            } => common,
-            ParsedItem::Light(common) => common,
-            ParsedItem::Layout(common) => common,
-            ParsedItem::Formatted {
-                common,
-                tokens: _tokens,
-                default: _default,
-            } => common,
-            ParsedItem::Filter(common) => common,
-            ParsedItem::Expression(common) => common,
+            ParsedItem::Primitive(p) => p.common(),
+            ParsedItem::Reference { common, .. } => common,
         }
     }
 }
@@ -302,120 +256,11 @@ pub enum Requirement {
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct EnumDocs {
-    pub doc: String,
-    #[serde(rename = "sdk-support")]
-    pub sdk_support: Option<Value>,
-    // for expression only
-    pub syntax: Option<Syntax>,
-    pub example: Option<Value>,
-    pub group: Option<String>,
-}
-
-#[derive(Debug, PartialEq, Eq, Clone, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct Syntax {
-    pub overloads: Vec<Overload>,
-    #[serde(default)]
-    pub parameters: Vec<Parameter>,
-}
-
-#[derive(Debug, PartialEq, Eq, Clone, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct Overload {
-    pub parameters: Vec<String>,
-    #[serde(rename = "output-type")]
-    pub output_type: ParameterType,
-}
-#[derive(Debug, PartialEq, Eq, Clone, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct Parameter {
-    name: String,
-    r#type: ParameterType,
-    description: Option<String>,
-}
-
-#[derive(Debug, PartialEq, Eq, Clone, Deserialize)]
-pub enum ParameterType {
-    #[serde(rename = "number literal")]
-    NumberLiteral,
-    #[serde(rename = "string literal")]
-    StringLiteral,
-    #[serde(rename = "any")]
-    Any,
-    #[serde(rename = "boolean")]
-    Boolean,
-    #[serde(rename = "GeoJSON object")]
-    GeoJSONObject,
-    #[serde(rename = "JSON object")]
-    JSONObject,
-    #[serde(rename = "JSON array")]
-    JSONArray,
-    #[serde(rename = "number")]
-    Number,
-    #[serde(rename = "string")]
-    String,
-    #[serde(rename = "collator")]
-    Collator,
-    #[serde(rename = "array")]
-    Array,
-    #[serde(rename = "array<type>", alias = "array<T>")]
-    ArrayType,
-    #[serde(rename = "T")]
-    Type,
-    #[serde(rename = "array<type, length>")]
-    ArrayTypeLength,
-    #[serde(rename = "array | string")]
-    ArrayOrString,
-    #[serde(rename = "string | number")]
-    StringOrNumber,
-    #[serde(rename = "formatted")]
-    Formatted,
-    #[serde(rename = "string | image")]
-    StringOrImage,
-    #[serde(rename = "image")]
-    Image,
-    #[serde(rename = "object")]
-    Object,
-    #[serde(
-        rename = "number | array<number> | color | array<color> | projection | array<projection>"
-    )]
-    NumberOrArrayNumberOrColorOrArrayColorOrProjectionOrArrayProjection,
-    #[serde(rename = "number | array<number> | color | array<color> | projection")]
-    NumberOrArrayNumberOrColorOrArrayColorOrProjectionOrProjection,
-    #[serde(rename = "color | array<color>")]
-    ColorOrColorArray,
-    #[serde(rename = "color")]
-    Color,
-    #[serde(
-        rename = "string literal | number literal | array<string literal> | array<number literal>"
-    )]
-    StringLiteralOrNumberLiteralOrArrayStringLiteralOrArrayNumberLiteral,
-    // below are variants which are ts defintions-ish
-    #[serde(rename = "\"string\" | \"number\" | \"boolean\"")]
-    StringOrNumberOrBoolean,
-    #[serde(
-        rename = "{ \"case-sensitive\"?: boolean, \"diacritic-sensitive\"?: boolean, \"locale\"?: string }"
-    )]
-    CollatorOptions,
-    #[serde(
-        rename = "{ \"text-font\"?: string, \"text-color\"?: color, \"font-scale\"?: number, \"vertical-align\"?: \"bottom\" | \"center\" | \"top\" }"
-    )]
-    FormattingOptions,
-    #[serde(rename = "[\"linear\"] | [\"exponential\", base] | [\"cubic-bezier\", x1, y1, x2, y2]")]
-    InterpolationType,
-    #[serde(
-        rename = "{ \"locale\"?: string, \"currency\"?: string, \"min-fraction-digits\"?: number, \"max-fraction-digits\"?: number }"
-    )]
-    LocaleOptions,
-}
-
-#[derive(Debug, PartialEq, Eq, Clone, Deserialize)]
 #[serde(untagged)]
 pub enum EnumValues {
     Version(Vec<Number>),
-    Enum(BTreeMap<String, EnumDocs>),
+    Enum(BTreeMap<String, enum_decoder::EnumDocs>),
+    SyntaxEnum(BTreeMap<String, enum_decoder::SyntaxEnum>),
 }
 impl EnumValues {
     /// number of variants this enum contains
@@ -423,7 +268,93 @@ impl EnumValues {
         match self {
             EnumValues::Version(numbers) => numbers.len(),
             EnumValues::Enum(btree_map) => btree_map.len(),
+            EnumValues::SyntaxEnum(btree_map) => btree_map.len(),
         }
+    }
+}
+pub mod enum_decoder {
+    use super::*;
+
+    #[derive(Debug, PartialEq, Eq, Clone, Deserialize)]
+    #[serde(deny_unknown_fields)]
+    pub struct EnumDocs {
+        pub doc: String,
+        #[serde(rename = "sdk-support")]
+        pub sdk_support: Option<Value>,
+    }
+    #[derive(Debug, PartialEq, Eq, Clone, Deserialize)]
+    #[serde(deny_unknown_fields)]
+    pub struct SyntaxEnum {
+        pub doc: String,
+        #[serde(rename = "sdk-support")]
+        pub sdk_support: Option<Value>,
+
+        pub syntax: Syntax,
+        pub example: Option<Value>,
+        pub group: String,
+    }
+
+    #[derive(Debug, PartialEq, Eq, Clone, Deserialize)]
+    #[serde(deny_unknown_fields)]
+    pub struct Syntax {
+        pub overloads: Vec<Overload>,
+        #[serde(default)]
+        pub parameters: Vec<Parameter>,
+    }
+
+    #[derive(Debug, PartialEq, Eq, Clone, Deserialize)]
+    #[serde(deny_unknown_fields)]
+    pub struct Overload {
+        pub parameters: Vec<String>,
+        #[serde(rename = "output-type")]
+        pub output_type: ParameterType,
+    }
+    #[derive(Debug, PartialEq, Eq, Clone, Deserialize)]
+    #[serde(deny_unknown_fields)]
+    pub struct Parameter {
+        name: String,
+        r#type: ParameterType,
+        description: Option<String>,
+    }
+
+    #[derive(Debug, PartialEq, Eq, Clone, Deserialize)]
+    pub enum ParameterType {
+        #[serde(rename = "number literal")]
+        NumberLiteral,
+        #[serde(rename = "string literal")]
+        StringLiteral,
+        #[serde(rename = "any")]
+        Any,
+        #[serde(rename = "boolean")]
+        Boolean,
+        #[serde(rename = "GeoJSON object")]
+        GeoJSONObject,
+        #[serde(rename = "JSON object")]
+        JSONObject,
+        #[serde(rename = "JSON array")]
+        JSONArray,
+        #[serde(rename = "number")]
+        Number,
+        #[serde(rename = "string")]
+        String,
+        #[serde(rename = "collator")]
+        Collator,
+        #[serde(rename = "array")]
+        Array,
+        #[serde(rename = "array<type>", alias = "array<T>")]
+        ArrayType,
+        #[serde(rename = "T")]
+        Type,
+        #[serde(rename = "array<type, length>")]
+        ArrayTypeLength,
+        #[serde(rename = "formatted")]
+        Formatted,
+        #[serde(rename = "image")]
+        Image,
+        #[serde(rename = "object")]
+        Object,
+        #[serde(rename = "color")]
+        Color,
     }
 }
 
@@ -481,8 +412,13 @@ mod tests {
         let expression = top.get("expression").unwrap().as_object().unwrap();
         let values = expression.get("values").unwrap().as_object().unwrap();
         for (k, v) in values {
-            let _: EnumDocs = serde_json::from_value(v.clone())
-                .expect(&format!("Failed to decode EnumDocs of {k}"));
+            if v.as_object().unwrap().contains_key("syntax") {
+                let _: enum_decoder::SyntaxEnum = serde_json::from_value(v.clone())
+                    .expect(&format!("Failed to decode EnumDocs of {k}"));
+            } else {
+                let _: enum_decoder::EnumDocs = serde_json::from_value(v.clone())
+                    .expect(&format!("Failed to decode EnumDocs of {k}"));
+            }
         }
     }
 

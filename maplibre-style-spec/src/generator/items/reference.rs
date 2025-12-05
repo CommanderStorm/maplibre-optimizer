@@ -2,13 +2,15 @@ use codegen2::Scope;
 
 use crate::decoder::Fields;
 use crate::generator::autotest::generate_test_from_example_if_present;
+use crate::generator::formatter::to_upper_camel_case;
 
-pub fn generate(scope: &mut Scope, name: &str, common: &Fields) {
+pub(crate) fn generate(scope: &mut Scope, name: &str, references: &str, common: &Fields) {
     scope
         .new_struct(name)
         .doc(&common.doc)
         .derive("serde::Deserialize, PartialEq, Debug, Clone")
-        .tuple_field("Sky");
+        .tuple_field(to_upper_camel_case(references));
+
     generate_test_from_example_if_present(scope, name, common.example.as_ref());
 }
 
@@ -21,7 +23,7 @@ mod tests {
     #[test]
     fn generate_empty() {
         let mut scope = Scope::new();
-        generate(&mut scope, "Foo", &Fields::default());
+        generate(&mut scope, "Foo", "sky", &Fields::default());
         insta::assert_snapshot!(scope.to_string(), @r"
         #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
         struct Foo(Sky);
