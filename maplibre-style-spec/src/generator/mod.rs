@@ -2,7 +2,8 @@ use std::collections::{BTreeMap, HashMap};
 
 use codegen2::Scope;
 
-use crate::decoder::{EnumValues, ParsedItem, PrimitiveType, StyleReference, TopLevelItem};
+use crate::decoder::r#enum::EnumValues;
+use crate::decoder::{ParsedItem, PrimitiveType, StyleReference, TopLevelItem};
 use crate::generator::formatter::{to_snake_case, to_upper_camel_case};
 
 mod autotest;
@@ -179,7 +180,8 @@ fn generate_top_level_oneof(
         .derive("serde::Deserialize, PartialEq, Debug, Clone");
 
     let enum_variant_key = discriminants
-        .iter().find(|d| d.0 == name)
+        .iter()
+        .find(|d| d.0 == name)
         .map(|d| d.2.clone());
     let descriminants = discriminants
         .iter()

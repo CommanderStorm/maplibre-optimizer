@@ -1,7 +1,9 @@
 use codegen2::Scope;
 use serde_json::{Number, Value};
 
-use crate::decoder::{ArrayValue, EnumValues, Fields, SimpleArrayValue};
+use crate::decoder::array::{ArrayValue, SimpleArrayValue};
+use crate::decoder::r#enum::EnumValues;
+use crate::decoder::Fields;
 use crate::generator::autotest::generate_test_from_example_if_present;
 use crate::generator::formatter::to_upper_camel_case;
 use crate::generator::generate_parsed_item;
@@ -180,7 +182,9 @@ mod tests {
     use serde_json::json;
 
     use super::*;
-    use crate::decoder::{SimpleArrayValue, StyleReference};
+    use crate::decoder::array::SimpleArrayValue;
+    use crate::decoder::StyleReference;
+
     #[test]
     fn generate_empty() {
         let mut scope = Scope::new();

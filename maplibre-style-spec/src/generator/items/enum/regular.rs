@@ -2,8 +2,8 @@ use std::collections::BTreeMap;
 
 use codegen2::Scope;
 
+use crate::decoder::r#enum::EnumDocs;
 use crate::decoder::Fields;
-use crate::decoder::enum_decoder::EnumDocs;
 use crate::generator::formatter::to_upper_camel_case;
 
 pub fn generate_regular_enum(

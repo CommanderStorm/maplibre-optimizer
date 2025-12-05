@@ -5,7 +5,8 @@ mod version;
 use codegen2::Scope;
 use serde_json::Value;
 
-use crate::decoder::{EnumValues, Fields};
+use crate::decoder::r#enum::EnumValues;
+use crate::decoder::Fields;
 use crate::generator::autotest::generate_test_from_example_if_present;
 use crate::generator::formatter::to_upper_camel_case;
 

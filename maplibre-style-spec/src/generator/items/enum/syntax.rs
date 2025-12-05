@@ -2,8 +2,8 @@ use std::collections::BTreeMap;
 
 use codegen2::Scope;
 
+use crate::decoder::r#enum::SyntaxEnum;
 use crate::decoder::Fields;
-use crate::decoder::enum_decoder::SyntaxEnum;
 use crate::generator::autotest::generate_test_from_examples_if_present;
 use crate::generator::formatter::to_upper_camel_case;
 
@@ -158,17 +158,17 @@ mod tests {
                   {
                     "name": "var_i_name",
                     "type": "string literal",
-                    "description": "The name of the i-th variable."
+                    "doc": "The name of the i-th variable."
                   },
                   {
                     "name": "var_i_value",
                     "type": "any",
-                    "description": "The value of the i-th variable."
+                    "doc": "The value of the i-th variable."
                   },
                   {
                     "name": "expression",
                     "type": "any",
-                    "description": "The expression within which the named variables can be referenced."
+                    "doc": "The expression within which the named variables can be referenced."
                   }
                 ]
               },
@@ -194,7 +194,7 @@ mod tests {
         #[derive(PartialEq, Eq, Debug, Clone)]
         pub enum Expression {
             /// Binds expressions to named variables, which can then be referenced in the result expression using `["var", "variable_name"]`.
-            ///
+            /// 
             ///  - [Visualize population density](https://maplibre.org/maplibre-gl-js/docs/examples/visualize-population-density/)
             Let(Vec<serde_json::Value>),
         }
