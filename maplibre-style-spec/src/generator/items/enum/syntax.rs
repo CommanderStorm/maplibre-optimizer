@@ -2,8 +2,8 @@ use std::collections::BTreeMap;
 
 use codegen2::Scope;
 
-use crate::decoder::r#enum::SyntaxEnum;
 use crate::decoder::Fields;
+use crate::decoder::r#enum::SyntaxEnum;
 use crate::generator::autotest::generate_test_from_examples_if_present;
 use crate::generator::formatter::to_upper_camel_case;
 

@@ -4,11 +4,12 @@ pub mod property_type;
 
 use std::collections::BTreeMap;
 
-use crate::decoder::array::ArrayValue;
-use crate::decoder::property_type::PropertyType;
-use crate::decoder::r#enum::EnumValues;
 use serde::Deserialize;
 use serde_json::{Number, Value};
+
+use crate::decoder::array::ArrayValue;
+use crate::decoder::r#enum::EnumValues;
+use crate::decoder::property_type::PropertyType;
 
 #[derive(Debug, PartialEq, Clone, Deserialize)]
 pub struct StyleReference {

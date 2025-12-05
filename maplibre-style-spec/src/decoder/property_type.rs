@@ -17,9 +17,11 @@ pub enum PropertyType {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use serde_json::Value;
     use std::collections::HashMap;
+
+    use serde_json::Value;
+
+    use super::*;
 
     // test that all property types that can be parsed from the spec are parseable
     #[test]

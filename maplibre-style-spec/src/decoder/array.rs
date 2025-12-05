@@ -1,5 +1,6 @@
-use crate::decoder::ParsedItem;
 use serde::Deserialize;
+
+use crate::decoder::ParsedItem;
 
 #[derive(Debug, PartialEq, Clone, Deserialize)]
 #[serde(untagged)]
