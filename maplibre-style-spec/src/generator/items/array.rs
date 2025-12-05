@@ -34,7 +34,7 @@ pub fn generate(
     };
     scope
         .new_struct(name)
-        .doc(&common.doc_with_range(max, min, None))
+        .doc(common.doc_with_range(max, min, None))
         .derive("serde::Deserialize, PartialEq, Debug, Clone")
         .tuple_field(field);
 
@@ -77,7 +77,7 @@ fn generate_value_default(buffer: &mut String, item: &Value) {
         }
         Value::String(s) => {
             buffer.push('"');
-            buffer.push_str(&s);
+            buffer.push_str(s);
             buffer.push_str("\".to_string()");
         }
         Value::Array(a) => generate_value_array_default(buffer, a, None),
@@ -157,7 +157,7 @@ fn generate_array_value(
             }
 
             let enu = scope
-                .new_enum(&name)
+                .new_enum(name)
                 .doc(format!("{name} Values"))
                 .attr("serde(untagged)")
                 .derive("serde::Deserialize, PartialEq, Debug, Clone")
@@ -169,7 +169,7 @@ fn generate_array_value(
             name.to_string()
         }
         ArrayValue::Complex(c) => {
-            generate_parsed_item(scope, c, &name);
+            generate_parsed_item(scope, c, name);
             name.to_string()
         }
     }

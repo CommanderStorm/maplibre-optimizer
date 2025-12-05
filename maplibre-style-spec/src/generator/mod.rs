@@ -18,8 +18,8 @@ pub fn generate_spec_scope(mut reference: StyleReference) -> String {
     let discriminants = extract_and_remove_discriminants(&mut reference.fields);
 
     for (key, item) in &reference.fields {
-        let name = to_upper_camel_case(&key);
-        generate_top_level_item(&mut scope, &item, &name, &discriminants)
+        let name = to_upper_camel_case(key);
+        generate_top_level_item(&mut scope, item, &name, &discriminants)
     }
     scope
         .get_or_new_module("test")
@@ -43,7 +43,7 @@ fn extract_and_remove_discriminants(
     for (top_name, join_keys) in anyof_top_level_fields {
         let variant_name = to_upper_camel_case(&top_name);
         for join_key in join_keys {
-            let joined_top_level =fields.get(&join_key).expect(&format!("anyof {top_name} does refer to its variant {join_key}, but there is no join partner"));
+            let joined_top_level =fields.get(&join_key).unwrap_or_else(|| panic!("anyof {top_name} does refer to its variant {join_key}, but there is no join partner"));
             let TopLevelItem::Group(btree_map) = joined_top_level else {
                 // cannot possibly contain a discriminant
                 continue;
@@ -101,7 +101,7 @@ fn generate_spec(scope: &mut Scope, root: &BTreeMap<String, ParsedItem>) {
         }
     }
     for (key, field) in root {
-        generate_parsed_item(scope, &field, &to_upper_camel_case(&format!("root {key}")));
+        generate_parsed_item(scope, field, &to_upper_camel_case(&format!("root {key}")));
     }
 }
 
@@ -115,7 +115,7 @@ fn generate_top_level_item(
         return; // bogus, not a style spec item, rather metadata about the item
     }
     match item {
-        TopLevelItem::Item(item) => generate_parsed_item(scope, &item, name),
+        TopLevelItem::Item(item) => generate_parsed_item(scope, item, name),
         TopLevelItem::Group(items) => generate_top_level_group(scope, items, name),
         TopLevelItem::OneOf(items) => generate_top_level_oneof(scope, items, name, discriminants),
     }
@@ -134,7 +134,7 @@ fn generate_top_level_group(scope: &mut Scope, items: &BTreeMap<String, ParsedIt
             .tuple_field(format!(
                 "std::collections::BTreeMap<String,{field_type_name}>"
             ));
-        generate_parsed_item(scope, &item, &field_type_name);
+        generate_parsed_item(scope, item, &field_type_name);
 
         return;
     }
@@ -157,15 +157,13 @@ fn generate_top_level_group(scope: &mut Scope, items: &BTreeMap<String, ParsedIt
             .vis("pub");
         if key == "*" {
             field.annotation("#[serde(flatten)]");
-        } else {
-            if &to_snake_case(key) != key {
-                field.annotation(format!("#[serde(rename=\"{key}\")]"));
-            }
+        } else if &to_snake_case(key) != key {
+            field.annotation(format!("#[serde(rename=\"{key}\")]"));
         }
     }
 
     for (key, item) in items {
-        generate_parsed_item(scope, &item, &to_upper_camel_case(&format!("{name} {key}")));
+        generate_parsed_item(scope, item, &to_upper_camel_case(&format!("{name} {key}")));
     }
 }
 
@@ -181,13 +179,11 @@ fn generate_top_level_oneof(
         .derive("serde::Deserialize, PartialEq, Debug, Clone");
 
     let enum_variant_key = discriminants
-        .iter()
-        .filter(|d| &d.0 == name)
-        .next()
+        .iter().find(|d| d.0 == name)
         .map(|d| d.2.clone());
     let descriminants = discriminants
         .iter()
-        .filter(|d| &d.0 == name)
+        .filter(|d| d.0 == name)
         .cloned()
         .map(|d| (d.1, d.3))
         .collect::<HashMap<_, _>>();
@@ -198,7 +194,7 @@ fn generate_top_level_oneof(
         enu.attr("serde(untagged)");
     }
     for key in items {
-        let var_name = to_upper_camel_case(&key);
+        let var_name = to_upper_camel_case(key);
         let var = enu.new_variant(&var_name).tuple(&var_name);
         if &var_name != key
             && let Some(descriminant_key) = descriminants.get(key)

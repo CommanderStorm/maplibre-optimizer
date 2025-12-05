@@ -17,7 +17,7 @@ pub fn generate(
         .new_enum(name)
         .vis("pub")
         .attr("serde(untagged)")
-        .doc(&common.doc_with_range(max, min, None))
+        .doc(common.doc_with_range(max, min, None))
         .derive("serde::Deserialize, PartialEq, Debug, Clone");
     enu.new_variant("One").tuple("serde_json::Number");
     enu.new_variant("Many").tuple("Vec<serde_json::Number>");

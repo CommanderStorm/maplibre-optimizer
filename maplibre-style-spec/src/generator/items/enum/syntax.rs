@@ -36,7 +36,7 @@ pub fn generate_syntax_enum(
             }
             for p in &overload.parameters {
                 let param = p.clone();
-                let tuple_identifier = if let Some(_) = param.strip_suffix('?') {
+                let tuple_identifier = if param.strip_suffix('?').is_some() {
                     "Option<serde_json::Value>".to_string()
                 } else {
                     "serde_json::Value".to_string()
@@ -76,7 +76,7 @@ pub fn generate_syntax_enum(
     generate_syntax_enum_deserializer(scope, &name, values);
 
     let examples = values.values().filter_map(|e| e.example.as_ref()).collect();
-    generate_test_from_examples_if_present(scope, &name, examples);
+    generate_test_from_examples_if_present(scope, name, examples);
 }
 
 fn generate_syntax_enum_deserializer(
@@ -104,7 +104,7 @@ fn generate_syntax_enum_deserializer(
         .new_impl(&visitor_name)
         .generic("'de")
         .impl_trait("serde::de::Visitor<'de>")
-        .associate_type("Value", &name);
+        .associate_type("Value", name);
     vis.new_fn("expecting")
         .arg_ref_self()
         .arg("formatter", "&mut std::fmt::Formatter")
@@ -120,7 +120,7 @@ fn generate_syntax_enum_deserializer(
     visit_seq.line("// First element: operator string");
     visit_seq.line("let op: String = seq.next_element()?.ok_or_else(|| serde::de::Error::custom(\"missing operator\"))?;");
     visit_seq.line("match op.as_str() {");
-    for (key, _value) in values {
+    for key in values.keys() {
         let variant_name = to_upper_camel_case(key);
         visit_seq.line(format!(
             "\"{key}\" => todo!(\"{name}::{variant_name} decoding is not currently implemented\"),"

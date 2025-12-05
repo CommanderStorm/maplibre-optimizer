@@ -271,6 +271,11 @@ impl EnumValues {
             EnumValues::SyntaxEnum(btree_map) => btree_map.len(),
         }
     }
+
+    /// returns true if the enum contains no variants
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
 }
 pub mod enum_decoder {
     use super::*;
@@ -414,10 +419,10 @@ mod tests {
         for (k, v) in values {
             if v.as_object().unwrap().contains_key("syntax") {
                 let _: enum_decoder::SyntaxEnum = serde_json::from_value(v.clone())
-                    .expect(&format!("Failed to decode EnumDocs of {k}"));
+                    .unwrap_or_else(|e| panic!("Failed to decode SyntaxEnum from {k}: {e:?}"));
             } else {
                 let _: enum_decoder::EnumDocs = serde_json::from_value(v.clone())
-                    .expect(&format!("Failed to decode EnumDocs of {k}"));
+                    .unwrap_or_else(|e| panic!("Failed to decode EnumDocs from {k}: {e:?}"));
             }
         }
     }

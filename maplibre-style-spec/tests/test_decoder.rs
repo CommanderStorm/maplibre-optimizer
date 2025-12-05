@@ -40,9 +40,9 @@ fn test_decode_top_level() {
         let root_items = serde_json::from_value::<BTreeMap<String, Value>>(root.clone())
             .expect("$root is a valid map of top level items.");
         for (key, root_item) in root_items {
-            serde_json::from_value::<ParsedItem>(root_item.clone()).expect(&format!(
-                "$root.{key} is not a valid ParsedItem\n{root_item:#?}"
-            ));
+            serde_json::from_value::<ParsedItem>(root_item.clone()).unwrap_or_else(|e| {
+                panic!("$root.{key} is not a valid ParsedItem\n{root_item:#?}: {e:?}")
+            });
         }
     }
 

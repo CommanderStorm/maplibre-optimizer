@@ -6,7 +6,7 @@ use crate::generator::autotest::generate_test_from_example_if_present;
 pub fn generate(scope: &mut Scope, name: &str, common: &Fields) {
     let anchor_name = "LayoutSymbolTextVariableAnchorValue";
     scope
-        .new_struct(&name)
+        .new_struct(name)
         .vis("pub")
         .doc(&common.doc)
         .derive("PartialEq, Debug, Clone")

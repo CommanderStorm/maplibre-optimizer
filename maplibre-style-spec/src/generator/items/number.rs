@@ -15,7 +15,7 @@ pub fn generate(
 ) {
     scope
         .new_struct(name)
-        .doc(&common.doc_with_range(max, min, period))
+        .doc(common.doc_with_range(max, min, period))
         .vis("pub")
         .derive("serde::Deserialize, PartialEq, Debug, Clone")
         .tuple_field("serde_json::Number");
