@@ -391,7 +391,7 @@ struct RootFontFaces(FontFaces);
 ///
 /// The URL must be absolute, containing the [scheme, authority and path components](https://en.wikipedia.org/wiki/URL#Syntax).
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-struct RootGlyphs(String);
+pub struct RootGlyphs(String);
 
 /// A style's `layers` property lists all the layers available in that style. The type of layer is specified by the `type` property, and must be one of `background`, `fill`, `line`, `symbol`, `raster`, `circle`, `fill-extrusion`, `heatmap`, `hillshade`, `color-relief`.
 ///
@@ -405,11 +405,11 @@ struct RootLight(Light);
 
 /// Arbitrary properties useful to track with the stylesheet, but do not influence rendering. Properties should be prefixed to avoid collisions, like 'maplibre:'.
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-struct RootMetadata(serde_json::Value);
+pub struct RootMetadata(serde_json::Value);
 
 /// A human-readable name for the style.
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-struct RootName(String);
+pub struct RootName(String);
 
 /// Default pitch, in degrees. Zero is perpendicular to the surface, for a look straight down at the map, while a greater value like 60 looks ahead towards the horizon. The style pitch will be used only if the map has not been positioned by other means (e.g. map options or user interaction).
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
@@ -478,7 +478,7 @@ pub enum RootSprite {
 
 /// An object used to define default values when using the [`global-state`](https://maplibre.org/maplibre-style-spec/expressions/#global-state) expression.
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-struct RootState(serde_json::Value);
+pub struct RootState(serde_json::Value);
 
 impl Default for RootState {
     fn default() -> Self {
@@ -1376,7 +1376,7 @@ impl Default for FunctionColorSpace {
 ///
 /// If no default is provided, the style property's default is used in these circumstances.
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-struct FunctionDefault(serde_json::Value);
+pub struct FunctionDefault(serde_json::Value);
 
 /// An expression.
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
@@ -1384,7 +1384,7 @@ struct FunctionExpression(Expression);
 
 /// The name of a feature property to use as the function input.
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-struct FunctionProperty(String);
+pub struct FunctionProperty(String);
 
 impl Default for FunctionProperty {
     fn default() -> Self {
@@ -1553,7 +1553,7 @@ struct LayerFilter(Filter);
 
 /// Unique layer name.
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-struct LayerId(String);
+pub struct LayerId(String);
 
 /// Layout properties for the layer.
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
@@ -1567,7 +1567,7 @@ pub struct LayerMaxzoom(serde_json::Number);
 
 /// Arbitrary properties useful to track with the layer, but do not influence rendering. Properties should be prefixed to avoid collisions, like 'maplibre:'.
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-struct LayerMetadata(serde_json::Value);
+pub struct LayerMetadata(serde_json::Value);
 
 /// The minimum zoom level for the layer. At zoom levels less than the minzoom, the layer will be hidden.
 ///
@@ -1581,11 +1581,11 @@ struct LayerPaint(Paint);
 
 /// Name of a source description to be used for this layer. Required for all layer types except `background`.
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-struct LayerSource(String);
+pub struct LayerSource(String);
 
 /// Layer to use from a vector tile source. Required for vector tile sources; prohibited for all other source types, including GeoJSON sources.
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-struct LayerSourceLayer(String);
+pub struct LayerSourceLayer(String);
 
 /// Rendering type of this layer.
 #[derive(serde::Deserialize, PartialEq, Eq, Debug, Clone, Copy)]
@@ -2154,9 +2154,8 @@ impl Default for LayoutSymbolIconIgnorePlacement {
 }
 
 /// Name of image in sprite to use for drawing an image background.
-#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-#[deprecated = "resolved_image not implemented"]
-struct LayoutSymbolIconImage(serde_json::Value);
+#[derive(serde::Deserialize, PartialEq, Eq, Debug, Clone)]
+struct LayoutSymbolIconImage(String);
 
 /// If true, the icon may be flipped to prevent it from being rendered upside-down.
 #[derive(serde::Deserialize, PartialEq, Debug, Clone, Copy)]
@@ -2966,9 +2965,8 @@ impl Default for PaintBackgroundBackgroundOpacity {
 }
 
 /// Name of image in sprite to use for drawing an image background. For seamless patterns, image width and height must be a factor of two (2, 4, 8, ..., 512). Note that zoom-dependent expressions will be evaluated only at integer zoom levels.
-#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-#[deprecated = "resolved_image not implemented"]
-struct PaintBackgroundBackgroundPattern(serde_json::Value);
+#[derive(serde::Deserialize, PartialEq, Eq, Debug, Clone)]
+struct PaintBackgroundBackgroundPattern(String);
 
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
 pub struct PaintCircle {
@@ -3260,9 +3258,8 @@ impl Default for PaintFillFillOpacity {
 struct PaintFillFillOutlineColor(color::DynamicColor);
 
 /// Name of image in sprite to use for drawing image fills. For seamless patterns, image width and height must be a factor of two (2, 4, 8, ..., 512). Note that zoom-dependent expressions will be evaluated only at integer zoom levels.
-#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-#[deprecated = "resolved_image not implemented"]
-struct PaintFillFillPattern(serde_json::Value);
+#[derive(serde::Deserialize, PartialEq, Eq, Debug, Clone)]
+struct PaintFillFillPattern(String);
 
 /// The geometry's offset. Values are [x, y] where negatives indicate left and up, respectively.
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
@@ -3380,9 +3377,8 @@ impl Default for PaintFillExtrusionFillExtrusionOpacity {
 }
 
 /// Name of image in sprite to use for drawing images on extruded fills. For seamless patterns, image width and height must be a factor of two (2, 4, 8, ..., 512). Note that zoom-dependent expressions will be evaluated only at integer zoom levels.
-#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-#[deprecated = "resolved_image not implemented"]
-struct PaintFillExtrusionFillExtrusionPattern(serde_json::Value);
+#[derive(serde::Deserialize, PartialEq, Eq, Debug, Clone)]
+struct PaintFillExtrusionFillExtrusionPattern(String);
 
 /// The geometry's offset. Values are [x, y] where negatives indicate left and up (on the flat plane), respectively.
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
@@ -3801,9 +3797,8 @@ impl Default for PaintLineLineOpacity {
 }
 
 /// Name of image in sprite to use for drawing image lines. For seamless patterns, image width must be a factor of two (2, 4, 8, ..., 512). Note that zoom-dependent expressions will be evaluated only at integer zoom levels.
-#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-#[deprecated = "resolved_image not implemented"]
-struct PaintLineLinePattern(serde_json::Value);
+#[derive(serde::Deserialize, PartialEq, Eq, Debug, Clone)]
+struct PaintLineLinePattern(String);
 
 /// The geometry's offset. Values are [x, y] where negatives indicate left and up, respectively.
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
@@ -4294,7 +4289,7 @@ pub struct PromoteId(std::collections::BTreeMap<String, InnerPromoteId>);
 
 /// A name of a feature property to use as ID for feature state.
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-struct InnerPromoteId(String);
+pub struct InnerPromoteId(String);
 
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
 pub struct Sky {
@@ -4483,7 +4478,7 @@ pub struct SourceGeojson {
 
 /// Contains an attribution to be displayed when the map is shown to a user.
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-struct SourceGeojsonAttribution(String);
+pub struct SourceGeojsonAttribution(String);
 
 /// Size of the tile buffer on each side. A value of 0 produces no buffer. A value of 512 produces a buffer as wide as the tile itself. Larger values produce fewer rendering artifacts near tile edges and slower performance.
 ///
@@ -4534,7 +4529,7 @@ pub struct SourceGeojsonClusterMinPoints(serde_json::Number);
 ///
 /// `{"sum": [["+", ["accumulated"], ["get", "sum"]], ["get", "scalerank"]]}`
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-struct SourceGeojsonClusterProperties(serde_json::Value);
+pub struct SourceGeojsonClusterProperties(serde_json::Value);
 
 /// Radius of each cluster if clustering is enabled. A value of 512 indicates a radius equal to the width of a tile.
 ///
@@ -4553,7 +4548,7 @@ impl Default for SourceGeojsonClusterRadius {
 
 /// A URL to a GeoJSON file, or inline GeoJSON.
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-struct SourceGeojsonData(serde_json::Value);
+pub struct SourceGeojsonData(serde_json::Value);
 
 /// An expression for filtering features prior to processing them for rendering.
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
@@ -4627,7 +4622,7 @@ struct SourceImageCoordinates(Box<[SourceImageCoordinatesValue; 4]>);
 
 /// URL that points to an image.
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-struct SourceImageUrl(String);
+pub struct SourceImageUrl(String);
 
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
 pub struct SourceRaster {
@@ -4657,11 +4652,11 @@ pub struct SourceRaster {
 
 /// Other keys to configure the data source.
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-struct SourceRasterStar(serde_json::Value);
+pub struct SourceRasterStar(serde_json::Value);
 
 /// Contains an attribution to be displayed when the map is shown to a user.
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-struct SourceRasterAttribution(String);
+pub struct SourceRasterAttribution(String);
 
 /// An array containing the longitude and latitude of the southwest and northeast corners of the source's bounding box in the following order: `[sw.lng, sw.lat, ne.lng, ne.lat]`. When this property is included in a source, no tiles outside of the given bounds are requested by MapLibre.
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
@@ -4744,7 +4739,7 @@ struct SourceRasterTiles(Vec<String>);
 
 /// A URL to a TileJSON resource. Supported protocols are `http:` and `https:`.
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-struct SourceRasterUrl(String);
+pub struct SourceRasterUrl(String);
 
 /// A setting to determine whether a source's tiles are cached locally.
 #[derive(serde::Deserialize, PartialEq, Debug, Clone, Copy)]
@@ -4796,11 +4791,11 @@ pub struct SourceRasterDem {
 
 /// Other keys to configure the data source.
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-struct SourceRasterDemStar(serde_json::Value);
+pub struct SourceRasterDemStar(serde_json::Value);
 
 /// Contains an attribution to be displayed when the map is shown to a user.
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-struct SourceRasterDemAttribution(String);
+pub struct SourceRasterDemAttribution(String);
 
 /// Value that will be added to the encoding mix when decoding. Only used on custom encodings.
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
@@ -4938,7 +4933,7 @@ struct SourceRasterDemTiles(Vec<String>);
 
 /// A URL to a TileJSON resource. Supported protocols are `http:` and `https:`.
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-struct SourceRasterDemUrl(String);
+pub struct SourceRasterDemUrl(String);
 
 /// A setting to determine whether a source's tiles are cached locally.
 #[derive(serde::Deserialize, PartialEq, Debug, Clone, Copy)]
@@ -4980,11 +4975,11 @@ pub struct SourceVector {
 
 /// Other keys to configure the data source.
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-struct SourceVectorStar(serde_json::Value);
+pub struct SourceVectorStar(serde_json::Value);
 
 /// Contains an attribution to be displayed when the map is shown to a user.
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-struct SourceVectorAttribution(String);
+pub struct SourceVectorAttribution(String);
 
 /// An array containing the longitude and latitude of the southwest and northeast corners of the source's bounding box in the following order: `[sw.lng, sw.lat, ne.lng, ne.lat]`. When this property is included in a source, no tiles outside of the given bounds are requested by MapLibre.
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
@@ -5075,7 +5070,7 @@ struct SourceVectorTiles(Vec<String>);
 
 /// A URL to a TileJSON resource. Supported protocols are `http:` and `https:`.
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-struct SourceVectorUrl(String);
+pub struct SourceVectorUrl(String);
 
 /// A setting to determine whether a source's tiles are cached locally.
 #[derive(serde::Deserialize, PartialEq, Debug, Clone, Copy)]
@@ -5139,7 +5134,7 @@ impl Default for TerrainExaggeration {
 
 /// The source for the terrain data.
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-struct TerrainSource(String);
+pub struct TerrainSource(String);
 
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
 pub struct Transition {

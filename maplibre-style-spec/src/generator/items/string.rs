@@ -6,6 +6,7 @@ use crate::generator::autotest::generate_test_from_example_if_present;
 pub fn generate(scope: &mut Scope, name: &str, common: &Fields, default: Option<&str>) {
     scope
         .new_struct(name)
+        .vis("pub")
         .doc(&common.doc)
         .derive("serde::Deserialize, PartialEq, Debug, Clone")
         .tuple_field("String");
