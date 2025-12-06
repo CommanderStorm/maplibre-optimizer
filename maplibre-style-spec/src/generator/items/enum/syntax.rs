@@ -130,6 +130,17 @@ fn generate_syntax_enum_deserializer(
         .arg_self()
         .arg("mut seq", "A")
         .ret("Result<Self::Value, A::Error>");
+    // helper function
+    visit_seq
+        .line("/// Reads the next element from the sequence or reports a missing field error.");
+    visit_seq.line(
+        "fn visit_seq_field<'de, A, T>(seq: &mut A, name: &'static str) -> Result<T, A::Error>",
+    );
+    visit_seq.line("where A: serde::de::SeqAccess<'de>, T: serde::Deserialize<'de> {");
+    visit_seq.line("seq.next_element()?.ok_or_else(|| serde::de::Error::missing_field(name))");
+    visit_seq.line("}");
+    visit_seq.line("");
+    // operator decoding
     visit_seq.line("// First element: operator string");
     visit_seq.line("let op: String = seq.next_element()?.ok_or_else(|| serde::de::Error::custom(\"missing operator\"))?;");
     visit_seq.line("match op.as_str() {");
@@ -151,11 +162,13 @@ fn generate_syntax_enum_deserializer(
                 continue;
             }
 
-            for (i, param) in overload.parameters.iter().enumerate() {
+            for param in &overload.parameters {
                 if let Some(param) = param.strip_suffix('?') {
                     visit_seq.line(format!("let {param} = seq.next_element()?.ok();"));
                 } else {
-                    visit_seq.line(format!("let {param} = seq.next_element()?.ok_or_else(|| serde::de::Error::custom(format!(\"missing {param} at index {i}\")))?;"));
+                    visit_seq.line(format!(
+                        "let {param} = visit_seq_field(&mut seq, {param})?;"
+                    ));
                 };
             }
             if overload.parameters.is_empty() {
@@ -193,7 +206,11 @@ fn generate_syntax_enum_deserializer(
         visit_seq.line("},");
     }
 
-    visit_seq.line(format!("_ => Err(serde::de::Error::custom(format!(\"unknown operator {{op}} in {name}. Please check the documentation for the available {name}.\")))"));
+    let variants = values.keys().cloned().collect::<Vec<_>>();
+    visit_seq.line(format!(
+        "_ => Err(serde::de::Error::unknown_variant(&op, &[\"{}\"]))",
+        variants.join("\", \"")
+    ));
     visit_seq.line("}");
 }
 

@@ -851,34 +851,34 @@ impl<'de> serde::de::Visitor<'de> for ExpressionNameVisitor {
     }
 
     fn visit_seq<A: serde::de::SeqAccess<'de>>(self, mut seq: A) -> Result<Self::Value, A::Error> {
+        /// Reads the next element from the sequence or reports a missing field error.
+        fn visit_seq_field<'de, A, T>(seq: &mut A, name: &'static str) -> Result<T, A::Error>
+        where
+            A: serde::de::SeqAccess<'de>,
+            T: serde::Deserialize<'de>,
+        {
+            seq.next_element()?
+                .ok_or_else(|| serde::de::Error::missing_field(name))
+        }
+
         // First element: operator string
         let op: String = seq
             .next_element()?
             .ok_or_else(|| serde::de::Error::custom("missing operator"))?;
         match op.as_str() {
             "!" => {
-                let input = seq
-                    .next_element()?
-                    .ok_or_else(|| serde::de::Error::custom(format!("missing input at index 0")))?;
+                let input = visit_seq_field(&mut seq, input)?;
                 Ok(ExpressionName::Not(input))
             }
             "!=" => {
-                let input_1 = seq.next_element()?.ok_or_else(|| {
-                    serde::de::Error::custom(format!("missing input_1 at index 0"))
-                })?;
-                let input_2 = seq.next_element()?.ok_or_else(|| {
-                    serde::de::Error::custom(format!("missing input_2 at index 1"))
-                })?;
+                let input_1 = visit_seq_field(&mut seq, input_1)?;
+                let input_2 = visit_seq_field(&mut seq, input_2)?;
                 let collator = seq.next_element()?.ok();
                 Ok(ExpressionName::NotEqual(input_1, input_2, collator))
             }
             "%" => {
-                let input_1 = seq.next_element()?.ok_or_else(|| {
-                    serde::de::Error::custom(format!("missing input_1 at index 0"))
-                })?;
-                let input_2 = seq.next_element()?.ok_or_else(|| {
-                    serde::de::Error::custom(format!("missing input_2 at index 1"))
-                })?;
+                let input_1 = visit_seq_field(&mut seq, input_1)?;
+                let input_2 = visit_seq_field(&mut seq, input_2)?;
                 Ok(ExpressionName::Percentage(input_1, input_2))
             }
             "*" => {
@@ -891,12 +891,8 @@ impl<'de> serde::de::Visitor<'de> for ExpressionNameVisitor {
                 todo!("Minus needs multiple overloads implemented")
             }
             "/" => {
-                let input_1 = seq.next_element()?.ok_or_else(|| {
-                    serde::de::Error::custom(format!("missing input_1 at index 0"))
-                })?;
-                let input_2 = seq.next_element()?.ok_or_else(|| {
-                    serde::de::Error::custom(format!("missing input_2 at index 1"))
-                })?;
+                let input_1 = visit_seq_field(&mut seq, input_1)?;
+                let input_2 = visit_seq_field(&mut seq, input_2)?;
                 Ok(ExpressionName::Slash(input_1, input_2))
             }
             "<" => {
@@ -906,12 +902,8 @@ impl<'de> serde::de::Visitor<'de> for ExpressionNameVisitor {
                 todo!("LessEqual needs multiple overloads implemented")
             }
             "==" => {
-                let input_1 = seq.next_element()?.ok_or_else(|| {
-                    serde::de::Error::custom(format!("missing input_1 at index 0"))
-                })?;
-                let input_2 = seq.next_element()?.ok_or_else(|| {
-                    serde::de::Error::custom(format!("missing input_2 at index 1"))
-                })?;
+                let input_1 = visit_seq_field(&mut seq, input_1)?;
+                let input_2 = visit_seq_field(&mut seq, input_2)?;
                 let collator = seq.next_element()?.ok();
                 Ok(ExpressionName::EqualEqual(input_1, input_2, collator))
             }
@@ -922,25 +914,17 @@ impl<'de> serde::de::Visitor<'de> for ExpressionNameVisitor {
                 todo!("GreaterEqual needs multiple overloads implemented")
             }
             "^" => {
-                let input_1 = seq.next_element()?.ok_or_else(|| {
-                    serde::de::Error::custom(format!("missing input_1 at index 0"))
-                })?;
-                let input_2 = seq.next_element()?.ok_or_else(|| {
-                    serde::de::Error::custom(format!("missing input_2 at index 1"))
-                })?;
+                let input_1 = visit_seq_field(&mut seq, input_1)?;
+                let input_2 = visit_seq_field(&mut seq, input_2)?;
                 Ok(ExpressionName::Power(input_1, input_2))
             }
             "abs" => {
-                let input = seq
-                    .next_element()?
-                    .ok_or_else(|| serde::de::Error::custom(format!("missing input at index 0")))?;
+                let input = visit_seq_field(&mut seq, input)?;
                 Ok(ExpressionName::Absolute(input))
             }
             "accumulated" => Ok(ExpressionName::Accumulated),
             "acos" => {
-                let input = seq
-                    .next_element()?
-                    .ok_or_else(|| serde::de::Error::custom(format!("missing input at index 0")))?;
+                let input = visit_seq_field(&mut seq, input)?;
                 Ok(ExpressionName::Arccosine(input))
             }
             "all" => {
@@ -953,24 +937,16 @@ impl<'de> serde::de::Visitor<'de> for ExpressionNameVisitor {
                 todo!("Array needs multiple overloads implemented")
             }
             "asin" => {
-                let input = seq
-                    .next_element()?
-                    .ok_or_else(|| serde::de::Error::custom(format!("missing input at index 0")))?;
+                let input = visit_seq_field(&mut seq, input)?;
                 Ok(ExpressionName::Asin(input))
             }
             "at" => {
-                let index = seq
-                    .next_element()?
-                    .ok_or_else(|| serde::de::Error::custom(format!("missing index at index 0")))?;
-                let array = seq
-                    .next_element()?
-                    .ok_or_else(|| serde::de::Error::custom(format!("missing array at index 1")))?;
+                let index = visit_seq_field(&mut seq, index)?;
+                let array = visit_seq_field(&mut seq, array)?;
                 Ok(ExpressionName::At(index, array))
             }
             "atan" => {
-                let input = seq
-                    .next_element()?
-                    .ok_or_else(|| serde::de::Error::custom(format!("missing input at index 0")))?;
+                let input = visit_seq_field(&mut seq, input)?;
                 Ok(ExpressionName::Atan(input))
             }
             "boolean" => {
@@ -980,53 +956,39 @@ impl<'de> serde::de::Visitor<'de> for ExpressionNameVisitor {
                 todo!("Case needs variadic overloads implemented")
             }
             "ceil" => {
-                let input = seq
-                    .next_element()?
-                    .ok_or_else(|| serde::de::Error::custom(format!("missing input at index 0")))?;
+                let input = visit_seq_field(&mut seq, input)?;
                 Ok(ExpressionName::Ceil(input))
             }
             "coalesce" => {
                 todo!("Coalesce needs variadic overloads implemented")
             }
             "collator" => {
-                let options = seq.next_element()?.ok_or_else(|| {
-                    serde::de::Error::custom(format!("missing options at index 0"))
-                })?;
+                let options = visit_seq_field(&mut seq, options)?;
                 Ok(ExpressionName::Collator(options))
             }
             "concat" => {
                 todo!("Concat needs variadic overloads implemented")
             }
             "cos" => {
-                let input = seq
-                    .next_element()?
-                    .ok_or_else(|| serde::de::Error::custom(format!("missing input at index 0")))?;
+                let input = visit_seq_field(&mut seq, input)?;
                 Ok(ExpressionName::Cos(input))
             }
             "distance" => {
-                let geojson = seq.next_element()?.ok_or_else(|| {
-                    serde::de::Error::custom(format!("missing geojson at index 0"))
-                })?;
+                let geojson = visit_seq_field(&mut seq, geojson)?;
                 Ok(ExpressionName::Distance(geojson))
             }
             "downcase" => {
-                let input = seq
-                    .next_element()?
-                    .ok_or_else(|| serde::de::Error::custom(format!("missing input at index 0")))?;
+                let input = visit_seq_field(&mut seq, input)?;
                 Ok(ExpressionName::Downcase(input))
             }
             "e" => Ok(ExpressionName::E),
             "elevation" => Ok(ExpressionName::Elevation),
             "feature-state" => {
-                let property_name = seq.next_element()?.ok_or_else(|| {
-                    serde::de::Error::custom(format!("missing property_name at index 0"))
-                })?;
+                let property_name = visit_seq_field(&mut seq, property_name)?;
                 Ok(ExpressionName::FeatureState(property_name))
             }
             "floor" => {
-                let input = seq
-                    .next_element()?
-                    .ok_or_else(|| serde::de::Error::custom(format!("missing input at index 0")))?;
+                let input = visit_seq_field(&mut seq, input)?;
                 Ok(ExpressionName::Floor(input))
             }
             "format" => {
@@ -1034,31 +996,23 @@ impl<'de> serde::de::Visitor<'de> for ExpressionNameVisitor {
             }
             "geometry-type" => Ok(ExpressionName::GeometryType),
             "get" => {
-                let property_name = seq.next_element()?.ok_or_else(|| {
-                    serde::de::Error::custom(format!("missing property_name at index 0"))
-                })?;
+                let property_name = visit_seq_field(&mut seq, property_name)?;
                 let object = seq.next_element()?.ok();
                 Ok(ExpressionName::Get(property_name, object))
             }
             "global-state" => {
-                let property_name = seq.next_element()?.ok_or_else(|| {
-                    serde::de::Error::custom(format!("missing property_name at index 0"))
-                })?;
+                let property_name = visit_seq_field(&mut seq, property_name)?;
                 Ok(ExpressionName::GlobalState(property_name))
             }
             "has" => {
-                let property_name = seq.next_element()?.ok_or_else(|| {
-                    serde::de::Error::custom(format!("missing property_name at index 0"))
-                })?;
+                let property_name = visit_seq_field(&mut seq, property_name)?;
                 let object = seq.next_element()?.ok();
                 Ok(ExpressionName::Has(property_name, object))
             }
             "heatmap-density" => Ok(ExpressionName::HeatmapDensity),
             "id" => Ok(ExpressionName::Id),
             "image" => {
-                let image_name = seq.next_element()?.ok_or_else(|| {
-                    serde::de::Error::custom(format!("missing image_name at index 0"))
-                })?;
+                let image_name = visit_seq_field(&mut seq, image_name)?;
                 Ok(ExpressionName::Image(image_name))
             }
             "in" => {
@@ -1077,15 +1031,11 @@ impl<'de> serde::de::Visitor<'de> for ExpressionNameVisitor {
                 todo!("InterpolateLab needs variadic overloads implemented")
             }
             "is-supported-script" => {
-                let input = seq
-                    .next_element()?
-                    .ok_or_else(|| serde::de::Error::custom(format!("missing input at index 0")))?;
+                let input = visit_seq_field(&mut seq, input)?;
                 Ok(ExpressionName::IsSupportedScript(input))
             }
             "length" => {
-                let array_or_string = seq.next_element()?.ok_or_else(|| {
-                    serde::de::Error::custom(format!("missing array_or_string at index 0"))
-                })?;
+                let array_or_string = visit_seq_field(&mut seq, array_or_string)?;
                 Ok(ExpressionName::Length(array_or_string))
             }
             "let" => {
@@ -1096,22 +1046,16 @@ impl<'de> serde::de::Visitor<'de> for ExpressionNameVisitor {
                 todo!("Literal needs multiple overloads implemented")
             }
             "ln" => {
-                let input = seq
-                    .next_element()?
-                    .ok_or_else(|| serde::de::Error::custom(format!("missing input at index 0")))?;
+                let input = visit_seq_field(&mut seq, input)?;
                 Ok(ExpressionName::Ln(input))
             }
             "ln2" => Ok(ExpressionName::Ln2),
             "log10" => {
-                let input = seq
-                    .next_element()?
-                    .ok_or_else(|| serde::de::Error::custom(format!("missing input at index 0")))?;
+                let input = visit_seq_field(&mut seq, input)?;
                 Ok(ExpressionName::Log10(input))
             }
             "log2" => {
-                let input = seq
-                    .next_element()?
-                    .ok_or_else(|| serde::de::Error::custom(format!("missing input at index 0")))?;
+                let input = visit_seq_field(&mut seq, input)?;
                 Ok(ExpressionName::Log2(input))
             }
             "match" => {
@@ -1127,12 +1071,8 @@ impl<'de> serde::de::Visitor<'de> for ExpressionNameVisitor {
                 todo!("Number needs variadic overloads implemented")
             }
             "number-format" => {
-                let input = seq
-                    .next_element()?
-                    .ok_or_else(|| serde::de::Error::custom(format!("missing input at index 0")))?;
-                let format_options = seq.next_element()?.ok_or_else(|| {
-                    serde::de::Error::custom(format!("missing format_options at index 1"))
-                })?;
+                let input = visit_seq_field(&mut seq, input)?;
+                let format_options = visit_seq_field(&mut seq, format_options)?;
                 Ok(ExpressionName::NumberFormat(input, format_options))
             }
             "object" => {
@@ -1141,57 +1081,35 @@ impl<'de> serde::de::Visitor<'de> for ExpressionNameVisitor {
             "pi" => Ok(ExpressionName::Pi),
             "properties" => Ok(ExpressionName::Properties),
             "resolved-locale" => {
-                let collator = seq.next_element()?.ok_or_else(|| {
-                    serde::de::Error::custom(format!("missing collator at index 0"))
-                })?;
+                let collator = visit_seq_field(&mut seq, collator)?;
                 Ok(ExpressionName::ResolvedLocale(collator))
             }
             "rgb" => {
-                let red = seq
-                    .next_element()?
-                    .ok_or_else(|| serde::de::Error::custom(format!("missing red at index 0")))?;
-                let green = seq
-                    .next_element()?
-                    .ok_or_else(|| serde::de::Error::custom(format!("missing green at index 1")))?;
-                let blue = seq
-                    .next_element()?
-                    .ok_or_else(|| serde::de::Error::custom(format!("missing blue at index 2")))?;
+                let red = visit_seq_field(&mut seq, red)?;
+                let green = visit_seq_field(&mut seq, green)?;
+                let blue = visit_seq_field(&mut seq, blue)?;
                 Ok(ExpressionName::Rgb(red, green, blue))
             }
             "rgba" => {
-                let red = seq
-                    .next_element()?
-                    .ok_or_else(|| serde::de::Error::custom(format!("missing red at index 0")))?;
-                let green = seq
-                    .next_element()?
-                    .ok_or_else(|| serde::de::Error::custom(format!("missing green at index 1")))?;
-                let blue = seq
-                    .next_element()?
-                    .ok_or_else(|| serde::de::Error::custom(format!("missing blue at index 2")))?;
-                let alpha = seq
-                    .next_element()?
-                    .ok_or_else(|| serde::de::Error::custom(format!("missing alpha at index 3")))?;
+                let red = visit_seq_field(&mut seq, red)?;
+                let green = visit_seq_field(&mut seq, green)?;
+                let blue = visit_seq_field(&mut seq, blue)?;
+                let alpha = visit_seq_field(&mut seq, alpha)?;
                 Ok(ExpressionName::Rgba(red, green, blue, alpha))
             }
             "round" => {
-                let input = seq
-                    .next_element()?
-                    .ok_or_else(|| serde::de::Error::custom(format!("missing input at index 0")))?;
+                let input = visit_seq_field(&mut seq, input)?;
                 Ok(ExpressionName::Round(input))
             }
             "sin" => {
-                let input = seq
-                    .next_element()?
-                    .ok_or_else(|| serde::de::Error::custom(format!("missing input at index 0")))?;
+                let input = visit_seq_field(&mut seq, input)?;
                 Ok(ExpressionName::Sin(input))
             }
             "slice" => {
                 todo!("Slice needs multiple overloads implemented")
             }
             "sqrt" => {
-                let input = seq
-                    .next_element()?
-                    .ok_or_else(|| serde::de::Error::custom(format!("missing input at index 0")))?;
+                let input = visit_seq_field(&mut seq, input)?;
                 Ok(ExpressionName::Sqrt(input))
             }
             "step" => {
@@ -1201,15 +1119,11 @@ impl<'de> serde::de::Visitor<'de> for ExpressionNameVisitor {
                 todo!("String needs variadic overloads implemented")
             }
             "tan" => {
-                let input = seq
-                    .next_element()?
-                    .ok_or_else(|| serde::de::Error::custom(format!("missing input at index 0")))?;
+                let input = visit_seq_field(&mut seq, input)?;
                 Ok(ExpressionName::Tan(input))
             }
             "to-boolean" => {
-                let value = seq
-                    .next_element()?
-                    .ok_or_else(|| serde::de::Error::custom(format!("missing value at index 0")))?;
+                let value = visit_seq_field(&mut seq, value)?;
                 Ok(ExpressionName::ToBoolean(value))
             }
             "to-color" => {
@@ -1219,45 +1133,120 @@ impl<'de> serde::de::Visitor<'de> for ExpressionNameVisitor {
                 todo!("ToNumber needs variadic overloads implemented")
             }
             "to-rgba" => {
-                let color = seq
-                    .next_element()?
-                    .ok_or_else(|| serde::de::Error::custom(format!("missing color at index 0")))?;
+                let color = visit_seq_field(&mut seq, color)?;
                 Ok(ExpressionName::ToRgba(color))
             }
             "to-string" => {
-                let value = seq
-                    .next_element()?
-                    .ok_or_else(|| serde::de::Error::custom(format!("missing value at index 0")))?;
+                let value = visit_seq_field(&mut seq, value)?;
                 Ok(ExpressionName::ToString(value))
             }
             "typeof" => {
-                let value = seq
-                    .next_element()?
-                    .ok_or_else(|| serde::de::Error::custom(format!("missing value at index 0")))?;
+                let value = visit_seq_field(&mut seq, value)?;
                 Ok(ExpressionName::Typeof(value))
             }
             "upcase" => {
-                let input = seq
-                    .next_element()?
-                    .ok_or_else(|| serde::de::Error::custom(format!("missing input at index 0")))?;
+                let input = visit_seq_field(&mut seq, input)?;
                 Ok(ExpressionName::Upcase(input))
             }
             "var" => {
-                let var_name = seq.next_element()?.ok_or_else(|| {
-                    serde::de::Error::custom(format!("missing var_name at index 0"))
-                })?;
+                let var_name = visit_seq_field(&mut seq, var_name)?;
                 Ok(ExpressionName::Var(var_name))
             }
             "within" => {
-                let geojson = seq.next_element()?.ok_or_else(|| {
-                    serde::de::Error::custom(format!("missing geojson at index 0"))
-                })?;
+                let geojson = visit_seq_field(&mut seq, geojson)?;
                 Ok(ExpressionName::Within(geojson))
             }
             "zoom" => Ok(ExpressionName::Zoom),
-            _ => Err(serde::de::Error::custom(format!(
-                "unknown operator {op} in ExpressionName. Please check the documentation for the available ExpressionName."
-            ))),
+            _ => Err(serde::de::Error::unknown_variant(
+                &op,
+                &[
+                    "!",
+                    "!=",
+                    "%",
+                    "*",
+                    "+",
+                    "-",
+                    "/",
+                    "<",
+                    "<=",
+                    "==",
+                    ">",
+                    ">=",
+                    "^",
+                    "abs",
+                    "accumulated",
+                    "acos",
+                    "all",
+                    "any",
+                    "array",
+                    "asin",
+                    "at",
+                    "atan",
+                    "boolean",
+                    "case",
+                    "ceil",
+                    "coalesce",
+                    "collator",
+                    "concat",
+                    "cos",
+                    "distance",
+                    "downcase",
+                    "e",
+                    "elevation",
+                    "feature-state",
+                    "floor",
+                    "format",
+                    "geometry-type",
+                    "get",
+                    "global-state",
+                    "has",
+                    "heatmap-density",
+                    "id",
+                    "image",
+                    "in",
+                    "index-of",
+                    "interpolate",
+                    "interpolate-hcl",
+                    "interpolate-lab",
+                    "is-supported-script",
+                    "length",
+                    "let",
+                    "line-progress",
+                    "literal",
+                    "ln",
+                    "ln2",
+                    "log10",
+                    "log2",
+                    "match",
+                    "max",
+                    "min",
+                    "number",
+                    "number-format",
+                    "object",
+                    "pi",
+                    "properties",
+                    "resolved-locale",
+                    "rgb",
+                    "rgba",
+                    "round",
+                    "sin",
+                    "slice",
+                    "sqrt",
+                    "step",
+                    "string",
+                    "tan",
+                    "to-boolean",
+                    "to-color",
+                    "to-number",
+                    "to-rgba",
+                    "to-string",
+                    "typeof",
+                    "upcase",
+                    "var",
+                    "within",
+                    "zoom",
+                ],
+            )),
         }
     }
 }
@@ -1497,36 +1486,37 @@ impl<'de> serde::de::Visitor<'de> for InterpolationNameVisitor {
     }
 
     fn visit_seq<A: serde::de::SeqAccess<'de>>(self, mut seq: A) -> Result<Self::Value, A::Error> {
+        /// Reads the next element from the sequence or reports a missing field error.
+        fn visit_seq_field<'de, A, T>(seq: &mut A, name: &'static str) -> Result<T, A::Error>
+        where
+            A: serde::de::SeqAccess<'de>,
+            T: serde::Deserialize<'de>,
+        {
+            seq.next_element()?
+                .ok_or_else(|| serde::de::Error::missing_field(name))
+        }
+
         // First element: operator string
         let op: String = seq
             .next_element()?
             .ok_or_else(|| serde::de::Error::custom("missing operator"))?;
         match op.as_str() {
             "cubic-bezier" => {
-                let x1 = seq
-                    .next_element()?
-                    .ok_or_else(|| serde::de::Error::custom(format!("missing x1 at index 0")))?;
-                let y1 = seq
-                    .next_element()?
-                    .ok_or_else(|| serde::de::Error::custom(format!("missing y1 at index 1")))?;
-                let x2 = seq
-                    .next_element()?
-                    .ok_or_else(|| serde::de::Error::custom(format!("missing x2 at index 2")))?;
-                let y2 = seq
-                    .next_element()?
-                    .ok_or_else(|| serde::de::Error::custom(format!("missing y2 at index 3")))?;
+                let x1 = visit_seq_field(&mut seq, x1)?;
+                let y1 = visit_seq_field(&mut seq, y1)?;
+                let x2 = visit_seq_field(&mut seq, x2)?;
+                let y2 = visit_seq_field(&mut seq, y2)?;
                 Ok(InterpolationName::CubicBezier(x1, y1, x2, y2))
             }
             "exponential" => {
-                let base = seq
-                    .next_element()?
-                    .ok_or_else(|| serde::de::Error::custom(format!("missing base at index 0")))?;
+                let base = visit_seq_field(&mut seq, base)?;
                 Ok(InterpolationName::Exponential(base))
             }
             "linear" => Ok(InterpolationName::Linear),
-            _ => Err(serde::de::Error::custom(format!(
-                "unknown operator {op} in InterpolationName. Please check the documentation for the available InterpolationName."
-            ))),
+            _ => Err(serde::de::Error::unknown_variant(
+                &op,
+                &["cubic-bezier", "exponential", "linear"],
+            )),
         }
     }
 }
