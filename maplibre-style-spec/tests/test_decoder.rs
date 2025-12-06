@@ -83,18 +83,18 @@ fn collect_referencs(style: &StyleReference) -> HashMap<String, String> {
     for (k, field) in &style.fields {
         match field {
             TopLevelItem::Item(p) => {
-                if let ParsedItem::Reference { references, .. } = p.as_ref() {
-                    if !ht.contains_key(references) {
-                        ht.insert(references.clone(), k.clone());
-                    }
+                if let ParsedItem::Reference { references, .. } = p.as_ref()
+                    && !ht.contains_key(references)
+                {
+                    ht.insert(references.clone(), k.clone());
                 }
             }
             TopLevelItem::Group(g) => {
                 for (key2, p) in g {
-                    if let ParsedItem::Reference { references, .. } = p {
-                        if !ht.contains_key(references) {
-                            ht.insert(references.clone(), format!("{k}.{key2}"));
-                        }
+                    if let ParsedItem::Reference { references, .. } = p
+                        && !ht.contains_key(references)
+                    {
+                        ht.insert(references.clone(), format!("{k}.{key2}"));
                     }
                 }
             }
