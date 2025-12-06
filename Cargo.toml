@@ -32,7 +32,7 @@ struct_field_names = "allow"
 [workspace.dependencies]
 anyhow = "1.0"
 clap = { version = "4", features = ["derive", "unstable-markdown", "wrap_help"] }
-criterion = { version = "0.7", features = ["async_futures", "async_tokio", "html_reports"] }
+criterion = { version = "0.8", features = ["async_futures", "async_tokio", "html_reports"] }
 image = "0.25.8"
 insta = "1"
 maplibre_native = "0.4.1"
