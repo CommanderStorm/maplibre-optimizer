@@ -1,9 +1,10 @@
 use std::collections::BTreeMap;
 
-use codegen2::Scope;
+use codegen2::{Function, Impl, Scope};
+use serde_json::Value;
 
 use crate::decoder::Fields;
-use crate::decoder::r#enum::SyntaxEnum;
+use crate::decoder::r#enum::{Overload, Syntax, SyntaxEnum};
 use crate::generator::autotest::generate_test_from_examples_if_present;
 use crate::generator::formatter::to_upper_camel_case;
 
@@ -95,6 +96,71 @@ fn generate_syntax_enum_deserializer(
     values: &BTreeMap<String, SyntaxEnum>,
     example: &serde_json::Value,
 ) {
+    let vis = generate_visitor(scope, name, example);
+
+    let visit_seq = vis
+        .new_fn("visit_seq")
+        .generic("A: serde::de::SeqAccess<'de>")
+        .arg_self()
+        .arg("mut seq", "A")
+        .ret("Result<Self::Value, A::Error>");
+    generate_visit_seq_field(visit_seq);
+    // operator decoding
+    visit_seq.line("// First element: operator string");
+    visit_seq.line("let op: String = seq.next_element()?.ok_or_else(|| serde::de::Error::custom(\"missing operator\"))?;");
+    visit_seq.line("match op.as_str() {");
+    for (key, syntax_docs) in values {
+        let syntax = &syntax_docs.syntax;
+        let has_variadic_overload = syntax
+            .overloads
+            .iter()
+            .any(|o| o.parameters.iter().any(|p| p == "..."));
+        let variant_name = to_upper_camel_case(key);
+
+        visit_seq.line(format!("\"{key}\" => {{"));
+        if syntax.overloads.len() == 1
+            && let Some(overload) = syntax.overloads.first()
+        {
+            if has_variadic_overload {
+                generate_syntax_enum_deserializer_regular_variadic_variant(
+                    visit_seq,
+                    (&name, &variant_name),
+                    overload,
+                )
+            } else {
+                generate_syntax_enum_deserializer_regular_variant(
+                    visit_seq,
+                    (&name, &variant_name),
+                    overload,
+                );
+            }
+        } else {
+            if has_variadic_overload {
+                generate_syntax_enum_deserializer_multi_variadic_overload_variant(
+                    visit_seq,
+                    (&name, &variant_name),
+                    syntax,
+                );
+            } else {
+                generate_syntax_enum_deserializer_multi_overload_variant(
+                    visit_seq,
+                    (&name, &variant_name),
+                    syntax,
+                );
+            }
+        }
+        visit_seq.line("},");
+    }
+
+    let variants = values.keys().cloned().collect::<Vec<_>>();
+    visit_seq.line(format!(
+        "_ => Err(serde::de::Error::unknown_variant(&op, &[\"{}\"]))",
+        variants.join("\", \"")
+    ));
+    visit_seq.line("}");
+}
+
+fn generate_visitor<'a>(scope: &'a mut Scope, name: &str, example: &Value) -> &'a mut Impl {
     let visitor_name = format!("{name}Visitor");
     scope
         .new_impl(name)
@@ -123,14 +189,11 @@ fn generate_syntax_enum_deserializer(
         .line(format!(
             "formatter.write_str(r#\"an {name} like {example}\"#)"
         ));
+    vis
+}
 
-    let visit_seq = vis
-        .new_fn("visit_seq")
-        .generic("A: serde::de::SeqAccess<'de>")
-        .arg_self()
-        .arg("mut seq", "A")
-        .ret("Result<Self::Value, A::Error>");
-    // helper function
+/// generates a helper function for visiting a field
+fn generate_visit_seq_field(visit_seq: &mut Function) {
     visit_seq
         .line("/// Reads the next element from the sequence or reports a missing field error.");
     visit_seq.line(
@@ -140,78 +203,69 @@ fn generate_syntax_enum_deserializer(
     visit_seq.line("seq.next_element()?.ok_or_else(|| serde::de::Error::missing_field(name))");
     visit_seq.line("}");
     visit_seq.line("");
-    // operator decoding
-    visit_seq.line("// First element: operator string");
-    visit_seq.line("let op: String = seq.next_element()?.ok_or_else(|| serde::de::Error::custom(\"missing operator\"))?;");
-    visit_seq.line("match op.as_str() {");
-    for (key, syntax_docs) in values {
-        let syntax = &syntax_docs.syntax;
-        let variant_name = to_upper_camel_case(key);
+}
 
-        // regular overloads
-        visit_seq.line(format!("\"{key}\" => {{"));
-        if syntax.overloads.len() == 1
-            && let Some(overload) = syntax.overloads.first()
-        {
-            // variadic (...) overloads
-            if overload.parameters.iter().any(|p| p == "...") {
-                visit_seq.line(format!(
-                    "todo!(\"{variant_name} needs variadic overloads implemented\")"
-                ));
-                visit_seq.line("},");
-                continue;
-            }
-
-            for param in &overload.parameters {
-                if let Some(param) = param.strip_suffix('?') {
-                    visit_seq.line(format!("let {param} = seq.next_element()?;"));
-                } else {
-                    visit_seq.line(format!(
-                        "let {param} = visit_seq_field(&mut seq, \"{param}\")?;"
-                    ));
-                };
-            }
-            if overload.parameters.is_empty() {
-                visit_seq.line(format!("Ok({name}::{variant_name})"));
-            } else {
-                let parameters = overload
-                    .parameters
-                    .iter()
-                    .map(|p| p.strip_suffix('?').unwrap_or(p))
-                    .collect::<Vec<_>>();
-                visit_seq.line(format!(
-                    "Ok({name}::{variant_name}({params}))",
-                    params = parameters.join(", ")
-                ));
-            }
-        } else {
-            //todo: multiple variadic overloads
-            if syntax
-                .overloads
-                .iter()
-                .any(|o| o.parameters.iter().any(|p| p == "..."))
-            {
-                visit_seq.line(format!(
-                    "todo!(\"{variant_name} needs variadic overloads implemented\")"
-                ));
-                visit_seq.line("},");
-                continue;
-            }
-
-            // todo: add multiple overloads
-            visit_seq.line(format!(
-                "todo!(\"{variant_name} needs multiple overloads implemented\")"
-            ));
-        }
-        visit_seq.line("},");
-    }
-
-    let variants = values.keys().cloned().collect::<Vec<_>>();
+fn generate_syntax_enum_deserializer_multi_variadic_overload_variant(
+    visit_seq: &mut Function,
+    (name, variant_name): (&str, &str),
+    syntax: &Syntax,
+) {
+    let options_name = format!("{variant_name}Options");
+    //todo: multiple variadic overloads
     visit_seq.line(format!(
-        "_ => Err(serde::de::Error::unknown_variant(&op, &[\"{}\"]))",
-        variants.join("\", \"")
+        "todo!(\"{name}::{variant_name} needs multiple variadic overloads, i.e. {options_name} implemented\")"
     ));
-    visit_seq.line("}");
+}
+
+fn generate_syntax_enum_deserializer_multi_overload_variant(
+    visit_seq: &mut Function,
+    (name, variant_name): (&str, &str),
+    syntax: &Syntax,
+) {
+    let options_name = format!("{variant_name}Options");
+    // todo: add multiple overloads
+    visit_seq.line(format!(
+        "todo!(\"{name}::{variant_name} needs multiple overloads, i.e. {options_name} implemented\")"
+    ));
+}
+
+fn generate_syntax_enum_deserializer_regular_variadic_variant(
+    visit_seq: &mut Function,
+    (name, variant_name): (&str, &str),
+    overload: &Overload,
+) {
+    // TODO: variadic (...) overloads
+    visit_seq.line(format!(
+        "todo!(\"{name}::{variant_name} needs variadic overloads implemented\")"
+    ));
+}
+fn generate_syntax_enum_deserializer_regular_variant(
+    visit_seq: &mut Function,
+    (name, variant_name): (&str, &str),
+    overload: &Overload,
+) {
+    for param in &overload.parameters {
+        if let Some(param) = param.strip_suffix('?') {
+            visit_seq.line(format!("let {param} = seq.next_element()?;"));
+        } else {
+            visit_seq.line(format!(
+                "let {param} = visit_seq_field(&mut seq, \"{param}\")?;"
+            ));
+        };
+    }
+    if overload.parameters.is_empty() {
+        visit_seq.line(format!("Ok({name}::{variant_name})"));
+    } else {
+        let parameters = overload
+            .parameters
+            .iter()
+            .map(|p| p.strip_suffix('?').unwrap_or(p))
+            .collect::<Vec<_>>();
+        visit_seq.line(format!(
+            "Ok({name}::{variant_name}({params}))",
+            params = parameters.join(", ")
+        ));
+    }
 }
 
 #[cfg(test)]
@@ -311,7 +365,7 @@ mod tests {
                 let op: String = seq.next_element()?.ok_or_else(|| serde::de::Error::custom("missing operator"))?;
                 match op.as_str() {
                 "let" => {
-                todo!("Let needs variadic overloads implemented")
+                todo!("Expression::Let needs variadic overloads implemented")
                 },
                 _ => Err(serde::de::Error::unknown_variant(&op, &["let"]))
                 }
