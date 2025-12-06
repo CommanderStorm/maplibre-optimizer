@@ -105,7 +105,7 @@ fn generate_syntax_enum_deserializer(
         .generic("D")
         .bound("D", "serde::Deserializer<'de>")
         .ret("Result<Self, D::Error>")
-        .line(format!("deserializer.deserialize_any({visitor_name})"));
+        .line(format!("deserializer.deserialize_seq({visitor_name})"));
 
     scope.new_struct(&visitor_name).doc(format!(
         "Visitor for deserializing the syntax enum [`{name}`]"
@@ -164,10 +164,10 @@ fn generate_syntax_enum_deserializer(
 
             for param in &overload.parameters {
                 if let Some(param) = param.strip_suffix('?') {
-                    visit_seq.line(format!("let {param} = seq.next_element()?.ok();"));
+                    visit_seq.line(format!("let {param} = seq.next_element()?;"));
                 } else {
                     visit_seq.line(format!(
-                        "let {param} = visit_seq_field(&mut seq, {param})?;"
+                        "let {param} = visit_seq_field(&mut seq, \"{param}\")?;"
                     ));
                 };
             }

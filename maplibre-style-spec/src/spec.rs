@@ -836,7 +836,7 @@ impl<'de> serde::Deserialize<'de> for ExpressionName {
     where
         D: serde::Deserializer<'de>,
     {
-        deserializer.deserialize_any(ExpressionNameVisitor)
+        deserializer.deserialize_seq(ExpressionNameVisitor)
     }
 }
 
@@ -867,18 +867,18 @@ impl<'de> serde::de::Visitor<'de> for ExpressionNameVisitor {
             .ok_or_else(|| serde::de::Error::custom("missing operator"))?;
         match op.as_str() {
             "!" => {
-                let input = visit_seq_field(&mut seq, input)?;
+                let input = visit_seq_field(&mut seq, "input")?;
                 Ok(ExpressionName::Not(input))
             }
             "!=" => {
-                let input_1 = visit_seq_field(&mut seq, input_1)?;
-                let input_2 = visit_seq_field(&mut seq, input_2)?;
-                let collator = seq.next_element()?.ok();
+                let input_1 = visit_seq_field(&mut seq, "input_1")?;
+                let input_2 = visit_seq_field(&mut seq, "input_2")?;
+                let collator = seq.next_element()?;
                 Ok(ExpressionName::NotEqual(input_1, input_2, collator))
             }
             "%" => {
-                let input_1 = visit_seq_field(&mut seq, input_1)?;
-                let input_2 = visit_seq_field(&mut seq, input_2)?;
+                let input_1 = visit_seq_field(&mut seq, "input_1")?;
+                let input_2 = visit_seq_field(&mut seq, "input_2")?;
                 Ok(ExpressionName::Percentage(input_1, input_2))
             }
             "*" => {
@@ -891,8 +891,8 @@ impl<'de> serde::de::Visitor<'de> for ExpressionNameVisitor {
                 todo!("Minus needs multiple overloads implemented")
             }
             "/" => {
-                let input_1 = visit_seq_field(&mut seq, input_1)?;
-                let input_2 = visit_seq_field(&mut seq, input_2)?;
+                let input_1 = visit_seq_field(&mut seq, "input_1")?;
+                let input_2 = visit_seq_field(&mut seq, "input_2")?;
                 Ok(ExpressionName::Slash(input_1, input_2))
             }
             "<" => {
@@ -902,9 +902,9 @@ impl<'de> serde::de::Visitor<'de> for ExpressionNameVisitor {
                 todo!("LessEqual needs multiple overloads implemented")
             }
             "==" => {
-                let input_1 = visit_seq_field(&mut seq, input_1)?;
-                let input_2 = visit_seq_field(&mut seq, input_2)?;
-                let collator = seq.next_element()?.ok();
+                let input_1 = visit_seq_field(&mut seq, "input_1")?;
+                let input_2 = visit_seq_field(&mut seq, "input_2")?;
+                let collator = seq.next_element()?;
                 Ok(ExpressionName::EqualEqual(input_1, input_2, collator))
             }
             ">" => {
@@ -914,17 +914,17 @@ impl<'de> serde::de::Visitor<'de> for ExpressionNameVisitor {
                 todo!("GreaterEqual needs multiple overloads implemented")
             }
             "^" => {
-                let input_1 = visit_seq_field(&mut seq, input_1)?;
-                let input_2 = visit_seq_field(&mut seq, input_2)?;
+                let input_1 = visit_seq_field(&mut seq, "input_1")?;
+                let input_2 = visit_seq_field(&mut seq, "input_2")?;
                 Ok(ExpressionName::Power(input_1, input_2))
             }
             "abs" => {
-                let input = visit_seq_field(&mut seq, input)?;
+                let input = visit_seq_field(&mut seq, "input")?;
                 Ok(ExpressionName::Absolute(input))
             }
             "accumulated" => Ok(ExpressionName::Accumulated),
             "acos" => {
-                let input = visit_seq_field(&mut seq, input)?;
+                let input = visit_seq_field(&mut seq, "input")?;
                 Ok(ExpressionName::Arccosine(input))
             }
             "all" => {
@@ -937,16 +937,16 @@ impl<'de> serde::de::Visitor<'de> for ExpressionNameVisitor {
                 todo!("Array needs multiple overloads implemented")
             }
             "asin" => {
-                let input = visit_seq_field(&mut seq, input)?;
+                let input = visit_seq_field(&mut seq, "input")?;
                 Ok(ExpressionName::Asin(input))
             }
             "at" => {
-                let index = visit_seq_field(&mut seq, index)?;
-                let array = visit_seq_field(&mut seq, array)?;
+                let index = visit_seq_field(&mut seq, "index")?;
+                let array = visit_seq_field(&mut seq, "array")?;
                 Ok(ExpressionName::At(index, array))
             }
             "atan" => {
-                let input = visit_seq_field(&mut seq, input)?;
+                let input = visit_seq_field(&mut seq, "input")?;
                 Ok(ExpressionName::Atan(input))
             }
             "boolean" => {
@@ -956,39 +956,39 @@ impl<'de> serde::de::Visitor<'de> for ExpressionNameVisitor {
                 todo!("Case needs variadic overloads implemented")
             }
             "ceil" => {
-                let input = visit_seq_field(&mut seq, input)?;
+                let input = visit_seq_field(&mut seq, "input")?;
                 Ok(ExpressionName::Ceil(input))
             }
             "coalesce" => {
                 todo!("Coalesce needs variadic overloads implemented")
             }
             "collator" => {
-                let options = visit_seq_field(&mut seq, options)?;
+                let options = visit_seq_field(&mut seq, "options")?;
                 Ok(ExpressionName::Collator(options))
             }
             "concat" => {
                 todo!("Concat needs variadic overloads implemented")
             }
             "cos" => {
-                let input = visit_seq_field(&mut seq, input)?;
+                let input = visit_seq_field(&mut seq, "input")?;
                 Ok(ExpressionName::Cos(input))
             }
             "distance" => {
-                let geojson = visit_seq_field(&mut seq, geojson)?;
+                let geojson = visit_seq_field(&mut seq, "geojson")?;
                 Ok(ExpressionName::Distance(geojson))
             }
             "downcase" => {
-                let input = visit_seq_field(&mut seq, input)?;
+                let input = visit_seq_field(&mut seq, "input")?;
                 Ok(ExpressionName::Downcase(input))
             }
             "e" => Ok(ExpressionName::E),
             "elevation" => Ok(ExpressionName::Elevation),
             "feature-state" => {
-                let property_name = visit_seq_field(&mut seq, property_name)?;
+                let property_name = visit_seq_field(&mut seq, "property_name")?;
                 Ok(ExpressionName::FeatureState(property_name))
             }
             "floor" => {
-                let input = visit_seq_field(&mut seq, input)?;
+                let input = visit_seq_field(&mut seq, "input")?;
                 Ok(ExpressionName::Floor(input))
             }
             "format" => {
@@ -996,23 +996,23 @@ impl<'de> serde::de::Visitor<'de> for ExpressionNameVisitor {
             }
             "geometry-type" => Ok(ExpressionName::GeometryType),
             "get" => {
-                let property_name = visit_seq_field(&mut seq, property_name)?;
-                let object = seq.next_element()?.ok();
+                let property_name = visit_seq_field(&mut seq, "property_name")?;
+                let object = seq.next_element()?;
                 Ok(ExpressionName::Get(property_name, object))
             }
             "global-state" => {
-                let property_name = visit_seq_field(&mut seq, property_name)?;
+                let property_name = visit_seq_field(&mut seq, "property_name")?;
                 Ok(ExpressionName::GlobalState(property_name))
             }
             "has" => {
-                let property_name = visit_seq_field(&mut seq, property_name)?;
-                let object = seq.next_element()?.ok();
+                let property_name = visit_seq_field(&mut seq, "property_name")?;
+                let object = seq.next_element()?;
                 Ok(ExpressionName::Has(property_name, object))
             }
             "heatmap-density" => Ok(ExpressionName::HeatmapDensity),
             "id" => Ok(ExpressionName::Id),
             "image" => {
-                let image_name = visit_seq_field(&mut seq, image_name)?;
+                let image_name = visit_seq_field(&mut seq, "image_name")?;
                 Ok(ExpressionName::Image(image_name))
             }
             "in" => {
@@ -1031,11 +1031,11 @@ impl<'de> serde::de::Visitor<'de> for ExpressionNameVisitor {
                 todo!("InterpolateLab needs variadic overloads implemented")
             }
             "is-supported-script" => {
-                let input = visit_seq_field(&mut seq, input)?;
+                let input = visit_seq_field(&mut seq, "input")?;
                 Ok(ExpressionName::IsSupportedScript(input))
             }
             "length" => {
-                let array_or_string = visit_seq_field(&mut seq, array_or_string)?;
+                let array_or_string = visit_seq_field(&mut seq, "array_or_string")?;
                 Ok(ExpressionName::Length(array_or_string))
             }
             "let" => {
@@ -1046,16 +1046,16 @@ impl<'de> serde::de::Visitor<'de> for ExpressionNameVisitor {
                 todo!("Literal needs multiple overloads implemented")
             }
             "ln" => {
-                let input = visit_seq_field(&mut seq, input)?;
+                let input = visit_seq_field(&mut seq, "input")?;
                 Ok(ExpressionName::Ln(input))
             }
             "ln2" => Ok(ExpressionName::Ln2),
             "log10" => {
-                let input = visit_seq_field(&mut seq, input)?;
+                let input = visit_seq_field(&mut seq, "input")?;
                 Ok(ExpressionName::Log10(input))
             }
             "log2" => {
-                let input = visit_seq_field(&mut seq, input)?;
+                let input = visit_seq_field(&mut seq, "input")?;
                 Ok(ExpressionName::Log2(input))
             }
             "match" => {
@@ -1071,8 +1071,8 @@ impl<'de> serde::de::Visitor<'de> for ExpressionNameVisitor {
                 todo!("Number needs variadic overloads implemented")
             }
             "number-format" => {
-                let input = visit_seq_field(&mut seq, input)?;
-                let format_options = visit_seq_field(&mut seq, format_options)?;
+                let input = visit_seq_field(&mut seq, "input")?;
+                let format_options = visit_seq_field(&mut seq, "format_options")?;
                 Ok(ExpressionName::NumberFormat(input, format_options))
             }
             "object" => {
@@ -1081,35 +1081,35 @@ impl<'de> serde::de::Visitor<'de> for ExpressionNameVisitor {
             "pi" => Ok(ExpressionName::Pi),
             "properties" => Ok(ExpressionName::Properties),
             "resolved-locale" => {
-                let collator = visit_seq_field(&mut seq, collator)?;
+                let collator = visit_seq_field(&mut seq, "collator")?;
                 Ok(ExpressionName::ResolvedLocale(collator))
             }
             "rgb" => {
-                let red = visit_seq_field(&mut seq, red)?;
-                let green = visit_seq_field(&mut seq, green)?;
-                let blue = visit_seq_field(&mut seq, blue)?;
+                let red = visit_seq_field(&mut seq, "red")?;
+                let green = visit_seq_field(&mut seq, "green")?;
+                let blue = visit_seq_field(&mut seq, "blue")?;
                 Ok(ExpressionName::Rgb(red, green, blue))
             }
             "rgba" => {
-                let red = visit_seq_field(&mut seq, red)?;
-                let green = visit_seq_field(&mut seq, green)?;
-                let blue = visit_seq_field(&mut seq, blue)?;
-                let alpha = visit_seq_field(&mut seq, alpha)?;
+                let red = visit_seq_field(&mut seq, "red")?;
+                let green = visit_seq_field(&mut seq, "green")?;
+                let blue = visit_seq_field(&mut seq, "blue")?;
+                let alpha = visit_seq_field(&mut seq, "alpha")?;
                 Ok(ExpressionName::Rgba(red, green, blue, alpha))
             }
             "round" => {
-                let input = visit_seq_field(&mut seq, input)?;
+                let input = visit_seq_field(&mut seq, "input")?;
                 Ok(ExpressionName::Round(input))
             }
             "sin" => {
-                let input = visit_seq_field(&mut seq, input)?;
+                let input = visit_seq_field(&mut seq, "input")?;
                 Ok(ExpressionName::Sin(input))
             }
             "slice" => {
                 todo!("Slice needs multiple overloads implemented")
             }
             "sqrt" => {
-                let input = visit_seq_field(&mut seq, input)?;
+                let input = visit_seq_field(&mut seq, "input")?;
                 Ok(ExpressionName::Sqrt(input))
             }
             "step" => {
@@ -1119,11 +1119,11 @@ impl<'de> serde::de::Visitor<'de> for ExpressionNameVisitor {
                 todo!("String needs variadic overloads implemented")
             }
             "tan" => {
-                let input = visit_seq_field(&mut seq, input)?;
+                let input = visit_seq_field(&mut seq, "input")?;
                 Ok(ExpressionName::Tan(input))
             }
             "to-boolean" => {
-                let value = visit_seq_field(&mut seq, value)?;
+                let value = visit_seq_field(&mut seq, "value")?;
                 Ok(ExpressionName::ToBoolean(value))
             }
             "to-color" => {
@@ -1133,27 +1133,27 @@ impl<'de> serde::de::Visitor<'de> for ExpressionNameVisitor {
                 todo!("ToNumber needs variadic overloads implemented")
             }
             "to-rgba" => {
-                let color = visit_seq_field(&mut seq, color)?;
+                let color = visit_seq_field(&mut seq, "color")?;
                 Ok(ExpressionName::ToRgba(color))
             }
             "to-string" => {
-                let value = visit_seq_field(&mut seq, value)?;
+                let value = visit_seq_field(&mut seq, "value")?;
                 Ok(ExpressionName::ToString(value))
             }
             "typeof" => {
-                let value = visit_seq_field(&mut seq, value)?;
+                let value = visit_seq_field(&mut seq, "value")?;
                 Ok(ExpressionName::Typeof(value))
             }
             "upcase" => {
-                let input = visit_seq_field(&mut seq, input)?;
+                let input = visit_seq_field(&mut seq, "input")?;
                 Ok(ExpressionName::Upcase(input))
             }
             "var" => {
-                let var_name = visit_seq_field(&mut seq, var_name)?;
+                let var_name = visit_seq_field(&mut seq, "var_name")?;
                 Ok(ExpressionName::Var(var_name))
             }
             "within" => {
-                let geojson = visit_seq_field(&mut seq, geojson)?;
+                let geojson = visit_seq_field(&mut seq, "geojson")?;
                 Ok(ExpressionName::Within(geojson))
             }
             "zoom" => Ok(ExpressionName::Zoom),
@@ -1471,7 +1471,7 @@ impl<'de> serde::Deserialize<'de> for InterpolationName {
     where
         D: serde::Deserializer<'de>,
     {
-        deserializer.deserialize_any(InterpolationNameVisitor)
+        deserializer.deserialize_seq(InterpolationNameVisitor)
     }
 }
 
@@ -1502,14 +1502,14 @@ impl<'de> serde::de::Visitor<'de> for InterpolationNameVisitor {
             .ok_or_else(|| serde::de::Error::custom("missing operator"))?;
         match op.as_str() {
             "cubic-bezier" => {
-                let x1 = visit_seq_field(&mut seq, x1)?;
-                let y1 = visit_seq_field(&mut seq, y1)?;
-                let x2 = visit_seq_field(&mut seq, x2)?;
-                let y2 = visit_seq_field(&mut seq, y2)?;
+                let x1 = visit_seq_field(&mut seq, "x1")?;
+                let y1 = visit_seq_field(&mut seq, "y1")?;
+                let x2 = visit_seq_field(&mut seq, "x2")?;
+                let y2 = visit_seq_field(&mut seq, "y2")?;
                 Ok(InterpolationName::CubicBezier(x1, y1, x2, y2))
             }
             "exponential" => {
-                let base = visit_seq_field(&mut seq, base)?;
+                let base = visit_seq_field(&mut seq, "base")?;
                 Ok(InterpolationName::Exponential(base))
             }
             "linear" => Ok(InterpolationName::Linear),
