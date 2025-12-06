@@ -7,9 +7,8 @@ pub fn generate(scope: &mut Scope, name: &str, common: &Fields, _tokens: Option<
     scope
         .new_struct(name)
         .doc(&common.doc)
-        .attr("deprecated = \"resolved_image not implemented\"")
-        .derive("serde::Deserialize, PartialEq, Debug, Clone")
-        .tuple_field("serde_json::Value");
+        .derive("serde::Deserialize, PartialEq, Eq, Debug, Clone")
+        .tuple_field("String");
     generate_test_from_example_if_present(scope, name, common.example.as_ref());
 }
 
