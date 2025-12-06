@@ -840,7 +840,7 @@ impl<'de> serde::Deserialize<'de> for ExpressionName {
     }
 }
 
-/// Visitor for deserializing the syntax enum [`{name}`]
+/// Visitor for deserializing the syntax enum [`ExpressionName`]
 struct ExpressionNameVisitor;
 
 impl<'de> serde::de::Visitor<'de> for ExpressionNameVisitor {
@@ -856,119 +856,405 @@ impl<'de> serde::de::Visitor<'de> for ExpressionNameVisitor {
             .next_element()?
             .ok_or_else(|| serde::de::Error::custom("missing operator"))?;
         match op.as_str() {
-            "!" => todo!("ExpressionName::Not decoding is not currently implemented"),
-            "!=" => todo!("ExpressionName::NotEqual decoding is not currently implemented"),
-            "%" => todo!("ExpressionName::Percentage decoding is not currently implemented"),
-            "*" => todo!("ExpressionName::Star decoding is not currently implemented"),
-            "+" => todo!("ExpressionName::Plus decoding is not currently implemented"),
-            "-" => todo!("ExpressionName::Minus decoding is not currently implemented"),
-            "/" => todo!("ExpressionName::Slash decoding is not currently implemented"),
-            "<" => todo!("ExpressionName::Less decoding is not currently implemented"),
-            "<=" => todo!("ExpressionName::LessEqual decoding is not currently implemented"),
-            "==" => todo!("ExpressionName::EqualEqual decoding is not currently implemented"),
-            ">" => todo!("ExpressionName::Greater decoding is not currently implemented"),
-            ">=" => todo!("ExpressionName::GreaterEqual decoding is not currently implemented"),
-            "^" => todo!("ExpressionName::Power decoding is not currently implemented"),
-            "abs" => todo!("ExpressionName::Absolute decoding is not currently implemented"),
-            "accumulated" => {
-                todo!("ExpressionName::Accumulated decoding is not currently implemented")
+            "!" => {
+                let input = seq
+                    .next_element()?
+                    .ok_or_else(|| serde::de::Error::custom(format!("missing input at index 0")))?;
+                Ok(ExpressionName::Not(input))
             }
-            "acos" => todo!("ExpressionName::Arccosine decoding is not currently implemented"),
-            "all" => todo!("ExpressionName::All decoding is not currently implemented"),
-            "any" => todo!("ExpressionName::Any decoding is not currently implemented"),
-            "array" => todo!("ExpressionName::Array decoding is not currently implemented"),
-            "asin" => todo!("ExpressionName::Asin decoding is not currently implemented"),
-            "at" => todo!("ExpressionName::At decoding is not currently implemented"),
-            "atan" => todo!("ExpressionName::Atan decoding is not currently implemented"),
-            "boolean" => todo!("ExpressionName::Boolean decoding is not currently implemented"),
-            "case" => todo!("ExpressionName::Case decoding is not currently implemented"),
-            "ceil" => todo!("ExpressionName::Ceil decoding is not currently implemented"),
-            "coalesce" => todo!("ExpressionName::Coalesce decoding is not currently implemented"),
-            "collator" => todo!("ExpressionName::Collator decoding is not currently implemented"),
-            "concat" => todo!("ExpressionName::Concat decoding is not currently implemented"),
-            "cos" => todo!("ExpressionName::Cos decoding is not currently implemented"),
-            "distance" => todo!("ExpressionName::Distance decoding is not currently implemented"),
-            "downcase" => todo!("ExpressionName::Downcase decoding is not currently implemented"),
-            "e" => todo!("ExpressionName::E decoding is not currently implemented"),
-            "elevation" => todo!("ExpressionName::Elevation decoding is not currently implemented"),
+            "!=" => {
+                let input_1 = seq.next_element()?.ok_or_else(|| {
+                    serde::de::Error::custom(format!("missing input_1 at index 0"))
+                })?;
+                let input_2 = seq.next_element()?.ok_or_else(|| {
+                    serde::de::Error::custom(format!("missing input_2 at index 1"))
+                })?;
+                let collator = seq.next_element()?.ok();
+                Ok(ExpressionName::NotEqual(input_1, input_2, collator))
+            }
+            "%" => {
+                let input_1 = seq.next_element()?.ok_or_else(|| {
+                    serde::de::Error::custom(format!("missing input_1 at index 0"))
+                })?;
+                let input_2 = seq.next_element()?.ok_or_else(|| {
+                    serde::de::Error::custom(format!("missing input_2 at index 1"))
+                })?;
+                Ok(ExpressionName::Percentage(input_1, input_2))
+            }
+            "*" => {
+                todo!("Star needs variadic overloads implemented")
+            }
+            "+" => {
+                todo!("Plus needs variadic overloads implemented")
+            }
+            "-" => {
+                todo!("Minus needs multiple overloads implemented")
+            }
+            "/" => {
+                let input_1 = seq.next_element()?.ok_or_else(|| {
+                    serde::de::Error::custom(format!("missing input_1 at index 0"))
+                })?;
+                let input_2 = seq.next_element()?.ok_or_else(|| {
+                    serde::de::Error::custom(format!("missing input_2 at index 1"))
+                })?;
+                Ok(ExpressionName::Slash(input_1, input_2))
+            }
+            "<" => {
+                todo!("Less needs multiple overloads implemented")
+            }
+            "<=" => {
+                todo!("LessEqual needs multiple overloads implemented")
+            }
+            "==" => {
+                let input_1 = seq.next_element()?.ok_or_else(|| {
+                    serde::de::Error::custom(format!("missing input_1 at index 0"))
+                })?;
+                let input_2 = seq.next_element()?.ok_or_else(|| {
+                    serde::de::Error::custom(format!("missing input_2 at index 1"))
+                })?;
+                let collator = seq.next_element()?.ok();
+                Ok(ExpressionName::EqualEqual(input_1, input_2, collator))
+            }
+            ">" => {
+                todo!("Greater needs multiple overloads implemented")
+            }
+            ">=" => {
+                todo!("GreaterEqual needs multiple overloads implemented")
+            }
+            "^" => {
+                let input_1 = seq.next_element()?.ok_or_else(|| {
+                    serde::de::Error::custom(format!("missing input_1 at index 0"))
+                })?;
+                let input_2 = seq.next_element()?.ok_or_else(|| {
+                    serde::de::Error::custom(format!("missing input_2 at index 1"))
+                })?;
+                Ok(ExpressionName::Power(input_1, input_2))
+            }
+            "abs" => {
+                let input = seq
+                    .next_element()?
+                    .ok_or_else(|| serde::de::Error::custom(format!("missing input at index 0")))?;
+                Ok(ExpressionName::Absolute(input))
+            }
+            "accumulated" => Ok(ExpressionName::Accumulated),
+            "acos" => {
+                let input = seq
+                    .next_element()?
+                    .ok_or_else(|| serde::de::Error::custom(format!("missing input at index 0")))?;
+                Ok(ExpressionName::Arccosine(input))
+            }
+            "all" => {
+                todo!("All needs variadic overloads implemented")
+            }
+            "any" => {
+                todo!("Any needs variadic overloads implemented")
+            }
+            "array" => {
+                todo!("Array needs multiple overloads implemented")
+            }
+            "asin" => {
+                let input = seq
+                    .next_element()?
+                    .ok_or_else(|| serde::de::Error::custom(format!("missing input at index 0")))?;
+                Ok(ExpressionName::Asin(input))
+            }
+            "at" => {
+                let index = seq
+                    .next_element()?
+                    .ok_or_else(|| serde::de::Error::custom(format!("missing index at index 0")))?;
+                let array = seq
+                    .next_element()?
+                    .ok_or_else(|| serde::de::Error::custom(format!("missing array at index 1")))?;
+                Ok(ExpressionName::At(index, array))
+            }
+            "atan" => {
+                let input = seq
+                    .next_element()?
+                    .ok_or_else(|| serde::de::Error::custom(format!("missing input at index 0")))?;
+                Ok(ExpressionName::Atan(input))
+            }
+            "boolean" => {
+                todo!("Boolean needs variadic overloads implemented")
+            }
+            "case" => {
+                todo!("Case needs variadic overloads implemented")
+            }
+            "ceil" => {
+                let input = seq
+                    .next_element()?
+                    .ok_or_else(|| serde::de::Error::custom(format!("missing input at index 0")))?;
+                Ok(ExpressionName::Ceil(input))
+            }
+            "coalesce" => {
+                todo!("Coalesce needs variadic overloads implemented")
+            }
+            "collator" => {
+                let options = seq.next_element()?.ok_or_else(|| {
+                    serde::de::Error::custom(format!("missing options at index 0"))
+                })?;
+                Ok(ExpressionName::Collator(options))
+            }
+            "concat" => {
+                todo!("Concat needs variadic overloads implemented")
+            }
+            "cos" => {
+                let input = seq
+                    .next_element()?
+                    .ok_or_else(|| serde::de::Error::custom(format!("missing input at index 0")))?;
+                Ok(ExpressionName::Cos(input))
+            }
+            "distance" => {
+                let geojson = seq.next_element()?.ok_or_else(|| {
+                    serde::de::Error::custom(format!("missing geojson at index 0"))
+                })?;
+                Ok(ExpressionName::Distance(geojson))
+            }
+            "downcase" => {
+                let input = seq
+                    .next_element()?
+                    .ok_or_else(|| serde::de::Error::custom(format!("missing input at index 0")))?;
+                Ok(ExpressionName::Downcase(input))
+            }
+            "e" => Ok(ExpressionName::E),
+            "elevation" => Ok(ExpressionName::Elevation),
             "feature-state" => {
-                todo!("ExpressionName::FeatureState decoding is not currently implemented")
+                let property_name = seq.next_element()?.ok_or_else(|| {
+                    serde::de::Error::custom(format!("missing property_name at index 0"))
+                })?;
+                Ok(ExpressionName::FeatureState(property_name))
             }
-            "floor" => todo!("ExpressionName::Floor decoding is not currently implemented"),
-            "format" => todo!("ExpressionName::Format decoding is not currently implemented"),
-            "geometry-type" => {
-                todo!("ExpressionName::GeometryType decoding is not currently implemented")
+            "floor" => {
+                let input = seq
+                    .next_element()?
+                    .ok_or_else(|| serde::de::Error::custom(format!("missing input at index 0")))?;
+                Ok(ExpressionName::Floor(input))
             }
-            "get" => todo!("ExpressionName::Get decoding is not currently implemented"),
+            "format" => {
+                todo!("Format needs variadic overloads implemented")
+            }
+            "geometry-type" => Ok(ExpressionName::GeometryType),
+            "get" => {
+                let property_name = seq.next_element()?.ok_or_else(|| {
+                    serde::de::Error::custom(format!("missing property_name at index 0"))
+                })?;
+                let object = seq.next_element()?.ok();
+                Ok(ExpressionName::Get(property_name, object))
+            }
             "global-state" => {
-                todo!("ExpressionName::GlobalState decoding is not currently implemented")
+                let property_name = seq.next_element()?.ok_or_else(|| {
+                    serde::de::Error::custom(format!("missing property_name at index 0"))
+                })?;
+                Ok(ExpressionName::GlobalState(property_name))
             }
-            "has" => todo!("ExpressionName::Has decoding is not currently implemented"),
-            "heatmap-density" => {
-                todo!("ExpressionName::HeatmapDensity decoding is not currently implemented")
+            "has" => {
+                let property_name = seq.next_element()?.ok_or_else(|| {
+                    serde::de::Error::custom(format!("missing property_name at index 0"))
+                })?;
+                let object = seq.next_element()?.ok();
+                Ok(ExpressionName::Has(property_name, object))
             }
-            "id" => todo!("ExpressionName::Id decoding is not currently implemented"),
-            "image" => todo!("ExpressionName::Image decoding is not currently implemented"),
-            "in" => todo!("ExpressionName::In decoding is not currently implemented"),
-            "index-of" => todo!("ExpressionName::IndexOf decoding is not currently implemented"),
+            "heatmap-density" => Ok(ExpressionName::HeatmapDensity),
+            "id" => Ok(ExpressionName::Id),
+            "image" => {
+                let image_name = seq.next_element()?.ok_or_else(|| {
+                    serde::de::Error::custom(format!("missing image_name at index 0"))
+                })?;
+                Ok(ExpressionName::Image(image_name))
+            }
+            "in" => {
+                todo!("In needs multiple overloads implemented")
+            }
+            "index-of" => {
+                todo!("IndexOf needs multiple overloads implemented")
+            }
             "interpolate" => {
-                todo!("ExpressionName::Interpolate decoding is not currently implemented")
+                todo!("Interpolate needs variadic overloads implemented")
             }
             "interpolate-hcl" => {
-                todo!("ExpressionName::InterpolateHcl decoding is not currently implemented")
+                todo!("InterpolateHcl needs variadic overloads implemented")
             }
             "interpolate-lab" => {
-                todo!("ExpressionName::InterpolateLab decoding is not currently implemented")
+                todo!("InterpolateLab needs variadic overloads implemented")
             }
             "is-supported-script" => {
-                todo!("ExpressionName::IsSupportedScript decoding is not currently implemented")
+                let input = seq
+                    .next_element()?
+                    .ok_or_else(|| serde::de::Error::custom(format!("missing input at index 0")))?;
+                Ok(ExpressionName::IsSupportedScript(input))
             }
-            "length" => todo!("ExpressionName::Length decoding is not currently implemented"),
-            "let" => todo!("ExpressionName::Let decoding is not currently implemented"),
-            "line-progress" => {
-                todo!("ExpressionName::LineProgress decoding is not currently implemented")
+            "length" => {
+                let array_or_string = seq.next_element()?.ok_or_else(|| {
+                    serde::de::Error::custom(format!("missing array_or_string at index 0"))
+                })?;
+                Ok(ExpressionName::Length(array_or_string))
             }
-            "literal" => todo!("ExpressionName::Literal decoding is not currently implemented"),
-            "ln" => todo!("ExpressionName::Ln decoding is not currently implemented"),
-            "ln2" => todo!("ExpressionName::Ln2 decoding is not currently implemented"),
-            "log10" => todo!("ExpressionName::Log10 decoding is not currently implemented"),
-            "log2" => todo!("ExpressionName::Log2 decoding is not currently implemented"),
-            "match" => todo!("ExpressionName::Match decoding is not currently implemented"),
-            "max" => todo!("ExpressionName::Max decoding is not currently implemented"),
-            "min" => todo!("ExpressionName::Min decoding is not currently implemented"),
-            "number" => todo!("ExpressionName::Number decoding is not currently implemented"),
+            "let" => {
+                todo!("Let needs variadic overloads implemented")
+            }
+            "line-progress" => Ok(ExpressionName::LineProgress),
+            "literal" => {
+                todo!("Literal needs multiple overloads implemented")
+            }
+            "ln" => {
+                let input = seq
+                    .next_element()?
+                    .ok_or_else(|| serde::de::Error::custom(format!("missing input at index 0")))?;
+                Ok(ExpressionName::Ln(input))
+            }
+            "ln2" => Ok(ExpressionName::Ln2),
+            "log10" => {
+                let input = seq
+                    .next_element()?
+                    .ok_or_else(|| serde::de::Error::custom(format!("missing input at index 0")))?;
+                Ok(ExpressionName::Log10(input))
+            }
+            "log2" => {
+                let input = seq
+                    .next_element()?
+                    .ok_or_else(|| serde::de::Error::custom(format!("missing input at index 0")))?;
+                Ok(ExpressionName::Log2(input))
+            }
+            "match" => {
+                todo!("Match needs variadic overloads implemented")
+            }
+            "max" => {
+                todo!("Max needs variadic overloads implemented")
+            }
+            "min" => {
+                todo!("Min needs variadic overloads implemented")
+            }
+            "number" => {
+                todo!("Number needs variadic overloads implemented")
+            }
             "number-format" => {
-                todo!("ExpressionName::NumberFormat decoding is not currently implemented")
+                let input = seq
+                    .next_element()?
+                    .ok_or_else(|| serde::de::Error::custom(format!("missing input at index 0")))?;
+                let format_options = seq.next_element()?.ok_or_else(|| {
+                    serde::de::Error::custom(format!("missing format_options at index 1"))
+                })?;
+                Ok(ExpressionName::NumberFormat(input, format_options))
             }
-            "object" => todo!("ExpressionName::Object decoding is not currently implemented"),
-            "pi" => todo!("ExpressionName::Pi decoding is not currently implemented"),
-            "properties" => {
-                todo!("ExpressionName::Properties decoding is not currently implemented")
+            "object" => {
+                todo!("Object needs variadic overloads implemented")
             }
+            "pi" => Ok(ExpressionName::Pi),
+            "properties" => Ok(ExpressionName::Properties),
             "resolved-locale" => {
-                todo!("ExpressionName::ResolvedLocale decoding is not currently implemented")
+                let collator = seq.next_element()?.ok_or_else(|| {
+                    serde::de::Error::custom(format!("missing collator at index 0"))
+                })?;
+                Ok(ExpressionName::ResolvedLocale(collator))
             }
-            "rgb" => todo!("ExpressionName::Rgb decoding is not currently implemented"),
-            "rgba" => todo!("ExpressionName::Rgba decoding is not currently implemented"),
-            "round" => todo!("ExpressionName::Round decoding is not currently implemented"),
-            "sin" => todo!("ExpressionName::Sin decoding is not currently implemented"),
-            "slice" => todo!("ExpressionName::Slice decoding is not currently implemented"),
-            "sqrt" => todo!("ExpressionName::Sqrt decoding is not currently implemented"),
-            "step" => todo!("ExpressionName::Step decoding is not currently implemented"),
-            "string" => todo!("ExpressionName::String decoding is not currently implemented"),
-            "tan" => todo!("ExpressionName::Tan decoding is not currently implemented"),
+            "rgb" => {
+                let red = seq
+                    .next_element()?
+                    .ok_or_else(|| serde::de::Error::custom(format!("missing red at index 0")))?;
+                let green = seq
+                    .next_element()?
+                    .ok_or_else(|| serde::de::Error::custom(format!("missing green at index 1")))?;
+                let blue = seq
+                    .next_element()?
+                    .ok_or_else(|| serde::de::Error::custom(format!("missing blue at index 2")))?;
+                Ok(ExpressionName::Rgb(red, green, blue))
+            }
+            "rgba" => {
+                let red = seq
+                    .next_element()?
+                    .ok_or_else(|| serde::de::Error::custom(format!("missing red at index 0")))?;
+                let green = seq
+                    .next_element()?
+                    .ok_or_else(|| serde::de::Error::custom(format!("missing green at index 1")))?;
+                let blue = seq
+                    .next_element()?
+                    .ok_or_else(|| serde::de::Error::custom(format!("missing blue at index 2")))?;
+                let alpha = seq
+                    .next_element()?
+                    .ok_or_else(|| serde::de::Error::custom(format!("missing alpha at index 3")))?;
+                Ok(ExpressionName::Rgba(red, green, blue, alpha))
+            }
+            "round" => {
+                let input = seq
+                    .next_element()?
+                    .ok_or_else(|| serde::de::Error::custom(format!("missing input at index 0")))?;
+                Ok(ExpressionName::Round(input))
+            }
+            "sin" => {
+                let input = seq
+                    .next_element()?
+                    .ok_or_else(|| serde::de::Error::custom(format!("missing input at index 0")))?;
+                Ok(ExpressionName::Sin(input))
+            }
+            "slice" => {
+                todo!("Slice needs multiple overloads implemented")
+            }
+            "sqrt" => {
+                let input = seq
+                    .next_element()?
+                    .ok_or_else(|| serde::de::Error::custom(format!("missing input at index 0")))?;
+                Ok(ExpressionName::Sqrt(input))
+            }
+            "step" => {
+                todo!("Step needs variadic overloads implemented")
+            }
+            "string" => {
+                todo!("String needs variadic overloads implemented")
+            }
+            "tan" => {
+                let input = seq
+                    .next_element()?
+                    .ok_or_else(|| serde::de::Error::custom(format!("missing input at index 0")))?;
+                Ok(ExpressionName::Tan(input))
+            }
             "to-boolean" => {
-                todo!("ExpressionName::ToBoolean decoding is not currently implemented")
+                let value = seq
+                    .next_element()?
+                    .ok_or_else(|| serde::de::Error::custom(format!("missing value at index 0")))?;
+                Ok(ExpressionName::ToBoolean(value))
             }
-            "to-color" => todo!("ExpressionName::ToColor decoding is not currently implemented"),
-            "to-number" => todo!("ExpressionName::ToNumber decoding is not currently implemented"),
-            "to-rgba" => todo!("ExpressionName::ToRgba decoding is not currently implemented"),
-            "to-string" => todo!("ExpressionName::ToString decoding is not currently implemented"),
-            "typeof" => todo!("ExpressionName::Typeof decoding is not currently implemented"),
-            "upcase" => todo!("ExpressionName::Upcase decoding is not currently implemented"),
-            "var" => todo!("ExpressionName::Var decoding is not currently implemented"),
-            "within" => todo!("ExpressionName::Within decoding is not currently implemented"),
-            "zoom" => todo!("ExpressionName::Zoom decoding is not currently implemented"),
+            "to-color" => {
+                todo!("ToColor needs variadic overloads implemented")
+            }
+            "to-number" => {
+                todo!("ToNumber needs variadic overloads implemented")
+            }
+            "to-rgba" => {
+                let color = seq
+                    .next_element()?
+                    .ok_or_else(|| serde::de::Error::custom(format!("missing color at index 0")))?;
+                Ok(ExpressionName::ToRgba(color))
+            }
+            "to-string" => {
+                let value = seq
+                    .next_element()?
+                    .ok_or_else(|| serde::de::Error::custom(format!("missing value at index 0")))?;
+                Ok(ExpressionName::ToString(value))
+            }
+            "typeof" => {
+                let value = seq
+                    .next_element()?
+                    .ok_or_else(|| serde::de::Error::custom(format!("missing value at index 0")))?;
+                Ok(ExpressionName::Typeof(value))
+            }
+            "upcase" => {
+                let input = seq
+                    .next_element()?
+                    .ok_or_else(|| serde::de::Error::custom(format!("missing input at index 0")))?;
+                Ok(ExpressionName::Upcase(input))
+            }
+            "var" => {
+                let var_name = seq.next_element()?.ok_or_else(|| {
+                    serde::de::Error::custom(format!("missing var_name at index 0"))
+                })?;
+                Ok(ExpressionName::Var(var_name))
+            }
+            "within" => {
+                let geojson = seq.next_element()?.ok_or_else(|| {
+                    serde::de::Error::custom(format!("missing geojson at index 0"))
+                })?;
+                Ok(ExpressionName::Within(geojson))
+            }
+            "zoom" => Ok(ExpressionName::Zoom),
             _ => Err(serde::de::Error::custom(format!(
                 "unknown operator {op} in ExpressionName. Please check the documentation for the available ExpressionName."
             ))),
@@ -1200,7 +1486,7 @@ impl<'de> serde::Deserialize<'de> for InterpolationName {
     }
 }
 
-/// Visitor for deserializing the syntax enum [`{name}`]
+/// Visitor for deserializing the syntax enum [`InterpolationName`]
 struct InterpolationNameVisitor;
 
 impl<'de> serde::de::Visitor<'de> for InterpolationNameVisitor {
@@ -1217,12 +1503,27 @@ impl<'de> serde::de::Visitor<'de> for InterpolationNameVisitor {
             .ok_or_else(|| serde::de::Error::custom("missing operator"))?;
         match op.as_str() {
             "cubic-bezier" => {
-                todo!("InterpolationName::CubicBezier decoding is not currently implemented")
+                let x1 = seq
+                    .next_element()?
+                    .ok_or_else(|| serde::de::Error::custom(format!("missing x1 at index 0")))?;
+                let y1 = seq
+                    .next_element()?
+                    .ok_or_else(|| serde::de::Error::custom(format!("missing y1 at index 1")))?;
+                let x2 = seq
+                    .next_element()?
+                    .ok_or_else(|| serde::de::Error::custom(format!("missing x2 at index 2")))?;
+                let y2 = seq
+                    .next_element()?
+                    .ok_or_else(|| serde::de::Error::custom(format!("missing y2 at index 3")))?;
+                Ok(InterpolationName::CubicBezier(x1, y1, x2, y2))
             }
             "exponential" => {
-                todo!("InterpolationName::Exponential decoding is not currently implemented")
+                let base = seq
+                    .next_element()?
+                    .ok_or_else(|| serde::de::Error::custom(format!("missing base at index 0")))?;
+                Ok(InterpolationName::Exponential(base))
             }
-            "linear" => todo!("InterpolationName::Linear decoding is not currently implemented"),
+            "linear" => Ok(InterpolationName::Linear),
             _ => Err(serde::de::Error::custom(format!(
                 "unknown operator {op} in InterpolationName. Please check the documentation for the available InterpolationName."
             ))),

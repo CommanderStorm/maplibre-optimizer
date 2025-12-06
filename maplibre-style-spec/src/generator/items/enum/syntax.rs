@@ -107,9 +107,9 @@ fn generate_syntax_enum_deserializer(
         .ret("Result<Self, D::Error>")
         .line(format!("deserializer.deserialize_any({visitor_name})"));
 
-    scope
-        .new_struct(&visitor_name)
-        .doc("Visitor for deserializing the syntax enum [`{name}`]");
+    scope.new_struct(&visitor_name).doc(format!(
+        "Visitor for deserializing the syntax enum [`{name}`]"
+    ));
 
     let vis = scope
         .new_impl(&visitor_name)
@@ -133,11 +133,64 @@ fn generate_syntax_enum_deserializer(
     visit_seq.line("// First element: operator string");
     visit_seq.line("let op: String = seq.next_element()?.ok_or_else(|| serde::de::Error::custom(\"missing operator\"))?;");
     visit_seq.line("match op.as_str() {");
-    for key in values.keys() {
+    for (key, syntax_docs) in values {
+        let syntax = &syntax_docs.syntax;
         let variant_name = to_upper_camel_case(key);
-        visit_seq.line(format!(
-            "\"{key}\" => todo!(\"{name}::{variant_name} decoding is not currently implemented\"),"
-        ));
+
+        // regular overloads
+        visit_seq.line(format!("\"{key}\" => {{"));
+        if syntax.overloads.len() == 1
+            && let Some(overload) = syntax.overloads.first()
+        {
+            // variadic (...) overloads
+            if overload.parameters.iter().any(|p| p == "...") {
+                visit_seq.line(format!(
+                    "todo!(\"{variant_name} needs variadic overloads implemented\")"
+                ));
+                visit_seq.line("},");
+                continue;
+            }
+
+            for (i, param) in overload.parameters.iter().enumerate() {
+                if let Some(param) = param.strip_suffix('?') {
+                    visit_seq.line(format!("let {param} = seq.next_element()?.ok();"));
+                } else {
+                    visit_seq.line(format!("let {param} = seq.next_element()?.ok_or_else(|| serde::de::Error::custom(format!(\"missing {param} at index {i}\")))?;"));
+                };
+            }
+            if overload.parameters.is_empty() {
+                visit_seq.line(format!("Ok({name}::{variant_name})"));
+            } else {
+                let parameters = overload
+                    .parameters
+                    .iter()
+                    .map(|p| p.strip_suffix('?').unwrap_or(p))
+                    .collect::<Vec<_>>();
+                visit_seq.line(format!(
+                    "Ok({name}::{variant_name}({params}))",
+                    params = parameters.join(", ")
+                ));
+            }
+        } else {
+            //todo: multiple variadic overloads
+            if syntax
+                .overloads
+                .iter()
+                .any(|o| o.parameters.iter().any(|p| p == "..."))
+            {
+                visit_seq.line(format!(
+                    "todo!(\"{variant_name} needs variadic overloads implemented\")"
+                ));
+                visit_seq.line("},");
+                continue;
+            }
+
+            // todo: add multiple overloads
+            visit_seq.line(format!(
+                "todo!(\"{variant_name} needs multiple overloads implemented\")"
+            ));
+        }
+        visit_seq.line("},");
     }
 
     visit_seq.line(format!("_ => Err(serde::de::Error::custom(format!(\"unknown operator {{op}} in {name}. Please check the documentation for the available {name}.\")))"));
@@ -207,7 +260,7 @@ mod tests {
         #[derive(PartialEq, Eq, Debug, Clone)]
         pub enum Expression {
             /// Binds expressions to named variables, which can then be referenced in the result expression using `["var", "variable_name"]`.
-            /// 
+            ///
             ///  - [Visualize population density](https://maplibre.org/maplibre-gl-js/docs/examples/visualize-population-density/)
             Let(Vec<serde_json::Value>),
         }
