@@ -1,6 +1,7 @@
 pub fn to_upper_camel_case(name: &str) -> String {
-    let name = prefilter_names(name);
-    let result = name
+    let prefiltered_name = prefilter_names(name);
+
+    let result = prefiltered_name
         .split(|c: char| !c.is_alphanumeric()) // split on non-alphanumeric
         .filter(|s| !s.is_empty())
         .map(|s| {
@@ -22,31 +23,33 @@ pub fn to_upper_camel_case(name: &str) -> String {
 
     debug_assert!(
         !result.starts_with('_'),
-        "{name} should not start with an underscore but produced {result}"
+        "{name} (prefiltered: {prefiltered_name}) should not start with an underscore but produced {result}"
     );
     debug_assert!(
         !result.ends_with('_'),
-        "{name} should not end with an underscore but produced {result}"
+        "{name} (prefiltered: {prefiltered_name}) should not end with an underscore but produced {result}"
     );
     debug_assert!(
         !result.is_empty(),
-        "{name} should not result in an empty string after conversion to snake case"
+        "{name} (prefiltered: {prefiltered_name}) should not result in an empty string after conversion to snake case"
     );
     rustize(result)
 }
 
 pub fn to_snake_case(name: &str) -> String {
-    let name = prefilter_names(name);
+    let prefiltered_name = prefilter_names(name);
     let mut result = String::new();
     let mut prev_was_lower = false;
     let mut prev_was_underscore = false;
 
-    for (i, c) in name.chars().enumerate() {
+    for (i, c) in prefiltered_name.chars().enumerate() {
         if c.is_alphanumeric() {
             if c.is_uppercase() {
                 // Insert underscore before uppercase if previous was lowercase
                 // or previous was not underscore and next is lowercase (e.g., "XMLHttp")
-                if (prev_was_lower || (!prev_was_underscore && has_next_lower(&name, i))) && i != 0
+                if (prev_was_lower
+                    || (!prev_was_underscore && has_next_lower(&prefiltered_name, i)))
+                    && i != 0
                 {
                     result.push('_');
                 }
@@ -72,15 +75,15 @@ pub fn to_snake_case(name: &str) -> String {
 
     debug_assert!(
         !result.starts_with('_'),
-        "{name} should not start with an underscore but produced {result}"
+        "{name} (prefiltered: {prefiltered_name}) should not start with an underscore but produced {result}"
     );
     debug_assert!(
         !result.ends_with('_'),
-        "{name} should not end with an underscore but produced {result}"
+        "{name} (prefiltered: {prefiltered_name}) should not end with an underscore but produced {result}"
     );
     debug_assert!(
         !result.is_empty(),
-        "{name} should not result in an empty string after conversion to snake case"
+        "{name} (prefiltered: {prefiltered_name}) should not result in an empty string after conversion to snake case"
     );
     rustize(result)
 }
