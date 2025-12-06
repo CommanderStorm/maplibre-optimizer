@@ -34,7 +34,7 @@ mod tests {
         generate(&mut scope, "Foo", &Fields::default(), None);
         insta::assert_snapshot!(scope.to_string(), @r"
         #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-        struct Foo(String);
+        pub struct Foo(String);
         ")
     }
 
@@ -65,7 +65,7 @@ mod tests {
 
         /// The source for the terrain data.
         #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-        struct TerrainSource(String);
+        pub struct TerrainSource(String);
 
         #[cfg(test)]
         mod test {

@@ -36,16 +36,16 @@ mod tests {
             &Fields::default(),
             &Value::String("hello_world".to_string()),
         );
-        insta::assert_snapshot!(scope.to_string(), @r#"
+        insta::assert_snapshot!(scope.to_string(), @r##"
         #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-        struct Foo(serde_json::Value);
+        pub struct Foo(serde_json::Value);
 
         impl Default for Foo {
             fn default() -> Self {
                 Self(serde_json::json!("hello_world"))
             }
         }
-        "#)
+        "##)
     }
 
     #[test]
@@ -82,7 +82,7 @@ mod tests {
 
         /// An object used to define default values when using the [`global-state`](https://maplibre.org/maplibre-style-spec/expressions/#global-state) expression.
         #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-        struct State(serde_json::Value);
+        pub struct State(serde_json::Value);
 
         impl Default for State {
             fn default() -> Self {

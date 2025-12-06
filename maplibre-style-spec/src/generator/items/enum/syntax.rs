@@ -277,7 +277,7 @@ mod tests {
         #[derive(PartialEq, Eq, Debug, Clone)]
         pub enum Expression {
             /// Binds expressions to named variables, which can then be referenced in the result expression using `["var", "variable_name"]`.
-            ///
+            /// 
             ///  - [Visualize population density](https://maplibre.org/maplibre-gl-js/docs/examples/visualize-population-density/)
             Let(Vec<serde_json::Value>),
         }
@@ -286,26 +286,34 @@ mod tests {
             fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
             where D: serde::Deserializer<'de>,
             {
-                deserializer.deserialize_any(ExpressionVisitor)
+                deserializer.deserialize_seq(ExpressionVisitor)
             }
         }
 
-        /// Visitor for deserializing the syntax enum [`{name}`]
+        /// Visitor for deserializing the syntax enum [`Expression`]
         struct ExpressionVisitor;
 
         impl<'de> serde::de::Visitor<'de> for ExpressionVisitor {
             type Value = Expression;
 
             fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
-                formatter.write_str(r#"an expression array like ["==", 1, 2]"#)
+                formatter.write_str(r#"an Expression like ["let","someNumber",500,["interpolate",["linear"],["var","someNumber"],274,"#edf8e9",1551,"#006d2c"]]"#)
             }
 
             fn visit_seq<A: serde::de::SeqAccess<'de>>(self, mut seq: A) -> Result<Self::Value, A::Error> {
+                /// Reads the next element from the sequence or reports a missing field error.
+                fn visit_seq_field<'de, A, T>(seq: &mut A, name: &'static str) -> Result<T, A::Error>
+                where A: serde::de::SeqAccess<'de>, T: serde::Deserialize<'de> {
+                seq.next_element()?.ok_or_else(|| serde::de::Error::missing_field(name))
+                }
+
                 // First element: operator string
                 let op: String = seq.next_element()?.ok_or_else(|| serde::de::Error::custom("missing operator"))?;
                 match op.as_str() {
-                "let" => todo!("Expression::Let decoding is not currently implemented"),
-                _ => Err(serde::de::Error::custom(&format!("unknown operator {op} in expression. Please check the documentation for the avaliable expressions.")))
+                "let" => {
+                todo!("Let needs variadic overloads implemented")
+                },
+                _ => Err(serde::de::Error::unknown_variant(&op, &["let"]))
                 }
             }
         }
@@ -315,7 +323,7 @@ mod tests {
             use super::*;
 
             #[rstest::rstest]
-            #[case(serde_json::json!(["let","someNumber",500,["interpolate",["linear"],["var","someNumber"],274,"#edf8e9",1551,"#006d2c"]]))]
+            #[case::t_let(serde_json::json!(["let","someNumber",500,["interpolate",["linear"],["var","someNumber"],274,"#edf8e9",1551,"#006d2c"]]))]
             fn test_example_expression_decodes(#[case] example: serde_json::Value) {
                 let _ = serde_json::from_value::<Expression>(example).expect("example should decode");
             }
@@ -342,6 +350,7 @@ mod tests {
                 ],
                 "parameters": []
               },
+              "example": ["linear"],
               "sdk-support": {},
               }
             },
@@ -387,7 +396,11 @@ mod tests {
                                             ],
                                             parameters: [],
                                         },
-                                        example: None,
+                                        example: Some(
+                                            Array [
+                                                String("linear"),
+                                            ],
+                                        ),
                                         group: None,
                                     },
                                 },
@@ -414,26 +427,34 @@ mod tests {
             fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
             where D: serde::Deserializer<'de>,
             {
-                deserializer.deserialize_any(InterpolationNameVisitor)
+                deserializer.deserialize_seq(InterpolationNameVisitor)
             }
         }
 
-        /// Visitor for deserializing the syntax enum [`{name}`]
+        /// Visitor for deserializing the syntax enum [`InterpolationName`]
         struct InterpolationNameVisitor;
 
         impl<'de> serde::de::Visitor<'de> for InterpolationNameVisitor {
             type Value = InterpolationName;
 
             fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
-                formatter.write_str(r#"an expression array like ["==", 1, 2]"#)
+                formatter.write_str(r#"an InterpolationName like ["linear"]"#)
             }
 
             fn visit_seq<A: serde::de::SeqAccess<'de>>(self, mut seq: A) -> Result<Self::Value, A::Error> {
+                /// Reads the next element from the sequence or reports a missing field error.
+                fn visit_seq_field<'de, A, T>(seq: &mut A, name: &'static str) -> Result<T, A::Error>
+                where A: serde::de::SeqAccess<'de>, T: serde::Deserialize<'de> {
+                seq.next_element()?.ok_or_else(|| serde::de::Error::missing_field(name))
+                }
+
                 // First element: operator string
                 let op: String = seq.next_element()?.ok_or_else(|| serde::de::Error::custom("missing operator"))?;
                 match op.as_str() {
-                "linear" => todo!("InterpolationName::Linear decoding is not currently implemented"),
-                _ => Err(serde::de::Error::custom(&format!("unknown operator {op} in expression. Please check the documentation for the avaliable expressions.")))
+                "linear" => {
+                Ok(InterpolationName::Linear)
+                },
+                _ => Err(serde::de::Error::unknown_variant(&op, &["linear"]))
                 }
             }
         }
@@ -443,6 +464,7 @@ mod tests {
             use super::*;
 
             #[rstest::rstest]
+            #[case::t_linear(serde_json::json!(["linear"]))]
             fn test_example_interpolation_name_decodes(#[case] example: serde_json::Value) {
                 let _ = serde_json::from_value::<InterpolationName>(example).expect("example should decode");
             }

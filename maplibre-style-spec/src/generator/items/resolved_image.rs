@@ -22,11 +22,10 @@ mod tests {
     fn generate_empty() {
         let mut scope = Scope::new();
         generate(&mut scope, "Foo", &Fields::default(), None);
-        insta::assert_snapshot!(scope.to_string(), @r#"
-        #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-        #[deprecated = "resolved_image not implemented"]
-        struct Foo(serde_json::Value);
-        "#)
+        insta::assert_snapshot!(scope.to_string(), @r"
+        #[derive(serde::Deserialize, PartialEq, Eq, Debug, Clone)]
+        struct Foo(String);
+        ")
     }
 
     #[test]
@@ -61,21 +60,20 @@ mod tests {
         },
         });
         let reference: StyleReference = serde_json::from_value(reference).unwrap();
-        insta::assert_snapshot!(crate::generator::generate_spec_scope(reference), @r#"
+        insta::assert_snapshot!(crate::generator::generate_spec_scope(reference), @r"
         /// This is a Maplibre Style Specification
         #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
         pub struct MaplibreStyleSpecification;
 
         /// Name of image in sprite to use for drawing an image background.
-        #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-        #[deprecated = "resolved_image not implemented"]
-        struct IconImage(serde_json::Value);
+        #[derive(serde::Deserialize, PartialEq, Eq, Debug, Clone)]
+        struct IconImage(String);
 
         #[cfg(test)]
         mod test {
             use super::*;
 
         }
-        "#);
+        ");
     }
 }

@@ -25,7 +25,7 @@ mod tests {
         generate(&mut scope, "Foo", &Fields::default());
         insta::assert_snapshot!(scope.to_string(), @r"
         #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-        struct Foo(serde_json::Value);
+        pub struct Foo(serde_json::Value);
         ")
     }
 
@@ -69,7 +69,7 @@ mod tests {
 
         /// A URL to a GeoJSON file, or inline GeoJSON.
         #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-        struct SourceGeojsonData(serde_json::Value);
+        pub struct SourceGeojsonData(serde_json::Value);
 
         /// The data type of the GeoJSON source.
         #[derive(serde::Deserialize, PartialEq, Eq, Debug, Clone, Copy)]
