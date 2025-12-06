@@ -277,7 +277,7 @@ mod tests {
         #[derive(PartialEq, Eq, Debug, Clone)]
         pub enum Expression {
             /// Binds expressions to named variables, which can then be referenced in the result expression using `["var", "variable_name"]`.
-            /// 
+            ///
             ///  - [Visualize population density](https://maplibre.org/maplibre-gl-js/docs/examples/visualize-population-density/)
             Let(Vec<serde_json::Value>),
         }
