@@ -32,6 +32,15 @@ pub fn generate_test_from_examples_if_present(
         .arg("#[case] example", "serde_json::Value")
         .attr("rstest::rstest");
     for example in examples {
+        if let Some(arr) = example.as_array() {
+            if let Some(fst) = arr.first() {
+                if let Some(op) = fst.as_str() {
+                    let ident = to_snake_case(op);
+                    fun.attr(format!("case::t_{ident}(serde_json::json!({example}))"));
+                    continue;
+                }
+            }
+        }
         fun.attr(format!("case(serde_json::json!({example}))"));
     }
     fun.line(format!(
