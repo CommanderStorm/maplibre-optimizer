@@ -13,16 +13,59 @@ pub fn generate(scope: &mut Scope, name: &str, common: &Fields) {
         .tuple_field(format!(
             "Vec<({anchor_name}, (serde_json::Number, serde_json::Number))>"
         ));
+    let visitor_name = format!("{name}Visitor");
     let des = scope
         .new_impl(name)
         .generic("'de")
         .impl_trait("serde::Deserialize<'de>")
         .new_fn("deserialize")
-        .arg("_deserializer", "D")
+        .arg("deserializer", "D")
         .generic("D")
         .bound("D", "serde::Deserializer<'de>")
         .ret("Result<Self, D::Error>");
-    des.line("todo!()");
+    des.line(format!("deserializer.deserialize_seq({visitor_name})"));
+
+    scope
+        .new_struct(&visitor_name)
+        .doc(format!("Visitor for deserializing [`{name}`]"));
+    let vis = scope
+        .new_impl(&visitor_name)
+        .generic("'de")
+        .impl_trait("serde::de::Visitor<'de>")
+        .associate_type("Value", name);
+    let maybe_like_example = common
+        .example
+        .as_ref()
+        .map(|it| format!(" like {it}"))
+        .unwrap_or_default();
+    vis.new_fn("expecting")
+        .arg_ref_self()
+        .arg("formatter", "&mut std::fmt::Formatter")
+        .ret("std::fmt::Result")
+        .line(format!(
+            "formatter.write_str(r#\"an {name}-array alternating between anchor and [x, y] offsets{maybe_like_example}\"#)",
+        ));
+
+    let visit_seq = vis
+        .new_fn("visit_seq")
+        .generic("A: serde::de::SeqAccess<'de>")
+        .arg_self()
+        .arg("mut seq", "A")
+        .ret("Result<Self::Value, A::Error>");
+    visit_seq.line("let mut out = Vec::new();");
+    {
+        visit_seq.line("loop {");
+        visit_seq.line("// 1. Read anchor");
+        visit_seq.line("let Some(anchor) = seq.next_element()? else {");
+        visit_seq.line("break; // no anchor = end of sequence");
+        visit_seq.line("};");
+        visit_seq.line("// 2. Read offset array");
+        visit_seq.line("let offset = seq.next_element()?;");
+        visit_seq.line("let Some(offset) = offset else { return Err(serde::de::Error::custom(\"expected offset after anchor, but sequence ended\")); };");
+        visit_seq.line("out.push((anchor, offset));");
+        visit_seq.line("}");
+    }
+    visit_seq.line(format!("Ok({name}(out))"));
 
     generate_test_from_example_if_present(scope, name, common.example.as_ref());
 }
@@ -37,18 +80,44 @@ mod tests {
     fn generate_empty() {
         let mut scope = Scope::new();
         generate(&mut scope, "Foo", &Fields::default());
-        insta::assert_snapshot!(scope.to_string(), @r"
+        insta::assert_snapshot!(scope.to_string(), @r##"
         #[derive(PartialEq, Debug, Clone)]
         pub struct Foo(Vec<(LayoutSymbolTextVariableAnchorValue, (serde_json::Number, serde_json::Number))>);
 
         impl<'de> serde::Deserialize<'de> for Foo {
-            fn deserialize<D>(_deserializer: D) -> Result<Self, D::Error>
+            fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
             where D: serde::Deserializer<'de>,
             {
-                todo!()
+                deserializer.deserialize_seq(FooVisitor)
             }
         }
-        ")
+
+        /// Visitor for deserializing [`Foo`]
+        struct FooVisitor;
+
+        impl<'de> serde::de::Visitor<'de> for FooVisitor {
+            type Value = Foo;
+
+            fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+                formatter.write_str(r#"an Foo-array alternating between anchor and [x, y] offsets"#)
+            }
+
+            fn visit_seq<A: serde::de::SeqAccess<'de>>(self, mut seq: A) -> Result<Self::Value, A::Error> {
+                let mut out = Vec::new();
+                loop {
+                // 1. Read anchor
+                let Some(anchor) = seq.next_element()? else {
+                break; // no anchor = end of sequence
+                };
+                // 2. Read offset array
+                let offset = seq.next_element()?;
+                let Some(offset) = offset else { return Err(serde::de::Error::custom("expected offset after anchor, but sequence ended")); };
+                out.push((anchor, offset));
+                }
+                Ok(Foo(out))
+            }
+        }
+        "##)
     }
 
     #[test]
@@ -90,7 +159,7 @@ mod tests {
         },
         });
         let reference: StyleReference = serde_json::from_value(reference).unwrap();
-        insta::assert_snapshot!(crate::generator::generate_spec_scope(reference), @r#"
+        insta::assert_snapshot!(crate::generator::generate_spec_scope(reference), @r##"
         /// This is a Maplibre Style Specification
         #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
         pub struct MaplibreStyleSpecification;
@@ -114,10 +183,36 @@ mod tests {
         pub struct TextVariableAnchorOffset(Vec<(LayoutSymbolTextVariableAnchorValue, (serde_json::Number, serde_json::Number))>);
 
         impl<'de> serde::Deserialize<'de> for TextVariableAnchorOffset {
-            fn deserialize<D>(_deserializer: D) -> Result<Self, D::Error>
+            fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
             where D: serde::Deserializer<'de>,
             {
-                todo!()
+                deserializer.deserialize_seq(TextVariableAnchorOffsetVisitor)
+            }
+        }
+
+        /// Visitor for deserializing [`TextVariableAnchorOffset`]
+        struct TextVariableAnchorOffsetVisitor;
+
+        impl<'de> serde::de::Visitor<'de> for TextVariableAnchorOffsetVisitor {
+            type Value = TextVariableAnchorOffset;
+
+            fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+                formatter.write_str(r#"an TextVariableAnchorOffset-array alternating between anchor and [x, y] offsets"#)
+            }
+
+            fn visit_seq<A: serde::de::SeqAccess<'de>>(self, mut seq: A) -> Result<Self::Value, A::Error> {
+                let mut out = Vec::new();
+                loop {
+                // 1. Read anchor
+                let Some(anchor) = seq.next_element()? else {
+                break; // no anchor = end of sequence
+                };
+                // 2. Read offset array
+                let offset = seq.next_element()?;
+                let Some(offset) = offset else { return Err(serde::de::Error::custom("expected offset after anchor, but sequence ended")); };
+                out.push((anchor, offset));
+                }
+                Ok(TextVariableAnchorOffset(out))
             }
         }
 
@@ -126,6 +221,6 @@ mod tests {
             use super::*;
 
         }
-        "#);
+        "##);
     }
 }

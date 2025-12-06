@@ -2800,11 +2800,41 @@ pub struct LayoutSymbolTextVariableAnchorOffset(
 );
 
 impl<'de> serde::Deserialize<'de> for LayoutSymbolTextVariableAnchorOffset {
-    fn deserialize<D>(_deserializer: D) -> Result<Self, D::Error>
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: serde::Deserializer<'de>,
     {
-        todo!()
+        deserializer.deserialize_seq(LayoutSymbolTextVariableAnchorOffsetVisitor)
+    }
+}
+
+/// Visitor for deserializing [`LayoutSymbolTextVariableAnchorOffset`]
+struct LayoutSymbolTextVariableAnchorOffsetVisitor;
+
+impl<'de> serde::de::Visitor<'de> for LayoutSymbolTextVariableAnchorOffsetVisitor {
+    type Value = LayoutSymbolTextVariableAnchorOffset;
+
+    fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+        formatter.write_str(r#"an LayoutSymbolTextVariableAnchorOffset-array alternating between anchor and [x, y] offsets like ["top",[0,4],"left",[3,0],"bottom",[1,1]]"#)
+    }
+
+    fn visit_seq<A: serde::de::SeqAccess<'de>>(self, mut seq: A) -> Result<Self::Value, A::Error> {
+        let mut out = Vec::new();
+        loop {
+            // 1. Read anchor
+            let Some(anchor) = seq.next_element()? else {
+                break; // no anchor = end of sequence
+            };
+            // 2. Read offset array
+            let offset = seq.next_element()?;
+            let Some(offset) = offset else {
+                return Err(serde::de::Error::custom(
+                    "expected offset after anchor, but sequence ended",
+                ));
+            };
+            out.push((anchor, offset));
+        }
+        Ok(LayoutSymbolTextVariableAnchorOffset(out))
     }
 }
 
