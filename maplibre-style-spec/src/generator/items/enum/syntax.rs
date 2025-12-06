@@ -80,17 +80,20 @@ pub fn generate_syntax_enum(
             // todo: enumerate options
         }
     }
+    let examples = values
+        .values()
+        .filter_map(|e| e.example.as_ref())
+        .collect::<Vec<_>>();
+    generate_syntax_enum_deserializer(scope, name, values, examples[0]);
 
-    generate_syntax_enum_deserializer(scope, &name, values);
-
-    let examples = values.values().filter_map(|e| e.example.as_ref()).collect();
     generate_test_from_examples_if_present(scope, name, examples);
 }
 
 fn generate_syntax_enum_deserializer(
     scope: &mut Scope,
-    name: &&str,
+    name: &str,
     values: &BTreeMap<String, SyntaxEnum>,
+    example: &serde_json::Value,
 ) {
     let visitor_name = format!("{name}Visitor");
     scope
@@ -117,7 +120,9 @@ fn generate_syntax_enum_deserializer(
         .arg_ref_self()
         .arg("formatter", "&mut std::fmt::Formatter")
         .ret("std::fmt::Result")
-        .line("formatter.write_str(r#\"an expression array like [\"==\", 1, 2]\"#)");
+        .line(format!(
+            "formatter.write_str(r#\"an {name} like {example}\"#)"
+        ));
 
     let visit_seq = vis
         .new_fn("visit_seq")
@@ -135,7 +140,7 @@ fn generate_syntax_enum_deserializer(
         ));
     }
 
-    visit_seq.line("_ => Err(serde::de::Error::custom(&format!(\"unknown operator {op} in expression. Please check the documentation for the avaliable expressions.\")))");
+    visit_seq.line(format!("_ => Err(serde::de::Error::custom(format!(\"unknown operator {{op}} in {name}. Please check the documentation for the available {name}.\")))"));
     visit_seq.line("}");
 }
 

@@ -847,7 +847,7 @@ impl<'de> serde::de::Visitor<'de> for ExpressionNameVisitor {
     type Value = ExpressionName;
 
     fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
-        formatter.write_str(r#"an expression array like ["==", 1, 2]"#)
+        formatter.write_str(r#"an ExpressionName like ["!",["has","point_count"]]"#)
     }
 
     fn visit_seq<A: serde::de::SeqAccess<'de>>(self, mut seq: A) -> Result<Self::Value, A::Error> {
@@ -969,8 +969,8 @@ impl<'de> serde::de::Visitor<'de> for ExpressionNameVisitor {
             "var" => todo!("ExpressionName::Var decoding is not currently implemented"),
             "within" => todo!("ExpressionName::Within decoding is not currently implemented"),
             "zoom" => todo!("ExpressionName::Zoom decoding is not currently implemented"),
-            _ => Err(serde::de::Error::custom(&format!(
-                "unknown operator {op} in expression. Please check the documentation for the avaliable expressions."
+            _ => Err(serde::de::Error::custom(format!(
+                "unknown operator {op} in ExpressionName. Please check the documentation for the available ExpressionName."
             ))),
         }
     }
@@ -1207,7 +1207,7 @@ impl<'de> serde::de::Visitor<'de> for InterpolationNameVisitor {
     type Value = InterpolationName;
 
     fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
-        formatter.write_str(r#"an expression array like ["==", 1, 2]"#)
+        formatter.write_str(r#"an InterpolationName like ["cubic-bezier",2,3,2,3]"#)
     }
 
     fn visit_seq<A: serde::de::SeqAccess<'de>>(self, mut seq: A) -> Result<Self::Value, A::Error> {
@@ -1223,8 +1223,8 @@ impl<'de> serde::de::Visitor<'de> for InterpolationNameVisitor {
                 todo!("InterpolationName::Exponential decoding is not currently implemented")
             }
             "linear" => todo!("InterpolationName::Linear decoding is not currently implemented"),
-            _ => Err(serde::de::Error::custom(&format!(
-                "unknown operator {op} in expression. Please check the documentation for the avaliable expressions."
+            _ => Err(serde::de::Error::custom(format!(
+                "unknown operator {op} in InterpolationName. Please check the documentation for the available InterpolationName."
             ))),
         }
     }
