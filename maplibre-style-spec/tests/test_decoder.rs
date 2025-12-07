@@ -1,8 +1,9 @@
-use maplibre_style_spec::spec::decoder::{StyleReference, TopLevelItem};
-use serde_json::Value;
-use std::{collections::HashMap, path::PathBuf};
+use std::collections::{BTreeMap, HashMap};
 
-// objects produced by errors here are too large to review
+use maplibre_style_spec::decoder::{ParsedItem, StyleReference, TopLevelItem};
+use serde_json::Value;
+
+// objects produced by errors here are too large to review;
 // to produce better error messages, we need to remove keys that don't cause errors
 fn minimise_object(check_still_produces_error: fn(Value) -> bool, value: Value) -> Value {
     let values_to_try_to_remove = if let Value::Object(o) = value.clone() {
@@ -18,7 +19,7 @@ fn minimise_object(check_still_produces_error: fn(Value) -> bool, value: Value) 
             .remove(&outer_key)
             .unwrap();
         if !check_still_produces_error(minimized.clone()) {
-            // current object must be causing the mishap
+            // the current object must be causing the mishap
             minimized.as_object_mut().unwrap().clear();
             let _ = minimized
                 .as_object_mut()
@@ -32,11 +33,18 @@ fn minimise_object(check_still_produces_error: fn(Value) -> bool, value: Value) 
 
 #[test]
 fn test_decode_top_level() {
-    let v8_path = PathBuf::from("tests/upstream/src/reference/v8.json");
-
-    let content = std::fs::read_to_string(v8_path).unwrap();
-    let mut style: HashMap<String, Value> = serde_json::from_str(&content).unwrap();
+    let content = include_str!("../../upstream/src/reference/v8.json");
+    let mut style: BTreeMap<String, Value> = serde_json::from_str(content).unwrap();
     assert_eq!(style.remove("$version"), Some(Value::Number(8.into())));
+    if let Some(root) = style.remove("$root") {
+        let root_items = serde_json::from_value::<BTreeMap<String, Value>>(root.clone())
+            .expect("$root is a valid map of top level items.");
+        for (key, root_item) in root_items {
+            serde_json::from_value::<ParsedItem>(root_item.clone()).unwrap_or_else(|e| {
+                panic!("$root.{key} is not a valid ParsedItem\n{root_item:#?}: {e:?}")
+            });
+        }
+    }
 
     for (key, value) in style {
         if let Err(e) = serde_json::from_value::<TopLevelItem>(value.clone()) {
@@ -55,9 +63,49 @@ fn test_decode_top_level() {
 
 #[test]
 fn test_decode_whole_reference() {
-    let v8_path = PathBuf::from("tests/upstream/src/reference/v8.json");
-
-    let content = std::fs::read_to_string(v8_path).unwrap();
-    let style: StyleReference = serde_json::from_str(&content).unwrap();
+    let content = include_str!("../../upstream/src/reference/v8.json");
+    let style: StyleReference = serde_json::from_str(content).unwrap();
     assert_eq!(style.version, 8);
+    assert!(!style.root.is_empty());
+    assert!(!style.fields.is_empty());
+
+    let references = collect_referencs(&style);
+    for (reference, first_occurance) in references {
+        if !style.fields.contains_key(&reference) {
+            panic!("{first_occurance} references {reference} which does not exist.");
+        }
+    }
+}
+
+/// collect all references in the style spec to ensure they are valid in a second step
+fn collect_referencs(style: &StyleReference) -> HashMap<String, String> {
+    let mut ht = HashMap::new();
+    for (k, field) in &style.fields {
+        match field {
+            TopLevelItem::Item(p) => {
+                if let ParsedItem::Reference { references, .. } = p.as_ref()
+                    && !ht.contains_key(references)
+                {
+                    ht.insert(references.clone(), k.clone());
+                }
+            }
+            TopLevelItem::Group(g) => {
+                for (key2, p) in g {
+                    if let ParsedItem::Reference { references, .. } = p
+                        && !ht.contains_key(references)
+                    {
+                        ht.insert(references.clone(), format!("{k}.{key2}"));
+                    }
+                }
+            }
+            TopLevelItem::OneOf(rs) => {
+                for reference in rs {
+                    if !ht.contains_key(reference) {
+                        ht.insert(reference.clone(), k.clone());
+                    }
+                }
+            }
+        }
+    }
+    ht
 }
