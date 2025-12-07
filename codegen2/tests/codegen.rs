@@ -746,9 +746,76 @@ fn struct_with_member_visibility() {
     struct_description.new_field("baz", "i16").vis("pub(crate)");
 
     insta::assert_snapshot!(scope.to_string(), @r"
+        struct Foo {
+            pub bar: usize,
+            pub(crate) baz: i16,
+        }
+        ");
+}
+
+#[test]
+fn get_mut_struct() {
+    let mut scope = Scope::new();
+    assert!(scope.get_enum_mut("Foo").is_none());
+
+    scope.new_struct("Foo").field("one", "usize");
+    insta::assert_snapshot!(scope.to_string(), @r"
     struct Foo {
-        pub bar: usize,
-        pub(crate) baz: i16,
+        one: usize,
+    }
+    ");
+
+    scope
+        .get_struct_mut("Foo")
+        .expect("struct_mut")
+        .field("two", "String");
+    insta::assert_snapshot!(scope.to_string(), @r"
+    struct Foo {
+        one: usize,
+        two: String,
+    }
+    ");
+}
+#[test]
+fn get_mut_enum() {
+    let mut scope = Scope::new();
+    assert!(scope.get_enum_mut("Bar").is_none());
+
+    scope.new_enum("Bar").push_variant(Variant::new("Baz"));
+    insta::assert_snapshot!(scope.to_string(), @r"
+    enum Bar {
+        Baz,
+    }
+    ");
+
+    scope
+        .get_enum_mut("Bar")
+        .expect("enum_mut")
+        .push_variant(Variant::new("Quux"));
+    insta::assert_snapshot!(scope.to_string(), @r"
+    enum Bar {
+        Baz,
+        Quux,
+    }
+    ");
+}
+#[test]
+fn get_mut_fn() {
+    let mut scope = Scope::new();
+    assert!(scope.get_fn_mut("baz").is_none());
+
+    scope.new_fn("baz").line("let a = 1;");
+    insta::assert_snapshot!(scope.to_string(), @r"
+    fn baz() {
+        let a = 1;
+    }
+    ");
+
+    scope.get_fn_mut("baz").expect("fn_mut").line("let b = 2;");
+    insta::assert_snapshot!(scope.to_string(), @r"
+    fn baz() {
+        let a = 1;
+        let b = 2;
     }
     ");
 }
