@@ -1,0 +1,21 @@
+[package]
+name = "codegen2"
+version = "0.3.0"
+license = "MIT"
+authors = [
+    "Carl Lerche <me@carllerche.com>",
+    "Carter Schultz <carterjschultz@gmail.com>",
+    "Yovoslav Yovchev <yovoslav@proton.me>",
+]
+description = "Library for generating Rust code"
+documentation = "https://docs.rs/codegen2"
+homepage = "https://gitlab.com/yovoslav/codegen"
+repository = "https://gitlab.com/yovoslav/codegen.git"
+readme = "README.md"
+edition = "2024"
+
+[dependencies]
+indexmap = "2.11"
+
+[dev-dependencies]
+insta.workspace = true
