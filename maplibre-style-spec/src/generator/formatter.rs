@@ -1,5 +1,6 @@
-pub fn to_upper_camel_case(name: &str) -> String {
-    let prefiltered_name = prefilter_names(name);
+pub fn to_upper_camel_case(name: impl ToString) -> String {
+    let name = name.to_string();
+    let prefiltered_name = prefilter_names(&name);
 
     let result = prefiltered_name
         .split(|c: char| !c.is_alphanumeric()) // split on non-alphanumeric
@@ -36,8 +37,9 @@ pub fn to_upper_camel_case(name: &str) -> String {
     rustize(result)
 }
 
-pub fn to_snake_case(name: &str) -> String {
-    let prefiltered_name = prefilter_names(name);
+pub fn to_snake_case(name: impl ToString) -> String {
+    let name = name.to_string();
+    let prefiltered_name = prefilter_names(&name);
     let mut result = String::new();
     let mut prev_was_lower = false;
     let mut prev_was_underscore = false;

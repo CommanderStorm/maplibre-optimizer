@@ -4,7 +4,7 @@ use codegen2::{Function, Impl, Scope};
 use serde_json::Value;
 
 use crate::decoder::Fields;
-use crate::decoder::r#enum::{Overload, Syntax, SyntaxEnum};
+use crate::decoder::r#enum::{Literal, Overload, Parameter, ParameterType, Syntax, SyntaxEnum};
 use crate::generator::autotest::generate_test_from_examples_if_present;
 use crate::generator::formatter::to_upper_camel_case;
 
@@ -19,6 +19,7 @@ pub fn generate_syntax_enum(
         .doc(&common.doc)
         .vis("pub")
         .derive("PartialEq, Eq, Debug, Clone");
+    // pass 1: populate enum variants
     for (key, value) in values {
         let var_name = to_upper_camel_case(key);
         let var = enu.new_variant(&var_name).doc(&value.doc);
@@ -35,7 +36,8 @@ pub fn generate_syntax_enum(
         if syntax.overloads.len() == 1 {
             // not overloaded, above the Option<T> level
             let overload = &syntax.overloads[0];
-            if overload.parameters.iter().any(|p| p == "...") {
+            if has_variadic_overload(&syntax.overloads) {
+                // todo: needs proper variadic codegen
                 var.tuple("Vec<serde_json::Value>");
                 continue;
             }
@@ -55,6 +57,7 @@ pub fn generate_syntax_enum(
             var.tuple(&options_name);
         }
     }
+    // pass 2: generate the previously referenced enum variants for overloaded variants
     for (key, value) in values {
         let var_name = to_upper_camel_case(key);
         let syntax = &value.syntax;
@@ -68,17 +71,9 @@ pub fn generate_syntax_enum(
             "{key} in {name_and_possibly_group} does not have a single overload"
         );
         if syntax.overloads.len() != 1 {
-            // actually overloaded
             let options_name = format!("{var_name}Options");
-
-            let _enu = scope
-                .new_enum(&options_name)
-                .doc(format!(
-                    "Options for deserializing the syntax enum variant [`{name}::{var_name}`]"
-                ))
-                .vis("pub")
-                .derive("serde::Deserialize, PartialEq, Eq, Debug, Clone");
-            // todo: enumerate options
+            // actually overloaded
+            generate_multi_overload(scope, (name, &var_name, &options_name), syntax);
         }
     }
     let examples = values
@@ -88,6 +83,173 @@ pub fn generate_syntax_enum(
     generate_syntax_enum_deserializer(scope, name, values, examples[0]);
 
     generate_test_from_examples_if_present(scope, name, examples);
+}
+
+fn has_variadic_overload(overloads: &Vec<Overload>) -> bool {
+    overloads.iter().any(|o| o.is_variadic())
+}
+
+fn generate_multi_overload(
+    scope: &mut Scope,
+    (name, var_name, options_name): (&str, &str, &str),
+    syntax: &Syntax,
+) {
+    // because scope can only be owned by one owner, we first need to generate all tuples, then can add them
+    let mut overloads_tuples = Vec::with_capacity(syntax.overloads.len());
+    for overload in &syntax.overloads {
+        if overload.is_variadic() {
+            // todo: needs proper variadic codegen
+            overloads_tuples.push(vec!["serde_json::Value".to_string()]);
+        } else {
+            let var_name = overload.output_type.to_upper_camel_case();
+            let mut tuples = Vec::with_capacity(overload.parameters.len());
+            for param in &overload.parameters {
+                let param_name =
+                    generate_parameter_type(scope, (name, &var_name, param), &syntax.parameters);
+                tuples.push(param_name);
+            }
+            overloads_tuples.push(tuples);
+        }
+    }
+
+    let enu = scope
+        .new_enum(&options_name)
+        .doc(format!(
+            "Options for deserializing the syntax enum variant [`{name}::{var_name}`]"
+        ))
+        .vis("pub")
+        .derive("serde::Deserialize, PartialEq, Eq, Debug, Clone");
+    let variant_naming_strat = OverloadVariantNamingStrategy::detect(&syntax.overloads);
+    for (i, overload) in syntax.overloads.iter().enumerate() {
+        let var_name = variant_naming_strat.var_name(overload, i);
+        let var = enu.new_variant(&var_name);
+        for t in &overloads_tuples[i] {
+            var.tuple(t);
+        }
+    }
+}
+
+enum OverloadVariantNamingStrategy {
+    OutputType,
+    NumberOptions,
+    ConstantMapping(Vec<String>),
+}
+
+impl OverloadVariantNamingStrategy {
+    fn detect(overloads: &Vec<Overload>) -> Self {
+        assert!(
+            overloads.len() > 1,
+            "renaming detection does only make sense for more than one overload"
+        );
+        // case 1: the output type is different
+        let mut output_types = overloads
+            .iter()
+            .map(|o| o.output_type.to_upper_camel_case())
+            .collect::<Vec<_>>();
+        output_types.sort_unstable();
+        let all_output_types = output_types.len();
+        output_types.dedup();
+        if all_output_types == output_types.len() {
+            return OverloadVariantNamingStrategy::NumberOptions;
+        }
+
+        // case 2: the parameter lengths are all different
+        let mut parameter_lengths = overloads
+            .iter()
+            .map(|o| o.parameters.len())
+            .collect::<Vec<_>>();
+        parameter_lengths.sort_unstable();
+        let all_params = parameter_lengths.len();
+        parameter_lengths.dedup();
+        if all_params == parameter_lengths.len() {
+            return OverloadVariantNamingStrategy::NumberOptions;
+        }
+
+        // case 3: the first parameter is different
+        let mut first_parameters = overloads
+            .iter()
+            .map(|o| o.parameters.first().cloned().unwrap_or_default())
+            // by default, the names are kind of bad, so we replace unstable patterns
+            .map(|name| {
+                if name.ends_with('?') {
+                    format!("Opt{}", name.replace('?', ""))
+                } else {
+                    name
+                }
+            })
+            .map(|name| {
+                if name.ends_with("_1") {
+                    name.replace("_1", "")
+                } else {
+                    name
+                }
+            })
+            .map(to_upper_camel_case)
+            .collect::<Vec<_>>();
+        first_parameters.sort_unstable();
+        let all_first_parameters = first_parameters.len();
+        first_parameters.dedup();
+        if all_first_parameters == first_parameters.len() {
+            return OverloadVariantNamingStrategy::ConstantMapping(first_parameters);
+        }
+
+        panic!("could not determine a good naming strategy for {overloads:?}");
+    }
+    fn var_name(&self, overload: &Overload, i: usize) -> String {
+        match self {
+            OverloadVariantNamingStrategy::OutputType => overload.output_type.to_upper_camel_case(),
+            OverloadVariantNamingStrategy::NumberOptions => to_upper_camel_case(&format!("{i}")),
+            OverloadVariantNamingStrategy::ConstantMapping(m) => m[i].clone(),
+        }
+    }
+}
+
+fn generate_parameter_type(
+    scope: &mut Scope,
+    (name, var_name, param): (&str, &str, &str),
+    parameters: &Vec<Parameter>,
+) -> String {
+    if let Some(param) = param.strip_suffix('?') {
+        let param = parameters.iter()
+            .find(|p| p.name == param)
+            .unwrap_or_else(|| panic!("parameter {param} from the syntax overload of {name}::{var_name} does not have a syntax parameter"));
+        let param_name = generate_parameter_variant(scope, &param.r#type);
+        format!("Option<{param_name}>")
+    } else {
+        let param = parameters.iter()
+            .find(|p| p.name == param.to_string().as_str())
+            .unwrap_or_else(|| panic!("parameter {param} from the syntax overload of {name}::{var_name} does not have a syntax parameter"));
+        generate_parameter_variant(scope, &param.r#type)
+    }
+}
+
+fn generate_parameter_variant(scope: &mut Scope, param: &ParameterType) -> String {
+    match &param {
+        ParameterType::Literal(l) => l.to_upper_camel_case().to_string(),
+        ParameterType::LiteralAnyOf(ls) => generate_any_of(scope, ls),
+        ParameterType::Expression(e) => e.to_upper_camel_case().to_string(),
+        ParameterType::ExpressionAnyOf(_) => "serde_json::Value".to_string(),
+        ParameterType::Object(_) => "serde_json::Map".to_string(),
+        ParameterType::Reference(r) => to_upper_camel_case(&r),
+    }
+}
+fn generate_any_of(scope: &mut Scope, any_of: &[Literal]) -> String {
+    let ts = any_of
+        .iter()
+        .map(|l| l.to_upper_camel_case())
+        .collect::<Vec<_>>();
+    let any_of_type = ts.join("Or");
+    if scope.get_enum_mut(&any_of_type).is_none() {
+        let enu = scope
+            .new_enum(&any_of_type)
+            .doc("Either of the below variants")
+            .vis("pub")
+            .derive("serde::Deserialize, PartialEq, Debug, Clone");
+        for t in ts {
+            enu.new_variant(&t).tuple(&t);
+        }
+    }
+    any_of_type
 }
 
 fn generate_syntax_enum_deserializer(
@@ -111,17 +273,13 @@ fn generate_syntax_enum_deserializer(
     visit_seq.line("match op.as_str() {");
     for (key, syntax_docs) in values {
         let syntax = &syntax_docs.syntax;
-        let has_variadic_overload = syntax
-            .overloads
-            .iter()
-            .any(|o| o.parameters.iter().any(|p| p == "..."));
         let variant_name = to_upper_camel_case(key);
 
         visit_seq.line(format!("\"{key}\" => {{"));
         if syntax.overloads.len() == 1
             && let Some(overload) = syntax.overloads.first()
         {
-            if has_variadic_overload {
+            if has_variadic_overload(&syntax.overloads) {
                 generate_syntax_enum_deserializer_regular_variadic_variant(
                     visit_seq,
                     (&name, &variant_name),
@@ -135,7 +293,7 @@ fn generate_syntax_enum_deserializer(
                 );
             }
         } else {
-            if has_variadic_overload {
+            if has_variadic_overload(&syntax.overloads) {
                 generate_syntax_enum_deserializer_multi_variadic_overload_variant(
                     visit_seq,
                     (&name, &variant_name),

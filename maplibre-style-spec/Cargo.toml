@@ -13,6 +13,7 @@ color = { workspace = true, features = ["serde"] }
 serde.workspace = true
 serde_json.workspace = true
 url = { workspace = true, features = ["serde"] }
+geojson.workspace = true
 
 [dev-dependencies]
 insta.workspace = true

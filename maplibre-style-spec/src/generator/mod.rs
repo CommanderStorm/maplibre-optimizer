@@ -7,7 +7,7 @@ use crate::decoder::{ParsedItem, PrimitiveType, StyleReference, TopLevelItem};
 use crate::generator::formatter::{to_snake_case, to_upper_camel_case};
 
 mod autotest;
-mod formatter;
+pub mod formatter;
 mod items;
 
 pub fn generate_spec_scope(mut reference: StyleReference) -> String {

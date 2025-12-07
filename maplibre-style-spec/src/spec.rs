@@ -521,13 +521,9 @@ pub enum ExpressionName {
     /// Returns `true` if the input values are not equal, `false` otherwise. The comparison is strictly typed: values of different runtime types are always considered unequal. Cases where the types are known to be different at parse time are considered invalid and will produce a parse error. Accepts an optional `collator` argument to control locale-dependent string comparisons.
     ///
     ///  - [Display HTML clusters with custom properties](https://maplibre.org/maplibre-gl-js/docs/examples/display-html-clusters-with-custom-properties/)
-    NotEqual(
-        serde_json::Value,
-        serde_json::Value,
-        Option<serde_json::Value>,
-    ),
+    NotEqual(Vec<serde_json::Value>),
     /// Returns the remainder after integer division of the first input by the second.
-    Percentage(serde_json::Value, serde_json::Value),
+    Percentage(Vec<serde_json::Value>),
     /// Returns the product of the inputs.
     Star(Vec<serde_json::Value>),
     /// Returns the sum of the inputs.
@@ -537,7 +533,7 @@ pub enum ExpressionName {
     /// Returns the result of floating point division of the first input by the second.
     ///
     ///  - [Visualize population density](https://maplibre.org/maplibre-gl-js/docs/examples/visualize-population-density/)
-    Slash(serde_json::Value, serde_json::Value),
+    Slash(Vec<serde_json::Value>),
     /// Returns `true` if the first input is strictly less than the second, `false` otherwise. The arguments are required to be either both strings or both numbers; if during evaluation they are not, expression evaluation produces an error. Cases where this constraint is known not to hold at parse time are considered in valid and will produce a parse error. Accepts an optional `collator` argument to control locale-dependent string comparisons.
     ///
     ///  - [Display HTML clusters with custom properties](https://maplibre.org/maplibre-gl-js/docs/examples/display-html-clusters-with-custom-properties/)
@@ -553,11 +549,7 @@ pub enum ExpressionName {
     ///  - [Display buildings in 3D](https://maplibre.org/maplibre-gl-js/docs/examples/display-buildings-in-3d/)
     ///
     ///  - [Filter symbols by toggling a list](https://maplibre.org/maplibre-gl-js/docs/examples/filter-symbols-by-toggling-a-list/)
-    EqualEqual(
-        serde_json::Value,
-        serde_json::Value,
-        Option<serde_json::Value>,
-    ),
+    EqualEqual(Vec<serde_json::Value>),
     /// Returns `true` if the first input is strictly greater than the second, `false` otherwise. The arguments are required to be either both strings or both numbers; if during evaluation they are not, expression evaluation produces an error. Cases where this constraint is known not to hold at parse time are considered in valid and will produce a parse error. Accepts an optional `collator` argument to control locale-dependent string comparisons.
     Greater(GreaterOptions),
     /// Returns `true` if the first input is greater than or equal to the second, `false` otherwise. The arguments are required to be either both strings or both numbers; if during evaluation they are not, expression evaluation produces an error. Cases where this constraint is known not to hold at parse time are considered in valid and will produce a parse error. Accepts an optional `collator` argument to control locale-dependent string comparisons.
@@ -565,7 +557,7 @@ pub enum ExpressionName {
     ///  - [Display HTML clusters with custom properties](https://maplibre.org/maplibre-gl-js/docs/examples/display-html-clusters-with-custom-properties/)
     GreaterEqual(GreaterEqualOptions),
     /// Returns the result of raising the first input to the power specified by the second.
-    Power(serde_json::Value, serde_json::Value),
+    Power(Vec<serde_json::Value>),
     /// Returns the absolute value of the input.
     Absolute(serde_json::Value),
     /// Gets the value of a cluster property accumulated so far. Can only be used in the `clusterProperties` option of a clustered GeoJSON source.
@@ -793,43 +785,74 @@ pub enum ExpressionName {
 
 /// Options for deserializing the syntax enum variant [`ExpressionName::Minus`]
 #[derive(serde::Deserialize, PartialEq, Eq, Debug, Clone)]
-pub enum MinusOptions {}
+pub enum MinusOptions {
+    Zero(serde_json::Value),
+    One(NumberExpression),
+}
 
 /// Options for deserializing the syntax enum variant [`ExpressionName::Less`]
 #[derive(serde::Deserialize, PartialEq, Eq, Debug, Clone)]
-pub enum LessOptions {}
+pub enum LessOptions {
+    Number(serde_json::Value),
+    String(serde_json::Value),
+}
 
 /// Options for deserializing the syntax enum variant [`ExpressionName::LessEqual`]
 #[derive(serde::Deserialize, PartialEq, Eq, Debug, Clone)]
-pub enum LessEqualOptions {}
+pub enum LessEqualOptions {
+    Number(serde_json::Value),
+    String(serde_json::Value),
+}
 
 /// Options for deserializing the syntax enum variant [`ExpressionName::Greater`]
 #[derive(serde::Deserialize, PartialEq, Eq, Debug, Clone)]
-pub enum GreaterOptions {}
+pub enum GreaterOptions {
+    Number(serde_json::Value),
+    String(serde_json::Value),
+}
 
 /// Options for deserializing the syntax enum variant [`ExpressionName::GreaterEqual`]
 #[derive(serde::Deserialize, PartialEq, Eq, Debug, Clone)]
-pub enum GreaterEqualOptions {}
+pub enum GreaterEqualOptions {
+    Number(serde_json::Value),
+    String(serde_json::Value),
+}
 
 /// Options for deserializing the syntax enum variant [`ExpressionName::Array`]
 #[derive(serde::Deserialize, PartialEq, Eq, Debug, Clone)]
-pub enum ArrayOptions {}
+pub enum ArrayOptions {
+    Zero(Expression),
+    One(serde_json::Value, Expression),
+    Two(serde_json::Value, NumberLiteral, Expression),
+}
 
 /// Options for deserializing the syntax enum variant [`ExpressionName::In`]
 #[derive(serde::Deserialize, PartialEq, Eq, Debug, Clone)]
-pub enum InOptions {}
+pub enum InOptions {
+    Item(T, ArrayExpression),
+    Substring(StringExpression, StringExpression),
+}
 
 /// Options for deserializing the syntax enum variant [`ExpressionName::IndexOf`]
 #[derive(serde::Deserialize, PartialEq, Eq, Debug, Clone)]
-pub enum IndexOfOptions {}
+pub enum IndexOfOptions {
+    Item(T, ArrayExpression, Option<NumberExpression>),
+    Substring(StringExpression, StringExpression, Option<NumberExpression>),
+}
 
 /// Options for deserializing the syntax enum variant [`ExpressionName::Literal`]
 #[derive(serde::Deserialize, PartialEq, Eq, Debug, Clone)]
-pub enum LiteralOptions {}
+pub enum LiteralOptions {
+    Zero(JSONObjectLiteral),
+    One(JSONArrayLiteral),
+}
 
 /// Options for deserializing the syntax enum variant [`ExpressionName::Slice`]
 #[derive(serde::Deserialize, PartialEq, Eq, Debug, Clone)]
-pub enum SliceOptions {}
+pub enum SliceOptions {
+    Zero(ArrayExpression, NumberExpression, Option<NumberExpression>),
+    One(StringExpression, NumberExpression, Option<NumberExpression>),
+}
 
 impl<'de> serde::Deserialize<'de> for ExpressionName {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
@@ -871,52 +894,50 @@ impl<'de> serde::de::Visitor<'de> for ExpressionNameVisitor {
                 Ok(ExpressionName::Not(input))
             }
             "!=" => {
-                let input_1 = visit_seq_field(&mut seq, "input_1")?;
-                let input_2 = visit_seq_field(&mut seq, "input_2")?;
-                let collator = seq.next_element()?;
-                Ok(ExpressionName::NotEqual(input_1, input_2, collator))
+                todo!("ExpressionName::NotEqual needs variadic overloads implemented")
             }
             "%" => {
-                let input_1 = visit_seq_field(&mut seq, "input_1")?;
-                let input_2 = visit_seq_field(&mut seq, "input_2")?;
-                Ok(ExpressionName::Percentage(input_1, input_2))
+                todo!("ExpressionName::Percentage needs variadic overloads implemented")
             }
             "*" => {
-                todo!("Star needs variadic overloads implemented")
+                todo!("ExpressionName::Star needs variadic overloads implemented")
             }
             "+" => {
-                todo!("Plus needs variadic overloads implemented")
+                todo!("ExpressionName::Plus needs variadic overloads implemented")
             }
             "-" => {
-                todo!("Minus needs multiple overloads implemented")
+                todo!(
+                    "ExpressionName::Minus needs multiple variadic overloads, i.e. MinusOptions implemented"
+                )
             }
             "/" => {
-                let input_1 = visit_seq_field(&mut seq, "input_1")?;
-                let input_2 = visit_seq_field(&mut seq, "input_2")?;
-                Ok(ExpressionName::Slash(input_1, input_2))
+                todo!("ExpressionName::Slash needs variadic overloads implemented")
             }
             "<" => {
-                todo!("Less needs multiple overloads implemented")
+                todo!(
+                    "ExpressionName::Less needs multiple variadic overloads, i.e. LessOptions implemented"
+                )
             }
             "<=" => {
-                todo!("LessEqual needs multiple overloads implemented")
+                todo!(
+                    "ExpressionName::LessEqual needs multiple variadic overloads, i.e. LessEqualOptions implemented"
+                )
             }
             "==" => {
-                let input_1 = visit_seq_field(&mut seq, "input_1")?;
-                let input_2 = visit_seq_field(&mut seq, "input_2")?;
-                let collator = seq.next_element()?;
-                Ok(ExpressionName::EqualEqual(input_1, input_2, collator))
+                todo!("ExpressionName::EqualEqual needs variadic overloads implemented")
             }
             ">" => {
-                todo!("Greater needs multiple overloads implemented")
+                todo!(
+                    "ExpressionName::Greater needs multiple variadic overloads, i.e. GreaterOptions implemented"
+                )
             }
             ">=" => {
-                todo!("GreaterEqual needs multiple overloads implemented")
+                todo!(
+                    "ExpressionName::GreaterEqual needs multiple variadic overloads, i.e. GreaterEqualOptions implemented"
+                )
             }
             "^" => {
-                let input_1 = visit_seq_field(&mut seq, "input_1")?;
-                let input_2 = visit_seq_field(&mut seq, "input_2")?;
-                Ok(ExpressionName::Power(input_1, input_2))
+                todo!("ExpressionName::Power needs variadic overloads implemented")
             }
             "abs" => {
                 let input = visit_seq_field(&mut seq, "input")?;
@@ -928,13 +949,15 @@ impl<'de> serde::de::Visitor<'de> for ExpressionNameVisitor {
                 Ok(ExpressionName::Arccosine(input))
             }
             "all" => {
-                todo!("All needs variadic overloads implemented")
+                todo!("ExpressionName::All needs variadic overloads implemented")
             }
             "any" => {
-                todo!("Any needs variadic overloads implemented")
+                todo!("ExpressionName::Any needs variadic overloads implemented")
             }
             "array" => {
-                todo!("Array needs multiple overloads implemented")
+                todo!(
+                    "ExpressionName::Array needs multiple overloads, i.e. ArrayOptions implemented"
+                )
             }
             "asin" => {
                 let input = visit_seq_field(&mut seq, "input")?;
@@ -950,24 +973,24 @@ impl<'de> serde::de::Visitor<'de> for ExpressionNameVisitor {
                 Ok(ExpressionName::Atan(input))
             }
             "boolean" => {
-                todo!("Boolean needs variadic overloads implemented")
+                todo!("ExpressionName::Boolean needs variadic overloads implemented")
             }
             "case" => {
-                todo!("Case needs variadic overloads implemented")
+                todo!("ExpressionName::Case needs variadic overloads implemented")
             }
             "ceil" => {
                 let input = visit_seq_field(&mut seq, "input")?;
                 Ok(ExpressionName::Ceil(input))
             }
             "coalesce" => {
-                todo!("Coalesce needs variadic overloads implemented")
+                todo!("ExpressionName::Coalesce needs variadic overloads implemented")
             }
             "collator" => {
                 let options = visit_seq_field(&mut seq, "options")?;
                 Ok(ExpressionName::Collator(options))
             }
             "concat" => {
-                todo!("Concat needs variadic overloads implemented")
+                todo!("ExpressionName::Concat needs variadic overloads implemented")
             }
             "cos" => {
                 let input = visit_seq_field(&mut seq, "input")?;
@@ -992,7 +1015,7 @@ impl<'de> serde::de::Visitor<'de> for ExpressionNameVisitor {
                 Ok(ExpressionName::Floor(input))
             }
             "format" => {
-                todo!("Format needs variadic overloads implemented")
+                todo!("ExpressionName::Format needs variadic overloads implemented")
             }
             "geometry-type" => Ok(ExpressionName::GeometryType),
             "get" => {
@@ -1016,19 +1039,21 @@ impl<'de> serde::de::Visitor<'de> for ExpressionNameVisitor {
                 Ok(ExpressionName::Image(image_name))
             }
             "in" => {
-                todo!("In needs multiple overloads implemented")
+                todo!("ExpressionName::In needs multiple overloads, i.e. InOptions implemented")
             }
             "index-of" => {
-                todo!("IndexOf needs multiple overloads implemented")
+                todo!(
+                    "ExpressionName::IndexOf needs multiple overloads, i.e. IndexOfOptions implemented"
+                )
             }
             "interpolate" => {
-                todo!("Interpolate needs variadic overloads implemented")
+                todo!("ExpressionName::Interpolate needs variadic overloads implemented")
             }
             "interpolate-hcl" => {
-                todo!("InterpolateHcl needs variadic overloads implemented")
+                todo!("ExpressionName::InterpolateHcl needs variadic overloads implemented")
             }
             "interpolate-lab" => {
-                todo!("InterpolateLab needs variadic overloads implemented")
+                todo!("ExpressionName::InterpolateLab needs variadic overloads implemented")
             }
             "is-supported-script" => {
                 let input = visit_seq_field(&mut seq, "input")?;
@@ -1039,11 +1064,13 @@ impl<'de> serde::de::Visitor<'de> for ExpressionNameVisitor {
                 Ok(ExpressionName::Length(array_or_string))
             }
             "let" => {
-                todo!("Let needs variadic overloads implemented")
+                todo!("ExpressionName::Let needs variadic overloads implemented")
             }
             "line-progress" => Ok(ExpressionName::LineProgress),
             "literal" => {
-                todo!("Literal needs multiple overloads implemented")
+                todo!(
+                    "ExpressionName::Literal needs multiple overloads, i.e. LiteralOptions implemented"
+                )
             }
             "ln" => {
                 let input = visit_seq_field(&mut seq, "input")?;
@@ -1059,16 +1086,16 @@ impl<'de> serde::de::Visitor<'de> for ExpressionNameVisitor {
                 Ok(ExpressionName::Log2(input))
             }
             "match" => {
-                todo!("Match needs variadic overloads implemented")
+                todo!("ExpressionName::Match needs variadic overloads implemented")
             }
             "max" => {
-                todo!("Max needs variadic overloads implemented")
+                todo!("ExpressionName::Max needs variadic overloads implemented")
             }
             "min" => {
-                todo!("Min needs variadic overloads implemented")
+                todo!("ExpressionName::Min needs variadic overloads implemented")
             }
             "number" => {
-                todo!("Number needs variadic overloads implemented")
+                todo!("ExpressionName::Number needs variadic overloads implemented")
             }
             "number-format" => {
                 let input = visit_seq_field(&mut seq, "input")?;
@@ -1076,7 +1103,7 @@ impl<'de> serde::de::Visitor<'de> for ExpressionNameVisitor {
                 Ok(ExpressionName::NumberFormat(input, format_options))
             }
             "object" => {
-                todo!("Object needs variadic overloads implemented")
+                todo!("ExpressionName::Object needs variadic overloads implemented")
             }
             "pi" => Ok(ExpressionName::Pi),
             "properties" => Ok(ExpressionName::Properties),
@@ -1106,17 +1133,19 @@ impl<'de> serde::de::Visitor<'de> for ExpressionNameVisitor {
                 Ok(ExpressionName::Sin(input))
             }
             "slice" => {
-                todo!("Slice needs multiple overloads implemented")
+                todo!(
+                    "ExpressionName::Slice needs multiple overloads, i.e. SliceOptions implemented"
+                )
             }
             "sqrt" => {
                 let input = visit_seq_field(&mut seq, "input")?;
                 Ok(ExpressionName::Sqrt(input))
             }
             "step" => {
-                todo!("Step needs variadic overloads implemented")
+                todo!("ExpressionName::Step needs variadic overloads implemented")
             }
             "string" => {
-                todo!("String needs variadic overloads implemented")
+                todo!("ExpressionName::String needs variadic overloads implemented")
             }
             "tan" => {
                 let input = visit_seq_field(&mut seq, "input")?;
@@ -1127,10 +1156,10 @@ impl<'de> serde::de::Visitor<'de> for ExpressionNameVisitor {
                 Ok(ExpressionName::ToBoolean(value))
             }
             "to-color" => {
-                todo!("ToColor needs variadic overloads implemented")
+                todo!("ExpressionName::ToColor needs variadic overloads implemented")
             }
             "to-number" => {
-                todo!("ToNumber needs variadic overloads implemented")
+                todo!("ExpressionName::ToNumber needs variadic overloads implemented")
             }
             "to-rgba" => {
                 let color = visit_seq_field(&mut seq, "color")?;
