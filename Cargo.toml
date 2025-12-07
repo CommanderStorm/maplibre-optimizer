@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["maplibre-style-spec"]
+members = ["codegen2", "maplibre-style-spec"]
 
 [workspace.package]
 edition = "2024"
@@ -32,16 +32,19 @@ struct_field_names = "allow"
 [workspace.dependencies]
 anyhow = "1.0"
 clap = { version = "4", features = ["derive", "unstable-markdown", "wrap_help"] }
+codegen2 = { version = "0.3.0", path = "codegen2" }
+color = "0.3.2"
 criterion = { version = "0.8", features = ["async_futures", "async_tokio", "html_reports"] }
-image = "0.25.8"
-insta = "1"
+image = "0.25.9"
+insta = "1.44"
 maplibre_native = "0.4.1"
 rstest = "0.26.1"
-rustls = "0.23.31"
+rustls = "0.23.35"
 serde = { version = "1", features = ["derive"] }
-serde_json = "1"
-serde_with = "3"
-thiserror = "2"
+serde_json = "1.0"
+serde_with = "3.16"
+thiserror = "2.0"
+url = "2.5"
 
 [profile.dev.package]
 # See https://docs.rs/insta/latest/insta/#optional-faster-runs
