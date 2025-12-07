@@ -9,3 +9,4 @@ serde_json.workspace = true
 
 [dev-dependencies]
 insta.workspace = true
+rstest.workspace = true
