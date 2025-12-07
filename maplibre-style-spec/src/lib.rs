@@ -1,2 +1,3 @@
 pub mod decoder;
-pub mod spec;
+mod spec;
+pub use spec::*;
