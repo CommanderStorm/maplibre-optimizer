@@ -12,7 +12,7 @@ use crate::r#type::Type;
 #[derive(Debug, Clone)]
 pub struct Function {
     /// Name of the function
-    name: String,
+    pub(crate) name: String,
 
     /// Function documentation
     docs: Option<Docs>,
