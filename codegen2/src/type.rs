@@ -5,7 +5,7 @@ use crate::formatter::Formatter;
 /// Defines a type.
 #[derive(Debug, Clone)]
 pub struct Type {
-    name: String,
+    pub(crate) name: String,
     generics: Vec<Type>,
 }
 
