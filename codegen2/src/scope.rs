@@ -130,7 +130,7 @@ impl Scope {
         }
     }
 
-    /// Push a module definition.
+    /// Push a [`Module`] definition.
     ///
     /// # Panics
     ///
@@ -138,7 +138,7 @@ impl Scope {
     /// which it is defined, pushing a module whose name is already defined
     /// in this scope will cause this function to panic.
     ///
-    /// In many cases, the [`get_or_new_module`] function is preferrable, as it will
+    /// In many cases, the [`get_or_new_module`] function is preferable, as it will
     /// return the existing definition instead.
     ///
     /// [`get_or_new_module`]: #method.get_or_new_module
@@ -148,7 +148,7 @@ impl Scope {
         self
     }
 
-    /// Push a new struct definition, returning a mutable reference to it.
+    /// Push a new [`Struct`] definition, returning a mutable reference to it.
     pub fn new_struct(&mut self, name: impl ToString) -> &mut Struct {
         self.push_struct(Struct::new(name));
 
@@ -158,10 +158,21 @@ impl Scope {
         }
     }
 
-    /// Push a struct definition
+    /// Push a [`Struct`] definition
     pub fn push_struct(&mut self, item: Struct) -> &mut Self {
         self.items.push(Item::Struct(item));
         self
+    }
+
+    /// Returns a mutable reference to a [`Struct`] if it is existing in this scope.
+    pub fn get_struct_mut<Q: ?Sized>(&mut self, name: &Q) -> Option<&mut Struct>
+    where
+        String: PartialEq<Q>,
+    {
+        self.items.iter_mut().find_map(|item| match item {
+            Item::Struct(stru) if stru.ty().name == *name => Some(stru),
+            _ => None,
+        })
     }
 
     /// Push a new function definition, returning a mutable reference to it.
@@ -178,6 +189,17 @@ impl Scope {
     pub fn push_fn(&mut self, item: Function) -> &mut Self {
         self.items.push(Item::Function(item));
         self
+    }
+
+    /// Returns a mutable reference to a [`Function`] if it is existing in this scope.
+    pub fn get_fn_mut<Q: ?Sized>(&mut self, name: &Q) -> Option<&mut Function>
+    where
+        String: PartialEq<Q>,
+    {
+        self.items.iter_mut().find_map(|item| match item {
+            Item::Function(fun) if fun.name == *name => Some(fun),
+            _ => None,
+        })
     }
 
     /// Push a new trait definition, returning a mutable reference to it.
@@ -210,6 +232,17 @@ impl Scope {
     pub fn push_enum(&mut self, item: Enum) -> &mut Self {
         self.items.push(Item::Enum(item));
         self
+    }
+
+    /// Returns a mutable reference to an enum if it is existing in this scope.
+    pub fn get_enum_mut<Q: ?Sized>(&mut self, name: &Q) -> Option<&mut Enum>
+    where
+        String: PartialEq<Q>,
+    {
+        self.items.iter_mut().find_map(|item| match item {
+            Item::Enum(enu) if enu.ty().name == *name => Some(enu),
+            _ => None,
+        })
     }
 
     /// Push a new `impl` block, returning a mutable reference to it.
