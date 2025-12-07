@@ -1,4 +1,3 @@
-
 pub mod array;
 pub mod r#enum;
 pub mod property_type;
