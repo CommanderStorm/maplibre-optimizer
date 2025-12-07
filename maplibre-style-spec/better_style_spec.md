@@ -3,5 +3,3 @@
 - union types are always specific types ()
 - anyof unions != union types
 - sum types can contain "type" as a field
-- center not having a length 2 array
-- expression being an array of length 1 of *
