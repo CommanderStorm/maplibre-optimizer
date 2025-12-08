@@ -5,6 +5,7 @@ use serde::{Deserialize, Deserializer};
 use serde_json::{Number, Value};
 
 use crate::decoder::ParsedItem;
+use crate::generator::formatter::to_upper_camel_case;
 
 #[derive(Debug, PartialEq, Clone, Deserialize)]
 #[serde(untagged)]
@@ -63,12 +64,21 @@ pub struct Overload {
     #[serde(rename = "output-type")]
     pub output_type: ParameterType,
 }
+
+impl Overload {
+    pub fn is_variadic(&self) -> bool {
+        self.parameters
+            .iter()
+            .any(|p| p.ends_with("_1") || p.ends_with("_0") || p == "...")
+    }
+}
+
 #[derive(Debug, PartialEq, Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Parameter {
-    name: String,
-    r#type: ParameterType,
-    doc: Option<String>,
+    pub name: String,
+    pub r#type: ParameterType,
+    pub doc: Option<String>,
 }
 
 #[derive(Debug, PartialEq, Clone, Deserialize)]
@@ -81,6 +91,28 @@ pub enum ParameterType {
     Object(BTreeMap<String, ParsedItem>),
     Reference(String),
 }
+
+impl ParameterType {
+    pub fn to_upper_camel_case(&self) -> String {
+        match self {
+            ParameterType::Literal(l) => l.to_upper_camel_case().to_string(),
+            ParameterType::LiteralAnyOf(ls) => ls
+                .iter()
+                .map(|l| l.to_upper_camel_case())
+                .collect::<Vec<_>>()
+                .join("Or"),
+            ParameterType::Expression(e) => e.to_upper_camel_case().to_string(),
+            ParameterType::ExpressionAnyOf(es) => es
+                .iter()
+                .map(|e| e.to_upper_camel_case())
+                .collect::<Vec<_>>()
+                .join("Or"),
+            ParameterType::Object(_) => "Object".to_string(),
+            ParameterType::Reference(r) => to_upper_camel_case(&r),
+        }
+    }
+}
+
 #[derive(Debug, PartialEq, Eq, Clone, Deserialize)]
 pub enum Literal {
     #[serde(rename = "number literal")]
@@ -94,6 +126,27 @@ pub enum Literal {
     #[serde(rename = "JSON array")]
     JSONArray,
 }
+impl Literal {
+    pub fn to_literal_type(&self) -> &'static str {
+        match self {
+            Literal::Number => "serde_json::Number",
+            Literal::String => "String",
+            Literal::GeoJSONObject => "geojson::GeoJson",
+            Literal::JSONObject => "serde_json::Value",
+            Literal::JSONArray => "Vec<serde_json::Value>",
+        }
+    }
+    pub fn to_upper_camel_case(&self) -> &'static str {
+        match self {
+            Literal::Number => "NumberLiteral",
+            Literal::String => "StringLiteral",
+            Literal::GeoJSONObject => "GeoJSONObjectLiteral",
+            Literal::JSONObject => "JSONObjectLiteral",
+            Literal::JSONArray => "JSONArrayLiteral",
+        }
+    }
+}
+
 #[derive(Debug, PartialEq, Clone)]
 pub enum Expression {
     Any,
@@ -188,6 +241,36 @@ fn deserialize_array_from_string(s: &str) -> Result<Expression, String> {
     };
 
     Ok(Expression::Array { r#type, length })
+}
+impl Expression {
+    pub fn to_expression_type(&self) -> &'static str {
+        match self {
+            Expression::Any => "Box<Expression>",
+            Expression::Boolean => "Box<BooleanExpression>",
+            Expression::Number => "Box<NumberExpression>",
+            Expression::String => "Box<StringExpression>",
+            Expression::Collator => "Box<CollatorExpression>",
+            Expression::Formatted => "Box<StringExpression>",
+            Expression::Image => "Box<StringExpression>",
+            Expression::Object => "Box<ObjectExpression>",
+            Expression::Color => "Box<StringExpression>",
+            Expression::Array { .. } => "Box<ArrayExpression>",
+        }
+    }
+    pub fn to_upper_camel_case(&self) -> &'static str {
+        match self {
+            Expression::Any => "Expression",
+            Expression::Boolean => "BooleanExpression",
+            Expression::Number => "NumberExpression",
+            Expression::String => "StringExpression",
+            Expression::Collator => "CollatorExpression",
+            Expression::Formatted => "StringExpression",
+            Expression::Image => "StringExpression",
+            Expression::Object => "ObjectExpression",
+            Expression::Color => "StringExpression",
+            Expression::Array { .. } => "ArrayExpression",
+        }
+    }
 }
 
 #[cfg(test)]

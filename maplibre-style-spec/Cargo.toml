@@ -3,9 +3,17 @@ name = "maplibre-style-spec"
 version = "0.1.0"
 edition = "2024"
 
+[[bin]]
+name = "generate_spec"
+path = "src/bin/generate_spec.rs"
+
 [dependencies]
+codegen2.workspace = true
+color = { workspace = true, features = ["serde"] }
 serde.workspace = true
 serde_json.workspace = true
+url = { workspace = true, features = ["serde"] }
+geojson.workspace = true
 
 [dev-dependencies]
 insta.workspace = true
