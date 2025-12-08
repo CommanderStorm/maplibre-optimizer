@@ -14,12 +14,46 @@ pub fn generate_syntax_enum(
     common: &&Fields,
     values: &BTreeMap<String, SyntaxEnum>,
 ) {
+    // pass 1: populate enum variants
+    generate_syntax_enum_body(scope, name, &common, values);
+    // pass 2: generate the previously referenced enum variants for overloaded variants
+    generate_referenced_multi_overload_options_enums(scope, name, values);
+    let examples = values
+        .values()
+        .filter_map(|e| e.example.as_ref())
+        .collect::<Vec<_>>();
+    generate_syntax_enum_deserializer(scope, name, values, examples[0]);
+
+    generate_test_from_examples_if_present(scope, name, examples);
+}
+
+fn generate_referenced_multi_overload_options_enums(scope: &mut Scope, name: &str, values: &BTreeMap<String, SyntaxEnum>) {
+    for (key, value) in values {
+        let var_name = to_upper_camel_case(key);
+        let syntax = &value.syntax;
+        let name_and_possibly_group = if let Some(group) = &value.group {
+            format!("{name} (group={group})")
+        } else {
+            name.to_string()
+        };
+        assert!(
+            !syntax.overloads.is_empty(),
+            "{key} in {name_and_possibly_group} does not have a single overload"
+        );
+        if syntax.overloads.len() != 1 {
+            let options_name = format!("{var_name}Options");
+            // actually overloaded
+            generate_multi_overload(scope, (name, &var_name, &options_name), syntax);
+        }
+    }
+}
+
+fn generate_syntax_enum_body(scope: &mut Scope, name: &str, common: &&&Fields, values: &BTreeMap<String, SyntaxEnum>) {
     let enu = scope
         .new_enum(name)
         .doc(&common.doc)
         .vis("pub")
         .derive("PartialEq, Eq, Debug, Clone");
-    // pass 1: populate enum variants
     for (key, value) in values {
         let var_name = to_upper_camel_case(key);
         let var = enu.new_variant(&var_name).doc(&value.doc);
@@ -57,32 +91,6 @@ pub fn generate_syntax_enum(
             var.tuple(&options_name);
         }
     }
-    // pass 2: generate the previously referenced enum variants for overloaded variants
-    for (key, value) in values {
-        let var_name = to_upper_camel_case(key);
-        let syntax = &value.syntax;
-        let name_and_possibly_group = if let Some(group) = &value.group {
-            format!("{name} (group={group})")
-        } else {
-            name.to_string()
-        };
-        assert!(
-            !syntax.overloads.is_empty(),
-            "{key} in {name_and_possibly_group} does not have a single overload"
-        );
-        if syntax.overloads.len() != 1 {
-            let options_name = format!("{var_name}Options");
-            // actually overloaded
-            generate_multi_overload(scope, (name, &var_name, &options_name), syntax);
-        }
-    }
-    let examples = values
-        .values()
-        .filter_map(|e| e.example.as_ref())
-        .collect::<Vec<_>>();
-    generate_syntax_enum_deserializer(scope, name, values, examples[0]);
-
-    generate_test_from_examples_if_present(scope, name, examples);
 }
 
 fn has_variadic_overload(overloads: &Vec<Overload>) -> bool {
