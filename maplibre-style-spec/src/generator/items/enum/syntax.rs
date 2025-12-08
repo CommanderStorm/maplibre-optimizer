@@ -131,7 +131,7 @@ fn generate_multi_overload(
 
 enum OverloadVariantNamingStrategy {
     OutputType,
-    NumberOptions,
+    NumberOptions(Vec<usize>),
     ConstantMapping(Vec<String>),
 }
 
@@ -150,7 +150,7 @@ impl OverloadVariantNamingStrategy {
         let all_output_types = output_types.len();
         output_types.dedup();
         if all_output_types == output_types.len() {
-            return OverloadVariantNamingStrategy::NumberOptions;
+            return OverloadVariantNamingStrategy::OutputType;
         }
 
         // case 2: the parameter lengths are all different
@@ -158,11 +158,12 @@ impl OverloadVariantNamingStrategy {
             .iter()
             .map(|o| o.parameters.len())
             .collect::<Vec<_>>();
+        let params_clone = parameter_lengths.clone();
         parameter_lengths.sort_unstable();
         let all_params = parameter_lengths.len();
         parameter_lengths.dedup();
         if all_params == parameter_lengths.len() {
-            return OverloadVariantNamingStrategy::NumberOptions;
+            return OverloadVariantNamingStrategy::NumberOptions(params_clone);
         }
 
         // case 3: the first parameter is different
@@ -198,8 +199,10 @@ impl OverloadVariantNamingStrategy {
     fn var_name(&self, overload: &Overload, i: usize) -> String {
         match self {
             OverloadVariantNamingStrategy::OutputType => overload.output_type.to_upper_camel_case(),
-            OverloadVariantNamingStrategy::NumberOptions => to_upper_camel_case(&format!("{i}")),
-            OverloadVariantNamingStrategy::ConstantMapping(m) => m[i].clone(),
+            OverloadVariantNamingStrategy::NumberOptions(ns) => {
+                format!("{}Params", to_upper_camel_case(&ns[i].to_string()))
+            }
+            OverloadVariantNamingStrategy::ConstantMapping(ms) => ms[i].clone(),
         }
     }
 }

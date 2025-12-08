@@ -786,8 +786,8 @@ pub enum ExpressionName {
 /// Options for deserializing the syntax enum variant [`ExpressionName::Minus`]
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
 pub enum MinusOptions {
-    Zero(serde_json::Value),
-    One(NumberExpression),
+    TwoParams(serde_json::Value),
+    OneParams(NumberExpression),
 }
 
 /// Options for deserializing the syntax enum variant [`ExpressionName::Less`]
@@ -821,9 +821,9 @@ pub enum GreaterEqualOptions {
 /// Options for deserializing the syntax enum variant [`ExpressionName::Array`]
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
 pub enum ArrayOptions {
-    Zero(Expression),
-    One(serde_json::Value, Expression),
-    Two(serde_json::Value, NumberLiteral, Expression),
+    OneParams(Expression),
+    TwoParams(serde_json::Value, Expression),
+    ThreeParams(serde_json::Value, NumberLiteral, Expression),
 }
 
 /// Options for deserializing the syntax enum variant [`ExpressionName::In`]
@@ -843,15 +843,15 @@ pub enum IndexOfOptions {
 /// Options for deserializing the syntax enum variant [`ExpressionName::Literal`]
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
 pub enum LiteralOptions {
-    Zero(JSONObjectLiteral),
-    One(JSONArrayLiteral),
+    ObjectExpression(JSONObjectLiteral),
+    ArrayExpression(JSONArrayLiteral),
 }
 
 /// Options for deserializing the syntax enum variant [`ExpressionName::Slice`]
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
 pub enum SliceOptions {
-    Zero(ArrayExpression, NumberExpression, Option<NumberExpression>),
-    One(StringExpression, NumberExpression, Option<NumberExpression>),
+    ArrayExpression(ArrayExpression, NumberExpression, Option<NumberExpression>),
+    StringExpression(StringExpression, NumberExpression, Option<NumberExpression>),
 }
 
 impl<'de> serde::Deserialize<'de> for ExpressionName {
