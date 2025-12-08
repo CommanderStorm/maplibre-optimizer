@@ -784,42 +784,42 @@ pub enum ExpressionName {
 }
 
 /// Options for deserializing the syntax enum variant [`ExpressionName::Minus`]
-#[derive(serde::Deserialize, PartialEq, Eq, Debug, Clone)]
+#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
 pub enum MinusOptions {
     Zero(serde_json::Value),
     One(NumberExpression),
 }
 
 /// Options for deserializing the syntax enum variant [`ExpressionName::Less`]
-#[derive(serde::Deserialize, PartialEq, Eq, Debug, Clone)]
+#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
 pub enum LessOptions {
     Number(serde_json::Value),
     String(serde_json::Value),
 }
 
 /// Options for deserializing the syntax enum variant [`ExpressionName::LessEqual`]
-#[derive(serde::Deserialize, PartialEq, Eq, Debug, Clone)]
+#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
 pub enum LessEqualOptions {
     Number(serde_json::Value),
     String(serde_json::Value),
 }
 
 /// Options for deserializing the syntax enum variant [`ExpressionName::Greater`]
-#[derive(serde::Deserialize, PartialEq, Eq, Debug, Clone)]
+#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
 pub enum GreaterOptions {
     Number(serde_json::Value),
     String(serde_json::Value),
 }
 
 /// Options for deserializing the syntax enum variant [`ExpressionName::GreaterEqual`]
-#[derive(serde::Deserialize, PartialEq, Eq, Debug, Clone)]
+#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
 pub enum GreaterEqualOptions {
     Number(serde_json::Value),
     String(serde_json::Value),
 }
 
 /// Options for deserializing the syntax enum variant [`ExpressionName::Array`]
-#[derive(serde::Deserialize, PartialEq, Eq, Debug, Clone)]
+#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
 pub enum ArrayOptions {
     Zero(Expression),
     One(serde_json::Value, Expression),
@@ -827,28 +827,28 @@ pub enum ArrayOptions {
 }
 
 /// Options for deserializing the syntax enum variant [`ExpressionName::In`]
-#[derive(serde::Deserialize, PartialEq, Eq, Debug, Clone)]
+#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
 pub enum InOptions {
     Item(T, ArrayExpression),
     Substring(StringExpression, StringExpression),
 }
 
 /// Options for deserializing the syntax enum variant [`ExpressionName::IndexOf`]
-#[derive(serde::Deserialize, PartialEq, Eq, Debug, Clone)]
+#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
 pub enum IndexOfOptions {
     Item(T, ArrayExpression, Option<NumberExpression>),
     Substring(StringExpression, StringExpression, Option<NumberExpression>),
 }
 
 /// Options for deserializing the syntax enum variant [`ExpressionName::Literal`]
-#[derive(serde::Deserialize, PartialEq, Eq, Debug, Clone)]
+#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
 pub enum LiteralOptions {
     Zero(JSONObjectLiteral),
     One(JSONArrayLiteral),
 }
 
 /// Options for deserializing the syntax enum variant [`ExpressionName::Slice`]
-#[derive(serde::Deserialize, PartialEq, Eq, Debug, Clone)]
+#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
 pub enum SliceOptions {
     Zero(ArrayExpression, NumberExpression, Option<NumberExpression>),
     One(StringExpression, NumberExpression, Option<NumberExpression>),
@@ -906,35 +906,25 @@ impl<'de> serde::de::Visitor<'de> for ExpressionNameVisitor {
                 todo!("ExpressionName::Plus needs variadic overloads implemented")
             }
             "-" => {
-                todo!(
-                    "ExpressionName::Minus needs multiple variadic overloads, i.e. MinusOptions implemented"
-                )
+                todo!("ExpressionName::Minus needs multiple variadic overloads, i.e. MinusOptions implemented")
             }
             "/" => {
                 todo!("ExpressionName::Slash needs variadic overloads implemented")
             }
             "<" => {
-                todo!(
-                    "ExpressionName::Less needs multiple variadic overloads, i.e. LessOptions implemented"
-                )
+                todo!("ExpressionName::Less needs multiple variadic overloads, i.e. LessOptions implemented")
             }
             "<=" => {
-                todo!(
-                    "ExpressionName::LessEqual needs multiple variadic overloads, i.e. LessEqualOptions implemented"
-                )
+                todo!("ExpressionName::LessEqual needs multiple variadic overloads, i.e. LessEqualOptions implemented")
             }
             "==" => {
                 todo!("ExpressionName::EqualEqual needs variadic overloads implemented")
             }
             ">" => {
-                todo!(
-                    "ExpressionName::Greater needs multiple variadic overloads, i.e. GreaterOptions implemented"
-                )
+                todo!("ExpressionName::Greater needs multiple variadic overloads, i.e. GreaterOptions implemented")
             }
             ">=" => {
-                todo!(
-                    "ExpressionName::GreaterEqual needs multiple variadic overloads, i.e. GreaterEqualOptions implemented"
-                )
+                todo!("ExpressionName::GreaterEqual needs multiple variadic overloads, i.e. GreaterEqualOptions implemented")
             }
             "^" => {
                 todo!("ExpressionName::Power needs variadic overloads implemented")
@@ -1042,9 +1032,7 @@ impl<'de> serde::de::Visitor<'de> for ExpressionNameVisitor {
                 todo!("ExpressionName::In needs multiple overloads, i.e. InOptions implemented")
             }
             "index-of" => {
-                todo!(
-                    "ExpressionName::IndexOf needs multiple overloads, i.e. IndexOfOptions implemented"
-                )
+                todo!("ExpressionName::IndexOf needs multiple overloads, i.e. IndexOfOptions implemented")
             }
             "interpolate" => {
                 todo!("ExpressionName::Interpolate needs variadic overloads implemented")
@@ -1068,9 +1056,7 @@ impl<'de> serde::de::Visitor<'de> for ExpressionNameVisitor {
             }
             "line-progress" => Ok(ExpressionName::LineProgress),
             "literal" => {
-                todo!(
-                    "ExpressionName::Literal needs multiple overloads, i.e. LiteralOptions implemented"
-                )
+                todo!("ExpressionName::Literal needs multiple overloads, i.e. LiteralOptions implemented")
             }
             "ln" => {
                 let input = visit_seq_field(&mut seq, "input")?;
