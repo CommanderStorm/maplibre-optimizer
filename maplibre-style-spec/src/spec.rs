@@ -786,36 +786,36 @@ pub enum ExpressionName {
 /// Options for deserializing the syntax enum variant [`ExpressionName::Minus`]
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
 pub enum MinusOptions {
-    TwoParams(serde_json::Value),
+    TwoParams(Vec<serde_json::Value>),
     OneParams(NumberExpression),
 }
 
 /// Options for deserializing the syntax enum variant [`ExpressionName::Less`]
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
 pub enum LessOptions {
-    Number(serde_json::Value),
-    String(serde_json::Value),
+    Number(Vec<serde_json::Value>),
+    String(Vec<serde_json::Value>),
 }
 
 /// Options for deserializing the syntax enum variant [`ExpressionName::LessEqual`]
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
 pub enum LessEqualOptions {
-    Number(serde_json::Value),
-    String(serde_json::Value),
+    Number(Vec<serde_json::Value>),
+    String(Vec<serde_json::Value>),
 }
 
 /// Options for deserializing the syntax enum variant [`ExpressionName::Greater`]
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
 pub enum GreaterOptions {
-    Number(serde_json::Value),
-    String(serde_json::Value),
+    Number(Vec<serde_json::Value>),
+    String(Vec<serde_json::Value>),
 }
 
 /// Options for deserializing the syntax enum variant [`ExpressionName::GreaterEqual`]
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
 pub enum GreaterEqualOptions {
-    Number(serde_json::Value),
-    String(serde_json::Value),
+    Number(Vec<serde_json::Value>),
+    String(Vec<serde_json::Value>),
 }
 
 /// Options for deserializing the syntax enum variant [`ExpressionName::Array`]

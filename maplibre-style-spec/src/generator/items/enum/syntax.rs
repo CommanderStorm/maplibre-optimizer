@@ -27,7 +27,11 @@ pub fn generate_syntax_enum(
     generate_test_from_examples_if_present(scope, name, examples);
 }
 
-fn generate_referenced_multi_overload_options_enums(scope: &mut Scope, name: &str, values: &BTreeMap<String, SyntaxEnum>) {
+fn generate_referenced_multi_overload_options_enums(
+    scope: &mut Scope,
+    name: &str,
+    values: &BTreeMap<String, SyntaxEnum>,
+) {
     for (key, value) in values {
         let var_name = to_upper_camel_case(key);
         let syntax = &value.syntax;
@@ -48,7 +52,12 @@ fn generate_referenced_multi_overload_options_enums(scope: &mut Scope, name: &st
     }
 }
 
-fn generate_syntax_enum_body(scope: &mut Scope, name: &str, common: &&&Fields, values: &BTreeMap<String, SyntaxEnum>) {
+fn generate_syntax_enum_body(
+    scope: &mut Scope,
+    name: &str,
+    common: &&&Fields,
+    values: &BTreeMap<String, SyntaxEnum>,
+) {
     let enu = scope
         .new_enum(name)
         .doc(&common.doc)
@@ -107,7 +116,7 @@ fn generate_multi_overload(
     for overload in &syntax.overloads {
         if overload.is_variadic() {
             // todo: needs proper variadic codegen
-            overloads_tuples.push(vec!["serde_json::Value".to_string()]);
+            overloads_tuples.push(vec!["Vec<serde_json::Value>".to_string()]);
         } else {
             let var_name = overload.output_type.to_upper_camel_case();
             let mut tuples = Vec::with_capacity(overload.parameters.len());
