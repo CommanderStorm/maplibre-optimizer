@@ -112,6 +112,7 @@ fmt-toml *args: (cargo-install 'cargo-sort')
 gen: clean-gen
     cargo run --bin generate_spec
     {{ just_executable() }} fmt
+    rustfmt maplibre-style-spec/src/spec.rs
 
 # Run cargo fmt and cargo clippy
 lint: fmt clippy
