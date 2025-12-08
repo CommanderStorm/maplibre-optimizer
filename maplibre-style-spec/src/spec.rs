@@ -785,6 +785,7 @@ pub enum ExpressionName {
 
 /// Options for deserializing the syntax enum variant [`ExpressionName::Minus`]
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+#[serde(untagged)]
 pub enum MinusOptions {
     TwoParams(Vec<serde_json::Value>),
     OneParams(NumberExpression),
@@ -792,6 +793,7 @@ pub enum MinusOptions {
 
 /// Options for deserializing the syntax enum variant [`ExpressionName::Less`]
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+#[serde(untagged)]
 pub enum LessOptions {
     Number(Vec<serde_json::Value>),
     String(Vec<serde_json::Value>),
@@ -799,6 +801,7 @@ pub enum LessOptions {
 
 /// Options for deserializing the syntax enum variant [`ExpressionName::LessEqual`]
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+#[serde(untagged)]
 pub enum LessEqualOptions {
     Number(Vec<serde_json::Value>),
     String(Vec<serde_json::Value>),
@@ -806,6 +809,7 @@ pub enum LessEqualOptions {
 
 /// Options for deserializing the syntax enum variant [`ExpressionName::Greater`]
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+#[serde(untagged)]
 pub enum GreaterOptions {
     Number(Vec<serde_json::Value>),
     String(Vec<serde_json::Value>),
@@ -813,6 +817,7 @@ pub enum GreaterOptions {
 
 /// Options for deserializing the syntax enum variant [`ExpressionName::GreaterEqual`]
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+#[serde(untagged)]
 pub enum GreaterEqualOptions {
     Number(Vec<serde_json::Value>),
     String(Vec<serde_json::Value>),
@@ -820,6 +825,7 @@ pub enum GreaterEqualOptions {
 
 /// Options for deserializing the syntax enum variant [`ExpressionName::Array`]
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+#[serde(untagged)]
 pub enum ArrayOptions {
     OneParams(Expression),
     TwoParams(serde_json::Value, Expression),
@@ -828,6 +834,7 @@ pub enum ArrayOptions {
 
 /// Options for deserializing the syntax enum variant [`ExpressionName::In`]
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+#[serde(untagged)]
 pub enum InOptions {
     Item(T, ArrayExpression),
     Substring(StringExpression, StringExpression),
@@ -835,6 +842,7 @@ pub enum InOptions {
 
 /// Options for deserializing the syntax enum variant [`ExpressionName::IndexOf`]
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+#[serde(untagged)]
 pub enum IndexOfOptions {
     Item(T, ArrayExpression, Option<NumberExpression>),
     Substring(StringExpression, StringExpression, Option<NumberExpression>),
@@ -842,6 +850,7 @@ pub enum IndexOfOptions {
 
 /// Options for deserializing the syntax enum variant [`ExpressionName::Literal`]
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+#[serde(untagged)]
 pub enum LiteralOptions {
     ObjectExpression(JSONObjectLiteral),
     ArrayExpression(JSONArrayLiteral),
@@ -849,6 +858,7 @@ pub enum LiteralOptions {
 
 /// Options for deserializing the syntax enum variant [`ExpressionName::Slice`]
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+#[serde(untagged)]
 pub enum SliceOptions {
     ArrayExpression(ArrayExpression, NumberExpression, Option<NumberExpression>),
     StringExpression(StringExpression, NumberExpression, Option<NumberExpression>),

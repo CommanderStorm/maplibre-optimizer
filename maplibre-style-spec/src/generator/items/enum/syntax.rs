@@ -135,7 +135,8 @@ fn generate_multi_overload(
             "Options for deserializing the syntax enum variant [`{name}::{var_name}`]"
         ))
         .vis("pub")
-        .derive("serde::Deserialize, PartialEq, Debug, Clone");
+        .derive("serde::Deserialize, PartialEq, Debug, Clone")
+        .attr("serde(untagged)");
     let variant_naming_strat = OverloadVariantNamingStrategy::detect(&syntax.overloads);
     for (i, overload) in syntax.overloads.iter().enumerate() {
         let var_name = variant_naming_strat.var_name(overload, i);
