@@ -1,4 +1,4 @@
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashSet};
 
 use serde::de::Error;
 use serde::{Deserialize, Deserializer};
@@ -57,6 +57,22 @@ pub struct Syntax {
     pub parameters: Vec<Parameter>,
 }
 
+impl Syntax {
+    /// returns the names of the parameters that may appear in this syntax
+    pub fn parameter_names(&self) -> HashSet<&str> {
+        self.parameters
+            .iter()
+            .map(|p| p.name.as_str())
+            .collect::<HashSet<_>>()
+    }
+    pub fn has_variadic_overload(&self) -> bool {
+        let params = self.parameter_names();
+        self.overloads
+            .iter()
+            .any(|overload| overload.is_variadic(&params))
+    }
+}
+
 #[derive(Debug, PartialEq, Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Overload {
@@ -66,10 +82,9 @@ pub struct Overload {
 }
 
 impl Overload {
-    pub fn is_variadic(&self) -> bool {
-        self.parameters
-            .iter()
-            .any(|p| p.ends_with("_1") || p.ends_with("_0") || p == "...")
+    pub fn is_variadic(&self, params: &HashSet<&str>) -> bool {
+        self.parameters.iter().any(|p| p == "...")
+            || !self.parameters.iter().all(|p| params.contains(p.as_str()))
     }
 }
 

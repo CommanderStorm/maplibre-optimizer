@@ -79,7 +79,7 @@ fn generate_syntax_enum_body(
         if syntax.overloads.len() == 1 {
             // not overloaded, above the Option<T> level
             let overload = &syntax.overloads[0];
-            if has_variadic_overload(&syntax.overloads) {
+            if syntax.has_variadic_overload() {
                 // todo: needs proper variadic codegen
                 var.tuple("Vec<serde_json::Value>");
                 continue;
@@ -102,10 +102,6 @@ fn generate_syntax_enum_body(
     }
 }
 
-fn has_variadic_overload(overloads: &Vec<Overload>) -> bool {
-    overloads.iter().any(|o| o.is_variadic())
-}
-
 fn generate_multi_overload(
     scope: &mut Scope,
     (name, var_name, options_name): (&str, &str, &str),
@@ -113,8 +109,9 @@ fn generate_multi_overload(
 ) {
     // because scope can only be owned by one owner, we first need to generate all tuples, then can add them
     let mut overloads_tuples = Vec::with_capacity(syntax.overloads.len());
+    let params = syntax.parameter_names();
     for overload in &syntax.overloads {
-        if overload.is_variadic() {
+        if overload.is_variadic(&params) {
             // todo: needs proper variadic codegen
             overloads_tuples.push(vec!["Vec<serde_json::Value>".to_string()]);
         } else {
@@ -300,7 +297,7 @@ fn generate_syntax_enum_deserializer(
         if syntax.overloads.len() == 1
             && let Some(overload) = syntax.overloads.first()
         {
-            if has_variadic_overload(&syntax.overloads) {
+            if syntax.has_variadic_overload() {
                 generate_syntax_enum_deserializer_regular_variadic_variant(
                     visit_seq,
                     (&name, &variant_name),
@@ -314,7 +311,7 @@ fn generate_syntax_enum_deserializer(
                 );
             }
         } else {
-            if has_variadic_overload(&syntax.overloads) {
+            if syntax.has_variadic_overload() {
                 generate_syntax_enum_deserializer_multi_variadic_overload_variant(
                     visit_seq,
                     (&name, &variant_name),
