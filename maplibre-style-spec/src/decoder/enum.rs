@@ -84,7 +84,14 @@ pub struct Overload {
 impl Overload {
     pub fn is_variadic(&self, params: &HashSet<&str>) -> bool {
         self.parameters.iter().any(|p| p == "...")
-            || !self.parameters.iter().all(|p| params.contains(p.as_str()))
+            || !self.parameters.iter().all(|p| {
+                // ? is an optional variable
+                if let Some(s) = p.strip_suffix('?') {
+                    params.contains(s)
+                } else {
+                    params.contains(p.as_str())
+                }
+            })
     }
 }
 

@@ -521,7 +521,11 @@ pub enum ExpressionName {
     /// Returns `true` if the input values are not equal, `false` otherwise. The comparison is strictly typed: values of different runtime types are always considered unequal. Cases where the types are known to be different at parse time are considered invalid and will produce a parse error. Accepts an optional `collator` argument to control locale-dependent string comparisons.
     ///
     ///  - [Display HTML clusters with custom properties](https://maplibre.org/maplibre-gl-js/docs/examples/display-html-clusters-with-custom-properties/)
-    NotEqual(Vec<serde_json::Value>),
+    NotEqual(
+        serde_json::Value,
+        serde_json::Value,
+        Option<serde_json::Value>,
+    ),
     /// Returns the remainder after integer division of the first input by the second.
     Percentage(serde_json::Value, serde_json::Value),
     /// Returns the product of the inputs.
@@ -549,7 +553,11 @@ pub enum ExpressionName {
     ///  - [Display buildings in 3D](https://maplibre.org/maplibre-gl-js/docs/examples/display-buildings-in-3d/)
     ///
     ///  - [Filter symbols by toggling a list](https://maplibre.org/maplibre-gl-js/docs/examples/filter-symbols-by-toggling-a-list/)
-    EqualEqual(Vec<serde_json::Value>),
+    EqualEqual(
+        serde_json::Value,
+        serde_json::Value,
+        Option<serde_json::Value>,
+    ),
     /// Returns `true` if the first input is strictly greater than the second, `false` otherwise. The arguments are required to be either both strings or both numbers; if during evaluation they are not, expression evaluation produces an error. Cases where this constraint is known not to hold at parse time are considered in valid and will produce a parse error. Accepts an optional `collator` argument to control locale-dependent string comparisons.
     Greater(GreaterOptions),
     /// Returns `true` if the first input is greater than or equal to the second, `false` otherwise. The arguments are required to be either both strings or both numbers; if during evaluation they are not, expression evaluation produces an error. Cases where this constraint is known not to hold at parse time are considered in valid and will produce a parse error. Accepts an optional `collator` argument to control locale-dependent string comparisons.
@@ -639,13 +647,13 @@ pub enum ExpressionName {
     ///  - [Display HTML clusters with custom properties](https://maplibre.org/maplibre-gl-js/docs/examples/display-html-clusters-with-custom-properties/)
     ///
     ///  - [Extrude polygons for 3D indoor mapping](https://maplibre.org/maplibre-gl-js/docs/examples/extrude-polygons-for-3d-indoor-mapping/)
-    Get(Vec<serde_json::Value>),
+    Get(serde_json::Value, Option<serde_json::Value>),
     /// Retrieves a property value from global state that can be set with platform-specific APIs. Defaults can be provided using the [`state`](https://maplibre.org/maplibre-style-spec/root/#state) root property. Returns `null` if no value nor default value is set for the retrieved property.
     GlobalState(serde_json::Value),
     /// Tests for the presence of a property value in the current feature's properties, or from another object if a second argument is provided.
     ///
     ///  - [Create and style clusters](https://maplibre.org/maplibre-gl-js/docs/examples/create-and-style-clusters/)
-    Has(Vec<serde_json::Value>),
+    Has(serde_json::Value, Option<serde_json::Value>),
     /// Gets the kernel density estimation of a pixel in a heatmap layer, which is a relative measure of how many data points are crowded around a particular pixel. Can only be used in the `heatmap-color` property.
     HeatmapDensity,
     /// Gets the feature's id, if it has one.
@@ -844,8 +852,8 @@ pub enum InOptions {
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
 #[serde(untagged)]
 pub enum IndexOfOptions {
-    Item(Vec<serde_json::Value>),
-    Substring(Vec<serde_json::Value>),
+    Item(T, ArrayExpression, Option<NumberExpression>),
+    Substring(StringExpression, StringExpression, Option<NumberExpression>),
 }
 
 /// Options for deserializing the syntax enum variant [`ExpressionName::Literal`]
@@ -860,8 +868,8 @@ pub enum LiteralOptions {
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
 #[serde(untagged)]
 pub enum SliceOptions {
-    ArrayExpression(Vec<serde_json::Value>),
-    StringExpression(Vec<serde_json::Value>),
+    ArrayExpression(ArrayExpression, NumberExpression, Option<NumberExpression>),
+    StringExpression(StringExpression, NumberExpression, Option<NumberExpression>),
 }
 
 impl<'de> serde::Deserialize<'de> for ExpressionName {
@@ -904,7 +912,10 @@ impl<'de> serde::de::Visitor<'de> for ExpressionNameVisitor {
                 Ok(ExpressionName::Not(input))
             }
             "!=" => {
-                todo!("ExpressionName::NotEqual needs variadic overloads implemented")
+                let input_1 = visit_seq_field(&mut seq, "input_1")?;
+                let input_2 = visit_seq_field(&mut seq, "input_2")?;
+                let collator = seq.next_element()?;
+                Ok(ExpressionName::NotEqual(input_1, input_2, collator))
             }
             "%" => {
                 let input_1 = visit_seq_field(&mut seq, "input_1")?;
@@ -934,7 +945,10 @@ impl<'de> serde::de::Visitor<'de> for ExpressionNameVisitor {
                 todo!("ExpressionName::LessEqual needs multiple variadic overloads, i.e. LessEqualOptions implemented")
             }
             "==" => {
-                todo!("ExpressionName::EqualEqual needs variadic overloads implemented")
+                let input_1 = visit_seq_field(&mut seq, "input_1")?;
+                let input_2 = visit_seq_field(&mut seq, "input_2")?;
+                let collator = seq.next_element()?;
+                Ok(ExpressionName::EqualEqual(input_1, input_2, collator))
             }
             ">" => {
                 todo!("ExpressionName::Greater needs multiple variadic overloads, i.e. GreaterOptions implemented")
@@ -1027,14 +1041,18 @@ impl<'de> serde::de::Visitor<'de> for ExpressionNameVisitor {
             }
             "geometry-type" => Ok(ExpressionName::GeometryType),
             "get" => {
-                todo!("ExpressionName::Get needs variadic overloads implemented")
+                let property_name = visit_seq_field(&mut seq, "property_name")?;
+                let object = seq.next_element()?;
+                Ok(ExpressionName::Get(property_name, object))
             }
             "global-state" => {
                 let property_name = visit_seq_field(&mut seq, "property_name")?;
                 Ok(ExpressionName::GlobalState(property_name))
             }
             "has" => {
-                todo!("ExpressionName::Has needs variadic overloads implemented")
+                let property_name = visit_seq_field(&mut seq, "property_name")?;
+                let object = seq.next_element()?;
+                Ok(ExpressionName::Has(property_name, object))
             }
             "heatmap-density" => Ok(ExpressionName::HeatmapDensity),
             "id" => Ok(ExpressionName::Id),
@@ -1046,7 +1064,7 @@ impl<'de> serde::de::Visitor<'de> for ExpressionNameVisitor {
                 todo!("ExpressionName::In needs multiple overloads, i.e. InOptions implemented")
             }
             "index-of" => {
-                todo!("ExpressionName::IndexOf needs multiple variadic overloads, i.e. IndexOfOptions implemented")
+                todo!("ExpressionName::IndexOf needs multiple overloads, i.e. IndexOfOptions implemented")
             }
             "interpolate" => {
                 todo!("ExpressionName::Interpolate needs variadic overloads implemented")
@@ -1133,7 +1151,9 @@ impl<'de> serde::de::Visitor<'de> for ExpressionNameVisitor {
                 Ok(ExpressionName::Sin(input))
             }
             "slice" => {
-                todo!("ExpressionName::Slice needs multiple variadic overloads, i.e. SliceOptions implemented")
+                todo!(
+                    "ExpressionName::Slice needs multiple overloads, i.e. SliceOptions implemented"
+                )
             }
             "sqrt" => {
                 let input = visit_seq_field(&mut seq, "input")?;
