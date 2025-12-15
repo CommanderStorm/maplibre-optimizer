@@ -25,7 +25,9 @@ export RUST_BACKTRACE := env('RUST_BACKTRACE', if ci_mode == '1' {'1'} else {''}
     {{just_executable()}} --list
 
 # Run integration tests and save its output as the new expected output (ordering is important)
-bless: clean-gen clean-test bless-insta gen
+bless: clean-gen clean-test bless-insta
+    # done this way as otherwise just can optimise the order when this runs
+    {{just_executable()}} gen
 
 # Run integration tests and save its output as the new expected output
 bless-insta *args:  (cargo-install 'cargo-insta')
