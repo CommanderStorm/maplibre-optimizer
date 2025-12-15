@@ -410,10 +410,26 @@ fn generate_syntax_enum_deserializer_regular_variadic_variant(
     (name, variant_name): (&str, &str),
     overload: &Overload,
 ) {
-    // TODO: variadic (...) overloads
-    visit_seq.line(format!(
-        "todo!(\"{name}::{variant_name} needs variadic overloads implemented\")"
-    ));
+    let minimum_length = overload
+        .parameters
+        .iter()
+        .position(|p| p == "...")
+        .expect("... parameter must be in a variadic list");
+    if minimum_length > 1 {
+        // TODO: variadic (...) overloads with tuples
+        visit_seq.line(format!(
+            "todo!(\"{name}::{variant_name} needs variadic overloads with tuples implemented\")"
+        ));
+        return;
+    }
+    visit_seq.line("let mut inputs = Vec::new();");
+    visit_seq.line("while let Some(element) = seq.next_element()? {");
+    visit_seq.line("inputs.push(element);");
+    visit_seq.line("}");
+    visit_seq.line(format!("if inputs.len() < {minimum_length} {{"));
+    visit_seq.line(format!("return Err(serde::de::Error::custom(\"{name}::{variant_name} requires at least {minimum_length} arguments\"));"));
+    visit_seq.line("}");
+    visit_seq.line(format!("Ok({name}::{variant_name}(inputs))"));
 }
 fn generate_syntax_enum_deserializer_regular_variant(
     visit_seq: &mut Function,
@@ -541,7 +557,7 @@ mod tests {
                 let op: String = seq.next_element()?.ok_or_else(|| serde::de::Error::custom("missing operator"))?;
                 match op.as_str() {
                 "let" => {
-                todo!("Expression::Let needs variadic overloads implemented")
+                todo!("Expression::Let needs variadic overloads with tuples implemented")
                 },
                 _ => Err(serde::de::Error::unknown_variant(&op, &["let"]))
                 }

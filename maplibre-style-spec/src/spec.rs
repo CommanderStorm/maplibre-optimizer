@@ -923,10 +923,28 @@ impl<'de> serde::de::Visitor<'de> for ExpressionNameVisitor {
                 Ok(ExpressionName::Percentage(input_1, input_2))
             }
             "*" => {
-                todo!("ExpressionName::Star needs variadic overloads implemented")
+                let mut inputs = Vec::new();
+                while let Some(element) = seq.next_element()? {
+                    inputs.push(element);
+                }
+                if inputs.len() < 1 {
+                    return Err(serde::de::Error::custom(
+                        "ExpressionName::Star requires at least 1 arguments",
+                    ));
+                }
+                Ok(ExpressionName::Star(inputs))
             }
             "+" => {
-                todo!("ExpressionName::Plus needs variadic overloads implemented")
+                let mut inputs = Vec::new();
+                while let Some(element) = seq.next_element()? {
+                    inputs.push(element);
+                }
+                if inputs.len() < 1 {
+                    return Err(serde::de::Error::custom(
+                        "ExpressionName::Plus requires at least 1 arguments",
+                    ));
+                }
+                Ok(ExpressionName::Plus(inputs))
             }
             "-" => {
                 todo!(
@@ -971,10 +989,28 @@ impl<'de> serde::de::Visitor<'de> for ExpressionNameVisitor {
                 Ok(ExpressionName::Arccosine(input))
             }
             "all" => {
-                todo!("ExpressionName::All needs variadic overloads implemented")
+                let mut inputs = Vec::new();
+                while let Some(element) = seq.next_element()? {
+                    inputs.push(element);
+                }
+                if inputs.len() < 1 {
+                    return Err(serde::de::Error::custom(
+                        "ExpressionName::All requires at least 1 arguments",
+                    ));
+                }
+                Ok(ExpressionName::All(inputs))
             }
             "any" => {
-                todo!("ExpressionName::Any needs variadic overloads implemented")
+                let mut inputs = Vec::new();
+                while let Some(element) = seq.next_element()? {
+                    inputs.push(element);
+                }
+                if inputs.len() < 1 {
+                    return Err(serde::de::Error::custom(
+                        "ExpressionName::Any requires at least 1 arguments",
+                    ));
+                }
+                Ok(ExpressionName::Any(inputs))
             }
             "array" => {
                 todo!(
@@ -995,24 +1031,51 @@ impl<'de> serde::de::Visitor<'de> for ExpressionNameVisitor {
                 Ok(ExpressionName::Atan(input))
             }
             "boolean" => {
-                todo!("ExpressionName::Boolean needs variadic overloads implemented")
+                let mut inputs = Vec::new();
+                while let Some(element) = seq.next_element()? {
+                    inputs.push(element);
+                }
+                if inputs.len() < 1 {
+                    return Err(serde::de::Error::custom(
+                        "ExpressionName::Boolean requires at least 1 arguments",
+                    ));
+                }
+                Ok(ExpressionName::Boolean(inputs))
             }
             "case" => {
-                todo!("ExpressionName::Case needs variadic overloads implemented")
+                todo!("ExpressionName::Case needs variadic overloads with tuples implemented")
             }
             "ceil" => {
                 let input = visit_seq_field(&mut seq, "input")?;
                 Ok(ExpressionName::Ceil(input))
             }
             "coalesce" => {
-                todo!("ExpressionName::Coalesce needs variadic overloads implemented")
+                let mut inputs = Vec::new();
+                while let Some(element) = seq.next_element()? {
+                    inputs.push(element);
+                }
+                if inputs.len() < 1 {
+                    return Err(serde::de::Error::custom(
+                        "ExpressionName::Coalesce requires at least 1 arguments",
+                    ));
+                }
+                Ok(ExpressionName::Coalesce(inputs))
             }
             "collator" => {
                 let options = visit_seq_field(&mut seq, "options")?;
                 Ok(ExpressionName::Collator(options))
             }
             "concat" => {
-                todo!("ExpressionName::Concat needs variadic overloads implemented")
+                let mut inputs = Vec::new();
+                while let Some(element) = seq.next_element()? {
+                    inputs.push(element);
+                }
+                if inputs.len() < 1 {
+                    return Err(serde::de::Error::custom(
+                        "ExpressionName::Concat requires at least 1 arguments",
+                    ));
+                }
+                Ok(ExpressionName::Concat(inputs))
             }
             "cos" => {
                 let input = visit_seq_field(&mut seq, "input")?;
@@ -1037,7 +1100,7 @@ impl<'de> serde::de::Visitor<'de> for ExpressionNameVisitor {
                 Ok(ExpressionName::Floor(input))
             }
             "format" => {
-                todo!("ExpressionName::Format needs variadic overloads implemented")
+                todo!("ExpressionName::Format needs variadic overloads with tuples implemented")
             }
             "geometry-type" => Ok(ExpressionName::GeometryType),
             "get" => {
@@ -1067,13 +1130,15 @@ impl<'de> serde::de::Visitor<'de> for ExpressionNameVisitor {
                 todo!("ExpressionName::IndexOf needs multiple overloads, i.e. IndexOfOptions implemented")
             }
             "interpolate" => {
-                todo!("ExpressionName::Interpolate needs variadic overloads implemented")
+                todo!(
+                    "ExpressionName::Interpolate needs variadic overloads with tuples implemented"
+                )
             }
             "interpolate-hcl" => {
-                todo!("ExpressionName::InterpolateHcl needs variadic overloads implemented")
+                todo!("ExpressionName::InterpolateHcl needs variadic overloads with tuples implemented")
             }
             "interpolate-lab" => {
-                todo!("ExpressionName::InterpolateLab needs variadic overloads implemented")
+                todo!("ExpressionName::InterpolateLab needs variadic overloads with tuples implemented")
             }
             "is-supported-script" => {
                 let input = visit_seq_field(&mut seq, "input")?;
@@ -1084,7 +1149,7 @@ impl<'de> serde::de::Visitor<'de> for ExpressionNameVisitor {
                 Ok(ExpressionName::Length(array_or_string))
             }
             "let" => {
-                todo!("ExpressionName::Let needs variadic overloads implemented")
+                todo!("ExpressionName::Let needs variadic overloads with tuples implemented")
             }
             "line-progress" => Ok(ExpressionName::LineProgress),
             "literal" => {
@@ -1104,16 +1169,43 @@ impl<'de> serde::de::Visitor<'de> for ExpressionNameVisitor {
                 Ok(ExpressionName::Log2(input))
             }
             "match" => {
-                todo!("ExpressionName::Match needs variadic overloads implemented")
+                todo!("ExpressionName::Match needs variadic overloads with tuples implemented")
             }
             "max" => {
-                todo!("ExpressionName::Max needs variadic overloads implemented")
+                let mut inputs = Vec::new();
+                while let Some(element) = seq.next_element()? {
+                    inputs.push(element);
+                }
+                if inputs.len() < 1 {
+                    return Err(serde::de::Error::custom(
+                        "ExpressionName::Max requires at least 1 arguments",
+                    ));
+                }
+                Ok(ExpressionName::Max(inputs))
             }
             "min" => {
-                todo!("ExpressionName::Min needs variadic overloads implemented")
+                let mut inputs = Vec::new();
+                while let Some(element) = seq.next_element()? {
+                    inputs.push(element);
+                }
+                if inputs.len() < 1 {
+                    return Err(serde::de::Error::custom(
+                        "ExpressionName::Min requires at least 1 arguments",
+                    ));
+                }
+                Ok(ExpressionName::Min(inputs))
             }
             "number" => {
-                todo!("ExpressionName::Number needs variadic overloads implemented")
+                let mut inputs = Vec::new();
+                while let Some(element) = seq.next_element()? {
+                    inputs.push(element);
+                }
+                if inputs.len() < 1 {
+                    return Err(serde::de::Error::custom(
+                        "ExpressionName::Number requires at least 1 arguments",
+                    ));
+                }
+                Ok(ExpressionName::Number(inputs))
             }
             "number-format" => {
                 let input = visit_seq_field(&mut seq, "input")?;
@@ -1121,7 +1213,16 @@ impl<'de> serde::de::Visitor<'de> for ExpressionNameVisitor {
                 Ok(ExpressionName::NumberFormat(input, format_options))
             }
             "object" => {
-                todo!("ExpressionName::Object needs variadic overloads implemented")
+                let mut inputs = Vec::new();
+                while let Some(element) = seq.next_element()? {
+                    inputs.push(element);
+                }
+                if inputs.len() < 1 {
+                    return Err(serde::de::Error::custom(
+                        "ExpressionName::Object requires at least 1 arguments",
+                    ));
+                }
+                Ok(ExpressionName::Object(inputs))
             }
             "pi" => Ok(ExpressionName::Pi),
             "properties" => Ok(ExpressionName::Properties),
@@ -1160,10 +1261,19 @@ impl<'de> serde::de::Visitor<'de> for ExpressionNameVisitor {
                 Ok(ExpressionName::Sqrt(input))
             }
             "step" => {
-                todo!("ExpressionName::Step needs variadic overloads implemented")
+                todo!("ExpressionName::Step needs variadic overloads with tuples implemented")
             }
             "string" => {
-                todo!("ExpressionName::String needs variadic overloads implemented")
+                let mut inputs = Vec::new();
+                while let Some(element) = seq.next_element()? {
+                    inputs.push(element);
+                }
+                if inputs.len() < 1 {
+                    return Err(serde::de::Error::custom(
+                        "ExpressionName::String requires at least 1 arguments",
+                    ));
+                }
+                Ok(ExpressionName::String(inputs))
             }
             "tan" => {
                 let input = visit_seq_field(&mut seq, "input")?;
@@ -1174,10 +1284,28 @@ impl<'de> serde::de::Visitor<'de> for ExpressionNameVisitor {
                 Ok(ExpressionName::ToBoolean(value))
             }
             "to-color" => {
-                todo!("ExpressionName::ToColor needs variadic overloads implemented")
+                let mut inputs = Vec::new();
+                while let Some(element) = seq.next_element()? {
+                    inputs.push(element);
+                }
+                if inputs.len() < 1 {
+                    return Err(serde::de::Error::custom(
+                        "ExpressionName::ToColor requires at least 1 arguments",
+                    ));
+                }
+                Ok(ExpressionName::ToColor(inputs))
             }
             "to-number" => {
-                todo!("ExpressionName::ToNumber needs variadic overloads implemented")
+                let mut inputs = Vec::new();
+                while let Some(element) = seq.next_element()? {
+                    inputs.push(element);
+                }
+                if inputs.len() < 1 {
+                    return Err(serde::de::Error::custom(
+                        "ExpressionName::ToNumber requires at least 1 arguments",
+                    ));
+                }
+                Ok(ExpressionName::ToNumber(inputs))
             }
             "to-rgba" => {
                 let color = visit_seq_field(&mut seq, "color")?;
