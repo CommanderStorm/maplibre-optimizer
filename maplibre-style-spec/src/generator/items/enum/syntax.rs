@@ -3,8 +3,8 @@ use std::collections::BTreeMap;
 use codegen2::{Function, Impl, Scope};
 use serde_json::Value;
 
-use crate::decoder::Fields;
 use crate::decoder::r#enum::{Literal, Overload, Parameter, ParameterType, Syntax, SyntaxEnum};
+use crate::decoder::Fields;
 use crate::generator::autotest::generate_test_from_examples_if_present;
 use crate::generator::formatter::{to_snake_case, to_upper_camel_case};
 
@@ -62,7 +62,7 @@ fn generate_syntax_enum_body(
         .new_enum(name)
         .doc(&common.doc)
         .vis("pub")
-        .derive("PartialEq, Eq, Debug, Clone");
+        .derive("PartialEq, Debug, Clone");
     for (key, value) in values {
         let var_name = to_upper_camel_case(key);
         let var = enu.new_variant(&var_name).doc(&value.doc);
@@ -303,6 +303,7 @@ fn generate_syntax_enum_deserializer(
         .arg_self()
         .arg("mut seq", "A")
         .ret("Result<Self::Value, A::Error>");
+    visit_seq.line("use serde::Deserialize;");
     generate_visit_seq_field(visit_seq);
     // operator decoding
     visit_seq.line("// First element: operator string");
@@ -436,7 +437,7 @@ fn generate_syntax_enum_deserializer_regular_variadic_variant(
         for (param_name, is_optional) in non_base_parameters {
             if *is_optional {
                 visit_seq.line(format!(
-                    "let {param_name} = seq.next_element()?.ok(); // optional param"
+                    "let {param_name} = seq.next_element()?; // optional param"
                 ));
             } else {
                 visit_seq.line(format!("let {param_name} = seq.next_element()?.ok_or_else(|| serde::de::Error::custom(\"expected {param_name} in {name}::{variant_name}\"))?;"));
@@ -453,7 +454,7 @@ fn generate_syntax_enum_deserializer_regular_variadic_variant(
     }
     visit_seq.line("inputs.push(element);");
     visit_seq.line("}");
-    visit_seq.line(format!("if inputs.empty() {{"));
+    visit_seq.line(format!("if inputs.is_empty() {{"));
     visit_seq.line(format!("return Err(serde::de::Error::custom(\"{name}::{variant_name} requires at least one argument\"));"));
     visit_seq.line("}");
     visit_seq.line(format!("Ok({name}::{variant_name}(inputs))"));
@@ -574,6 +575,7 @@ mod tests {
             }
 
             fn visit_seq<A: serde::de::SeqAccess<'de>>(self, mut seq: A) -> Result<Self::Value, A::Error> {
+                use serde::Deserialize;
                 /// Reads the next element from the sequence or reports a missing field error.
                 fn visit_seq_field<'de, A, T>(seq: &mut A, name: &'static str) -> Result<T, A::Error>
                 where A: serde::de::SeqAccess<'de>, T: serde::Deserialize<'de> {
@@ -590,7 +592,7 @@ mod tests {
                 let element = (var_name_i,var_value_i);
                 inputs.push(element);
                 }
-                if inputs.empty() {
+                if inputs.is_empty() {
                 return Err(serde::de::Error::custom("Expression::Let requires at least one argument"));
                 }
                 Ok(Expression::Let(inputs))
@@ -670,6 +672,7 @@ mod tests {
             }
 
             fn visit_seq<A: serde::de::SeqAccess<'de>>(self, mut seq: A) -> Result<Self::Value, A::Error> {
+                use serde::Deserialize;
                 /// Reads the next element from the sequence or reports a missing field error.
                 fn visit_seq_field<'de, A, T>(seq: &mut A, name: &'static str) -> Result<T, A::Error>
                 where A: serde::de::SeqAccess<'de>, T: serde::Deserialize<'de> {
@@ -772,6 +775,7 @@ mod tests {
             }
 
             fn visit_seq<A: serde::de::SeqAccess<'de>>(self, mut seq: A) -> Result<Self::Value, A::Error> {
+                use serde::Deserialize;
                 /// Reads the next element from the sequence or reports a missing field error.
                 fn visit_seq_field<'de, A, T>(seq: &mut A, name: &'static str) -> Result<T, A::Error>
                 where A: serde::de::SeqAccess<'de>, T: serde::Deserialize<'de> {
@@ -784,11 +788,11 @@ mod tests {
                 "format" => {
                 let mut inputs = Vec::new();
                 while let Some(input_i) = seq.next_element()? {
-                let style_overrides_i = seq.next_element()?.ok(); // optional param
+                let style_overrides_i = seq.next_element()?; // optional param
                 let element = (input_i,style_overrides_i);
                 inputs.push(element);
                 }
-                if inputs.empty() {
+                if inputs.is_empty() {
                 return Err(serde::de::Error::custom("ExpressionName::Format requires at least one argument"));
                 }
                 Ok(ExpressionName::Format(inputs))
