@@ -3,8 +3,8 @@ use std::collections::BTreeMap;
 use codegen2::{Function, Impl, Scope};
 use serde_json::Value;
 
-use crate::decoder::r#enum::{Literal, Overload, Parameter, ParameterType, Syntax, SyntaxEnum};
 use crate::decoder::Fields;
+use crate::decoder::r#enum::{Literal, Overload, Parameter, ParameterType, Syntax, SyntaxEnum};
 use crate::generator::autotest::generate_test_from_examples_if_present;
 use crate::generator::formatter::{to_snake_case, to_upper_camel_case};
 
@@ -551,7 +551,7 @@ mod tests {
         #[derive(PartialEq, Eq, Debug, Clone)]
         pub enum Expression {
             /// Binds expressions to named variables, which can then be referenced in the result expression using `["var", "variable_name"]`.
-            /// 
+            ///
             ///  - [Visualize population density](https://maplibre.org/maplibre-gl-js/docs/examples/visualize-population-density/)
             Let(Vec<(StringLiteral,Expression)>),
         }
