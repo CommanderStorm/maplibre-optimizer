@@ -20,7 +20,10 @@ pub fn generate(scope: &mut Scope, name: &str, common: &Fields, default: Option<
         if let Value::String(default) = default {
             fun.line(format!("Self(color::parse_color(\"{default}\").expect(\"Invalid color specified as the default value\"))"));
         } else {
-            fun.line("todo!(\"needs expressions to be expressed in the style spec\")");
+            fun.line(format!(
+                "let default = serde_json::from_value(serde_json::json!({default}));"
+            ));
+            fun.line("Self(default)");
         }
     }
     generate_test_from_example_if_present(scope, name, common.example.as_ref());

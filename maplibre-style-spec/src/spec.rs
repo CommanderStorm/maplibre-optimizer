@@ -529,9 +529,9 @@ pub enum ExpressionName {
     /// Returns the remainder after integer division of the first input by the second.
     Percentage(serde_json::Value, serde_json::Value),
     /// Returns the product of the inputs.
-    Star(Vec<serde_json::Value>),
+    Star(Vec<NumberExpression>),
     /// Returns the sum of the inputs.
-    Plus(Vec<serde_json::Value>),
+    Plus(Vec<NumberExpression>),
     /// For two inputs, returns the result of subtracting the second input from the first. For a single input, returns the result of subtracting it from 0.
     Minus(MinusOptions),
     /// Returns the result of floating point division of the first input by the second.
@@ -575,9 +575,9 @@ pub enum ExpressionName {
     /// Returns `true` if all the inputs are `true`, `false` otherwise. The inputs are evaluated in order, and evaluation is short-circuiting: once an input expression evaluates to `false`, the result is `false` and no further input expressions are evaluated.
     ///
     ///  - [Display HTML clusters with custom properties](https://maplibre.org/maplibre-gl-js/docs/examples/display-html-clusters-with-custom-properties/)
-    All(Vec<serde_json::Value>),
+    All(Vec<BooleanExpression>),
     /// Returns `true` if any of the inputs are `true`, `false` otherwise. The inputs are evaluated in order, and evaluation is short-circuiting: once an input expression evaluates to `true`, the result is `true` and no further input expressions are evaluated.
-    Any(Vec<serde_json::Value>),
+    Any(Vec<BooleanExpression>),
     /// Asserts that the input is an array (optionally with a specific item type and length). If, when the input expression is evaluated, it is not of the asserted type or length, then this assertion will cause the whole expression to be aborted.
     Array(ArrayOptions),
     /// Returns the arcsine of the input.
@@ -589,19 +589,19 @@ pub enum ExpressionName {
     /// Asserts that the input value is a boolean. If multiple values are provided, each one is evaluated in order until a boolean is obtained. If none of the inputs are booleans, the expression is an error.
     ///
     ///  - [Create a hover effect](https://maplibre.org/maplibre-gl-js/docs/examples/create-a-hover-effect/)
-    Boolean(Vec<serde_json::Value>),
+    Boolean(Vec<Expression>),
     /// Selects the first output whose corresponding test condition evaluates to true, or the fallback value otherwise.
     ///
     ///  - [Create a hover effect](https://maplibre.org/maplibre-gl-js/docs/examples/create-a-hover-effect/)
     ///
     ///  - [Display HTML clusters with custom properties](https://maplibre.org/maplibre-gl-js/docs/examples/display-html-clusters-with-custom-properties/)
-    Case(Vec<serde_json::Value>),
+    Case(Vec<(BooleanExpression, Expression)>),
     /// Returns the smallest integer that is greater than or equal to the input.
     Ceil(serde_json::Value),
     /// Evaluates each expression in turn until the first non-null value is obtained, and returns that value.
     ///
     ///  - [Use a fallback image](https://maplibre.org/maplibre-gl-js/docs/examples/use-a-fallback-image/)
-    Coalesce(Vec<serde_json::Value>),
+    Coalesce(Vec<Expression>),
     /// Returns a `collator` for use in locale-dependent comparison operations. Use `resolved-locale` to test the results of locale fallback behavior.
     Collator(serde_json::Value),
     /// Returns a `string` consisting of the concatenation of the inputs. Each input is converted to a string as if by `to-string`.
@@ -613,7 +613,7 @@ pub enum ExpressionName {
     ///  - [Use a fallback image](https://maplibre.org/maplibre-gl-js/docs/examples/fallback-image/)
     ///
     ///  - [Variable label placement](https://maplibre.org/maplibre-gl-js/docs/examples/variable-label-placement/)
-    Concat(Vec<serde_json::Value>),
+    Concat(Vec<Expression>),
     /// Returns the cosine of the input.
     Cos(serde_json::Value),
     /// Returns the shortest distance in meters between the evaluated feature and the input geometry. The input value can be a valid GeoJSON of type `Point`, `MultiPoint`, `LineString`, `MultiLineString`, `Polygon`, `MultiPolygon`, `Feature`, or `FeatureCollection`. Distance values returned may vary in precision due to loss in precision from encoding geometries, particularly below zoom level 13.
@@ -637,7 +637,7 @@ pub enum ExpressionName {
     ///  - [Change the case of labels](https://maplibre.org/maplibre-gl-js/docs/examples/change-case-of-labels/)
     ///
     ///  - [Display and style rich text labels](https://maplibre.org/maplibre-gl-js/docs/examples/display-and-style-rich-text-labels/)
-    Format(Vec<serde_json::Value>),
+    Format(Vec<(StringExpressionOrStringExpression, Object)>),
     /// Returns the feature's simple geometry type: `Point`, `LineString`, or `Polygon`. `MultiPoint`, `MultiLineString`, and `MultiPolygon` are returned as `Point`, `LineString`, and `Polygon`, respectively.
     GeometryType,
     /// Retrieves a property value from the current feature's properties, or from another object if a second argument is provided. Returns null if the requested property is missing.
@@ -677,11 +677,32 @@ pub enum ExpressionName {
     ///  - [Create a heatmap layer](https://maplibre.org/maplibre-gl-js/docs/examples/heatmap-layer/)
     ///
     ///  - [Visualize population density](https://maplibre.org/maplibre-gl-js/docs/examples/visualize-population-density/)
-    Interpolate(Vec<serde_json::Value>),
+    Interpolate(
+        Vec<(
+            Interpolation,
+            NumberExpression,
+            NumberLiteral,
+            NumberExpressionOrArrayExpressionOrStringExpressionOrArrayExpressionOrProjection,
+        )>,
+    ),
     /// Produces continuous, smooth results by interpolating between pairs of input and output values ("stops"). Works like `interpolate`, but the output type must be `color` or `array<color>`, and the interpolation is performed in the Hue-Chroma-Luminance color space.
-    InterpolateHcl(Vec<serde_json::Value>),
+    InterpolateHcl(
+        Vec<(
+            Interpolation,
+            NumberExpression,
+            NumberLiteral,
+            StringExpressionOrArrayExpression,
+        )>,
+    ),
     /// Produces continuous, smooth results by interpolating between pairs of input and output values ("stops"). Works like `interpolate`, but the output type must be `color` or `array<color>`, and the interpolation is performed in the CIELAB color space.
-    InterpolateLab(Vec<serde_json::Value>),
+    InterpolateLab(
+        Vec<(
+            Interpolation,
+            NumberExpression,
+            NumberLiteral,
+            StringExpressionOrArrayExpression,
+        )>,
+    ),
     /// Returns `true` if the input string is expected to render legibly. Returns `false` if the input string contains sections that cannot be rendered without potential loss of meaning (e.g. Indic scripts that require complex text shaping, or right-to-left scripts if the `mapbox-gl-rtl-text` plugin is not in use in MapLibre GL JS).
     IsSupportedScript(serde_json::Value),
     /// Gets the length of an array or string. In a string, a UTF-16 surrogate pair counts as a single position.
@@ -689,7 +710,7 @@ pub enum ExpressionName {
     /// Binds expressions to named variables, which can then be referenced in the result expression using `["var", "variable_name"]`.
     ///
     ///  - [Visualize population density](https://maplibre.org/maplibre-gl-js/docs/examples/visualize-population-density/)
-    Let(Vec<serde_json::Value>),
+    Let(Vec<(StringLiteral, Expression)>),
     /// Gets the progress along a gradient line. Can only be used in the `line-gradient` property.
     LineProgress,
     /// Provides a literal array or object value.
@@ -711,19 +732,25 @@ pub enum ExpressionName {
     ///  - an array of literal values, whose values must be all strings or all numbers (e.g. `[100, 101]` or `["c", "b"]`). The input matches if any of the values in the array matches, similar to the `"in"` operator.
     ///
     /// Each label must be unique. If the input type does not match the type of the labels, the result will be the fallback value.
-    Match(Vec<serde_json::Value>),
+    Match(
+        Vec<(
+            StringExpressionOrNumberExpression,
+            StringLiteralOrNumberLiteralOrArrayExpressionOrArrayExpression,
+            Expression,
+        )>,
+    ),
     /// Returns the maximum value of the inputs.
-    Max(Vec<serde_json::Value>),
+    Max(Vec<NumberExpression>),
     /// Returns the minimum value of the inputs.
-    Min(Vec<serde_json::Value>),
+    Min(Vec<NumberExpression>),
     /// Asserts that the input value is a number. If multiple values are provided, each one is evaluated in order until a number is obtained. If none of the inputs are numbers, the expression is an error.
-    Number(Vec<serde_json::Value>),
+    Number(Vec<Expression>),
     /// Converts the input number into a string representation using the provided format_options.
     ///
     ///  - [Display HTML clusters with custom properties](https://maplibre.org/maplibre-gl-js/docs/examples/display-html-clusters-with-custom-properties/)
     NumberFormat(serde_json::Value, serde_json::Value),
     /// Asserts that the input value is an object. If multiple values are provided, each one is evaluated in order until an object is obtained. If none of the inputs are objects, the expression is an error.
-    Object(Vec<serde_json::Value>),
+    Object(Vec<Expression>),
     /// Returns the mathematical constant pi.
     Pi,
     /// Gets the feature properties object.  Note that in some cases, it may be more efficient to use ["get", "property_name"] directly.
@@ -752,9 +779,9 @@ pub enum ExpressionName {
     /// Returns the output value of the stop just less than the input, or the first output if the input is less than the first stop.
     ///
     ///  - [Create and style clusters](https://maplibre.org/maplibre-gl-js/docs/examples/create-and-style-clusters/)
-    Step(Vec<serde_json::Value>),
+    Step(Vec<(NumberExpression, Expression, NumberLiteral, Expression)>),
     /// Asserts that the input value is a string. If multiple values are provided, each one is evaluated in order until a string is obtained. If none of the inputs are strings, the expression is an error.
-    String(Vec<serde_json::Value>),
+    String(Vec<Expression>),
     /// Returns the tangent of the input.
     Tan(serde_json::Value),
     /// Converts the input value to a boolean. The result is `false` when the input is an empty string, 0, `false`, `null`, or `NaN`; otherwise it is `true`.
@@ -762,9 +789,9 @@ pub enum ExpressionName {
     /// Converts the input value to a color. If multiple values are provided, each one is evaluated in order until the first successful conversion is obtained. If none of the inputs can be converted, the expression is an error.
     ///
     ///  - [Visualize population density](https://maplibre.org/maplibre-gl-js/docs/examples/visualize-population-density/)
-    ToColor(Vec<serde_json::Value>),
+    ToColor(Vec<Expression>),
     /// Converts the input value to a number, if possible. If the input is `null` or `false`, the result is 0. If the input is `true`, the result is 1. If the input is a string, it is converted to a number as specified by the ["ToNumber Applied to the String Type" algorithm](https://tc39.github.io/ecma262/#sec-tonumber-applied-to-the-string-type) of the ECMAScript Language Specification. If multiple values are provided, each one is evaluated in order until the first successful conversion is obtained. If none of the inputs can be converted, the expression is an error.
-    ToNumber(Vec<serde_json::Value>),
+    ToNumber(Vec<Expression>),
     /// Returns a four-element array containing the input color's red, green, blue, and alpha components, in that order.
     ToRgba(serde_json::Value),
     /// Converts the input value to a string. If the input is `null`, the result is `""`. If the input is a boolean, the result is `"true"` or `"false"`. If the input is a number, it is converted to a string as specified by the ["NumberToString" algorithm](https://tc39.github.io/ecma262/#sec-tostring-applied-to-the-number-type) of the ECMAScript Language Specification. If the input is a color, it is converted to a string of the form `"rgba(r,g,b,a)"`, where `r`, `g`, and `b` are numerals ranging from 0 to 255, and `a` ranges from 0 to 1. Otherwise, the input is converted to a string in the format specified by the [`JSON.stringify`](https://tc39.github.io/ecma262/#sec-json.stringify) function of the ECMAScript Language Specification.
@@ -3847,7 +3874,24 @@ struct PaintHeatmapHeatmapColor(color::DynamicColor);
 
 impl Default for PaintHeatmapHeatmapColor {
     fn default() -> Self {
-        todo!("needs expressions to be expressed in the style spec")
+        let default = serde_json::from_value(serde_json::json!([
+            "interpolate",
+            ["linear"],
+            ["heatmap-density"],
+            0,
+            "rgba(0, 0, 255, 0)",
+            0.1,
+            "royalblue",
+            0.3,
+            "cyan",
+            0.5,
+            "lime",
+            0.7,
+            "yellow",
+            1,
+            "red"
+        ]));
+        Self(default)
     }
 }
 

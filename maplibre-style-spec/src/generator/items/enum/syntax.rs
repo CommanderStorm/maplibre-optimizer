@@ -80,8 +80,28 @@ fn generate_syntax_enum_body(
             // not overloaded, above the Option<T> level
             let overload = &syntax.overloads[0];
             if syntax.has_variadic_overload() {
-                // todo: needs proper variadic codegen
-                var.tuple("Vec<serde_json::Value>");
+                let position_of_variadic_separator = overload.position_of_variadic_separator();
+
+                let params = &overload.parameters[0..position_of_variadic_separator]
+                    .iter()
+                    .map(|o| {
+                        syntax
+                            .parameters
+                            .iter()
+                            .find(|p| p.matches_overload_parameter_name(o))
+                            .expect("overload parameter not found in syntax parameters")
+                    })
+                    .collect::<Vec<_>>();
+                let mut tuple_type_names = params[0].r#type.to_upper_camel_case();
+                for p in &params[1..] {
+                    tuple_type_names.push_str(",");
+                    tuple_type_names.push_str(p.r#type.to_upper_camel_case().as_str());
+                }
+                if params.len() > 1 {
+                    var.tuple(format!("Vec<({tuple_type_names})>"));
+                } else {
+                    var.tuple(format!("Vec<{tuple_type_names}>"));
+                }
                 continue;
             }
             for p in &overload.parameters {
@@ -399,11 +419,7 @@ fn generate_syntax_enum_deserializer_regular_variadic_variant(
     (name, variant_name): (&str, &str),
     overload: &Overload,
 ) {
-    let position_of_variadic_separator = overload
-        .parameters
-        .iter()
-        .position(|p| p == "...")
-        .expect("... parameter must be in a variadic list");
+    let position_of_variadic_separator = overload.position_of_variadic_separator();
     assert_ne!(position_of_variadic_separator, 0);
     visit_seq.line("let mut inputs = Vec::new();");
     if position_of_variadic_separator == 1 {
@@ -536,7 +552,7 @@ mod tests {
             /// Binds expressions to named variables, which can then be referenced in the result expression using `["var", "variable_name"]`.
             /// 
             ///  - [Visualize population density](https://maplibre.org/maplibre-gl-js/docs/examples/visualize-population-density/)
-            Let(Vec<serde_json::Value>),
+            Let(Vec<(StringLiteral,Expression)>),
         }
 
         impl<'de> serde::Deserialize<'de> for Expression {
