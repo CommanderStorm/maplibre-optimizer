@@ -74,6 +74,13 @@ pub struct Overload {
 }
 
 impl Overload {
+    pub fn position_of_variadic_separator(&self) -> usize {
+        self.parameters
+            .iter()
+            .position(|p| p == "...")
+            .expect("... parameter must be in a variadic list")
+    }
+
     pub fn is_variadic(&self, params: &[Parameter]) -> bool {
         self.parameters.iter().any(|p| p == "...")
             || !self.parameters.iter().all(|overloaded_param| {
@@ -433,5 +440,35 @@ mod tests {
             doc: None,
         };
         assert_eq!(param.matches_overload_parameter_name(overload), expected);
+    }
+
+    #[test]
+    fn test_variadic_separator_is_found() {
+        let overload = Overload {
+            parameters: vec![
+                "param1".to_string(),
+                "param2".to_string(),
+                "...".to_string(),
+                "param4".to_string(),
+            ],
+            output_type: ParameterType::Literal(Literal::Number),
+        };
+
+        let position = overload.position_of_variadic_separator();
+        assert_eq!(
+            position, 2,
+            "Expected the variadic separator '...' to be at index 2."
+        );
+    }
+
+    #[test]
+    #[should_panic(expected = "... parameter must be in a variadic list")]
+    fn test_variadic_separator_is_missing_panics() {
+        let overload = Overload {
+            parameters: vec![],
+            output_type: ParameterType::Literal(Literal::Number),
+        };
+
+        overload.position_of_variadic_separator();
     }
 }
