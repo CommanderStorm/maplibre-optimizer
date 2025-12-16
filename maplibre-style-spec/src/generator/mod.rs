@@ -5,17 +5,20 @@ use codegen2::Scope;
 use crate::decoder::r#enum::EnumValues;
 use crate::decoder::{ParsedItem, PrimitiveType, StyleReference, TopLevelItem};
 use crate::generator::formatter::{to_snake_case, to_upper_camel_case};
+use crate::generator::literals::generate_literals;
 
 mod autotest;
 pub mod formatter;
 mod items;
+mod literals;
 
 pub fn generate_spec_scope(mut reference: StyleReference) -> String {
     let mut scope = Scope::new();
-
     assert_eq!(reference.version, 8);
+    reorder_expressions(&mut reference.fields);
 
     generate_spec(&mut scope, &reference.root);
+    generate_literals(&mut scope);
     let discriminants = extract_and_remove_discriminants(&mut reference.fields);
 
     for (key, item) in &reference.fields {
@@ -28,6 +31,65 @@ pub fn generate_spec_scope(mut reference: StyleReference) -> String {
         .import("super", "*");
 
     scope.to_string()
+}
+
+fn reorder_expressions(fields: &mut BTreeMap<String, TopLevelItem>) {
+    let _ = fields
+        .remove("expression")
+        .expect("expression to be a top level item");
+    fields.insert(
+        "expression".to_string(),
+        TopLevelItem::OneOf(vec![
+            "BooleanExpression".to_string(),
+            "NumberExpression".to_string(),
+            "StringExpression".to_string(),
+            "CollatorExpression".to_string(),
+            "StringExpression".to_string(),
+            "StringExpression".to_string(),
+            "ObjectExpression".to_string(),
+            "StringExpression".to_string(),
+            "ArrayExpression".to_string(),
+        ]),
+    );
+    let expression_name = fields
+        .remove("expression_name")
+        .expect("expression_name to be a top level item");
+    let (values, default, common) = match expression_name {
+        TopLevelItem::Item(expression_name) => match *expression_name {
+            ParsedItem::Primitive(p) => match p {
+                PrimitiveType::Number { .. }
+                | PrimitiveType::Array { .. }
+                | PrimitiveType::Color { .. }
+                | PrimitiveType::String { .. }
+                | PrimitiveType::Boolean { .. }
+                | PrimitiveType::ResolvedImage { .. }
+                | PrimitiveType::NumberArray { .. }
+                | PrimitiveType::ColorArray { .. }
+                | PrimitiveType::State { .. }
+                | PrimitiveType::Padding { .. }
+                | PrimitiveType::Formatted { .. }
+                | PrimitiveType::Star(_)
+                | PrimitiveType::PropertyType(_)
+                | PrimitiveType::ProjectionDefinition { .. }
+                | PrimitiveType::VariableAnchorOffsetCollection(_)
+                | PrimitiveType::Sprite(_)
+                | PrimitiveType::PromoteId(_) => unreachable!("expression_name must be an enum"),
+                PrimitiveType::Enum {
+                    values,
+                    default,
+                    common,
+                } => (values, default, common),
+            },
+            ParsedItem::Reference { .. } => unreachable!("expression_name must be a primitive"),
+        },
+        TopLevelItem::OneOf(_) | TopLevelItem::Group(_) => {
+            unreachable!("expression_name must be an item")
+        }
+    };
+    let EnumValues::SyntaxEnum(values) = values else {
+        unreachable!("expression_name must be syntax enum")
+    };
+    todo!("reorder expressions to match the syntax enum");
 }
 
 fn extract_and_remove_discriminants(
