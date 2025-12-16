@@ -623,60 +623,6 @@ mod tests {
           }
         });
         let reference: StyleReference = serde_json::from_value(reference).unwrap();
-        insta::assert_debug_snapshot!(reference,@r#"
-        StyleReference {
-            version: 8,
-            root: {},
-            fields: {
-                "interpolation_name": Item(
-                    Primitive(
-                        Enum {
-                            common: Fields {
-                                doc: "First element in an interpolation array. May be followed by a number of arguments.",
-                                example: None,
-                                units: None,
-                                expression: None,
-                                property_type: None,
-                                sdk_support: None,
-                                transition: None,
-                                required: None,
-                                overridable: None,
-                                requires: None,
-                            },
-                            default: None,
-                            values: SyntaxEnum(
-                                {
-                                    "linear": SyntaxEnum {
-                                        doc: "Interpolates linearly between the pair of stops just less than and just greater than the input",
-                                        sdk_support: Some(
-                                            Object {},
-                                        ),
-                                        syntax: Syntax {
-                                            overloads: [
-                                                Overload {
-                                                    parameters: [],
-                                                    output_type: Reference(
-                                                        "interpolation",
-                                                    ),
-                                                },
-                                            ],
-                                            parameters: [],
-                                        },
-                                        example: Some(
-                                            Array [
-                                                String("linear"),
-                                            ],
-                                        ),
-                                        group: None,
-                                    },
-                                },
-                            ),
-                        },
-                    ),
-                ),
-            },
-        }
-        "#);
         insta::assert_snapshot!(crate::generator::generate_spec_scope(reference), @r##"
         /// This is a Maplibre Style Specification
         #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
@@ -733,6 +679,121 @@ mod tests {
             #[case::t_linear(serde_json::json!(["linear"]))]
             fn test_example_interpolation_name_decodes(#[case] example: serde_json::Value) {
                 let _ = serde_json::from_value::<InterpolationName>(example).expect("example should decode");
+            }
+        }
+        "##);
+    }
+    #[test]
+    fn test_generate_spec_fmt() {
+        let reference = json!({
+          "$version": 8,
+          "$root": {},
+          "expression_name": {
+            "doc": "First element in an expression array. May be followed by a number of arguments.",
+            "type": "enum",
+            "values": {
+              "format": {
+                "doc": "Returns a `formatted` string for displaying mixed-format text in the `text-field` property.",
+                "syntax": {
+                  "overloads": [
+                    {
+                      "parameters": ["input_1", "style_overrides_1?", "...", "input_n", "style_overrides_n?"],
+                      "output-type": "formatted"
+                    }
+                  ],
+                  "parameters": [
+                    {
+                      "name": "input_i",
+                      "type": ["string", "image"]
+                    },
+                    {
+                      "name": "style_overrides_i",
+                      "type": {
+                        "text-font": {
+                          "type": "string",
+                          "doc": "Overrides the font stack specified by the root layout property.",
+                          "example": "Arial Unicode MS Regular"
+                        }
+                      }
+                    }
+                  ]
+                },
+                "example": ["format", ["upcase", ["get", "FacilityName"]], {"font-scale": 0.8}, "\n\n", {}, ["downcase", ["get", "Comments"]], {"font-scale": 0.6, "vertical-align": "center"}],
+                "sdk-support": {}
+              }
+            }
+          }
+        });
+        let reference: StyleReference = serde_json::from_value(reference).unwrap();
+        insta::assert_snapshot!(crate::generator::generate_spec_scope(reference), @r##"
+        /// This is a Maplibre Style Specification
+        #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+        pub struct MaplibreStyleSpecification;
+
+        /// First element in an expression array. May be followed by a number of arguments.
+        #[derive(PartialEq, Eq, Debug, Clone)]
+        pub enum ExpressionName {
+            /// Returns a `formatted` string for displaying mixed-format text in the `text-field` property. The input may contain a string literal or expression, including an [`'image'`](#image) expression. Strings may be followed by a style override object.
+            /// 
+            ///  - [Change the case of labels](https://maplibre.org/maplibre-gl-js/docs/examples/change-case-of-labels/)
+            /// 
+            ///  - [Display and style rich text labels](https://maplibre.org/maplibre-gl-js/docs/examples/display-and-style-rich-text-labels/)
+            Format(Vec<(StringExpressionOrStringExpression,Object)>),
+        }
+
+        impl<'de> serde::Deserialize<'de> for ExpressionName {
+            fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+            where D: serde::Deserializer<'de>,
+            {
+                deserializer.deserialize_seq(ExpressionNameVisitor)
+            }
+        }
+
+        /// Visitor for deserializing the syntax enum [`ExpressionName`]
+        struct ExpressionNameVisitor;
+
+        impl<'de> serde::de::Visitor<'de> for ExpressionNameVisitor {
+            type Value = ExpressionName;
+
+            fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+                formatter.write_str(r#"an ExpressionName like ["format",["upcase",["get","FacilityName"]],{"font-scale":0.8},"\n\n",{},["downcase",["get","Comments"]],{"font-scale":0.6,"vertical-align":"center"}]"#)
+            }
+
+            fn visit_seq<A: serde::de::SeqAccess<'de>>(self, mut seq: A) -> Result<Self::Value, A::Error> {
+                /// Reads the next element from the sequence or reports a missing field error.
+                fn visit_seq_field<'de, A, T>(seq: &mut A, name: &'static str) -> Result<T, A::Error>
+                where A: serde::de::SeqAccess<'de>, T: serde::Deserialize<'de> {
+                seq.next_element()?.ok_or_else(|| serde::de::Error::missing_field(name))
+                }
+
+                // First element: operator string
+                let op: String = seq.next_element()?.ok_or_else(|| serde::de::Error::custom("missing operator"))?;
+                match op.as_str() {
+                "format" => {
+                let mut inputs = Vec::new();
+                while let Some(input_i) = seq.next_element()? {
+                let style_overrides_i = seq.next_element()?.ok(); // optional param
+                let element = (input_i,style_overrides_i);
+                inputs.push(element);
+                }
+                if inputs.empty() {
+                return Err(serde::de::Error::custom("ExpressionName::Format requires at least one argument"));
+                }
+                Ok(ExpressionName::Format(inputs))
+                },
+                _ => Err(serde::de::Error::unknown_variant(&op, &["format"]))
+                }
+            }
+        }
+
+        #[cfg(test)]
+        mod test {
+            use super::*;
+
+            #[rstest::rstest]
+            #[case::t_format(serde_json::json!(["format",["upcase",["get","FacilityName"]],{"font-scale":0.8},"\n\n",{},["downcase",["get","Comments"]],{"font-scale":0.6,"vertical-align":"center"}]))]
+            fn test_example_expression_name_decodes(#[case] example: serde_json::Value) {
+                let _ = serde_json::from_value::<ExpressionName>(example).expect("example should decode");
             }
         }
         "##);
