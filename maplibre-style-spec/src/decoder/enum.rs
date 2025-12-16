@@ -5,6 +5,7 @@ use serde::{Deserialize, Deserializer};
 use serde_json::{Number, Value};
 
 use crate::decoder::ParsedItem;
+use crate::generator::formatter::to_upper_camel_case;
 
 #[derive(Debug, PartialEq, Clone, Deserialize)]
 #[serde(untagged)]
@@ -56,6 +57,14 @@ pub struct Syntax {
     pub parameters: Vec<Parameter>,
 }
 
+impl Syntax {
+    pub fn has_variadic_overload(&self) -> bool {
+        self.overloads
+            .iter()
+            .any(|overload| overload.is_variadic(&self.parameters))
+    }
+}
+
 #[derive(Debug, PartialEq, Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Overload {
@@ -63,12 +72,48 @@ pub struct Overload {
     #[serde(rename = "output-type")]
     pub output_type: ParameterType,
 }
+
+impl Overload {
+    pub fn position_of_variadic_separator(&self) -> usize {
+        self.parameters
+            .iter()
+            .position(|p| p == "...")
+            .expect("... parameter must be in a variadic list")
+    }
+
+    pub fn is_variadic(&self, params: &[Parameter]) -> bool {
+        self.parameters.iter().any(|p| p == "...")
+            || !self.parameters.iter().all(|overloaded_param| {
+                params.iter().any(|actual_param| {
+                    actual_param.matches_overload_parameter_name(overloaded_param)
+                })
+            })
+    }
+}
+
 #[derive(Debug, PartialEq, Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Parameter {
-    name: String,
-    r#type: ParameterType,
-    doc: Option<String>,
+    pub name: String,
+    pub r#type: ParameterType,
+    pub doc: Option<String>,
+}
+
+impl Parameter {
+    pub fn matches_overload_parameter_name(&self, overloaded_name: &str) -> bool {
+        if let Some(maybe_template) = self.name.strip_suffix("_i") {
+            for suffix in &["_1", "_2", "_1?", "_2?"] {
+                if let Some(param) = overloaded_name.strip_suffix(suffix) {
+                    return maybe_template == param;
+                }
+            }
+            self.name == overloaded_name
+        } else if let Some(opt) = overloaded_name.strip_suffix('?') {
+            self.name == opt
+        } else {
+            self.name == overloaded_name
+        }
+    }
 }
 
 #[derive(Debug, PartialEq, Clone, Deserialize)]
@@ -81,6 +126,28 @@ pub enum ParameterType {
     Object(BTreeMap<String, ParsedItem>),
     Reference(String),
 }
+
+impl ParameterType {
+    pub fn to_upper_camel_case(&self) -> String {
+        match self {
+            ParameterType::Literal(l) => l.to_upper_camel_case().to_string(),
+            ParameterType::LiteralAnyOf(ls) => ls
+                .iter()
+                .map(|l| l.to_upper_camel_case())
+                .collect::<Vec<_>>()
+                .join("Or"),
+            ParameterType::Expression(e) => e.to_upper_camel_case().to_string(),
+            ParameterType::ExpressionAnyOf(es) => es
+                .iter()
+                .map(|e| e.to_upper_camel_case())
+                .collect::<Vec<_>>()
+                .join("Or"),
+            ParameterType::Object(_) => "Object".to_string(),
+            ParameterType::Reference(r) => to_upper_camel_case(&r),
+        }
+    }
+}
+
 #[derive(Debug, PartialEq, Eq, Clone, Deserialize)]
 pub enum Literal {
     #[serde(rename = "number literal")]
@@ -94,6 +161,27 @@ pub enum Literal {
     #[serde(rename = "JSON array")]
     JSONArray,
 }
+impl Literal {
+    pub fn to_literal_type(&self) -> &'static str {
+        match self {
+            Literal::Number => "serde_json::Number",
+            Literal::String => "String",
+            Literal::GeoJSONObject => "geojson::GeoJson",
+            Literal::JSONObject => "serde_json::Value",
+            Literal::JSONArray => "Vec<serde_json::Value>",
+        }
+    }
+    pub fn to_upper_camel_case(&self) -> &'static str {
+        match self {
+            Literal::Number => "NumberLiteral",
+            Literal::String => "StringLiteral",
+            Literal::GeoJSONObject => "GeoJSONObjectLiteral",
+            Literal::JSONObject => "JSONObjectLiteral",
+            Literal::JSONArray => "JSONArrayLiteral",
+        }
+    }
+}
+
 #[derive(Debug, PartialEq, Clone)]
 pub enum Expression {
     Any,
@@ -188,6 +276,36 @@ fn deserialize_array_from_string(s: &str) -> Result<Expression, String> {
     };
 
     Ok(Expression::Array { r#type, length })
+}
+impl Expression {
+    pub fn to_expression_type(&self) -> &'static str {
+        match self {
+            Expression::Any => "Box<Expression>",
+            Expression::Boolean => "Box<BooleanExpression>",
+            Expression::Number => "Box<NumberExpression>",
+            Expression::String => "Box<StringExpression>",
+            Expression::Collator => "Box<CollatorExpression>",
+            Expression::Formatted => "Box<StringExpression>",
+            Expression::Image => "Box<StringExpression>",
+            Expression::Object => "Box<ObjectExpression>",
+            Expression::Color => "Box<StringExpression>",
+            Expression::Array { .. } => "Box<ArrayExpression>",
+        }
+    }
+    pub fn to_upper_camel_case(&self) -> &'static str {
+        match self {
+            Expression::Any => "Expression",
+            Expression::Boolean => "BooleanExpression",
+            Expression::Number => "NumberExpression",
+            Expression::String => "StringExpression",
+            Expression::Collator => "CollatorExpression",
+            Expression::Formatted => "StringExpression",
+            Expression::Image => "StringExpression",
+            Expression::Object => "ObjectExpression",
+            Expression::Color => "StringExpression",
+            Expression::Array { .. } => "ArrayExpression",
+        }
+    }
 }
 
 #[cfg(test)]
@@ -293,5 +411,64 @@ mod tests {
             }
         });
         let _: BTreeMap<String, SyntaxEnum> = serde_json::from_value(reference).unwrap();
+    }
+
+    #[rstest]
+    #[case::basic_exact_match("foo", "foo", true)]
+    #[case::basic_mismatch("foo", "bar", false)]
+    #[case::no_template_substition_1("foo_1", "foo_1", true)]
+    #[case::no_template_substition_2("foo_2", "foo_2", true)]
+    #[case::optional_suffix_match("foo", "foo?", true)]
+    #[case::optional_suffix_mismatch("bar", "foo?", false)]
+    #[case::template_mismatch_0("val_i", "val_0", false)]
+    #[case::template_match_1("val_i", "val_1", true)]
+    #[case::template_match_2("val_i", "val_2", true)]
+    #[case::template_match_1_optional("val_i", "val_1?", true)]
+    #[case::template_match_2_optional("val_i", "val_2?", true)]
+    #[case::template_exact_fallback("val_i", "val_i", true)]
+    #[case::template_invalid_numeric_suffix("val_i", "val_3", false)]
+    #[case::template_base_name_mismatch("val_i", "other_1", false)]
+    #[case::template_missing_suffix("val_i", "val", false)]
+    fn test_parameter_matching(
+        #[case] param_name: &str,
+        #[case] overload: &str,
+        #[case] expected: bool,
+    ) {
+        let param = Parameter {
+            name: param_name.to_string(),
+            r#type: ParameterType::Literal(Literal::Number),
+            doc: None,
+        };
+        assert_eq!(param.matches_overload_parameter_name(overload), expected);
+    }
+
+    #[test]
+    fn test_variadic_separator_is_found() {
+        let overload = Overload {
+            parameters: vec![
+                "param1".to_string(),
+                "param2".to_string(),
+                "...".to_string(),
+                "param4".to_string(),
+            ],
+            output_type: ParameterType::Literal(Literal::Number),
+        };
+
+        let position = overload.position_of_variadic_separator();
+        assert_eq!(
+            position, 2,
+            "Expected the variadic separator '...' to be at index 2."
+        );
+    }
+
+    #[test]
+    #[should_panic(expected = "... parameter must be in a variadic list")]
+    fn test_variadic_separator_is_missing_panics() {
+        let overload = Overload {
+            parameters: vec![],
+            output_type: ParameterType::Literal(Literal::Number),
+        };
+
+        overload.position_of_variadic_separator();
     }
 }
