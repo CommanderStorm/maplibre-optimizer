@@ -927,9 +927,9 @@ impl<'de> serde::de::Visitor<'de> for ExpressionNameVisitor {
                 while let Some(element) = seq.next_element()? {
                     inputs.push(element);
                 }
-                if inputs.len() < 1 {
+                if inputs.empty() {
                     return Err(serde::de::Error::custom(
-                        "ExpressionName::Star requires at least 1 arguments",
+                        "ExpressionName::Star requires at least one argument",
                     ));
                 }
                 Ok(ExpressionName::Star(inputs))
@@ -939,9 +939,9 @@ impl<'de> serde::de::Visitor<'de> for ExpressionNameVisitor {
                 while let Some(element) = seq.next_element()? {
                     inputs.push(element);
                 }
-                if inputs.len() < 1 {
+                if inputs.empty() {
                     return Err(serde::de::Error::custom(
-                        "ExpressionName::Plus requires at least 1 arguments",
+                        "ExpressionName::Plus requires at least one argument",
                     ));
                 }
                 Ok(ExpressionName::Plus(inputs))
@@ -993,9 +993,9 @@ impl<'de> serde::de::Visitor<'de> for ExpressionNameVisitor {
                 while let Some(element) = seq.next_element()? {
                     inputs.push(element);
                 }
-                if inputs.len() < 1 {
+                if inputs.empty() {
                     return Err(serde::de::Error::custom(
-                        "ExpressionName::All requires at least 1 arguments",
+                        "ExpressionName::All requires at least one argument",
                     ));
                 }
                 Ok(ExpressionName::All(inputs))
@@ -1005,9 +1005,9 @@ impl<'de> serde::de::Visitor<'de> for ExpressionNameVisitor {
                 while let Some(element) = seq.next_element()? {
                     inputs.push(element);
                 }
-                if inputs.len() < 1 {
+                if inputs.empty() {
                     return Err(serde::de::Error::custom(
-                        "ExpressionName::Any requires at least 1 arguments",
+                        "ExpressionName::Any requires at least one argument",
                     ));
                 }
                 Ok(ExpressionName::Any(inputs))
@@ -1035,15 +1035,28 @@ impl<'de> serde::de::Visitor<'de> for ExpressionNameVisitor {
                 while let Some(element) = seq.next_element()? {
                     inputs.push(element);
                 }
-                if inputs.len() < 1 {
+                if inputs.empty() {
                     return Err(serde::de::Error::custom(
-                        "ExpressionName::Boolean requires at least 1 arguments",
+                        "ExpressionName::Boolean requires at least one argument",
                     ));
                 }
                 Ok(ExpressionName::Boolean(inputs))
             }
             "case" => {
-                todo!("ExpressionName::Case needs variadic overloads with tuples implemented")
+                let mut inputs = Vec::new();
+                while let Some(condition_i) = seq.next_element()? {
+                    let output_i = seq.next_element()?.ok_or_else(|| {
+                        serde::de::Error::custom("expected output_i in ExpressionName::Case")
+                    })?;
+                    let element = (condition_i, output_i);
+                    inputs.push(element);
+                }
+                if inputs.empty() {
+                    return Err(serde::de::Error::custom(
+                        "ExpressionName::Case requires at least one argument",
+                    ));
+                }
+                Ok(ExpressionName::Case(inputs))
             }
             "ceil" => {
                 let input = visit_seq_field(&mut seq, "input")?;
@@ -1054,9 +1067,9 @@ impl<'de> serde::de::Visitor<'de> for ExpressionNameVisitor {
                 while let Some(element) = seq.next_element()? {
                     inputs.push(element);
                 }
-                if inputs.len() < 1 {
+                if inputs.empty() {
                     return Err(serde::de::Error::custom(
-                        "ExpressionName::Coalesce requires at least 1 arguments",
+                        "ExpressionName::Coalesce requires at least one argument",
                     ));
                 }
                 Ok(ExpressionName::Coalesce(inputs))
@@ -1070,9 +1083,9 @@ impl<'de> serde::de::Visitor<'de> for ExpressionNameVisitor {
                 while let Some(element) = seq.next_element()? {
                     inputs.push(element);
                 }
-                if inputs.len() < 1 {
+                if inputs.empty() {
                     return Err(serde::de::Error::custom(
-                        "ExpressionName::Concat requires at least 1 arguments",
+                        "ExpressionName::Concat requires at least one argument",
                     ));
                 }
                 Ok(ExpressionName::Concat(inputs))
@@ -1100,7 +1113,18 @@ impl<'de> serde::de::Visitor<'de> for ExpressionNameVisitor {
                 Ok(ExpressionName::Floor(input))
             }
             "format" => {
-                todo!("ExpressionName::Format needs variadic overloads with tuples implemented")
+                let mut inputs = Vec::new();
+                while let Some(input_i) = seq.next_element()? {
+                    let style_overrides_i = seq.next_element()?.ok(); // optional param
+                    let element = (input_i, style_overrides_i);
+                    inputs.push(element);
+                }
+                if inputs.empty() {
+                    return Err(serde::de::Error::custom(
+                        "ExpressionName::Format requires at least one argument",
+                    ));
+                }
+                Ok(ExpressionName::Format(inputs))
             }
             "geometry-type" => Ok(ExpressionName::GeometryType),
             "get" => {
@@ -1130,15 +1154,82 @@ impl<'de> serde::de::Visitor<'de> for ExpressionNameVisitor {
                 todo!("ExpressionName::IndexOf needs multiple overloads, i.e. IndexOfOptions implemented")
             }
             "interpolate" => {
-                todo!(
-                    "ExpressionName::Interpolate needs variadic overloads with tuples implemented"
-                )
+                let mut inputs = Vec::new();
+                while let Some(interpolation_type) = seq.next_element()? {
+                    let input = seq.next_element()?.ok_or_else(|| {
+                        serde::de::Error::custom("expected input in ExpressionName::Interpolate")
+                    })?;
+                    let stop_i_input = seq.next_element()?.ok_or_else(|| {
+                        serde::de::Error::custom(
+                            "expected stop_i_input in ExpressionName::Interpolate",
+                        )
+                    })?;
+                    let stop_i_output = seq.next_element()?.ok_or_else(|| {
+                        serde::de::Error::custom(
+                            "expected stop_i_output in ExpressionName::Interpolate",
+                        )
+                    })?;
+                    let element = (interpolation_type, input, stop_i_input, stop_i_output);
+                    inputs.push(element);
+                }
+                if inputs.empty() {
+                    return Err(serde::de::Error::custom(
+                        "ExpressionName::Interpolate requires at least one argument",
+                    ));
+                }
+                Ok(ExpressionName::Interpolate(inputs))
             }
             "interpolate-hcl" => {
-                todo!("ExpressionName::InterpolateHcl needs variadic overloads with tuples implemented")
+                let mut inputs = Vec::new();
+                while let Some(interpolation_type) = seq.next_element()? {
+                    let input = seq.next_element()?.ok_or_else(|| {
+                        serde::de::Error::custom("expected input in ExpressionName::InterpolateHcl")
+                    })?;
+                    let stop_i_input = seq.next_element()?.ok_or_else(|| {
+                        serde::de::Error::custom(
+                            "expected stop_i_input in ExpressionName::InterpolateHcl",
+                        )
+                    })?;
+                    let stop_i_output = seq.next_element()?.ok_or_else(|| {
+                        serde::de::Error::custom(
+                            "expected stop_i_output in ExpressionName::InterpolateHcl",
+                        )
+                    })?;
+                    let element = (interpolation_type, input, stop_i_input, stop_i_output);
+                    inputs.push(element);
+                }
+                if inputs.empty() {
+                    return Err(serde::de::Error::custom(
+                        "ExpressionName::InterpolateHcl requires at least one argument",
+                    ));
+                }
+                Ok(ExpressionName::InterpolateHcl(inputs))
             }
             "interpolate-lab" => {
-                todo!("ExpressionName::InterpolateLab needs variadic overloads with tuples implemented")
+                let mut inputs = Vec::new();
+                while let Some(interpolation_type) = seq.next_element()? {
+                    let input = seq.next_element()?.ok_or_else(|| {
+                        serde::de::Error::custom("expected input in ExpressionName::InterpolateLab")
+                    })?;
+                    let stop_i_input = seq.next_element()?.ok_or_else(|| {
+                        serde::de::Error::custom(
+                            "expected stop_i_input in ExpressionName::InterpolateLab",
+                        )
+                    })?;
+                    let stop_i_output = seq.next_element()?.ok_or_else(|| {
+                        serde::de::Error::custom(
+                            "expected stop_i_output in ExpressionName::InterpolateLab",
+                        )
+                    })?;
+                    let element = (interpolation_type, input, stop_i_input, stop_i_output);
+                    inputs.push(element);
+                }
+                if inputs.empty() {
+                    return Err(serde::de::Error::custom(
+                        "ExpressionName::InterpolateLab requires at least one argument",
+                    ));
+                }
+                Ok(ExpressionName::InterpolateLab(inputs))
             }
             "is-supported-script" => {
                 let input = visit_seq_field(&mut seq, "input")?;
@@ -1149,7 +1240,20 @@ impl<'de> serde::de::Visitor<'de> for ExpressionNameVisitor {
                 Ok(ExpressionName::Length(array_or_string))
             }
             "let" => {
-                todo!("ExpressionName::Let needs variadic overloads with tuples implemented")
+                let mut inputs = Vec::new();
+                while let Some(var_i_name) = seq.next_element()? {
+                    let var_i_value = seq.next_element()?.ok_or_else(|| {
+                        serde::de::Error::custom("expected var_i_value in ExpressionName::Let")
+                    })?;
+                    let element = (var_i_name, var_i_value);
+                    inputs.push(element);
+                }
+                if inputs.empty() {
+                    return Err(serde::de::Error::custom(
+                        "ExpressionName::Let requires at least one argument",
+                    ));
+                }
+                Ok(ExpressionName::Let(inputs))
             }
             "line-progress" => Ok(ExpressionName::LineProgress),
             "literal" => {
@@ -1169,16 +1273,32 @@ impl<'de> serde::de::Visitor<'de> for ExpressionNameVisitor {
                 Ok(ExpressionName::Log2(input))
             }
             "match" => {
-                todo!("ExpressionName::Match needs variadic overloads with tuples implemented")
+                let mut inputs = Vec::new();
+                while let Some(input) = seq.next_element()? {
+                    let label_i = seq.next_element()?.ok_or_else(|| {
+                        serde::de::Error::custom("expected label_i in ExpressionName::Match")
+                    })?;
+                    let output_i = seq.next_element()?.ok_or_else(|| {
+                        serde::de::Error::custom("expected output_i in ExpressionName::Match")
+                    })?;
+                    let element = (input, label_i, output_i);
+                    inputs.push(element);
+                }
+                if inputs.empty() {
+                    return Err(serde::de::Error::custom(
+                        "ExpressionName::Match requires at least one argument",
+                    ));
+                }
+                Ok(ExpressionName::Match(inputs))
             }
             "max" => {
                 let mut inputs = Vec::new();
                 while let Some(element) = seq.next_element()? {
                     inputs.push(element);
                 }
-                if inputs.len() < 1 {
+                if inputs.empty() {
                     return Err(serde::de::Error::custom(
-                        "ExpressionName::Max requires at least 1 arguments",
+                        "ExpressionName::Max requires at least one argument",
                     ));
                 }
                 Ok(ExpressionName::Max(inputs))
@@ -1188,9 +1308,9 @@ impl<'de> serde::de::Visitor<'de> for ExpressionNameVisitor {
                 while let Some(element) = seq.next_element()? {
                     inputs.push(element);
                 }
-                if inputs.len() < 1 {
+                if inputs.empty() {
                     return Err(serde::de::Error::custom(
-                        "ExpressionName::Min requires at least 1 arguments",
+                        "ExpressionName::Min requires at least one argument",
                     ));
                 }
                 Ok(ExpressionName::Min(inputs))
@@ -1200,9 +1320,9 @@ impl<'de> serde::de::Visitor<'de> for ExpressionNameVisitor {
                 while let Some(element) = seq.next_element()? {
                     inputs.push(element);
                 }
-                if inputs.len() < 1 {
+                if inputs.empty() {
                     return Err(serde::de::Error::custom(
-                        "ExpressionName::Number requires at least 1 arguments",
+                        "ExpressionName::Number requires at least one argument",
                     ));
                 }
                 Ok(ExpressionName::Number(inputs))
@@ -1217,9 +1337,9 @@ impl<'de> serde::de::Visitor<'de> for ExpressionNameVisitor {
                 while let Some(element) = seq.next_element()? {
                     inputs.push(element);
                 }
-                if inputs.len() < 1 {
+                if inputs.empty() {
                     return Err(serde::de::Error::custom(
-                        "ExpressionName::Object requires at least 1 arguments",
+                        "ExpressionName::Object requires at least one argument",
                     ));
                 }
                 Ok(ExpressionName::Object(inputs))
@@ -1261,16 +1381,35 @@ impl<'de> serde::de::Visitor<'de> for ExpressionNameVisitor {
                 Ok(ExpressionName::Sqrt(input))
             }
             "step" => {
-                todo!("ExpressionName::Step needs variadic overloads with tuples implemented")
+                let mut inputs = Vec::new();
+                while let Some(input) = seq.next_element()? {
+                    let output_0 = seq.next_element()?.ok_or_else(|| {
+                        serde::de::Error::custom("expected output_0 in ExpressionName::Step")
+                    })?;
+                    let stop_i_input = seq.next_element()?.ok_or_else(|| {
+                        serde::de::Error::custom("expected stop_i_input in ExpressionName::Step")
+                    })?;
+                    let stop_i_output = seq.next_element()?.ok_or_else(|| {
+                        serde::de::Error::custom("expected stop_i_output in ExpressionName::Step")
+                    })?;
+                    let element = (input, output_0, stop_i_input, stop_i_output);
+                    inputs.push(element);
+                }
+                if inputs.empty() {
+                    return Err(serde::de::Error::custom(
+                        "ExpressionName::Step requires at least one argument",
+                    ));
+                }
+                Ok(ExpressionName::Step(inputs))
             }
             "string" => {
                 let mut inputs = Vec::new();
                 while let Some(element) = seq.next_element()? {
                     inputs.push(element);
                 }
-                if inputs.len() < 1 {
+                if inputs.empty() {
                     return Err(serde::de::Error::custom(
-                        "ExpressionName::String requires at least 1 arguments",
+                        "ExpressionName::String requires at least one argument",
                     ));
                 }
                 Ok(ExpressionName::String(inputs))
@@ -1288,9 +1427,9 @@ impl<'de> serde::de::Visitor<'de> for ExpressionNameVisitor {
                 while let Some(element) = seq.next_element()? {
                     inputs.push(element);
                 }
-                if inputs.len() < 1 {
+                if inputs.empty() {
                     return Err(serde::de::Error::custom(
-                        "ExpressionName::ToColor requires at least 1 arguments",
+                        "ExpressionName::ToColor requires at least one argument",
                     ));
                 }
                 Ok(ExpressionName::ToColor(inputs))
@@ -1300,9 +1439,9 @@ impl<'de> serde::de::Visitor<'de> for ExpressionNameVisitor {
                 while let Some(element) = seq.next_element()? {
                     inputs.push(element);
                 }
-                if inputs.len() < 1 {
+                if inputs.empty() {
                     return Err(serde::de::Error::custom(
-                        "ExpressionName::ToNumber requires at least 1 arguments",
+                        "ExpressionName::ToNumber requires at least one argument",
                     ));
                 }
                 Ok(ExpressionName::ToNumber(inputs))

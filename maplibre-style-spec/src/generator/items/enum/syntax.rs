@@ -6,7 +6,7 @@ use serde_json::Value;
 use crate::decoder::Fields;
 use crate::decoder::r#enum::{Literal, Overload, Parameter, ParameterType, Syntax, SyntaxEnum};
 use crate::generator::autotest::generate_test_from_examples_if_present;
-use crate::generator::formatter::to_upper_camel_case;
+use crate::generator::formatter::{to_snake_case, to_upper_camel_case};
 
 pub fn generate_syntax_enum(
     scope: &mut Scope,
@@ -410,24 +410,46 @@ fn generate_syntax_enum_deserializer_regular_variadic_variant(
     (name, variant_name): (&str, &str),
     overload: &Overload,
 ) {
-    let minimum_length = overload
+    let position_of_variadic_separator = overload
         .parameters
         .iter()
         .position(|p| p == "...")
         .expect("... parameter must be in a variadic list");
-    if minimum_length > 1 {
-        // TODO: variadic (...) overloads with tuples
-        visit_seq.line(format!(
-            "todo!(\"{name}::{variant_name} needs variadic overloads with tuples implemented\")"
-        ));
-        return;
-    }
+    assert_ne!(position_of_variadic_separator, 0);
     visit_seq.line("let mut inputs = Vec::new();");
-    visit_seq.line("while let Some(element) = seq.next_element()? {");
+    if position_of_variadic_separator == 1 {
+        visit_seq.line("while let Some(element) = seq.next_element()? {");
+    } else {
+        let base_name = to_snake_case(&overload.parameters[0]).replace("_1", "_i");
+        visit_seq.line(format!(
+            "while let Some({base_name}) = seq.next_element()? {{"
+        ));
+        let non_base_parameters = &overload.parameters[1..position_of_variadic_separator]
+            .iter()
+            .map(|p| (to_snake_case(p).replace("_1", "_i"), p.ends_with('?')))
+            .collect::<Vec<_>>();
+        for (param_name, is_optional) in non_base_parameters {
+            if *is_optional {
+                visit_seq.line(format!(
+                    "let {param_name} = seq.next_element()?.ok(); // optional param"
+                ));
+            } else {
+                visit_seq.line(format!("let {param_name} = seq.next_element()?.ok_or_else(|| serde::de::Error::custom(\"expected {param_name} in {name}::{variant_name}\"))?;"));
+            }
+        }
+        visit_seq.line(format!(
+            "let element = ({base_name},{});",
+            non_base_parameters
+                .iter()
+                .map(|(p, _)| p.as_str())
+                .collect::<Vec<_>>()
+                .join(", ")
+        ));
+    }
     visit_seq.line("inputs.push(element);");
     visit_seq.line("}");
-    visit_seq.line(format!("if inputs.len() < {minimum_length} {{"));
-    visit_seq.line(format!("return Err(serde::de::Error::custom(\"{name}::{variant_name} requires at least {minimum_length} arguments\"));"));
+    visit_seq.line(format!("if inputs.empty() {{"));
+    visit_seq.line(format!("return Err(serde::de::Error::custom(\"{name}::{variant_name} requires at least one argument\"));"));
     visit_seq.line("}");
     visit_seq.line(format!("Ok({name}::{variant_name}(inputs))"));
 }
@@ -557,7 +579,16 @@ mod tests {
                 let op: String = seq.next_element()?.ok_or_else(|| serde::de::Error::custom("missing operator"))?;
                 match op.as_str() {
                 "let" => {
-                todo!("Expression::Let needs variadic overloads with tuples implemented")
+                let mut inputs = Vec::new();
+                while let Some(var_i_name) = seq.next_element()? {
+                let var_i_value = seq.next_element()?.ok_or_else(|| serde::de::Error::custom("expected var_i_value in Expression::Let"))?;
+                let element = (var_i_name,var_i_value);
+                inputs.push(element);
+                }
+                if inputs.empty() {
+                return Err(serde::de::Error::custom("Expression::Let requires at least one argument"));
+                }
+                Ok(Expression::Let(inputs))
                 },
                 _ => Err(serde::de::Error::unknown_variant(&op, &["let"]))
                 }
