@@ -311,10 +311,8 @@ fn generate_syntax_enum_deserializer(
             }
         } else {
             if syntax.has_variadic_overload() {
-                generate_syntax_enum_deserializer_multi_variadic_overload_variant(
-                    visit_seq,
-                    (&name, &variant_name),
-                    syntax,
+                unreachable!(
+                    "{name}::{variant_name} needs multiple variadic overloads, i.e. {variant_name}Options implemented"
                 );
             } else {
                 generate_syntax_enum_deserializer_multi_overload_variant(
@@ -377,18 +375,6 @@ fn generate_visit_seq_field(visit_seq: &mut Function) {
     visit_seq.line("seq.next_element()?.ok_or_else(|| serde::de::Error::missing_field(name))");
     visit_seq.line("}");
     visit_seq.line("");
-}
-
-fn generate_syntax_enum_deserializer_multi_variadic_overload_variant(
-    visit_seq: &mut Function,
-    (name, variant_name): (&str, &str),
-    syntax: &Syntax,
-) {
-    let options_name = format!("{variant_name}Options");
-    //todo: multiple variadic overloads
-    visit_seq.line(format!(
-        "todo!(\"{name}::{variant_name} needs multiple variadic overloads, i.e. {options_name} implemented\")"
-    ));
 }
 
 fn generate_syntax_enum_deserializer_multi_overload_variant(
