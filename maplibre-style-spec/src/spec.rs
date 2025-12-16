@@ -803,32 +803,64 @@ pub enum MinusOptions {
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
 #[serde(untagged)]
 pub enum LessOptions {
-    Number(Vec<serde_json::Value>),
-    String(Vec<serde_json::Value>),
+    Number(
+        StringExpression,
+        StringExpression,
+        Option<CollatorExpression>,
+    ),
+    String(
+        NumberExpression,
+        NumberExpression,
+        Option<CollatorExpression>,
+    ),
 }
 
 /// Options for deserializing the syntax enum variant [`ExpressionName::LessEqual`]
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
 #[serde(untagged)]
 pub enum LessEqualOptions {
-    Number(Vec<serde_json::Value>),
-    String(Vec<serde_json::Value>),
+    Number(
+        StringExpression,
+        StringExpression,
+        Option<CollatorExpression>,
+    ),
+    String(
+        NumberExpression,
+        NumberExpression,
+        Option<CollatorExpression>,
+    ),
 }
 
 /// Options for deserializing the syntax enum variant [`ExpressionName::Greater`]
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
 #[serde(untagged)]
 pub enum GreaterOptions {
-    Number(Vec<serde_json::Value>),
-    String(Vec<serde_json::Value>),
+    Number(
+        StringExpression,
+        StringExpression,
+        Option<CollatorExpression>,
+    ),
+    String(
+        NumberExpression,
+        NumberExpression,
+        Option<CollatorExpression>,
+    ),
 }
 
 /// Options for deserializing the syntax enum variant [`ExpressionName::GreaterEqual`]
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
 #[serde(untagged)]
 pub enum GreaterEqualOptions {
-    Number(Vec<serde_json::Value>),
-    String(Vec<serde_json::Value>),
+    Number(
+        StringExpression,
+        StringExpression,
+        Option<CollatorExpression>,
+    ),
+    String(
+        NumberExpression,
+        NumberExpression,
+        Option<CollatorExpression>,
+    ),
 }
 
 /// Options for deserializing the syntax enum variant [`ExpressionName::Array`]
@@ -958,10 +990,16 @@ impl<'de> serde::de::Visitor<'de> for ExpressionNameVisitor {
                 Ok(ExpressionName::Slash(input_1, input_2))
             }
             "<" => {
-                todo!("ExpressionName::Less needs multiple variadic overloads, i.e. LessOptions implemented")
+                // Delegate the remainder of the sequence to LessOptions deserialization
+                let remainder_of_sequence = serde::de::value::SeqAccessDeserializer::new(seq);
+                let options = LessOptions::deserialize(remainder_of_sequence)?;
+                Ok(ExpressionName::Less(options))
             }
             "<=" => {
-                todo!("ExpressionName::LessEqual needs multiple variadic overloads, i.e. LessEqualOptions implemented")
+                // Delegate the remainder of the sequence to LessEqualOptions deserialization
+                let remainder_of_sequence = serde::de::value::SeqAccessDeserializer::new(seq);
+                let options = LessEqualOptions::deserialize(remainder_of_sequence)?;
+                Ok(ExpressionName::LessEqual(options))
             }
             "==" => {
                 let input_1 = visit_seq_field(&mut seq, "input_1")?;
@@ -970,10 +1008,16 @@ impl<'de> serde::de::Visitor<'de> for ExpressionNameVisitor {
                 Ok(ExpressionName::EqualEqual(input_1, input_2, collator))
             }
             ">" => {
-                todo!("ExpressionName::Greater needs multiple variadic overloads, i.e. GreaterOptions implemented")
+                // Delegate the remainder of the sequence to GreaterOptions deserialization
+                let remainder_of_sequence = serde::de::value::SeqAccessDeserializer::new(seq);
+                let options = GreaterOptions::deserialize(remainder_of_sequence)?;
+                Ok(ExpressionName::Greater(options))
             }
             ">=" => {
-                todo!("ExpressionName::GreaterEqual needs multiple variadic overloads, i.e. GreaterEqualOptions implemented")
+                // Delegate the remainder of the sequence to GreaterEqualOptions deserialization
+                let remainder_of_sequence = serde::de::value::SeqAccessDeserializer::new(seq);
+                let options = GreaterEqualOptions::deserialize(remainder_of_sequence)?;
+                Ok(ExpressionName::GreaterEqual(options))
             }
             "^" => {
                 let input_1 = visit_seq_field(&mut seq, "input_1")?;

@@ -109,9 +109,8 @@ fn generate_multi_overload(
 ) {
     // because scope can only be owned by one owner, we first need to generate all tuples, then can add them
     let mut overloads_tuples = Vec::with_capacity(syntax.overloads.len());
-    let params = syntax.parameter_names();
     for overload in &syntax.overloads {
-        if overload.is_variadic(&params) {
+        if overload.is_variadic(&syntax.parameters) {
             // todo: needs proper variadic codegen
             overloads_tuples.push(vec!["Vec<serde_json::Value>".to_string()]);
         } else {
@@ -229,13 +228,13 @@ fn generate_parameter_type(
 ) -> String {
     if let Some(param) = param.strip_suffix('?') {
         let param = parameters.iter()
-            .find(|p| p.name == param)
+            .find(|p| p.matches_overload_parameter_name(param))
             .unwrap_or_else(|| panic!("parameter {param} from the syntax overload of {name}::{var_name} does not have a syntax parameter"));
         let param_name = generate_parameter_variant(scope, &param.r#type);
         format!("Option<{param_name}>")
     } else {
         let param = parameters.iter()
-            .find(|p| p.name == param.to_string().as_str())
+            .find(|p| p.matches_overload_parameter_name(param))
             .unwrap_or_else(|| panic!("parameter {param} from the syntax overload of {name}::{var_name} does not have a syntax parameter"));
         generate_parameter_variant(scope, &param.r#type)
     }

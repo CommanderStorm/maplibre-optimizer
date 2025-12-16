@@ -1,4 +1,4 @@
-use std::collections::{BTreeMap, HashSet};
+use std::collections::BTreeMap;
 
 use serde::de::Error;
 use serde::{Deserialize, Deserializer};
@@ -58,18 +58,10 @@ pub struct Syntax {
 }
 
 impl Syntax {
-    /// returns the names of the parameters that may appear in this syntax
-    pub fn parameter_names(&self) -> HashSet<&str> {
-        self.parameters
-            .iter()
-            .map(|p| p.name.as_str())
-            .collect::<HashSet<_>>()
-    }
     pub fn has_variadic_overload(&self) -> bool {
-        let params = self.parameter_names();
         self.overloads
             .iter()
-            .any(|overload| overload.is_variadic(&params))
+            .any(|overload| overload.is_variadic(&self.parameters))
     }
 }
 
@@ -82,15 +74,12 @@ pub struct Overload {
 }
 
 impl Overload {
-    pub fn is_variadic(&self, params: &HashSet<&str>) -> bool {
+    pub fn is_variadic(&self, params: &[Parameter]) -> bool {
         self.parameters.iter().any(|p| p == "...")
-            || !self.parameters.iter().all(|p| {
-                // ? is an optional variable
-                if let Some(s) = p.strip_suffix('?') {
-                    params.contains(s)
-                } else {
-                    params.contains(p.as_str())
-                }
+            || !self.parameters.iter().all(|overloaded_param| {
+                params.iter().any(|actual_param| {
+                    actual_param.matches_overload_parameter_name(overloaded_param)
+                })
             })
     }
 }
@@ -101,6 +90,24 @@ pub struct Parameter {
     pub name: String,
     pub r#type: ParameterType,
     pub doc: Option<String>,
+}
+
+impl Parameter {
+    pub fn matches_overload_parameter_name(&self, overloaded_name: &str) -> bool {
+        if let Some(opt) = overloaded_name.strip_suffix('?') {
+            self.name == opt
+        } else if let Some(maybe_template) = self.name.strip_suffix("_i") {
+            if let Some(param1) = overloaded_name.strip_suffix("_1") {
+                maybe_template == param1
+            } else if let Some(param2) = overloaded_name.strip_suffix("_2") {
+                maybe_template == param2
+            } else {
+                self.name == overloaded_name
+            }
+        } else {
+            self.name == overloaded_name
+        }
+    }
 }
 
 #[derive(Debug, PartialEq, Clone, Deserialize)]
