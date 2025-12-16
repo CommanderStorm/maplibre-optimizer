@@ -405,4 +405,33 @@ mod tests {
         });
         let _: BTreeMap<String, SyntaxEnum> = serde_json::from_value(reference).unwrap();
     }
+
+    #[rstest]
+    #[case::basic_exact_match("foo", "foo", true)]
+    #[case::basic_mismatch("foo", "bar", false)]
+    #[case::no_template_substition_1("foo_1", "foo_1", true)]
+    #[case::no_template_substition_2("foo_2", "foo_2", true)]
+    #[case::optional_suffix_match("foo", "foo?", true)]
+    #[case::optional_suffix_mismatch("bar", "foo?", false)]
+    #[case::template_mismatch_0("val_i", "val_0", false)]
+    #[case::template_match_1("val_i", "val_1", true)]
+    #[case::template_match_2("val_i", "val_2", true)]
+    #[case::template_match_1_optional("val_i", "val_1?", true)]
+    #[case::template_match_2_optional("val_i", "val_2?", true)]
+    #[case::template_exact_fallback("val_i", "val_i", true)]
+    #[case::template_invalid_numeric_suffix("val_i", "val_3", false)]
+    #[case::template_base_name_mismatch("val_i", "other_1", false)]
+    #[case::template_missing_suffix("val_i", "val", false)]
+    fn test_parameter_matching(
+        #[case] param_name: &str,
+        #[case] overload: &str,
+        #[case] expected: bool,
+    ) {
+        let param = Parameter {
+            name: param_name.to_string(),
+            r#type: ParameterType::Literal(Literal::Number),
+            doc: None,
+        };
+        assert_eq!(param.matches_overload_parameter_name(overload), expected);
+    }
 }
