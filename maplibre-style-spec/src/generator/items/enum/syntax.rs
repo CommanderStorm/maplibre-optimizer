@@ -321,7 +321,6 @@ fn generate_syntax_enum_deserializer(
                 generate_syntax_enum_deserializer_multi_overload_variant(
                     visit_seq,
                     (&name, &variant_name),
-                    syntax,
                 );
             }
         }
@@ -396,13 +395,18 @@ fn generate_syntax_enum_deserializer_multi_variadic_overload_variant(
 fn generate_syntax_enum_deserializer_multi_overload_variant(
     visit_seq: &mut Function,
     (name, variant_name): (&str, &str),
-    syntax: &Syntax,
 ) {
     let options_name = format!("{variant_name}Options");
-    // todo: add multiple overloads
+
     visit_seq.line(format!(
-        "todo!(\"{name}::{variant_name} needs multiple overloads, i.e. {options_name} implemented\")"
+        "// Delegate the remainder of the sequence to {options_name} deserialization"
     ));
+    visit_seq
+        .line("let remainder_of_sequence = serde::de::value::SeqAccessDeserializer::new(seq);");
+    visit_seq.line(format!(
+        "let options = {options_name}::deserialize(remainder_of_sequence)?;"
+    ));
+    visit_seq.line(format!("Ok({name}::{variant_name}(options))"));
 }
 
 fn generate_syntax_enum_deserializer_regular_variadic_variant(

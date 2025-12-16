@@ -947,9 +947,10 @@ impl<'de> serde::de::Visitor<'de> for ExpressionNameVisitor {
                 Ok(ExpressionName::Plus(inputs))
             }
             "-" => {
-                todo!(
-                    "ExpressionName::Minus needs multiple overloads, i.e. MinusOptions implemented"
-                )
+                // Delegate the remainder of the sequence to MinusOptions deserialization
+                let remainder_of_sequence = serde::de::value::SeqAccessDeserializer::new(seq);
+                let options = MinusOptions::deserialize(remainder_of_sequence)?;
+                Ok(ExpressionName::Minus(options))
             }
             "/" => {
                 let input_1 = visit_seq_field(&mut seq, "input_1")?;
@@ -1013,9 +1014,10 @@ impl<'de> serde::de::Visitor<'de> for ExpressionNameVisitor {
                 Ok(ExpressionName::Any(inputs))
             }
             "array" => {
-                todo!(
-                    "ExpressionName::Array needs multiple overloads, i.e. ArrayOptions implemented"
-                )
+                // Delegate the remainder of the sequence to ArrayOptions deserialization
+                let remainder_of_sequence = serde::de::value::SeqAccessDeserializer::new(seq);
+                let options = ArrayOptions::deserialize(remainder_of_sequence)?;
+                Ok(ExpressionName::Array(options))
             }
             "asin" => {
                 let input = visit_seq_field(&mut seq, "input")?;
@@ -1148,10 +1150,16 @@ impl<'de> serde::de::Visitor<'de> for ExpressionNameVisitor {
                 Ok(ExpressionName::Image(image_name))
             }
             "in" => {
-                todo!("ExpressionName::In needs multiple overloads, i.e. InOptions implemented")
+                // Delegate the remainder of the sequence to InOptions deserialization
+                let remainder_of_sequence = serde::de::value::SeqAccessDeserializer::new(seq);
+                let options = InOptions::deserialize(remainder_of_sequence)?;
+                Ok(ExpressionName::In(options))
             }
             "index-of" => {
-                todo!("ExpressionName::IndexOf needs multiple overloads, i.e. IndexOfOptions implemented")
+                // Delegate the remainder of the sequence to IndexOfOptions deserialization
+                let remainder_of_sequence = serde::de::value::SeqAccessDeserializer::new(seq);
+                let options = IndexOfOptions::deserialize(remainder_of_sequence)?;
+                Ok(ExpressionName::IndexOf(options))
             }
             "interpolate" => {
                 let mut inputs = Vec::new();
@@ -1257,7 +1265,10 @@ impl<'de> serde::de::Visitor<'de> for ExpressionNameVisitor {
             }
             "line-progress" => Ok(ExpressionName::LineProgress),
             "literal" => {
-                todo!("ExpressionName::Literal needs multiple overloads, i.e. LiteralOptions implemented")
+                // Delegate the remainder of the sequence to LiteralOptions deserialization
+                let remainder_of_sequence = serde::de::value::SeqAccessDeserializer::new(seq);
+                let options = LiteralOptions::deserialize(remainder_of_sequence)?;
+                Ok(ExpressionName::Literal(options))
             }
             "ln" => {
                 let input = visit_seq_field(&mut seq, "input")?;
@@ -1372,9 +1383,10 @@ impl<'de> serde::de::Visitor<'de> for ExpressionNameVisitor {
                 Ok(ExpressionName::Sin(input))
             }
             "slice" => {
-                todo!(
-                    "ExpressionName::Slice needs multiple overloads, i.e. SliceOptions implemented"
-                )
+                // Delegate the remainder of the sequence to SliceOptions deserialization
+                let remainder_of_sequence = serde::de::value::SeqAccessDeserializer::new(seq);
+                let options = SliceOptions::deserialize(remainder_of_sequence)?;
+                Ok(ExpressionName::Slice(options))
             }
             "sqrt" => {
                 let input = visit_seq_field(&mut seq, "input")?;
