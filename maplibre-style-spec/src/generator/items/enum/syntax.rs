@@ -490,18 +490,18 @@ mod tests {
               "syntax": {
                 "overloads": [
                   {
-                    "parameters": ["var_1_name", "var_1_value", "...", "var_n_name", "var_n_value", "expression"],
+                    "parameters": ["var_name_1", "var_value_1", "...", "var_name_n", "var_value_n", "expression"],
                     "output-type": "any"
                   }
                 ],
                 "parameters": [
                   {
-                    "name": "var_i_name",
+                    "name": "var_name_i",
                     "type": "string literal",
                     "doc": "The name of the i-th variable."
                   },
                   {
-                    "name": "var_i_value",
+                    "name": "var_value_i",
                     "type": "any",
                     "doc": "The value of the i-th variable."
                   },
@@ -569,9 +569,9 @@ mod tests {
                 match op.as_str() {
                 "let" => {
                 let mut inputs = Vec::new();
-                while let Some(var_i_name) = seq.next_element()? {
-                let var_i_value = seq.next_element()?.ok_or_else(|| serde::de::Error::custom("expected var_i_value in Expression::Let"))?;
-                let element = (var_i_name,var_i_value);
+                while let Some(var_name_i) = seq.next_element()? {
+                let var_value_i = seq.next_element()?.ok_or_else(|| serde::de::Error::custom("expected var_value_i in Expression::Let"))?;
+                let element = (var_name_i,var_value_i);
                 inputs.push(element);
                 }
                 if inputs.empty() {
@@ -733,11 +733,7 @@ mod tests {
         /// First element in an expression array. May be followed by a number of arguments.
         #[derive(PartialEq, Eq, Debug, Clone)]
         pub enum ExpressionName {
-            /// Returns a `formatted` string for displaying mixed-format text in the `text-field` property. The input may contain a string literal or expression, including an [`'image'`](#image) expression. Strings may be followed by a style override object.
-            /// 
-            ///  - [Change the case of labels](https://maplibre.org/maplibre-gl-js/docs/examples/change-case-of-labels/)
-            /// 
-            ///  - [Display and style rich text labels](https://maplibre.org/maplibre-gl-js/docs/examples/display-and-style-rich-text-labels/)
+            /// Returns a `formatted` string for displaying mixed-format text in the `text-field` property.
             Format(Vec<(StringExpressionOrStringExpression,Object)>),
         }
 
