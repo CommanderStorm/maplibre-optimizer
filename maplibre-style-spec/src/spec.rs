@@ -1167,17 +1167,17 @@ impl<'de> serde::de::Visitor<'de> for ExpressionNameVisitor {
                     let input = seq.next_element()?.ok_or_else(|| {
                         serde::de::Error::custom("expected input in ExpressionName::Interpolate")
                     })?;
-                    let stop_i_input = seq.next_element()?.ok_or_else(|| {
+                    let stop_input_i = seq.next_element()?.ok_or_else(|| {
                         serde::de::Error::custom(
-                            "expected stop_i_input in ExpressionName::Interpolate",
+                            "expected stop_input_i in ExpressionName::Interpolate",
                         )
                     })?;
-                    let stop_i_output = seq.next_element()?.ok_or_else(|| {
+                    let stop_output_i = seq.next_element()?.ok_or_else(|| {
                         serde::de::Error::custom(
-                            "expected stop_i_output in ExpressionName::Interpolate",
+                            "expected stop_output_i in ExpressionName::Interpolate",
                         )
                     })?;
-                    let element = (interpolation_type, input, stop_i_input, stop_i_output);
+                    let element = (interpolation_type, input, stop_input_i, stop_output_i);
                     inputs.push(element);
                 }
                 if inputs.empty() {
@@ -1193,17 +1193,17 @@ impl<'de> serde::de::Visitor<'de> for ExpressionNameVisitor {
                     let input = seq.next_element()?.ok_or_else(|| {
                         serde::de::Error::custom("expected input in ExpressionName::InterpolateHcl")
                     })?;
-                    let stop_i_input = seq.next_element()?.ok_or_else(|| {
+                    let stop_input_i = seq.next_element()?.ok_or_else(|| {
                         serde::de::Error::custom(
-                            "expected stop_i_input in ExpressionName::InterpolateHcl",
+                            "expected stop_input_i in ExpressionName::InterpolateHcl",
                         )
                     })?;
-                    let stop_i_output = seq.next_element()?.ok_or_else(|| {
+                    let stop_output_i = seq.next_element()?.ok_or_else(|| {
                         serde::de::Error::custom(
-                            "expected stop_i_output in ExpressionName::InterpolateHcl",
+                            "expected stop_output_i in ExpressionName::InterpolateHcl",
                         )
                     })?;
-                    let element = (interpolation_type, input, stop_i_input, stop_i_output);
+                    let element = (interpolation_type, input, stop_input_i, stop_output_i);
                     inputs.push(element);
                 }
                 if inputs.empty() {
@@ -1219,17 +1219,17 @@ impl<'de> serde::de::Visitor<'de> for ExpressionNameVisitor {
                     let input = seq.next_element()?.ok_or_else(|| {
                         serde::de::Error::custom("expected input in ExpressionName::InterpolateLab")
                     })?;
-                    let stop_i_input = seq.next_element()?.ok_or_else(|| {
+                    let stop_input_i = seq.next_element()?.ok_or_else(|| {
                         serde::de::Error::custom(
-                            "expected stop_i_input in ExpressionName::InterpolateLab",
+                            "expected stop_input_i in ExpressionName::InterpolateLab",
                         )
                     })?;
-                    let stop_i_output = seq.next_element()?.ok_or_else(|| {
+                    let stop_output_i = seq.next_element()?.ok_or_else(|| {
                         serde::de::Error::custom(
-                            "expected stop_i_output in ExpressionName::InterpolateLab",
+                            "expected stop_output_i in ExpressionName::InterpolateLab",
                         )
                     })?;
-                    let element = (interpolation_type, input, stop_i_input, stop_i_output);
+                    let element = (interpolation_type, input, stop_input_i, stop_output_i);
                     inputs.push(element);
                 }
                 if inputs.empty() {
@@ -1249,11 +1249,11 @@ impl<'de> serde::de::Visitor<'de> for ExpressionNameVisitor {
             }
             "let" => {
                 let mut inputs = Vec::new();
-                while let Some(var_i_name) = seq.next_element()? {
-                    let var_i_value = seq.next_element()?.ok_or_else(|| {
-                        serde::de::Error::custom("expected var_i_value in ExpressionName::Let")
+                while let Some(var_name_i) = seq.next_element()? {
+                    let var_value_i = seq.next_element()?.ok_or_else(|| {
+                        serde::de::Error::custom("expected var_value_i in ExpressionName::Let")
                     })?;
-                    let element = (var_i_name, var_i_value);
+                    let element = (var_name_i, var_value_i);
                     inputs.push(element);
                 }
                 if inputs.empty() {
@@ -1398,13 +1398,13 @@ impl<'de> serde::de::Visitor<'de> for ExpressionNameVisitor {
                     let output_0 = seq.next_element()?.ok_or_else(|| {
                         serde::de::Error::custom("expected output_0 in ExpressionName::Step")
                     })?;
-                    let stop_i_input = seq.next_element()?.ok_or_else(|| {
-                        serde::de::Error::custom("expected stop_i_input in ExpressionName::Step")
+                    let stop_input_i = seq.next_element()?.ok_or_else(|| {
+                        serde::de::Error::custom("expected stop_input_i in ExpressionName::Step")
                     })?;
-                    let stop_i_output = seq.next_element()?.ok_or_else(|| {
-                        serde::de::Error::custom("expected stop_i_output in ExpressionName::Step")
+                    let stop_output_i = seq.next_element()?.ok_or_else(|| {
+                        serde::de::Error::custom("expected stop_output_i in ExpressionName::Step")
                     })?;
-                    let element = (input, output_0, stop_i_input, stop_i_output);
+                    let element = (input, output_0, stop_input_i, stop_output_i);
                     inputs.push(element);
                 }
                 if inputs.empty() {
