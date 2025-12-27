@@ -35,7 +35,7 @@ jobs:
       - name: Checkout sources
         uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
         with: { persist-credentials: false, submodules: true }
-      - uses: taiki-e/install-action@50708e9ba8d7b6587a2cb575ddaa9a62e927bc06 # v2.62.63
+      - uses: taiki-e/install-action@45a93d9c71692daf99a53feb97366fb6f4c3757f # v2.65.5
         # TODO: add cargo-sort once https://github.com/taiki-e/install-action/pull/997 is resolved
         with: { tool: 'just,cargo-binstall' }
       - uses: Swatinem/rust-cache@779680da715d629ac1d338a641029a2f4372abb5 # v2.8.2
@@ -53,7 +53,7 @@ jobs:
       - name: Checkout sources
         uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
         with: { persist-credentials: false, submodules: true }
-      - uses: taiki-e/install-action@50708e9ba8d7b6587a2cb575ddaa9a62e927bc06 # v2.62.63
+      - uses: taiki-e/install-action@45a93d9c71692daf99a53feb97366fb6f4c3757f # v2.65.5
         with: { tool: 'just' }
       - uses: Swatinem/rust-cache@779680da715d629ac1d338a641029a2f4372abb5 # v2.8.2
         if: github.event_name != 'release' && github.event_name != 'workflow_dispatch'
