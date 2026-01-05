@@ -1,0 +1,29 @@
+---
+source: maplibre-style-spec/src/generator/mod.rs
+expression: "&spec"
+---
+/// This is a Maplibre Style Specification
+#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+pub struct MaplibreStyleSpecification;
+
+#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+pub struct Names {
+    /// A number between 0 and 10.
+    pub name_one: Option<NamesNameOne>,
+}
+
+/// A number between 0 and 10.
+#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+pub struct NamesNameOne(serde_json::Number);
+
+impl Default for NamesNameOne {
+    fn default() -> Self {
+        Self(serde_json::Number::from_f64(1.0).expect("the number is serialised from a number and is thus always valid"))
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+}

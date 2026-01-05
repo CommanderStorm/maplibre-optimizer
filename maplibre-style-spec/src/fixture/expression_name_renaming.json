@@ -1,0 +1,154 @@
+{
+  "$version": 8,
+  "$root": {},
+  "expression": {
+    "type": "array",
+    "value": "expression_name",
+    "minimum": 1,
+    "doc": "An expression defines a function that can be used for data-driven style properties or feature filters. The first element of an expression array is a string naming the expression operator, e.g. `\"*\"` or `\"case\"`. Elements that follow (if any) are the _arguments_ to the expression. Each argument is either a literal value (a string, number, boolean, or `null`), or another expression array."
+  },
+  "expression_name": {
+    "doc": "First element in an expression array. May be followed by a number of arguments.",
+    "type": "enum",
+    "values": {
+      "literal": {
+        "doc": "Provides a literal array or object value.\n\n - [Display and style rich text labels](https://maplibre.org/maplibre-gl-js/docs/examples/display-and-style-rich-text-labels/)",
+        "syntax": {
+          "overloads": [
+            {
+              "parameters": [
+                "json_object"
+              ],
+              "output-type": "object"
+            },
+            {
+              "parameters": [
+                "json_array"
+              ],
+              "output-type": "array"
+            }
+          ],
+          "parameters": [
+            {
+              "name": "json_object",
+              "type": "JSON object"
+            },
+            {
+              "name": "json_array",
+              "type": "JSON array"
+            }
+          ]
+        },
+        "example": [
+          "literal",
+          [
+            "DIN Offc Pro Italic",
+            "Arial Unicode MS Regular"
+          ]
+        ],
+        "group": "Types"
+      },
+      "array": {
+        "doc": "Asserts that the input is an array (optionally with a specific item type and length). If, when the input expression is evaluated, it is not of the asserted type or length, then this assertion will cause the whole expression to be aborted.",
+        "syntax": {
+          "overloads": [
+            {
+              "parameters": [
+                "value"
+              ],
+              "output-type": "array"
+            },
+            {
+              "parameters": [
+                "type",
+                "value"
+              ],
+              "output-type": "array<type>"
+            },
+            {
+              "parameters": [
+                "type",
+                "length",
+                "value"
+              ],
+              "output-type": "array<type, length>"
+            }
+          ],
+          "parameters": [
+            {
+              "name": "value",
+              "type": "any"
+            },
+            {
+              "name": "type",
+              "type": [
+                "string",
+                "number",
+                "boolean"
+              ],
+              "doc": "The asserted type of the input array."
+            },
+            {
+              "name": "length",
+              "type": "number literal",
+              "doc": "The asserted length of the input array."
+            }
+          ]
+        },
+        "example": [
+          "array",
+          "string",
+          3,
+          [
+            "literal",
+            [
+              "a",
+              "b",
+              "c"
+            ]
+          ]
+        ],
+        "group": "Types"
+      },
+      "at": {
+        "doc": "Retrieves an item from an array.",
+        "syntax": {
+          "overloads": [
+            {
+              "parameters": [
+                "index",
+                "array"
+              ],
+              "output-type": "T"
+            }
+          ],
+          "parameters": [
+            {
+              "name": "index",
+              "type": "number",
+              "doc": "The index into `array`."
+            },
+            {
+              "name": "array",
+              "type": "array<T>",
+              "doc": "The array of items to retrieve the specified item from."
+            }
+          ]
+        },
+        "example": [
+          "at",
+          1,
+          [
+            "literal",
+            [
+              "a",
+              "b",
+              "c"
+            ]
+          ]
+        ],
+        "group": "Lookup"
+      }
+    }
+  }
+}

@@ -647,7 +647,7 @@ mod tests {
         pub struct MaplibreStyleSpecification;
 
         /// First element in an interpolation array. May be followed by a number of arguments.
-        #[derive(PartialEq, Eq, Debug, Clone)]
+        #[derive(PartialEq, Debug, Clone)]
         pub enum InterpolationName {
             /// Interpolates linearly between the pair of stops just less than and just greater than the input
             Linear,
@@ -750,7 +750,7 @@ mod tests {
         pub struct MaplibreStyleSpecification;
 
         /// First element in an expression array. May be followed by a number of arguments.
-        #[derive(PartialEq, Eq, Debug, Clone)]
+        #[derive(PartialEq, Debug, Clone)]
         pub enum ExpressionName {
             /// Returns a `formatted` string for displaying mixed-format text in the `text-field` property.
             Format(Vec<(StringExpressionOrStringExpression,Object)>),

@@ -1,0 +1,36 @@
+---
+source: maplibre-style-spec/src/generator/mod.rs
+expression: generate_spec_scope(reference)
+---
+/// This is a Maplibre Style Specification
+#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+pub struct MaplibreStyleSpecification;
+
+/// A number between 0 and 20.
+///
+/// Range: 0.0..=10.0
+#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+pub struct NumberOne(serde_json::Number);
+
+impl Default for NumberOne {
+    fn default() -> Self {
+        Self(serde_json::Number::from_f64(1.0).expect("the number is serialised from a number and is thus always valid"))
+    }
+}
+
+/// Another number
+#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+pub struct NumberTwo(serde_json::Number);
+
+#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+#[serde(untagged)]
+pub enum Numbers {
+    NumberOne(NumberOne),
+    NumberTwo(NumberTwo),
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+}

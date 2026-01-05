@@ -1,9 +1,9 @@
-use std::collections::{BTreeMap, HashMap};
+use std::collections::{BTreeMap, HashMap, HashSet};
 
 use codegen2::Scope;
 
 use crate::decoder::r#enum::EnumValues;
-use crate::decoder::{ParsedItem, PrimitiveType, StyleReference, TopLevelItem};
+use crate::decoder::{Fields, ParsedItem, PrimitiveType, StyleReference, TopLevelItem};
 use crate::generator::formatter::{to_snake_case, to_upper_camel_case};
 use crate::generator::literals::generate_literals;
 
@@ -34,62 +34,71 @@ pub fn generate_spec_scope(mut reference: StyleReference) -> String {
 }
 
 fn reorder_expressions(fields: &mut BTreeMap<String, TopLevelItem>) {
-    let _ = fields
-        .remove("expression")
-        .expect("expression to be a top level item");
-    fields.insert(
-        "expression".to_string(),
-        TopLevelItem::OneOf(vec![
-            "BooleanExpression".to_string(),
-            "NumberExpression".to_string(),
-            "StringExpression".to_string(),
-            "CollatorExpression".to_string(),
-            "StringExpression".to_string(),
-            "StringExpression".to_string(),
-            "ObjectExpression".to_string(),
-            "StringExpression".to_string(),
-            "ArrayExpression".to_string(),
-        ]),
-    );
+    let Some(_) = fields.remove("expression") else {
+        return; // we are in a testcase
+    };
+    let mut possible_expressions = HashSet::new();
     let expression_name = fields
         .remove("expression_name")
         .expect("expression_name to be a top level item");
-    let (values, default, common) = match expression_name {
-        TopLevelItem::Item(expression_name) => match *expression_name {
-            ParsedItem::Primitive(p) => match p {
-                PrimitiveType::Number { .. }
-                | PrimitiveType::Array { .. }
-                | PrimitiveType::Color { .. }
-                | PrimitiveType::String { .. }
-                | PrimitiveType::Boolean { .. }
-                | PrimitiveType::ResolvedImage { .. }
-                | PrimitiveType::NumberArray { .. }
-                | PrimitiveType::ColorArray { .. }
-                | PrimitiveType::State { .. }
-                | PrimitiveType::Padding { .. }
-                | PrimitiveType::Formatted { .. }
-                | PrimitiveType::Star(_)
-                | PrimitiveType::PropertyType(_)
-                | PrimitiveType::ProjectionDefinition { .. }
-                | PrimitiveType::VariableAnchorOffsetCollection(_)
-                | PrimitiveType::Sprite(_)
-                | PrimitiveType::PromoteId(_) => unreachable!("expression_name must be an enum"),
-                PrimitiveType::Enum {
-                    values,
-                    default,
-                    common,
-                } => (values, default, common),
-            },
-            ParsedItem::Reference { .. } => unreachable!("expression_name must be a primitive"),
-        },
-        TopLevelItem::OneOf(_) | TopLevelItem::Group(_) => {
-            unreachable!("expression_name must be an item")
+    let (expr_name_values, expr_name_common) = {
+        let (values, common, default) = expression_name
+            .as_item()
+            .expect("expression_name must be an item")
+            .as_primitive()
+            .expect("expression_name must be a primitive")
+            .as_enum()
+            .expect("expression_name must be an enum");
+        assert_eq!(
+            default, None,
+            "expression_name must not have a default value.. effects are a little unclear"
+        );
+        let values = values
+            .as_syntax_enum()
+            .expect("expression_name must be syntax enum");
+        (values, common)
+    };
+
+    for (key, syntax_enum) in expr_name_values {
+        for overload in &syntax_enum.syntax.overloads {
+            let output_type_name = overload.output_type.to_upper_camel_case();
+            possible_expressions.insert(output_type_name.clone());
+
+            fields
+                .entry(output_type_name.clone())
+                .and_modify(|f| {
+                    f.as_item_mut()
+                        .expect("is a syntax enum")
+                        .as_primitive_mut()
+                        .expect("is a syntax enum")
+                        .enum_values_mut()
+                        .expect("is a syntax enum")
+                        .as_syntax_enum_mut()
+                        .expect("is a syntax enum")
+                        .entry(key.clone())
+                        .and_modify(|e| e.syntax.overloads.push(overload.clone()))
+                        .or_insert_with(|| {
+                            let mut s = syntax_enum.clone();
+                            s.syntax.overloads = vec![overload.clone()];
+                            s
+                        });
+                })
+                .or_insert_with(|| {
+                    let mut tl_common = Fields::default();
+                    tl_common.doc = format!("{output_type_name}\n\n{}", expr_name_common.doc);
+                    TopLevelItem::Item(Box::new(ParsedItem::Primitive(PrimitiveType::Enum {
+                        common: tl_common,
+                        default: None,
+                        values: EnumValues::SyntaxEnum([(key.clone(), syntax_enum.clone())].into()),
+                    })))
+                });
         }
-    };
-    let EnumValues::SyntaxEnum(values) = values else {
-        unreachable!("expression_name must be syntax enum")
-    };
-    todo!("reorder expressions to match the syntax enum");
+    }
+
+    fields.insert(
+        "expression".to_string(),
+        TopLevelItem::OneOf(possible_expressions.into_iter().collect()),
+    );
 }
 
 fn extract_and_remove_discriminants(
@@ -106,7 +115,7 @@ fn extract_and_remove_discriminants(
     for (top_name, join_keys) in anyof_top_level_fields {
         let variant_name = to_upper_camel_case(&top_name);
         for join_key in join_keys {
-            let joined_top_level =fields.get(&join_key).unwrap_or_else(|| panic!("anyof {top_name} does refer to its variant {join_key}, but there is no join partner"));
+            let joined_top_level = fields.get(&join_key).unwrap_or_else(|| panic!("anyof {top_name} does refer to its variant {join_key}, but there is no join partner"));
             let TopLevelItem::Group(btree_map) = joined_top_level else {
                 // cannot possibly contain a discriminant
                 continue;
@@ -388,27 +397,7 @@ mod tests {
             }
         });
         let reference: StyleReference = serde_json::from_value(reference).unwrap();
-        insta::assert_snapshot!(generate_spec_scope(reference), @r#"
-        /// This is a Maplibre Style Specification
-        #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-        pub struct MaplibreStyleSpecification;
-
-        /// A number between 0 and 10.
-        #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-        pub struct NumberOne(serde_json::Number);
-
-        impl Default for NumberOne {
-            fn default() -> Self {
-                Self(serde_json::Number::from_i128(0).expect("the number is serialised from a number and is thus always valid"))
-            }
-        }
-
-        #[cfg(test)]
-        mod test {
-            use super::*;
-
-        }
-        "#);
+        insta::assert_snapshot!(generate_spec_scope(reference));
     }
 
     #[test]
@@ -426,33 +415,7 @@ mod tests {
         });
         let reference: StyleReference = serde_json::from_value(reference).unwrap();
         let spec = generate_spec_scope(reference);
-        insta::assert_snapshot!(&spec, @r#"
-        /// This is a Maplibre Style Specification
-        #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-        pub struct MaplibreStyleSpecification;
-
-        #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-        pub struct Names {
-            /// A number between 0 and 10.
-            pub name_one: Option<NamesNameOne>,
-        }
-
-        /// A number between 0 and 10.
-        #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-        pub struct NamesNameOne(serde_json::Number);
-
-        impl Default for NamesNameOne {
-            fn default() -> Self {
-                Self(serde_json::Number::from_f64(1.0).expect("the number is serialised from a number and is thus always valid"))
-            }
-        }
-
-        #[cfg(test)]
-        mod test {
-            use super::*;
-
-        }
-        "#);
+        insta::assert_snapshot!(&spec);
     }
 
     #[test]
@@ -474,39 +437,14 @@ mod tests {
             "numbers": ["number_one", "number_two"]
         });
         let reference: StyleReference = serde_json::from_value(reference).unwrap();
-        insta::assert_snapshot!(generate_spec_scope(reference), @r#"
-        /// This is a Maplibre Style Specification
-        #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-        pub struct MaplibreStyleSpecification;
+        insta::assert_snapshot!(generate_spec_scope(reference));
+    }
 
-        /// A number between 0 and 20.
-        ///
-        /// Range: 0.0..=10.0
-        #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-        pub struct NumberOne(serde_json::Number);
-
-        impl Default for NumberOne {
-            fn default() -> Self {
-                Self(serde_json::Number::from_f64(1.0).expect("the number is serialised from a number and is thus always valid"))
-            }
-        }
-
-        /// Another number
-        #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-        pub struct NumberTwo(serde_json::Number);
-
-        #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-        #[serde(untagged)]
-        pub enum Numbers {
-            NumberOne(NumberOne),
-            NumberTwo(NumberTwo),
-        }
-
-        #[cfg(test)]
-        mod test {
-            use super::*;
-
-        }
-        "#);
+    #[test]
+    fn test_expression_name_renaming() {
+        let mut reference: StyleReference =
+            serde_json::from_str(include_str!("../fixture/expression_name_renaming.json")).unwrap();
+        reorder_expressions(&mut reference.fields);
+        insta::assert_json_snapshot!(reference);
     }
 }
