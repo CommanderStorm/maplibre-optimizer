@@ -1,13 +1,13 @@
 use std::collections::BTreeMap;
 
 use serde::de::Error;
-use serde::{Deserialize, Deserializer};
+use serde::{Deserialize, Deserializer, Serialize};
 use serde_json::{Number, Value};
 
 use crate::decoder::ParsedItem;
 use crate::generator::formatter::to_upper_camel_case;
 
-#[derive(Debug, PartialEq, Clone, Deserialize)]
+#[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum EnumValues {
     Version(Vec<Number>),
@@ -28,16 +28,54 @@ impl EnumValues {
     pub fn is_empty(&self) -> bool {
         self.len() == 0
     }
+
+    pub fn as_version(&self) -> Option<&[Number]> {
+        match self {
+            EnumValues::Version(numbers) => Some(numbers),
+            _ => None,
+        }
+    }
+
+    pub fn as_version_mut(&self) -> Option<&[Number]> {
+        match self {
+            EnumValues::Version(numbers) => Some(numbers),
+            _ => None,
+        }
+    }
+    pub fn as_enum(&self) -> Option<&BTreeMap<String, EnumDocs>> {
+        match self {
+            EnumValues::Enum(btree_map) => Some(btree_map),
+            _ => None,
+        }
+    }
+    pub fn as_enum_mut(&mut self) -> Option<&mut BTreeMap<String, EnumDocs>> {
+        match self {
+            EnumValues::Enum(btree_map) => Some(btree_map),
+            _ => None,
+        }
+    }
+    pub fn as_syntax_enum(&self) -> Option<&BTreeMap<String, SyntaxEnum>> {
+        match self {
+            EnumValues::SyntaxEnum(btree_map) => Some(btree_map),
+            _ => None,
+        }
+    }
+    pub fn as_syntax_enum_mut(&mut self) -> Option<&mut BTreeMap<String, SyntaxEnum>> {
+        match self {
+            EnumValues::SyntaxEnum(btree_map) => Some(btree_map),
+            _ => None,
+        }
+    }
 }
 
-#[derive(Debug, PartialEq, Eq, Clone, Deserialize)]
+#[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct EnumDocs {
     pub doc: String,
     #[serde(rename = "sdk-support")]
     pub sdk_support: Option<Value>,
 }
-#[derive(Debug, PartialEq, Clone, Deserialize)]
+#[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct SyntaxEnum {
     pub doc: String,
@@ -49,7 +87,7 @@ pub struct SyntaxEnum {
     pub group: Option<String>,
 }
 
-#[derive(Debug, PartialEq, Clone, Deserialize)]
+#[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Syntax {
     pub overloads: Vec<Overload>,
@@ -65,7 +103,7 @@ impl Syntax {
     }
 }
 
-#[derive(Debug, PartialEq, Clone, Deserialize)]
+#[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Overload {
     pub parameters: Vec<String>,
@@ -91,7 +129,7 @@ impl Overload {
     }
 }
 
-#[derive(Debug, PartialEq, Clone, Deserialize)]
+#[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Parameter {
     pub name: String,
@@ -116,7 +154,7 @@ impl Parameter {
     }
 }
 
-#[derive(Debug, PartialEq, Clone, Deserialize)]
+#[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum ParameterType {
     Literal(Literal),
@@ -148,7 +186,7 @@ impl ParameterType {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, Clone, Deserialize)]
+#[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
 pub enum Literal {
     #[serde(rename = "number literal")]
     Number,
@@ -242,7 +280,6 @@ impl<'de> Deserialize<'de> for Expression {
         }
     }
 }
-
 fn deserialize_array_from_string(s: &str) -> Result<Expression, String> {
     if s == "array" {
         return Ok(Expression::Array {
@@ -277,6 +314,53 @@ fn deserialize_array_from_string(s: &str) -> Result<Expression, String> {
 
     Ok(Expression::Array { r#type, length })
 }
+
+impl serde::ser::Serialize for Expression {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::ser::Serializer,
+    {
+        let s = match self {
+            Expression::Any => "any".to_string(),
+            Expression::Boolean => "boolean".to_string(),
+            Expression::Number => "number".to_string(),
+            Expression::String => "string".to_string(),
+            Expression::Collator => "collator".to_string(),
+            Expression::Formatted => "formatted".to_string(),
+            Expression::Image => "image".to_string(),
+            Expression::Object => "object".to_string(),
+            Expression::Color => "color".to_string(),
+            Expression::Array { r#type, length } => {
+                if r#type.is_none() && length.is_none() {
+                    "array".to_string()
+                } else {
+                    // Serialize ParameterType to a string compatible with deserializer
+                    let type_str = if let Some(t) = r#type {
+                        // Serialize using JSON, then strip quotes if it's a string
+                        let raw = serde_json::to_string(t).map_err(serde::ser::Error::custom)?;
+                        // Remove quotes for string types, keep other JSON as-is
+                        if raw.starts_with('"') && raw.ends_with('"') {
+                            raw[1..raw.len() - 1].to_string()
+                        } else {
+                            raw
+                        }
+                    } else {
+                        "any".to_string()
+                    };
+
+                    if let Some(len) = length {
+                        format!("array<{type_str},{len}>")
+                    } else {
+                        format!("array<{type_str}>")
+                    }
+                }
+            }
+        };
+
+        serializer.serialize_str(&s)
+    }
+}
+
 impl Expression {
     pub fn to_expression_type(&self) -> &'static str {
         match self {

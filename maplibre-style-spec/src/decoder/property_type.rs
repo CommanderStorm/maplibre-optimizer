@@ -1,4 +1,6 @@
-#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+use serde::{Deserialize, Serialize};
+
+#[derive(PartialEq, Debug, Clone, Deserialize, Serialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum PropertyType {
     /// Property should be specified using a color ramp from which the output color can be sampled based on a property calculation.
@@ -19,9 +21,8 @@ pub enum PropertyType {
 mod tests {
     use std::collections::HashMap;
 
-    use serde_json::Value;
-
     use super::*;
+    use serde_json::Value;
 
     // test that all property types that can be parsed from the spec are parseable
     #[test]
