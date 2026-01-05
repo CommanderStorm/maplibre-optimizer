@@ -499,6 +499,12 @@ mod tests {
         "$version": 8,
         "$root": {},
         "expression": {
+          "type": "array",
+          "value": "expression_name",
+          "minimum": 1,
+          "doc": "An expression defines a function that can be used for data-driven style properties or feature filters. The first element of an expression array is a string naming the expression operator, e.g. `\"*\"` or `\"case\"`. Elements that follow (if any) are the _arguments_ to the expression. Each argument is either a literal value (a string, number, boolean, or `null`), or another expression array."
+        },
+        "expression_name": {
           "doc": "",
           "type": "enum",
           "values": {
@@ -548,7 +554,9 @@ mod tests {
         #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
         pub struct MaplibreStyleSpecification;
 
-        #[derive(PartialEq, Eq, Debug, Clone)]
+        /// Expression
+        ///
+        #[derive(PartialEq, Debug, Clone)]
         pub enum Expression {
             /// Binds expressions to named variables, which can then be referenced in the result expression using `["var", "variable_name"]`.
             ///
@@ -611,6 +619,12 @@ mod tests {
             fn test_example_expression_decodes(#[case] example: serde_json::Value) {
                 let _ = serde_json::from_value::<Expression>(example).expect("example should decode");
             }
+        }
+
+        #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+        #[serde(untagged)]
+        pub enum Expression {
+            Expression(Expression),
         }
         "##);
     }

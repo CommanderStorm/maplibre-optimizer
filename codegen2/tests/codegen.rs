@@ -628,7 +628,7 @@ fn trait_with_macros() {
     f.set_async(true);
     f.line("println!(\"petting toby because he is a good boi\");");
 
-    insta::assert_snapshot!(scope.to_string(), @r##"
+    insta::assert_snapshot!(scope.to_string(), @r#"
     #[async_trait]
     #[toby_is_cute]
     trait Foo {
@@ -636,7 +636,7 @@ fn trait_with_macros() {
             println!("petting toby because he is a good boi");
         }
     }
-    "##);
+    "#);
 }
 
 #[test]
@@ -746,11 +746,11 @@ fn struct_with_member_visibility() {
     struct_description.new_field("baz", "i16").vis("pub(crate)");
 
     insta::assert_snapshot!(scope.to_string(), @r"
-        struct Foo {
-            pub bar: usize,
-            pub(crate) baz: i16,
-        }
-        ");
+    struct Foo {
+        pub bar: usize,
+        pub(crate) baz: i16,
+    }
+    ");
 }
 
 #[test]

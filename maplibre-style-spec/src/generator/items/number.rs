@@ -100,7 +100,7 @@ mod tests {
             None,
             None,
         );
-        insta::assert_snapshot!(scope.to_string(), @r##"
+        insta::assert_snapshot!(scope.to_string(), @r#"
         #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
         pub struct Foo(serde_json::Number);
 
@@ -109,7 +109,7 @@ mod tests {
                 Self(serde_json::Number::from_i128(42).expect("the number is serialised from a number and is thus always valid"))
             }
         }
-        "##)
+        "#)
     }
 
     #[test]

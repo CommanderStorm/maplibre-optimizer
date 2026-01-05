@@ -36,7 +36,7 @@ mod tests {
             &Fields::default(),
             &Value::String("hello_world".to_string()),
         );
-        insta::assert_snapshot!(scope.to_string(), @r##"
+        insta::assert_snapshot!(scope.to_string(), @r#"
         #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
         pub struct Foo(serde_json::Value);
 
@@ -45,7 +45,7 @@ mod tests {
                 Self(serde_json::json!("hello_world"))
             }
         }
-        "##)
+        "#)
     }
 
     #[test]
