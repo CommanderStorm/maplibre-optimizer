@@ -1,8 +1,8 @@
-use std::collections::{BTreeMap, HashMap, HashSet};
+use std::collections::{BTreeMap, HashMap};
 
 use codegen2::Scope;
 
-use crate::decoder::r#enum::EnumValues;
+use crate::decoder::r#enum::{EnumValues, ParameterType};
 use crate::decoder::{Fields, ParsedItem, PrimitiveType, StyleReference, TopLevelItem};
 use crate::generator::formatter::{to_snake_case, to_upper_camel_case};
 use crate::generator::literals::generate_literals;
@@ -37,12 +37,12 @@ fn reorder_expressions(fields: &mut BTreeMap<String, TopLevelItem>) {
     let Some(_) = fields.remove("expression") else {
         return; // we are in a testcase
     };
-    let mut possible_expressions = HashSet::new();
+    let mut possible_expressions = HashMap::new();
     let expression_name = fields
         .remove("expression_name")
         .expect("expression_name to be a top level item");
-    let (expr_name_values, expr_name_common) = {
-        let (values, common, default) = expression_name
+    let expr_name_values = {
+        let (values, _common, default) = expression_name
             .as_item()
             .expect("expression_name must be an item")
             .as_primitive()
@@ -56,13 +56,13 @@ fn reorder_expressions(fields: &mut BTreeMap<String, TopLevelItem>) {
         let values = values
             .as_syntax_enum()
             .expect("expression_name must be syntax enum");
-        (values, common)
+        values
     };
 
     for (key, syntax_enum) in expr_name_values {
         for overload in &syntax_enum.syntax.overloads {
             let output_type_name = overload.output_type.to_upper_camel_case();
-            possible_expressions.insert(output_type_name.clone());
+            possible_expressions.insert(output_type_name.clone(), overload.output_type.clone());
 
             fields
                 .entry(output_type_name.clone())
@@ -85,7 +85,7 @@ fn reorder_expressions(fields: &mut BTreeMap<String, TopLevelItem>) {
                 })
                 .or_insert_with(|| {
                     let mut tl_common = Fields::default();
-                    tl_common.doc = format!("{output_type_name}\n\n{}", expr_name_common.doc);
+                    tl_common.doc = format!("{output_type_name:?}");
                     TopLevelItem::Item(Box::new(ParsedItem::Primitive(PrimitiveType::Enum {
                         common: tl_common,
                         default: None,
@@ -95,10 +95,47 @@ fn reorder_expressions(fields: &mut BTreeMap<String, TopLevelItem>) {
         }
     }
 
-    fields.insert(
-        "expression".to_string(),
-        TopLevelItem::OneOf(possible_expressions.into_iter().collect()),
-    );
+    // because we are funny, t values can be any value :tada:
+    // -> for correct codegen, we need to insert them anywhere
+    // for tests, this is not enforced to be present :)
+    if let Some(param_t) = possible_expressions.remove("T") {
+        assert_eq!(param_t, ParameterType::Reference("T".to_string()));
+        let t = fields.remove("T").expect("T must be a top level item");
+        let t_values = t
+            .as_item()
+            .expect("T must be an item")
+            .as_primitive()
+            .expect("T must be a primitive")
+            .as_enum()
+            .expect("T must be an enum")
+            .0
+            .as_syntax_enum()
+            .expect("T must be a syntax enum");
+        for (expr_type_name, more_specific_t_type) in &possible_expressions {
+            let expr_type_values = fields
+                .get_mut(expr_type_name)
+                .unwrap()
+                .as_item_mut()
+                .expect("expr_type must be an item")
+                .as_primitive_mut()
+                .expect("expr_type must be a primitive")
+                .enum_values_mut()
+                .expect("expr_type must be an enum")
+                .as_syntax_enum_mut()
+                .expect("expr_type must be a syntax enum");
+            for (k, v) in t_values {
+                let mut specialised_v = v.clone();
+                for o in specialised_v.syntax.overloads.iter_mut() {
+                    o.output_type = more_specific_t_type.clone();
+                }
+                expr_type_values.insert(k.clone(), specialised_v);
+            }
+        }
+    }
+
+    let mut keys = possible_expressions.into_keys().collect::<Vec<_>>();
+    keys.sort_unstable();
+    fields.insert("expression".to_string(), TopLevelItem::OneOf(keys));
 }
 
 fn extract_and_remove_discriminants(

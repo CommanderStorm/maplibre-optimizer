@@ -29,47 +29,39 @@ impl EnumValues {
         self.len() == 0
     }
 
-    pub fn as_version(&self) -> Option<&[Number]> {
+    pub fn as_enum(&self) -> &BTreeMap<String, EnumDocs> {
         match self {
-            EnumValues::Version(numbers) => Some(numbers),
-            _ => None,
+            EnumValues::SyntaxEnum(_) => panic!("Enum enum cannot be a SyntaxEnum"),
+            EnumValues::Version(_) => panic!("Enum enum cannot be a SyntaxEnum"),
+            EnumValues::Enum(btree_map) => btree_map,
         }
     }
-
-    pub fn as_version_mut(&self) -> Option<&[Number]> {
+    pub fn as_enum_mut(&mut self) -> &mut BTreeMap<String, EnumDocs> {
         match self {
-            EnumValues::Version(numbers) => Some(numbers),
-            _ => None,
+            EnumValues::SyntaxEnum(_) => panic!("Enum enum cannot be a SyntaxEnum"),
+            EnumValues::Enum(btree_map) => btree_map,
+            EnumValues::Enum(_) => panic!("Enum enum cannot be a SyntaxEnum"),
         }
     }
-    pub fn as_enum(&self) -> Option<&BTreeMap<String, EnumDocs>> {
+    pub fn as_syntax_enum(&self) -> &BTreeMap<String, SyntaxEnum> {
         match self {
-            EnumValues::Enum(btree_map) => Some(btree_map),
-            _ => None,
+            EnumValues::SyntaxEnum(btree_map) => btree_map,
+            EnumValues::Version(_) => panic!("Version enum cannot be a SyntaxEnum"),
+            EnumValues::Enum(_) => panic!("Enum enum cannot be a SyntaxEnum"),
         }
     }
-    pub fn as_enum_mut(&mut self) -> Option<&mut BTreeMap<String, EnumDocs>> {
+    pub fn as_syntax_enum_mut(&mut self) -> &mut BTreeMap<String, SyntaxEnum> {
         match self {
-            EnumValues::Enum(btree_map) => Some(btree_map),
-            _ => None,
-        }
-    }
-    pub fn as_syntax_enum(&self) -> Option<&BTreeMap<String, SyntaxEnum>> {
-        match self {
-            EnumValues::SyntaxEnum(btree_map) => Some(btree_map),
-            _ => None,
-        }
-    }
-    pub fn as_syntax_enum_mut(&mut self) -> Option<&mut BTreeMap<String, SyntaxEnum>> {
-        match self {
-            EnumValues::SyntaxEnum(btree_map) => Some(btree_map),
-            _ => None,
+            EnumValues::SyntaxEnum(btree_map) => btree_map,
+            EnumValues::Version(_) => panic!("Version enum cannot be a SyntaxEnum"),
+            EnumValues::Enum(_) => panic!("Enum enum cannot be a SyntaxEnum"),
         }
     }
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
+#[serde_with::skip_serializing_none]
 pub struct EnumDocs {
     pub doc: String,
     #[serde(rename = "sdk-support")]
@@ -77,6 +69,7 @@ pub struct EnumDocs {
 }
 #[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
+#[serde_with::skip_serializing_none]
 pub struct SyntaxEnum {
     pub doc: String,
     #[serde(rename = "sdk-support")]
@@ -89,6 +82,7 @@ pub struct SyntaxEnum {
 
 #[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
+#[serde_with::skip_serializing_none]
 pub struct Syntax {
     pub overloads: Vec<Overload>,
     #[serde(default)]
@@ -105,6 +99,7 @@ impl Syntax {
 
 #[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
+#[serde_with::skip_serializing_none]
 pub struct Overload {
     pub parameters: Vec<String>,
     #[serde(rename = "output-type")]
@@ -131,6 +126,7 @@ impl Overload {
 
 #[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
+#[serde_with::skip_serializing_none]
 pub struct Parameter {
     pub name: String,
     pub r#type: ParameterType,

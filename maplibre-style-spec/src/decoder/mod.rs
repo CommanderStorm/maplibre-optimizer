@@ -8,8 +8,8 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Number, Value};
 
 use crate::decoder::array::ArrayValue;
-use crate::decoder::property_type::PropertyType;
 use crate::decoder::r#enum::EnumValues;
+use crate::decoder::property_type::PropertyType;
 
 #[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
 pub struct StyleReference {
@@ -37,46 +37,46 @@ pub enum TopLevelItem {
 }
 
 impl TopLevelItem {
-    pub fn as_item(&self) -> Option<&ParsedItem> {
+    pub fn as_item(&self) -> &ParsedItem {
         match self {
-            TopLevelItem::Item(item) => Some(&item),
-            TopLevelItem::Group(_) => None,
-            TopLevelItem::OneOf(_) => None,
+            TopLevelItem::Item(item) => &item,
+            TopLevelItem::Group(_) => panic!("cannot get item from group"),
+            TopLevelItem::OneOf(_) => panic!("cannot get item from oneof"),
         }
     }
-    pub fn as_item_mut(&mut self) -> Option<&mut ParsedItem> {
+    pub fn as_item_mut(&mut self) -> &mut ParsedItem {
         match self {
-            TopLevelItem::Item(item) => Some(item),
-            TopLevelItem::Group(_) => None,
-            TopLevelItem::OneOf(_) => None,
+            TopLevelItem::Item(item) => item,
+            TopLevelItem::Group(_) => panic!("cannot get item from group"),
+            TopLevelItem::OneOf(_) => panic!("cannot get item from oneof"),
         }
     }
-    pub fn as_group(&self) -> Option<&BTreeMap<String, ParsedItem>> {
+    pub fn as_group(&self) -> &BTreeMap<String, ParsedItem> {
         match self {
-            TopLevelItem::Item(_) => None,
-            TopLevelItem::Group(group) => Some(group),
-            TopLevelItem::OneOf(_) => None,
+            TopLevelItem::Item(_) => panic!("cannot get group from item"),
+            TopLevelItem::Group(group) => group,
+            TopLevelItem::OneOf(_) => panic!("cannot get group from oneof"),
         }
     }
-    pub fn as_group_mut(&mut self) -> Option<&mut BTreeMap<String, ParsedItem>> {
+    pub fn as_group_mut(&mut self) -> &mut BTreeMap<String, ParsedItem> {
         match self {
-            TopLevelItem::Item(_) => None,
-            TopLevelItem::Group(group) => Some(group),
-            TopLevelItem::OneOf(_) => None,
+            TopLevelItem::Item(_) => panic!("cannot get group from item"),
+            TopLevelItem::Group(group) => group,
+            TopLevelItem::OneOf(_) => panic!("cannot get group from oneof"),
         }
     }
-    pub fn as_one_of(&self) -> Option<&[String]> {
+    pub fn as_one_of(&self) -> &[String] {
         match self {
-            TopLevelItem::Item(_) => None,
-            TopLevelItem::Group(_) => None,
-            TopLevelItem::OneOf(one_of) => Some(one_of),
+            TopLevelItem::Item(_) => panic!("cannot get oneof from item"),
+            TopLevelItem::Group(_) => panic!("cannot get oneof from group"),
+            TopLevelItem::OneOf(one_of) => one_of,
         }
     }
-    pub fn as_one_of_mut(&mut self) -> Option<&mut [String]> {
+    pub fn as_one_of_mut(&mut self) -> &mut [String] {
         match self {
-            TopLevelItem::Item(_) => None,
-            TopLevelItem::Group(_) => None,
-            TopLevelItem::OneOf(one_of) => Some(one_of),
+            TopLevelItem::Item(_) => panic!("cannot get oneof from item"),
+            TopLevelItem::Group(_) => panic!("cannot get oneof from group"),
+            TopLevelItem::OneOf(one_of) => one_of,
         }
     }
 }
@@ -84,6 +84,7 @@ impl TopLevelItem {
 #[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "camelCase")]
 #[serde(deny_unknown_fields)]
+#[serde_with::skip_serializing_none]
 pub enum PrimitiveType {
     Number {
         #[serde(flatten)]
@@ -209,20 +210,26 @@ impl PrimitiveType {
             Self::PromoteId(common) => common,
         }
     }
-    pub fn as_enum(&self) -> Option<(&EnumValues, &Fields, Option<&Value>)> {
+    pub fn as_enum(&self) -> (&EnumValues, &Fields, Option<&Value>) {
         match self {
             Self::Enum {
                 values,
                 common,
                 default,
-            } => Some((values, common, default.as_ref())),
-            _ => None,
+            } => (values, common, default.as_ref()),
+            _ => panic!("cannot downcast as enum"),
         }
     }
-    pub fn enum_values_mut(&mut self) -> Option<&mut EnumValues> {
+    pub fn enum_values_mut(&mut self) -> &mut EnumValues {
         match self {
-            Self::Enum { values, .. } => Some(values),
-            _ => None,
+            Self::Enum { values, .. } => values,
+            _ => panic!("cannot downcast as enum"),
+        }
+    }
+    pub fn as_array(&self) -> _ {
+        match self {
+            Self::Array { values } => values,
+            _ => panic!("cannot downcast as enum"),
         }
     }
     // TODO: more as_* methods for the rest
@@ -254,28 +261,28 @@ impl ParsedItem {
         }
     }
 
-    pub fn as_primitive(&self) -> Option<&PrimitiveType> {
+    pub fn as_primitive(&self) -> &PrimitiveType {
         match self {
-            ParsedItem::Primitive(p) => Some(p),
-            ParsedItem::Reference { .. } => None,
+            ParsedItem::Primitive(p) => p,
+            ParsedItem::Reference { .. } => panic!("cannot get primitive from reference"),
         }
     }
-    pub fn as_primitive_mut(&mut self) -> Option<&mut PrimitiveType> {
+    pub fn as_primitive_mut(&mut self) -> &mut PrimitiveType {
         match self {
-            ParsedItem::Primitive(p) => Some(p),
-            ParsedItem::Reference { .. } => None,
+            ParsedItem::Primitive(p) => p,
+            ParsedItem::Reference { .. } => panic!("cannot get primitive from reference"),
         }
     }
-    pub fn as_reference(&self) -> Option<&str> {
+    pub fn as_reference(&self) -> &str {
         match self {
-            ParsedItem::Primitive(_) => None,
-            ParsedItem::Reference { references, .. } => Some(references),
+            ParsedItem::Primitive(_) => panic!("cannot get reference from primitive"),
+            ParsedItem::Reference { references, .. } => references,
         }
     }
-    pub fn as_reference_mut(&mut self) -> Option<&mut String> {
+    pub fn as_reference_mut(&mut self) -> &mut String {
         match self {
-            ParsedItem::Primitive(_) => None,
-            ParsedItem::Reference { references, .. } => Some(references),
+            ParsedItem::Primitive(_) => panic!("cannot get reference from primitive"),
+            ParsedItem::Reference { references, .. } => references,
         }
     }
 }
@@ -338,6 +345,7 @@ impl Fields {
 
 #[derive(Default, Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
+#[serde_with::skip_serializing_none]
 pub struct Expression {
     pub interpolated: bool,
     pub parameters: Vec<String>,

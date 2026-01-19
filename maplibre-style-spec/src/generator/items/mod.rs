@@ -9,7 +9,7 @@ pub mod number_array;
 pub mod padding;
 pub mod projection_definition;
 pub mod promote_id;
-pub(crate) mod reference;
+pub mod reference;
 pub mod resolved_image;
 pub mod sprite;
 pub mod star;

@@ -4,7 +4,7 @@ use crate::decoder::Fields;
 use crate::generator::autotest::generate_test_from_example_if_present;
 use crate::generator::formatter::to_upper_camel_case;
 
-pub(crate) fn generate(scope: &mut Scope, name: &str, references: &str, common: &Fields) {
+pub fn generate(scope: &mut Scope, name: &str, references: &str, common: &Fields) {
     scope
         .new_struct(name)
         .doc(&common.doc)

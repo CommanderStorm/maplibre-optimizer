@@ -554,8 +554,7 @@ mod tests {
         #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
         pub struct MaplibreStyleSpecification;
 
-        /// Expression
-        ///
+        /// "Expression"
         #[derive(PartialEq, Debug, Clone)]
         pub enum Expression {
             /// Binds expressions to named variables, which can then be referenced in the result expression using `["var", "variable_name"]`.

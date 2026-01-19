@@ -7,7 +7,7 @@ expression: reference
   "$root": {},
   "ArrayExpression": {
     "type": "enum",
-    "doc": "ArrayExpression\n\nFirst element in an expression array. May be followed by a number of arguments.",
+    "doc": "\"ArrayExpression\"",
     "example": null,
     "units": null,
     "expression": null,
@@ -90,6 +90,46 @@ expression: reference
         ],
         "group": "Types"
       },
+      "at": {
+        "doc": "Retrieves an item from an array.",
+        "sdk-support": null,
+        "syntax": {
+          "overloads": [
+            {
+              "parameters": [
+                "index",
+                "array"
+              ],
+              "output-type": "array"
+            }
+          ],
+          "parameters": [
+            {
+              "name": "index",
+              "type": "number",
+              "doc": "The index into `array`."
+            },
+            {
+              "name": "array",
+              "type": "array<T>",
+              "doc": "The array of items to retrieve the specified item from."
+            }
+          ]
+        },
+        "example": [
+          "at",
+          1,
+          [
+            "literal",
+            [
+              "a",
+              "b",
+              "c"
+            ]
+          ]
+        ],
+        "group": "Lookup"
+      },
       "literal": {
         "doc": "Provides a literal array or object value.\n\n - [Display and style rich text labels](https://maplibre.org/maplibre-gl-js/docs/examples/display-and-style-rich-text-labels/)",
         "sdk-support": null,
@@ -128,7 +168,7 @@ expression: reference
   },
   "ArrayLessTypeLengthGreater": {
     "type": "enum",
-    "doc": "ArrayLessTypeLengthGreater\n\nFirst element in an expression array. May be followed by a number of arguments.",
+    "doc": "\"ArrayLessTypeLengthGreater\"",
     "example": null,
     "units": null,
     "expression": null,
@@ -203,12 +243,52 @@ expression: reference
           ]
         ],
         "group": "Types"
+      },
+      "at": {
+        "doc": "Retrieves an item from an array.",
+        "sdk-support": null,
+        "syntax": {
+          "overloads": [
+            {
+              "parameters": [
+                "index",
+                "array"
+              ],
+              "output-type": "array<type, length>"
+            }
+          ],
+          "parameters": [
+            {
+              "name": "index",
+              "type": "number",
+              "doc": "The index into `array`."
+            },
+            {
+              "name": "array",
+              "type": "array<T>",
+              "doc": "The array of items to retrieve the specified item from."
+            }
+          ]
+        },
+        "example": [
+          "at",
+          1,
+          [
+            "literal",
+            [
+              "a",
+              "b",
+              "c"
+            ]
+          ]
+        ],
+        "group": "Lookup"
       }
     }
   },
   "ObjectExpression": {
     "type": "enum",
-    "doc": "ObjectExpression\n\nFirst element in an expression array. May be followed by a number of arguments.",
+    "doc": "\"ObjectExpression\"",
     "example": null,
     "units": null,
     "expression": null,
@@ -220,6 +300,46 @@ expression: reference
     "requires": null,
     "default": null,
     "values": {
+      "at": {
+        "doc": "Retrieves an item from an array.",
+        "sdk-support": null,
+        "syntax": {
+          "overloads": [
+            {
+              "parameters": [
+                "index",
+                "array"
+              ],
+              "output-type": "object"
+            }
+          ],
+          "parameters": [
+            {
+              "name": "index",
+              "type": "number",
+              "doc": "The index into `array`."
+            },
+            {
+              "name": "array",
+              "type": "array<T>",
+              "doc": "The array of items to retrieve the specified item from."
+            }
+          ]
+        },
+        "example": [
+          "at",
+          1,
+          [
+            "literal",
+            [
+              "a",
+              "b",
+              "c"
+            ]
+          ]
+        ],
+        "group": "Lookup"
+      },
       "literal": {
         "doc": "Provides a literal array or object value.\n\n - [Display and style rich text labels](https://maplibre.org/maplibre-gl-js/docs/examples/display-and-style-rich-text-labels/)",
         "sdk-support": null,
@@ -262,66 +382,9 @@ expression: reference
       }
     }
   },
-  "T": {
-    "type": "enum",
-    "doc": "T\n\nFirst element in an expression array. May be followed by a number of arguments.",
-    "example": null,
-    "units": null,
-    "expression": null,
-    "property-type": null,
-    "sdk-support": null,
-    "transition": null,
-    "required": null,
-    "overridable": null,
-    "requires": null,
-    "default": null,
-    "values": {
-      "at": {
-        "doc": "Retrieves an item from an array.",
-        "sdk-support": null,
-        "syntax": {
-          "overloads": [
-            {
-              "parameters": [
-                "index",
-                "array"
-              ],
-              "output-type": "T"
-            }
-          ],
-          "parameters": [
-            {
-              "name": "index",
-              "type": "number",
-              "doc": "The index into `array`."
-            },
-            {
-              "name": "array",
-              "type": "array<T>",
-              "doc": "The array of items to retrieve the specified item from."
-            }
-          ]
-        },
-        "example": [
-          "at",
-          1,
-          [
-            "literal",
-            [
-              "a",
-              "b",
-              "c"
-            ]
-          ]
-        ],
-        "group": "Lookup"
-      }
-    }
-  },
   "expression": [
     "ArrayExpression",
     "ArrayLessTypeLengthGreater",
-    "ObjectExpression",
-    "T"
+    "ObjectExpression"
   ]
 }
