@@ -1,0 +1,34 @@
+---
+source: maplibre-style-spec/src/generator/items/enum/version.rs
+expression: "crate::generator::generate_spec_scope(&spec)"
+---
+/// This is a Maplibre Style Specification
+#[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+pub struct MaplibreStyleSpecification {
+    /// Style specification version number. Must be 8.
+    pub version: RootVersion,
+}
+
+/// Style specification version number. Must be 8.
+#[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy)]
+#[repr(u8)]
+pub enum RootVersion {
+    Eight = 8,
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn test_example_root_version_decodes() {
+        let example = serde_json::json!(8);
+        let _ = serde_json::from_value::<RootVersion>(example).expect("example should decode");
+    }
+
+    #[test]
+    fn test_example_root_version_decodes() {
+        let example = serde_json::json!(8);
+        let _ = serde_json::from_value::<RootVersion>(example).expect("example should decode");
+    }
+}

@@ -1,3 +1,3 @@
 pub mod decoder;
 pub mod generator;
-mod mir;
+pub mod mir;

@@ -1,11 +1,16 @@
-use crate::decoder;
-use crate::decoder::TopLevelItem;
+use std::collections::BTreeMap;
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash, serde::Deserialize, serde::Serialize)]
-pub struct IntermediateExpression {}
+use crate::mir::types::SyntaxVariantDef;
 
-impl From<decoder::TopLevelItem> for IntermediateExpression {
-    fn from(value: TopLevelItem) -> Self {
-        todo!()
-    }
+/// All expression definitions, grouped by their output type.
+/// Used to generate the per-output-type expression enums (e.g. `NumberExpression`).
+pub struct IntermediateExpressions {
+    /// Keyed by UpperCamelCase output type name (e.g. `"NumberExpression"`).
+    pub by_output_type: BTreeMap<String, ExpressionGroup>,
+}
+
+/// All expression operators that produce a specific output type.
+pub struct ExpressionGroup {
+    /// Keyed by the expression operator name (e.g. `"literal"`, `"interpolate"`).
+    pub variants: BTreeMap<String, SyntaxVariantDef>,
 }

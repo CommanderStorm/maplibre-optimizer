@@ -1,30 +1,49 @@
-use std::collections::{BTreeMap, HashMap};
+use std::collections::BTreeMap;
 
 use codegen2::Scope;
 
-use crate::decoder::r#enum::{EnumValues, ParameterType};
-use crate::decoder::{Fields, ParsedItem, PrimitiveType, StyleReference, TopLevelItem};
 use crate::generator::formatter::{to_snake_case, to_upper_camel_case};
 use crate::generator::literals::generate_literals;
+use crate::mir::{
+    IntermediateLayerField, IntermediateNamedType, IntermediateOneOf, IntermediateSpec,
+    Expressions, Layers, Sources,
+};
+use crate::mir::types::{
+    ArrayElement, BooleanField, ColorArrayField, ColorField, EnumField, FieldMeta,
+    FormattedTextField, MirEnum, MirField, NumberArrayField, NumberField, PaddingField,
+    ProjectionDefinitionField, ResolvedImageField, RegularEnum, RegularVariant,
+    StateField, StringField,
+};
+use crate::mir::types::{ArrayElementType, IntermediateType};
 
 mod autotest;
 pub mod formatter;
 mod items;
 mod literals;
 
-pub fn generate_spec_scope(mut reference: StyleReference) -> String {
+/// Generate Rust source from the semantic MIR.
+/// This is the sole entry point; it never touches decoder types.
+pub fn generate_spec_scope(spec: &IntermediateSpec) -> String {
     let mut scope = Scope::new();
-    assert_eq!(reference.version, 8);
-    reorder_expressions(&mut reference.fields);
 
-    generate_spec(&mut scope, &reference.root);
+    generate_root_struct(&mut scope, spec);
     generate_literals(&mut scope);
-    let discriminants = extract_and_remove_discriminants(&mut reference.fields);
 
-    for (key, item) in &reference.fields {
+    // Named types (groups, type aliases, OneOf enums)
+    for (key, named_type) in &spec.named_types {
         let name = to_upper_camel_case(key);
-        generate_top_level_item(&mut scope, item, &name, &discriminants)
+        generate_named_type(&mut scope, &name, named_type);
     }
+
+    // Expression syntax enums (per-output-type)
+    generate_expression_types(&mut scope, &spec.expressions);
+
+    // Source struct types
+    generate_source_types(&mut scope, &spec.sources);
+
+    // Layer struct types
+    generate_layer_types(&mut scope, &spec.layers);
+
     scope
         .get_or_new_module("test")
         .attr("cfg(test)")
@@ -33,387 +52,374 @@ pub fn generate_spec_scope(mut reference: StyleReference) -> String {
     scope.to_string()
 }
 
-fn reorder_expressions(fields: &mut BTreeMap<String, TopLevelItem>) {
-    let Some(_) = fields.remove("expression") else {
-        return; // we are in a testcase
-    };
-    let mut possible_expressions = HashMap::new();
-    let expression_name = fields
-        .remove("expression_name")
-        .expect("expression_name to be a top level item");
-    let expr_name_values = {
-        let (values, _common, default) = expression_name
-            .as_item()
-            .expect("expression_name must be an item")
-            .as_primitive()
-            .expect("expression_name must be a primitive")
-            .as_enum()
-            .expect("expression_name must be an enum");
-        assert_eq!(
-            default, None,
-            "expression_name must not have a default value.. effects are a little unclear"
-        );
-        let values = values
-            .as_syntax_enum()
-            .expect("expression_name must be syntax enum");
-        values
-    };
+// ── Root struct ───────────────────────────────────────────────────────────────
 
-    for (key, syntax_enum) in expr_name_values {
-        for overload in &syntax_enum.syntax.overloads {
-            let output_type_name = overload.output_type.to_upper_camel_case();
-            possible_expressions.insert(output_type_name.clone(), overload.output_type.clone());
-
-            fields
-                .entry(output_type_name.clone())
-                .and_modify(|f| {
-                    f.as_item_mut()
-                        .expect("is a syntax enum")
-                        .as_primitive_mut()
-                        .expect("is a syntax enum")
-                        .enum_values_mut()
-                        .expect("is a syntax enum")
-                        .as_syntax_enum_mut()
-                        .expect("is a syntax enum")
-                        .entry(key.clone())
-                        .and_modify(|e| e.syntax.overloads.push(overload.clone()))
-                        .or_insert_with(|| {
-                            let mut s = syntax_enum.clone();
-                            s.syntax.overloads = vec![overload.clone()];
-                            s
-                        });
-                })
-                .or_insert_with(|| {
-                    let mut tl_common = Fields::default();
-                    tl_common.doc = format!("{output_type_name:?}");
-                    TopLevelItem::Item(Box::new(ParsedItem::Primitive(PrimitiveType::Enum {
-                        common: tl_common,
-                        default: None,
-                        values: EnumValues::SyntaxEnum([(key.clone(), syntax_enum.clone())].into()),
-                    })))
-                });
-        }
-    }
-
-    // because we are funny, t values can be any value :tada:
-    // -> for correct codegen, we need to insert them anywhere
-    // for tests, this is not enforced to be present :)
-    if let Some(param_t) = possible_expressions.remove("T") {
-        assert_eq!(param_t, ParameterType::Reference("T".to_string()));
-        let t = fields.remove("T").expect("T must be a top level item");
-        let t_values = t
-            .as_item()
-            .expect("T must be an item")
-            .as_primitive()
-            .expect("T must be a primitive")
-            .as_enum()
-            .expect("T must be an enum")
-            .0
-            .as_syntax_enum()
-            .expect("T must be a syntax enum");
-        for (expr_type_name, more_specific_t_type) in &possible_expressions {
-            let expr_type_values = fields
-                .get_mut(expr_type_name)
-                .unwrap()
-                .as_item_mut()
-                .expect("expr_type must be an item")
-                .as_primitive_mut()
-                .expect("expr_type must be a primitive")
-                .enum_values_mut()
-                .expect("expr_type must be an enum")
-                .as_syntax_enum_mut()
-                .expect("expr_type must be a syntax enum");
-            for (k, v) in t_values {
-                let mut specialised_v = v.clone();
-                for o in specialised_v.syntax.overloads.iter_mut() {
-                    o.output_type = more_specific_t_type.clone();
-                }
-                expr_type_values.insert(k.clone(), specialised_v);
-            }
-        }
-    }
-
-    let mut keys = possible_expressions.into_keys().collect::<Vec<_>>();
-    keys.sort_unstable();
-    fields.insert("expression".to_string(), TopLevelItem::OneOf(keys));
-}
-
-fn extract_and_remove_discriminants(
-    fields: &mut BTreeMap<String, TopLevelItem>,
-) -> Vec<(String, String, String, String)> {
-    // collect where to search
-    let anyof_top_level_fields = fields.iter().filter_map(|f| match f {
-        (k, TopLevelItem::OneOf(i)) => Some((k.clone(), i.clone())),
-        _ => None,
-    });
-
-    // collect discriminants at the search places
-    let mut discriminants = Vec::new();
-    for (top_name, join_keys) in anyof_top_level_fields {
-        let variant_name = to_upper_camel_case(&top_name);
-        for join_key in join_keys {
-            let joined_top_level = fields.get(&join_key).unwrap_or_else(|| panic!("anyof {top_name} does refer to its variant {join_key}, but there is no join partner"));
-            let TopLevelItem::Group(btree_map) = joined_top_level else {
-                // cannot possibly contain a discriminant
-                continue;
-            };
-            for (descriminant, item) in btree_map {
-                if let ParsedItem::Primitive(PrimitiveType::Enum { values, .. }) = item
-                    && values.len() == 1
-                {
-                    let EnumValues::Enum(enum_values) = values else {
-                        unreachable!("the version is not referenced in an anyof")
-                    };
-                    let value = enum_values.keys().next().expect("value length is 1");
-                    discriminants.push((
-                        variant_name.clone(),
-                        join_key.clone(),
-                        descriminant.clone(),
-                        value.clone(),
-                    ));
-                }
-            }
-        }
-    }
-
-    // now remove the discriminants
-    for (k, v) in fields.iter_mut() {
-        if let TopLevelItem::Group(i) = v {
-            for (_, k2, tag, _) in &discriminants {
-                if k == k2 {
-                    let _ = i.remove(tag);
-                }
-            }
-        }
-    }
-    discriminants
-}
-
-fn generate_spec(scope: &mut Scope, root: &BTreeMap<String, ParsedItem>) {
-    let spec = scope
+fn generate_root_struct(scope: &mut Scope, spec: &IntermediateSpec) {
+    let s = scope
         .new_struct("MaplibreStyleSpecification")
         .doc("This is a Maplibre Style Specification")
         .vis("pub")
-        .derive("serde::Deserialize, PartialEq, Debug, Clone");
-    for (key, field) in root {
-        let mut field_type_name = to_upper_camel_case(&format!("root {key}"));
-        if field.optional() {
-            field_type_name = format!("Option<{field_type_name}>");
-        }
+        .derive("serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone");
 
-        let fields = spec
-            .new_field(to_snake_case(key), field_type_name)
+    for (key, field) in &spec.root.0 {
+        let meta = field.meta();
+        let type_name = to_upper_camel_case(&format!("root {key}"));
+        let mut field_type = type_name.clone();
+        if meta.optional {
+            field_type = format!("Option<{field_type}>");
+        }
+        let sf = s
+            .new_field(&meta.rust_name, field_type)
             .vis("pub")
-            .doc(field.doc());
-        if &to_snake_case(key) != key {
-            fields.annotation(format!("#[serde(rename=\"{key}\")]"));
+            .doc(&meta.doc);
+        if &meta.rust_name != key {
+            sf.annotation(format!("#[serde(rename=\"{key}\")]"));
         }
     }
-    for (key, field) in root {
-        generate_parsed_item(scope, field, &to_upper_camel_case(&format!("root {key}")));
+
+    // Generate subtypes for each root field
+    for (key, field) in &spec.root.0 {
+        let type_name = to_upper_camel_case(&format!("root {key}"));
+        generate_mir_type(scope, &type_name, field);
     }
 }
 
-fn generate_top_level_item(
-    scope: &mut Scope,
-    item: &TopLevelItem,
-    name: &str,
-    discriminants: &[(String, String, String, String)],
-) {
-    if name == "PropertyType" {
-        return; // bogus, not a style spec item, rather metadata about the item
-    }
-    match item {
-        TopLevelItem::Item(item) => generate_parsed_item(scope, item, name),
-        TopLevelItem::Group(items) => generate_top_level_group(scope, items, name),
-        TopLevelItem::OneOf(items) => generate_top_level_oneof(scope, items, name, discriminants),
+// ── Named types ───────────────────────────────────────────────────────────────
+
+fn generate_named_type(scope: &mut Scope, name: &str, named_type: &IntermediateNamedType) {
+    match named_type {
+        IntermediateNamedType::Struct(fields) => generate_struct_from_fields(scope, name, fields),
+        IntermediateNamedType::TypeDef(field) => generate_mir_type(scope, name, field),
+        IntermediateNamedType::OneOf(one_of) => generate_oneof(scope, name, one_of),
     }
 }
 
-fn generate_top_level_group(scope: &mut Scope, items: &BTreeMap<String, ParsedItem>, name: &str) {
-    // special case for *:
-    if items.len() == 1
-        && let Some(item) = items.get("*")
-    {
-        let field_type_name = to_upper_camel_case(&format!("Inner {name}"));
-        scope
-            .new_struct(name)
-            .vis("pub")
-            .derive("serde::Deserialize, PartialEq, Debug, Clone")
-            .tuple_field(format!(
-                "std::collections::BTreeMap<String,{field_type_name}>"
-            ));
-        generate_parsed_item(scope, item, &field_type_name);
-
-        return;
+/// Generate a named struct from a slice of MIR fields.
+/// Handles the single-star (`*`) wildcard field as a BTreeMap wrapper.
+fn generate_struct_from_fields(scope: &mut Scope, name: &str, fields: &[MirField]) {
+    // Special case: single-star field → BTreeMap wrapper
+    if fields.len() == 1 {
+        if let MirField::Star(meta) = &fields[0] {
+            let inner_name = to_upper_camel_case(&format!("Inner {name}"));
+            scope
+                .new_struct(name)
+                .vis("pub")
+                .derive("serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone")
+                .tuple_field(format!(
+                    "std::collections::BTreeMap<String,{inner_name}>"
+                ));
+            items::star::generate(scope, &inner_name, meta);
+            return;
+        }
     }
 
-    let group = scope
+    let s = scope
         .new_struct(name)
         .vis("pub")
-        .derive("serde::Deserialize, PartialEq, Debug, Clone");
-    for (key, item) in items {
-        let mut field_type_name = to_upper_camel_case(&format!("{name} {key}"));
-        if key == "*" {
-            field_type_name = format!("std::collections::BTreeMap<String,{field_type_name}>");
+        .derive("serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone");
+
+    for field in fields {
+        let meta = field.meta();
+        let field_type_name = to_upper_camel_case(&format!("{name} {}", meta.spec_name));
+        let mut field_type = if meta.spec_name == "*" {
+            format!("std::collections::BTreeMap<String,{field_type_name}>")
+        } else {
+            field_type_name.clone()
+        };
+        if meta.optional {
+            field_type = format!("Option<{field_type}>");
         }
-        if item.optional() {
-            field_type_name = format!("Option<{field_type_name}>");
-        }
-        let field = group
-            .new_field(to_snake_case(key), field_type_name)
-            .doc(item.doc())
-            .vis("pub");
-        if key == "*" {
-            field.annotation("#[serde(flatten)]");
-        } else if &to_snake_case(key) != key {
-            field.annotation(format!("#[serde(rename=\"{key}\")]"));
+        let sf = s
+            .new_field(&meta.rust_name, field_type)
+            .vis("pub")
+            .doc(&meta.doc);
+        if meta.spec_name == "*" {
+            sf.annotation("#[serde(flatten)]");
+        } else if &meta.rust_name != meta.spec_name.as_str() {
+            sf.annotation(format!("#[serde(rename=\"{}\")]", meta.spec_name));
         }
     }
 
-    for (key, item) in items {
-        generate_parsed_item(scope, item, &to_upper_camel_case(&format!("{name} {key}")));
+    // Generate subtypes for each field
+    for field in fields {
+        let meta = field.meta();
+        if meta.spec_name == "*" {
+            // Already handled above via star::generate
+            continue;
+        }
+        let field_type_name = to_upper_camel_case(&format!("{name} {}", meta.spec_name));
+        generate_mir_type(scope, &field_type_name, field);
     }
 }
 
-fn generate_top_level_oneof(
-    scope: &mut Scope,
-    items: &Vec<String>,
-    name: &str,
-    discriminants: &[(String, String, String, String)],
-) {
+/// Generate a `#[serde(tag)]` or `#[serde(untagged)]` sum-type enum.
+fn generate_oneof(scope: &mut Scope, name: &str, one_of: &IntermediateOneOf) {
     let enu = scope
         .new_enum(name)
         .vis("pub")
-        .derive("serde::Deserialize, PartialEq, Debug, Clone");
+        .derive("serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone");
 
-    let enum_variant_key = discriminants
-        .iter()
-        .find(|d| d.0 == name)
-        .map(|d| d.2.clone());
-    let descriminants = discriminants
-        .iter()
-        .filter(|d| d.0 == name)
-        .cloned()
-        .map(|d| (d.1, d.3))
-        .collect::<HashMap<_, _>>();
-
-    if let Some(enum_variant_key) = enum_variant_key {
-        enu.attr(format!("serde(tag=\"{enum_variant_key}\")"));
+    if let Some(tag) = &one_of.tag {
+        enu.attr(format!("serde(tag=\"{tag}\")"));
     } else {
         enu.attr("serde(untagged)");
     }
-    for key in items {
-        let var_name = to_upper_camel_case(key);
+
+    for variant_key in &one_of.variants {
+        let var_name = to_upper_camel_case(variant_key);
         let var = enu.new_variant(&var_name).tuple(&var_name);
-        if &var_name != key
-            && let Some(descriminant_key) = descriminants.get(key)
-        {
-            var.annotation(format!("#[serde(rename=\"{descriminant_key}\")]"));
+        if let Some(rename) = one_of.renames.get(&var_name) {
+            var.annotation(format!("#[serde(rename=\"{rename}\")]"));
         }
     }
 }
 
-fn generate_parsed_item(scope: &mut Scope, item: &ParsedItem, name: &str) {
-    match item {
-        ParsedItem::Primitive(p) => match p {
-            PrimitiveType::Number {
-                common,
-                default,
-                maximum,
-                minimum,
-                period,
-            } => items::number::generate(
-                scope,
-                name,
-                common,
-                default.as_ref(),
-                maximum.as_ref(),
-                minimum.as_ref(),
-                period.as_ref(),
-            ),
-            PrimitiveType::Enum {
-                common,
-                default,
-                values,
-            } => items::r#enum::generate(scope, name, common, default.as_ref(), values),
-            PrimitiveType::Array {
-                common,
-                default,
-                value,
-                values,
-                minimum,
-                maximum,
-                length,
-            } => items::array::generate(
-                scope,
-                name,
-                common,
-                default.as_ref(),
-                value,
-                values.as_ref(),
-                minimum.as_ref(),
-                maximum.as_ref(),
-                length.as_ref(),
-            ),
-            PrimitiveType::Color { common, default } => {
-                items::color::generate(scope, name, common, default.as_ref())
-            }
-            PrimitiveType::String { common, default } => {
-                items::string::generate(scope, name, common, default.as_deref())
-            }
-            PrimitiveType::Boolean { common, default } => {
-                items::boolean::generate(scope, name, common, default.as_ref())
-            }
-            PrimitiveType::ResolvedImage { common, tokens } => {
-                items::resolved_image::generate(scope, name, common, *tokens)
-            }
-            PrimitiveType::NumberArray {
-                common,
-                default,
-                minimum,
-                maximum,
-            } => items::number_array::generate(
-                scope,
-                name,
-                common,
-                default.as_ref(),
-                minimum.as_ref(),
-                maximum.as_ref(),
-            ),
-            PrimitiveType::ColorArray { common, default } => {
-                items::color_array::generate(scope, name, common, default.as_deref())
-            }
+// ── Expression types ──────────────────────────────────────────────────────────
 
-            PrimitiveType::Padding { common, default } => {
-                items::padding::generate(scope, name, common, default.as_ref())
-            }
-            PrimitiveType::Formatted {
-                common,
-                tokens,
-                default,
-            } => items::formatted::generate(scope, name, common, default, *tokens),
+fn generate_expression_types(scope: &mut Scope, expressions: &Expressions) {
+    for (output_type_name, group) in &expressions.by_output_type {
+        items::r#enum::syntax::generate_syntax_enum(
+            scope,
+            output_type_name,
+            &format!("{output_type_name:?}"),
+            &group.variants,
+        );
+    }
+}
 
-            // meta-types, not something proper but still useful to handle explicitly
-            PrimitiveType::Star(fields) => items::star::generate(scope, name, fields),
-            PrimitiveType::State { common, default } => {
-                items::state::generate(scope, name, common, default)
-            }
-            PrimitiveType::PropertyType(_) => {}
+// ── Source types ──────────────────────────────────────────────────────────────
 
-            // below are types which are only primitives due to bad spec work upstream
-            PrimitiveType::ProjectionDefinition { common, default } => {
-                items::projection_definition::generate(scope, name, common, default.as_str())
-            }
-            PrimitiveType::VariableAnchorOffsetCollection(fields) => {
-                items::variable_anchor_offset_collection::generate(scope, name, fields)
-            }
-            PrimitiveType::Sprite(fields) => items::sprite::generate(scope, name, fields),
-            PrimitiveType::PromoteId(fields) => items::promote_id::generate(scope, name, fields),
+fn generate_source_types(scope: &mut Scope, sources: &Sources) {
+    if sources.source_types.is_empty() {
+        return;
+    }
+
+    // Generate a struct per source type
+    for (type_name, def) in &sources.source_types {
+        let struct_name = to_upper_camel_case(&format!("{type_name} source"));
+        generate_struct_from_fields(scope, &struct_name, &def.fields);
+    }
+
+    // Generate the Source sum type
+    let variant_keys: Vec<String> = sources
+        .source_types
+        .keys()
+        .map(|k| format!("{k}_source"))
+        .collect();
+
+    // Detect common tag field ("type") and build renames
+    let tag = if sources
+        .source_types
+        .values()
+        .all(|d| d.discriminant_value.is_some())
+    {
+        Some("type".to_string())
+    } else {
+        None
+    };
+
+    let renames: BTreeMap<String, String> = sources
+        .source_types
+        .iter()
+        .filter_map(|(k, d)| {
+            d.discriminant_value.as_ref().map(|v| {
+                (to_upper_camel_case(&format!("{k}_source")), v.clone())
+            })
+        })
+        .collect();
+
+    generate_oneof(
+        scope,
+        "Source",
+        &IntermediateOneOf {
+            variants: variant_keys,
+            tag,
+            renames,
         },
-        ParsedItem::Reference { references, common } => {
-            items::reference::generate(scope, name, references, common)
+    );
+}
+
+// ── Layer types ───────────────────────────────────────────────────────────────
+
+fn generate_layer_types(scope: &mut Scope, layers: &Layers) {
+    if layers.common_fields.is_empty() && layers.layer_types.is_empty() {
+        return;
+    }
+
+    // Common `Layer` struct
+    let common_mir: Vec<MirField> = layer_fields_to_mir(&layers.common_fields);
+    generate_struct_from_fields(scope, "Layer", &common_mir);
+
+    // Per-type layout and paint structs
+    for (type_key, layer_type) in &layers.layer_types {
+        let layout_name = to_upper_camel_case(&format!("{type_key} layout layer"));
+        let paint_name = to_upper_camel_case(&format!("{type_key} paint layer"));
+        let layout_mir: Vec<MirField> = layer_fields_to_mir(&layer_type.layout);
+        let paint_mir: Vec<MirField> = layer_fields_to_mir(&layer_type.paint);
+        generate_struct_from_fields(scope, &layout_name, &layout_mir);
+        generate_struct_from_fields(scope, &paint_name, &paint_mir);
+    }
+}
+
+fn layer_fields_to_mir(
+    fields: &std::collections::BTreeMap<String, IntermediateLayerField>,
+) -> Vec<MirField> {
+    fields.iter().map(|(name, f)| layer_field_to_mir(name, f)).collect()
+}
+
+fn layer_field_to_mir(spec_name: &str, f: &IntermediateLayerField) -> MirField {
+    let meta = FieldMeta {
+        spec_name: spec_name.to_string(),
+        rust_name: to_snake_case(spec_name),
+        optional: !f.required,
+        transition: false,
+        expression: f.expression.clone(),
+        doc: f.doc.clone(),
+        example: None,
+        units: None,
+    };
+
+    match &f.r#type {
+        IntermediateType::Number { min, max } => MirField::Number(NumberField {
+            meta,
+            default: f.default.as_ref().and_then(|v| serde_json::from_value(v.clone()).ok()),
+            min: *min,
+            max: *max,
+            period: None,
+        }),
+        IntermediateType::String => MirField::String(StringField {
+            meta,
+            default: f.default.as_ref().and_then(|v| v.as_str().map(|s| s.to_string())),
+        }),
+        IntermediateType::Boolean => MirField::Boolean(BooleanField {
+            meta,
+            default: f.default.as_ref().and_then(|v| v.as_bool()),
+        }),
+        IntermediateType::Color => MirField::Color(ColorField {
+            meta,
+            default: f.default.clone(),
+        }),
+        IntermediateType::Enum { values } => MirField::Enum(EnumField {
+            meta,
+            default: f.default.clone(),
+            variants: MirEnum::Regular(RegularEnum {
+                variants: values
+                    .iter()
+                    .map(|v| (v.clone(), RegularVariant { doc: String::new() }))
+                    .collect(),
+            }),
+        }),
+        IntermediateType::Array { element, length } => {
+            let mir_element = array_element_type_to_mir(element);
+            MirField::Array(crate::mir::types::ArrayField {
+                meta,
+                default: f
+                    .default
+                    .as_ref()
+                    .and_then(|v| serde_json::from_value(v.clone()).ok()),
+                element: mir_element,
+                length: *length,
+            })
         }
+        IntermediateType::Padding => MirField::Padding(PaddingField {
+            meta,
+            default: match &f.default {
+                Some(serde_json::Value::Array(arr)) => arr
+                    .iter()
+                    .filter_map(|v| serde_json::from_value(v.clone()).ok())
+                    .collect(),
+                _ => vec![],
+            },
+        }),
+        IntermediateType::Formatted { tokens } => MirField::FormattedText(FormattedTextField {
+            meta,
+            tokens: *tokens,
+            default: f
+                .default
+                .as_ref()
+                .and_then(|v| v.as_str().map(|s| s.to_string()))
+                .unwrap_or_default(),
+        }),
+        IntermediateType::ResolvedImage { tokens } => {
+            MirField::ResolvedImage(ResolvedImageField {
+                meta,
+                tokens: Some(*tokens),
+            })
+        }
+        IntermediateType::NumberArray { min, max } => MirField::NumberArray(NumberArrayField {
+            meta,
+            default: f.default.as_ref().and_then(|v| serde_json::from_value(v.clone()).ok()),
+            min: *min,
+            max: *max,
+        }),
+        IntermediateType::ColorArray => MirField::ColorArray(ColorArrayField {
+            meta,
+            default: f.default.as_ref().and_then(|v| v.as_str().map(|s| s.to_string())),
+        }),
+        IntermediateType::State => MirField::State(StateField {
+            meta,
+            default: f.default.clone().unwrap_or(serde_json::Value::Null),
+        }),
+        IntermediateType::AnyObject => MirField::Star(meta),
+        IntermediateType::Sprite => MirField::Sprite(meta),
+        IntermediateType::PromoteId => MirField::PromoteId(meta),
+        IntermediateType::ProjectionDefinition => {
+            MirField::ProjectionDefinition(ProjectionDefinitionField {
+                meta,
+                default: f
+                    .default
+                    .as_ref()
+                    .and_then(|v| v.as_str().map(|s| s.to_string()))
+                    .unwrap_or_default(),
+            })
+        }
+        IntermediateType::VariableAnchorOffsetCollection => {
+            MirField::VariableAnchorOffsetCollection(meta)
+        }
+    }
+}
+
+fn array_element_type_to_mir(element: &ArrayElementType) -> ArrayElement {
+    match element {
+        ArrayElementType::String => ArrayElement::String,
+        ArrayElementType::Number => ArrayElement::Number { min: None, max: None },
+        ArrayElementType::Color => ArrayElement::Color,
+        ArrayElementType::Enum(values) => ArrayElement::Enum(RegularEnum {
+            variants: values
+                .iter()
+                .map(|v| (v.clone(), RegularVariant { doc: String::new() }))
+                .collect(),
+        }),
+        ArrayElementType::Layer => ArrayElement::Layer,
+    }
+}
+
+// ── MirField dispatch ─────────────────────────────────────────────────────────
+
+/// Dispatch a `MirField` to the appropriate item generator.
+/// Called both from this module and from `items/array.rs` (for `Complex` elements).
+pub fn generate_mir_type(scope: &mut Scope, name: &str, field: &MirField) {
+    match field {
+        MirField::Number(f) => items::number::generate(scope, name, f),
+        MirField::Boolean(f) => items::boolean::generate(scope, name, f),
+        MirField::String(f) => items::string::generate(scope, name, f),
+        MirField::Color(f) => items::color::generate(scope, name, f),
+        MirField::Enum(f) => items::r#enum::generate_mir(scope, name, f),
+        MirField::Array(f) => items::array::generate(scope, name, f),
+        MirField::NumberArray(f) => items::number_array::generate(scope, name, f),
+        MirField::ColorArray(f) => items::color_array::generate(scope, name, f),
+        MirField::FormattedText(f) => items::formatted::generate(scope, name, f),
+        MirField::ResolvedImage(f) => items::resolved_image::generate(scope, name, f),
+        MirField::Padding(f) => items::padding::generate(scope, name, f),
+        MirField::State(f) => items::state::generate(scope, name, f),
+        MirField::ProjectionDefinition(f) => items::projection_definition::generate(scope, name, f),
+        MirField::Sprite(m) => items::sprite::generate(scope, name, m),
+        MirField::PromoteId(m) => items::promote_id::generate(scope, name, m),
+        MirField::VariableAnchorOffsetCollection(m) => {
+            items::variable_anchor_offset_collection::generate(scope, name, m)
+        }
+        MirField::Star(m) => items::star::generate(scope, name, m),
+        MirField::Reference(f) => items::reference::generate(scope, name, f),
     }
 }
 
@@ -421,7 +427,11 @@ fn generate_parsed_item(scope: &mut Scope, item: &ParsedItem, name: &str) {
 mod tests {
     use serde_json::json;
 
+    use crate::decoder::StyleReference;
+    use crate::mir::IntermediateSpec;
+
     use super::*;
+
     #[test]
     fn test_generate_spec_items() {
         let reference = json!({
@@ -434,7 +444,8 @@ mod tests {
             }
         });
         let reference: StyleReference = serde_json::from_value(reference).unwrap();
-        insta::assert_snapshot!(generate_spec_scope(reference));
+        let spec = IntermediateSpec::from(reference);
+        insta::assert_snapshot!(generate_spec_scope(&spec));
     }
 
     #[test]
@@ -451,8 +462,8 @@ mod tests {
             }
         });
         let reference: StyleReference = serde_json::from_value(reference).unwrap();
-        let spec = generate_spec_scope(reference);
-        insta::assert_snapshot!(&spec);
+        let spec = IntermediateSpec::from(reference);
+        insta::assert_snapshot!(generate_spec_scope(&spec));
     }
 
     #[test]
@@ -474,14 +485,7 @@ mod tests {
             "numbers": ["number_one", "number_two"]
         });
         let reference: StyleReference = serde_json::from_value(reference).unwrap();
-        insta::assert_snapshot!(generate_spec_scope(reference));
-    }
-
-    #[test]
-    fn test_expression_name_renaming() {
-        let mut reference: StyleReference =
-            serde_json::from_str(include_str!("../fixture/expression_name_renaming.json")).unwrap();
-        reorder_expressions(&mut reference.fields);
-        insta::assert_json_snapshot!(reference);
+        let spec = IntermediateSpec::from(reference);
+        insta::assert_snapshot!(generate_spec_scope(&spec));
     }
 }

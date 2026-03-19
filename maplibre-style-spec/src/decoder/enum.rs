@@ -39,8 +39,8 @@ impl EnumValues {
     pub fn as_enum_mut(&mut self) -> &mut BTreeMap<String, EnumDocs> {
         match self {
             EnumValues::SyntaxEnum(_) => panic!("Enum enum cannot be a SyntaxEnum"),
+            EnumValues::Version(_) => panic!("Version enum cannot be an Enum"),
             EnumValues::Enum(btree_map) => btree_map,
-            EnumValues::Enum(_) => panic!("Enum enum cannot be a SyntaxEnum"),
         }
     }
     pub fn as_syntax_enum(&self) -> &BTreeMap<String, SyntaxEnum> {

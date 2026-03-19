@@ -1,0 +1,39 @@
+---
+source: maplibre-style-spec/src/generator/items/enum/regular.rs
+expression: "crate::generator::generate_spec_scope(&spec)"
+---
+/// This is a Maplibre Style Specification
+#[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+pub struct MaplibreStyleSpecification;
+
+/// The color space in which colors interpolated. Interpolating colors in perceptual color spaces like LAB and HCL tend to produce color ramps that look more consistent and produce colors that can be differentiated more easily than those interpolated in RGB space.
+#[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy)]
+pub enum ColorSpace {
+    /// Use the HCL color space to interpolate color values, interpolating the Hue, Chroma, and Luminance channels individually.
+    #[serde(rename="hcl")]
+    Hcl,
+    /// Use the LAB color space to interpolate color values.
+    #[serde(rename="lab")]
+    Lab,
+    /// Use the RGB color space to interpolate color values
+    #[serde(rename="rgb")]
+    Rgb,
+}
+
+impl Default for ColorSpace {
+    fn default() -> Self {
+        Self::Rgb
+    }
+}
+
+impl Default for ColorSpace {
+    fn default() -> Self {
+        Self::Rgb
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+}

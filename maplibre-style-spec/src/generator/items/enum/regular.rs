@@ -1,28 +1,38 @@
-use std::collections::BTreeMap;
-
 use codegen2::Scope;
 
-use crate::decoder::Fields;
-use crate::decoder::r#enum::EnumDocs;
 use crate::generator::formatter::to_upper_camel_case;
+use crate::mir::types::RegularEnum;
 
 pub fn generate_regular_enum(
     scope: &mut Scope,
     name: &str,
-    common: &&Fields,
-    values: &BTreeMap<String, EnumDocs>,
+    doc: &str,
+    variants: &RegularEnum,
+    default: Option<&serde_json::Value>,
 ) {
     let enu = scope
         .new_enum(name)
-        .doc(&common.doc)
+        .doc(doc)
         .vis("pub")
-        .derive("serde::Deserialize, PartialEq, Eq, Debug, Clone, Copy");
-    for (key, value) in values {
+        .derive("serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy");
+    for (key, value) in &variants.variants {
         let var_name = to_upper_camel_case(key);
         let var = enu.new_variant(&var_name).doc(&value.doc);
         if key != &var_name {
             var.annotation(format!("#[serde(rename=\"{key}\")]"));
         }
+    }
+
+    if let Some(default) = default {
+        scope
+            .new_impl(name)
+            .impl_trait("Default")
+            .new_fn("default")
+            .ret("Self")
+            .line(format!(
+                "Self::{}",
+                to_upper_camel_case(&default.to_string())
+            ));
     }
 }
 
@@ -30,7 +40,9 @@ pub fn generate_regular_enum(
 mod tests {
     use serde_json::json;
 
+    use super::*;
     use crate::decoder::StyleReference;
+    use crate::mir::IntermediateSpec;
 
     #[test]
     fn test_generate_spec() {
@@ -55,37 +67,8 @@ mod tests {
         },
         });
         let reference: StyleReference = serde_json::from_value(reference).unwrap();
-        insta::assert_snapshot!(crate::generator::generate_spec_scope(reference), @r#"
-        /// This is a Maplibre Style Specification
-        #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-        pub struct MaplibreStyleSpecification;
-
-        /// The color space in which colors interpolated. Interpolating colors in perceptual color spaces like LAB and HCL tend to produce color ramps that look more consistent and produce colors that can be differentiated more easily than those interpolated in RGB space.
-        #[derive(serde::Deserialize, PartialEq, Eq, Debug, Clone, Copy)]
-        pub enum ColorSpace {
-            /// Use the HCL color space to interpolate color values, interpolating the Hue, Chroma, and Luminance channels individually.
-            #[serde(rename="hcl")]
-            Hcl,
-            /// Use the LAB color space to interpolate color values.
-            #[serde(rename="lab")]
-            Lab,
-            /// Use the RGB color space to interpolate color values
-            #[serde(rename="rgb")]
-            Rgb,
-        }
-
-        impl Default for ColorSpace {
-            fn default() -> Self {
-                Self::Rgb
-            }
-        }
-
-        #[cfg(test)]
-        mod test {
-            use super::*;
-
-        }
-        "#);
+        let spec = IntermediateSpec::from(reference);
+        insta::assert_snapshot!(crate::generator::generate_spec_scope(&spec));
     }
 
     #[test]
@@ -113,33 +96,7 @@ mod tests {
         },
         });
         let reference: StyleReference = serde_json::from_value(reference).unwrap();
-        insta::assert_snapshot!(crate::generator::generate_spec_scope(reference), @r#"
-        /// This is a Maplibre Style Specification
-        #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-        pub struct MaplibreStyleSpecification;
-
-        /// The filter operator.
-        #[derive(serde::Deserialize, PartialEq, Eq, Debug, Clone, Copy)]
-        pub enum FilterOperator {
-            /// `["!=", key, value]` inequality: `feature[key] ≠ value`
-            #[serde(rename="!=")]
-            NotEqual,
-            /// `["==", key, value]` equality: `feature[key] = value`
-            #[serde(rename="==")]
-            EqualEqual,
-            /// `[">", key, value]` greater than: `feature[key] > value`
-            #[serde(rename=">")]
-            Greater,
-            /// `[">=", key, value]` greater than or equal: `feature[key] ≥ value`
-            #[serde(rename=">=")]
-            GreaterEqual,
-        }
-
-        #[cfg(test)]
-        mod test {
-            use super::*;
-
-        }
-        "#);
+        let spec = IntermediateSpec::from(reference);
+        insta::assert_snapshot!(crate::generator::generate_spec_scope(&spec));
     }
 }

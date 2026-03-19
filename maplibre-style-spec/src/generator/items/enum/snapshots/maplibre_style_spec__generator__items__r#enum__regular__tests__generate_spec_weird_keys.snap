@@ -1,0 +1,30 @@
+---
+source: maplibre-style-spec/src/generator/items/enum/regular.rs
+expression: "crate::generator::generate_spec_scope(&spec)"
+---
+/// This is a Maplibre Style Specification
+#[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+pub struct MaplibreStyleSpecification;
+
+/// The filter operator.
+#[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy)]
+pub enum FilterOperator {
+    /// `["!=", key, value]` inequality: `feature[key] ≠ value`
+    #[serde(rename="!=")]
+    NotEqual,
+    /// `["==", key, value]` equality: `feature[key] = value`
+    #[serde(rename="==")]
+    EqualEqual,
+    /// `[">", key, value]` greater than: `feature[key] > value`
+    #[serde(rename=">")]
+    Greater,
+    /// `[">=", key, value]` greater than or equal: `feature[key] ≥ value`
+    #[serde(rename=">=")]
+    GreaterEqual,
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+}

@@ -3,19 +3,19 @@ use std::collections::BTreeMap;
 use codegen2::{Function, Impl, Scope};
 use serde_json::Value;
 
-use crate::decoder::Fields;
-use crate::decoder::r#enum::{Literal, Overload, Parameter, ParameterType, Syntax, SyntaxEnum};
+use crate::decoder::r#enum::{Literal, Overload, Parameter, ParameterType, Syntax};
 use crate::generator::autotest::generate_test_from_examples_if_present;
 use crate::generator::formatter::{to_snake_case, to_upper_camel_case};
+use crate::mir::types::SyntaxVariantDef;
 
 pub fn generate_syntax_enum(
     scope: &mut Scope,
     name: &str,
-    common: &&Fields,
-    values: &BTreeMap<String, SyntaxEnum>,
+    doc: &str,
+    values: &BTreeMap<String, SyntaxVariantDef>,
 ) {
     // pass 1: populate enum variants
-    generate_syntax_enum_body(scope, name, &common, values);
+    generate_syntax_enum_body(scope, name, doc, values);
     // pass 2: generate the previously referenced enum variants for overloaded variants
     generate_referenced_multi_overload_options_enums(scope, name, values);
     let examples = values
@@ -30,7 +30,7 @@ pub fn generate_syntax_enum(
 fn generate_referenced_multi_overload_options_enums(
     scope: &mut Scope,
     name: &str,
-    values: &BTreeMap<String, SyntaxEnum>,
+    values: &BTreeMap<String, SyntaxVariantDef>,
 ) {
     for (key, value) in values {
         let var_name = to_upper_camel_case(key);
@@ -55,12 +55,12 @@ fn generate_referenced_multi_overload_options_enums(
 fn generate_syntax_enum_body(
     scope: &mut Scope,
     name: &str,
-    common: &&&Fields,
-    values: &BTreeMap<String, SyntaxEnum>,
+    doc: &str,
+    values: &BTreeMap<String, SyntaxVariantDef>,
 ) {
     let enu = scope
         .new_enum(name)
-        .doc(&common.doc)
+        .doc(doc)
         .vis("pub")
         .derive("PartialEq, Debug, Clone");
     for (key, value) in values {
@@ -292,7 +292,7 @@ fn generate_any_of(scope: &mut Scope, any_of: &[Literal]) -> String {
 fn generate_syntax_enum_deserializer(
     scope: &mut Scope,
     name: &str,
-    values: &BTreeMap<String, SyntaxEnum>,
+    values: &BTreeMap<String, SyntaxVariantDef>,
     example: &serde_json::Value,
 ) {
     let vis = generate_visitor(scope, name, example);
@@ -493,6 +493,8 @@ mod tests {
     use serde_json::json;
 
     use crate::decoder::StyleReference;
+    use crate::mir::IntermediateSpec;
+
     #[test]
     fn test_generate_spec_expressions() {
         let reference = json!({
@@ -502,14 +504,14 @@ mod tests {
           "type": "array",
           "value": "expression_name",
           "minimum": 1,
-          "doc": "An expression defines a function that can be used for data-driven style properties or feature filters. The first element of an expression array is a string naming the expression operator, e.g. `\"*\"` or `\"case\"`. Elements that follow (if any) are the _arguments_ to the expression. Each argument is either a literal value (a string, number, boolean, or `null`), or another expression array."
+          "doc": "An expression defines a function that can be used for data-driven style properties or feature filters."
         },
         "expression_name": {
           "doc": "",
           "type": "enum",
           "values": {
             "let": {
-              "doc": "Binds expressions to named variables, which can then be referenced in the result expression using `[\"var\", \"variable_name\"]`.\n\n - [Visualize population density](https://maplibre.org/maplibre-gl-js/docs/examples/visualize-population-density/)",
+              "doc": "Binds expressions to named variables.",
               "syntax": {
                 "overloads": [
                   {
@@ -518,115 +520,23 @@ mod tests {
                   }
                 ],
                 "parameters": [
-                  {
-                    "name": "var_name_i",
-                    "type": "string literal",
-                    "doc": "The name of the i-th variable."
-                  },
-                  {
-                    "name": "var_value_i",
-                    "type": "any",
-                    "doc": "The value of the i-th variable."
-                  },
-                  {
-                    "name": "expression",
-                    "type": "any",
-                    "doc": "The expression within which the named variables can be referenced."
-                  }
+                  { "name": "var_name_i", "type": "string literal", "doc": "Variable name." },
+                  { "name": "var_value_i", "type": "any", "doc": "Variable value." },
+                  { "name": "expression", "type": "any", "doc": "Result expression." }
                 ]
               },
               "example": ["let", "someNumber", 500, ["interpolate", ["linear"], ["var", "someNumber"], 274, "#edf8e9", 1551, "#006d2c"]],
               "group": "Variable binding",
-              "sdk-support": {
-                "basic functionality": {
-                  "js": "0.41.0",
-                  "android": "6.0.0",
-                  "ios": "4.0.0"
-                }
-              }
-            },
-          },
-        },
+              "sdk-support": {}
+            }
+          }
+        }
         });
         let reference: StyleReference = serde_json::from_value(reference).unwrap();
-        insta::assert_snapshot!(crate::generator::generate_spec_scope(reference), @r##"
-        /// This is a Maplibre Style Specification
-        #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-        pub struct MaplibreStyleSpecification;
-
-        /// "Expression"
-        #[derive(PartialEq, Debug, Clone)]
-        pub enum Expression {
-            /// Binds expressions to named variables, which can then be referenced in the result expression using `["var", "variable_name"]`.
-            ///
-            ///  - [Visualize population density](https://maplibre.org/maplibre-gl-js/docs/examples/visualize-population-density/)
-            Let(Vec<(StringLiteral,Expression)>),
-        }
-
-        impl<'de> serde::Deserialize<'de> for Expression {
-            fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-            where D: serde::Deserializer<'de>,
-            {
-                deserializer.deserialize_seq(ExpressionVisitor)
-            }
-        }
-
-        /// Visitor for deserializing the syntax enum [`Expression`]
-        struct ExpressionVisitor;
-
-        impl<'de> serde::de::Visitor<'de> for ExpressionVisitor {
-            type Value = Expression;
-
-            fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
-                formatter.write_str(r#"an Expression like ["let","someNumber",500,["interpolate",["linear"],["var","someNumber"],274,"#edf8e9",1551,"#006d2c"]]"#)
-            }
-
-            fn visit_seq<A: serde::de::SeqAccess<'de>>(self, mut seq: A) -> Result<Self::Value, A::Error> {
-                use serde::Deserialize;
-                /// Reads the next element from the sequence or reports a missing field error.
-                fn visit_seq_field<'de, A, T>(seq: &mut A, name: &'static str) -> Result<T, A::Error>
-                where A: serde::de::SeqAccess<'de>, T: serde::Deserialize<'de> {
-                seq.next_element()?.ok_or_else(|| serde::de::Error::missing_field(name))
-                }
-
-                // First element: operator string
-                let op: String = seq.next_element()?.ok_or_else(|| serde::de::Error::custom("missing operator"))?;
-                match op.as_str() {
-                "let" => {
-                let mut inputs = Vec::new();
-                while let Some(var_name_i) = seq.next_element()? {
-                let var_value_i = seq.next_element()?.ok_or_else(|| serde::de::Error::custom("expected var_value_i in Expression::Let"))?;
-                let element = (var_name_i,var_value_i);
-                inputs.push(element);
-                }
-                if inputs.is_empty() {
-                return Err(serde::de::Error::custom("Expression::Let requires at least one argument"));
-                }
-                Ok(Expression::Let(inputs))
-                },
-                _ => Err(serde::de::Error::unknown_variant(&op, &["let"]))
-                }
-            }
-        }
-
-        #[cfg(test)]
-        mod test {
-            use super::*;
-
-            #[rstest::rstest]
-            #[case::t_let(serde_json::json!(["let","someNumber",500,["interpolate",["linear"],["var","someNumber"],274,"#edf8e9",1551,"#006d2c"]]))]
-            fn test_example_expression_decodes(#[case] example: serde_json::Value) {
-                let _ = serde_json::from_value::<Expression>(example).expect("example should decode");
-            }
-        }
-
-        #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-        #[serde(untagged)]
-        pub enum Expression {
-            Expression(Expression),
-        }
-        "##);
+        let spec = IntermediateSpec::from(reference);
+        insta::assert_snapshot!(crate::generator::generate_spec_scope(&spec));
     }
+
     #[test]
     fn test_generate_spec_interpolation() {
         let reference = json!({
@@ -639,82 +549,20 @@ mod tests {
             "linear": {
               "doc": "Interpolates linearly between the pair of stops just less than and just greater than the input",
               "syntax": {
-                "overloads": [
-                  {
-                    "parameters": [],
-                    "output-type": "interpolation"
-                  }
-                ],
+                "overloads": [{ "parameters": [], "output-type": "interpolation" }],
                 "parameters": []
               },
               "example": ["linear"],
-              "sdk-support": {},
-              }
-            },
+              "sdk-support": {}
+            }
           }
+        }
         });
         let reference: StyleReference = serde_json::from_value(reference).unwrap();
-        insta::assert_snapshot!(crate::generator::generate_spec_scope(reference), @r##"
-        /// This is a Maplibre Style Specification
-        #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-        pub struct MaplibreStyleSpecification;
-
-        /// First element in an interpolation array. May be followed by a number of arguments.
-        #[derive(PartialEq, Debug, Clone)]
-        pub enum InterpolationName {
-            /// Interpolates linearly between the pair of stops just less than and just greater than the input
-            Linear,
-        }
-
-        impl<'de> serde::Deserialize<'de> for InterpolationName {
-            fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-            where D: serde::Deserializer<'de>,
-            {
-                deserializer.deserialize_seq(InterpolationNameVisitor)
-            }
-        }
-
-        /// Visitor for deserializing the syntax enum [`InterpolationName`]
-        struct InterpolationNameVisitor;
-
-        impl<'de> serde::de::Visitor<'de> for InterpolationNameVisitor {
-            type Value = InterpolationName;
-
-            fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
-                formatter.write_str(r#"an InterpolationName like ["linear"]"#)
-            }
-
-            fn visit_seq<A: serde::de::SeqAccess<'de>>(self, mut seq: A) -> Result<Self::Value, A::Error> {
-                use serde::Deserialize;
-                /// Reads the next element from the sequence or reports a missing field error.
-                fn visit_seq_field<'de, A, T>(seq: &mut A, name: &'static str) -> Result<T, A::Error>
-                where A: serde::de::SeqAccess<'de>, T: serde::Deserialize<'de> {
-                seq.next_element()?.ok_or_else(|| serde::de::Error::missing_field(name))
-                }
-
-                // First element: operator string
-                let op: String = seq.next_element()?.ok_or_else(|| serde::de::Error::custom("missing operator"))?;
-                match op.as_str() {
-                "linear" => {
-                Ok(InterpolationName::Linear)
-                },
-                _ => Err(serde::de::Error::unknown_variant(&op, &["linear"]))
-                }
-            }
-        }
-
-        #[cfg(test)]
-        mod test {
-            use super::*;
-
-            #[rstest::rstest]
-            #[case::t_linear(serde_json::json!(["linear"]))]
-            fn test_example_interpolation_name_decodes(#[case] example: serde_json::Value) {
-                let _ = serde_json::from_value::<InterpolationName>(example).expect("example should decode");
-            }
-        }
-        "##);
+        let spec = IntermediateSpec::from(reference);
+        insta::assert_snapshot!(crate::generator::generate_spec_scope(&spec));
     }
+
     #[test]
     fn test_generate_spec_fmt() {
         let reference = json!({
@@ -734,97 +582,18 @@ mod tests {
                     }
                   ],
                   "parameters": [
-                    {
-                      "name": "input_i",
-                      "type": ["string", "image"]
-                    },
-                    {
-                      "name": "style_overrides_i",
-                      "type": {
-                        "text-font": {
-                          "type": "string",
-                          "doc": "Overrides the font stack specified by the root layout property.",
-                          "example": "Arial Unicode MS Regular"
-                        }
-                      }
-                    }
+                    { "name": "input_i", "type": ["string", "image"] },
+                    { "name": "style_overrides_i", "type": { "text-font": { "type": "string", "doc": "Font override." } } }
                   ]
                 },
-                "example": ["format", ["upcase", ["get", "FacilityName"]], {"font-scale": 0.8}, "\n\n", {}, ["downcase", ["get", "Comments"]], {"font-scale": 0.6, "vertical-align": "center"}],
+                "example": ["format", ["upcase", ["get", "FacilityName"]], {"font-scale": 0.8}, "\n\n", {}, ["downcase", ["get", "Comments"]], {"font-scale": 0.6}],
                 "sdk-support": {}
               }
             }
           }
         });
         let reference: StyleReference = serde_json::from_value(reference).unwrap();
-        insta::assert_snapshot!(crate::generator::generate_spec_scope(reference), @r##"
-        /// This is a Maplibre Style Specification
-        #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-        pub struct MaplibreStyleSpecification;
-
-        /// First element in an expression array. May be followed by a number of arguments.
-        #[derive(PartialEq, Debug, Clone)]
-        pub enum ExpressionName {
-            /// Returns a `formatted` string for displaying mixed-format text in the `text-field` property.
-            Format(Vec<(StringExpressionOrStringExpression,Object)>),
-        }
-
-        impl<'de> serde::Deserialize<'de> for ExpressionName {
-            fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-            where D: serde::Deserializer<'de>,
-            {
-                deserializer.deserialize_seq(ExpressionNameVisitor)
-            }
-        }
-
-        /// Visitor for deserializing the syntax enum [`ExpressionName`]
-        struct ExpressionNameVisitor;
-
-        impl<'de> serde::de::Visitor<'de> for ExpressionNameVisitor {
-            type Value = ExpressionName;
-
-            fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
-                formatter.write_str(r#"an ExpressionName like ["format",["upcase",["get","FacilityName"]],{"font-scale":0.8},"\n\n",{},["downcase",["get","Comments"]],{"font-scale":0.6,"vertical-align":"center"}]"#)
-            }
-
-            fn visit_seq<A: serde::de::SeqAccess<'de>>(self, mut seq: A) -> Result<Self::Value, A::Error> {
-                use serde::Deserialize;
-                /// Reads the next element from the sequence or reports a missing field error.
-                fn visit_seq_field<'de, A, T>(seq: &mut A, name: &'static str) -> Result<T, A::Error>
-                where A: serde::de::SeqAccess<'de>, T: serde::Deserialize<'de> {
-                seq.next_element()?.ok_or_else(|| serde::de::Error::missing_field(name))
-                }
-
-                // First element: operator string
-                let op: String = seq.next_element()?.ok_or_else(|| serde::de::Error::custom("missing operator"))?;
-                match op.as_str() {
-                "format" => {
-                let mut inputs = Vec::new();
-                while let Some(input_i) = seq.next_element()? {
-                let style_overrides_i = seq.next_element()?; // optional param
-                let element = (input_i,style_overrides_i);
-                inputs.push(element);
-                }
-                if inputs.is_empty() {
-                return Err(serde::de::Error::custom("ExpressionName::Format requires at least one argument"));
-                }
-                Ok(ExpressionName::Format(inputs))
-                },
-                _ => Err(serde::de::Error::unknown_variant(&op, &["format"]))
-                }
-            }
-        }
-
-        #[cfg(test)]
-        mod test {
-            use super::*;
-
-            #[rstest::rstest]
-            #[case::t_format(serde_json::json!(["format",["upcase",["get","FacilityName"]],{"font-scale":0.8},"\n\n",{},["downcase",["get","Comments"]],{"font-scale":0.6,"vertical-align":"center"}]))]
-            fn test_example_expression_name_decodes(#[case] example: serde_json::Value) {
-                let _ = serde_json::from_value::<ExpressionName>(example).expect("example should decode");
-            }
-        }
-        "##);
+        let spec = IntermediateSpec::from(reference);
+        insta::assert_snapshot!(crate::generator::generate_spec_scope(&spec));
     }
 }

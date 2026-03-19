@@ -1,7 +1,20 @@
-#[derive(Debug, Clone, PartialEq, Eq, Hash, serde::Deserialize, serde::Serialize)]
+use std::collections::BTreeMap;
+
+use serde::{Deserialize, Serialize};
+
+use crate::mir::types::MirField;
+
+/// All data source type definitions.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct IntermediateSources {
-    sources: Vec<SourceType>,
+    /// Keyed by source type name (e.g. `"vector"`, `"geojson"`).
+    pub source_types: BTreeMap<String, SourceTypeDef>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash, serde::Deserialize, serde::Serialize)]
-struct SourceType {}
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct SourceTypeDef {
+    pub fields: Vec<MirField>,
+    /// The discriminant value used for `#[serde(rename = "...")]`
+    /// on this source variant (e.g. `Some("vector")` for the vector source).
+    pub discriminant_value: Option<String>,
+}

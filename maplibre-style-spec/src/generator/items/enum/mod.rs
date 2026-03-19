@@ -1,40 +1,53 @@
-mod regular;
-mod syntax;
-mod version;
+pub mod regular;
+pub mod syntax;
+pub mod version;
 
 use codegen2::Scope;
 use serde_json::Value;
 
-use crate::decoder::Fields;
-use crate::decoder::r#enum::EnumValues;
 use crate::generator::autotest::generate_test_from_example_if_present;
 use crate::generator::formatter::to_upper_camel_case;
+use crate::mir::types::{EnumField, MirEnum, RegularEnum};
 
-pub fn generate(
-    scope: &mut Scope,
-    name: &str,
-    common: &Fields,
-    default: Option<&Value>,
-    values: &EnumValues,
-) {
-    match values {
-        EnumValues::Version(values) => version::generate_version(scope, name, &common, values),
-        EnumValues::Enum(values) => regular::generate_regular_enum(scope, name, &common, values),
-        EnumValues::SyntaxEnum(values) => {
-            syntax::generate_syntax_enum(scope, name, &common, values)
+/// Dispatch an `EnumField` from the MIR to the appropriate enum generator.
+pub fn generate_mir(scope: &mut Scope, name: &str, field: &EnumField) {
+    match &field.variants {
+        MirEnum::Version(v) => {
+            version::generate_version(scope, name, &field.meta.doc, v, field.meta.example.as_ref())
+        }
+        MirEnum::Regular(r) => {
+            regular::generate_regular_enum(scope, name, &field.meta.doc, r, field.default.as_ref())
+        }
+        MirEnum::Syntax(s) => {
+            syntax::generate_syntax_enum(scope, name, &field.meta.doc, &s.variants)
         }
     }
 
-    if let Some(default) = default {
-        scope
-            .new_impl(name)
-            .impl_trait("Default")
-            .new_fn("default")
-            .ret("Self")
-            .line(format!(
-                "Self::{}",
-                to_upper_camel_case(&default.to_string())
-            ));
+    // Default impl for regular/version enums (syntax enums define their own deserializer
+    // and are handled inside generate_syntax_enum)
+    if matches!(&field.variants, MirEnum::Regular(_) | MirEnum::Version(_)) {
+        if let Some(default) = &field.default {
+            scope
+                .new_impl(name)
+                .impl_trait("Default")
+                .new_fn("default")
+                .ret("Self")
+                .line(format!(
+                    "Self::{}",
+                    to_upper_camel_case(&default.to_string())
+                ));
+        }
+        generate_test_from_example_if_present(scope, name, field.meta.example.as_ref());
     }
-    generate_test_from_example_if_present(scope, name, common.example.as_ref());
+}
+
+/// Convenience wrapper for generating a regular enum from array.rs (inline enum element).
+pub fn generate_regular(
+    scope: &mut Scope,
+    name: &str,
+    doc: &str,
+    variants: &RegularEnum,
+    default: Option<&Value>,
+) {
+    regular::generate_regular_enum(scope, name, doc, variants, default);
 }

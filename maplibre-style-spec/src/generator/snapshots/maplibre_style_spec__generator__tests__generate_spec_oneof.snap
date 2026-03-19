@@ -1,15 +1,15 @@
 ---
 source: maplibre-style-spec/src/generator/mod.rs
-expression: generate_spec_scope(reference)
+expression: generate_spec_scope(&spec)
 ---
 /// This is a Maplibre Style Specification
-#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+#[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
 pub struct MaplibreStyleSpecification;
 
 /// A number between 0 and 20.
 ///
-/// Range: 0.0..=10.0
-#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+/// Range: 0..=10
+#[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
 pub struct NumberOne(serde_json::Number);
 
 impl Default for NumberOne {
@@ -19,10 +19,10 @@ impl Default for NumberOne {
 }
 
 /// Another number
-#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+#[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
 pub struct NumberTwo(serde_json::Number);
 
-#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+#[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
 #[serde(untagged)]
 pub enum Numbers {
     NumberOne(NumberOne),

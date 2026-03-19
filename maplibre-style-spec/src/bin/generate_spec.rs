@@ -3,6 +3,7 @@ use std::path::PathBuf;
 
 use maplibre_style_spec::decoder::StyleReference;
 use maplibre_style_spec::generator::generate_spec_scope;
+use maplibre_style_spec::mir::IntermediateSpec;
 
 fn main() {
     let json_content = include_str!("../../../upstream/src/reference/v8.json");
@@ -10,7 +11,8 @@ fn main() {
     let reference: StyleReference =
         serde_json::from_str(json_content).expect("Failed to parse v8.json into StyleReference");
 
-    let generated_code = generate_spec_scope(reference);
+    let spec = IntermediateSpec::from(reference);
+    let generated_code = generate_spec_scope(&spec);
     let code_bytes_cnt = generated_code.len();
     let code_lines_cnt = generated_code.lines().count();
 
