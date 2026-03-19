@@ -1,0 +1,72 @@
+---
+source: maplibre-style-spec/src/generator/items/enum/syntax.rs
+assertion_line: 670
+expression: "crate::generator::generate_spec_scope(&spec)"
+---
+/// This is a Maplibre Style Specification
+#[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+pub struct MaplibreStyleSpecification;
+
+/// First element in an expression array. May be followed by a number of arguments.
+#[derive(PartialEq, Debug, Clone)]
+pub enum ExpressionName {
+    /// Returns a `formatted` string for displaying mixed-format text in the `text-field` property.
+    Format(Vec<(StringOrImage,Object)>),
+}
+
+impl<'de> serde::Deserialize<'de> for ExpressionName {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where D: serde::Deserializer<'de>,
+    {
+        deserializer.deserialize_seq(ExpressionNameVisitor)
+    }
+}
+
+/// Visitor for deserializing the syntax enum [`ExpressionName`]
+struct ExpressionNameVisitor;
+
+impl<'de> serde::de::Visitor<'de> for ExpressionNameVisitor {
+    type Value = ExpressionName;
+
+    fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+        formatter.write_str(r#"an ExpressionName like ["format",["upcase",["get","FacilityName"]],{"font-scale":0.8},"\n\n",{},["downcase",["get","Comments"]],{"font-scale":0.6}]"#)
+    }
+
+    fn visit_seq<A: serde::de::SeqAccess<'de>>(self, mut seq: A) -> Result<Self::Value, A::Error> {
+        use serde::Deserialize;
+        /// Reads the next element from the sequence or reports a missing field error.
+        fn visit_seq_field<'de, A, T>(seq: &mut A, name: &'static str) -> Result<T, A::Error>
+        where A: serde::de::SeqAccess<'de>, T: serde::Deserialize<'de> {
+        seq.next_element()?.ok_or_else(|| serde::de::Error::missing_field(name))
+        }
+
+        // First element: operator string
+        let op: String = seq.next_element()?.ok_or_else(|| serde::de::Error::custom("missing operator"))?;
+        match op.as_str() {
+        "format" => {
+        let mut inputs = Vec::new();
+        while let Some(input_i) = seq.next_element()? {
+        let style_overrides_i = seq.next_element()?; // optional param
+        let element = (input_i,style_overrides_i);
+        inputs.push(element);
+        }
+        if inputs.is_empty() {
+        return Err(serde::de::Error::custom("ExpressionName::Format requires at least one argument"));
+        }
+        Ok(ExpressionName::Format(inputs))
+        },
+        _ => Err(serde::de::Error::unknown_variant(&op, &["format"]))
+        }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[rstest::rstest]
+    #[case::t_format(serde_json::json!(["format",["upcase",["get","FacilityName"]],{"font-scale":0.8},"\n\n",{},["downcase",["get","Comments"]],{"font-scale":0.6}]))]
+    fn test_example_expression_name_decodes(#[case] example: serde_json::Value) {
+        let _ = serde_json::from_value::<ExpressionName>(example).expect("example should decode");
+    }
+}

@@ -1,0 +1,72 @@
+---
+source: maplibre-style-spec/src/generator/items/enum/syntax.rs
+assertion_line: 610
+expression: "crate::generator::generate_spec_scope(&spec)"
+---
+/// This is a Maplibre Style Specification
+#[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+pub struct MaplibreStyleSpecification;
+
+/// "Any"
+#[derive(PartialEq, Debug, Clone)]
+pub enum Any {
+    /// Binds expressions to named variables.
+    Let(Vec<(StringLiteral,Any)>),
+}
+
+impl<'de> serde::Deserialize<'de> for Any {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where D: serde::Deserializer<'de>,
+    {
+        deserializer.deserialize_seq(AnyVisitor)
+    }
+}
+
+/// Visitor for deserializing the syntax enum [`Any`]
+struct AnyVisitor;
+
+impl<'de> serde::de::Visitor<'de> for AnyVisitor {
+    type Value = Any;
+
+    fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+        formatter.write_str(r#"an Any like ["let","someNumber",500,["interpolate",["linear"],["var","someNumber"],274,"#edf8e9",1551,"#006d2c"]]"#)
+    }
+
+    fn visit_seq<A: serde::de::SeqAccess<'de>>(self, mut seq: A) -> Result<Self::Value, A::Error> {
+        use serde::Deserialize;
+        /// Reads the next element from the sequence or reports a missing field error.
+        fn visit_seq_field<'de, A, T>(seq: &mut A, name: &'static str) -> Result<T, A::Error>
+        where A: serde::de::SeqAccess<'de>, T: serde::Deserialize<'de> {
+        seq.next_element()?.ok_or_else(|| serde::de::Error::missing_field(name))
+        }
+
+        // First element: operator string
+        let op: String = seq.next_element()?.ok_or_else(|| serde::de::Error::custom("missing operator"))?;
+        match op.as_str() {
+        "let" => {
+        let mut inputs = Vec::new();
+        while let Some(var_name_i) = seq.next_element()? {
+        let var_value_i = seq.next_element()?.ok_or_else(|| serde::de::Error::custom("expected var_value_i in Any::Let"))?;
+        let element = (var_name_i,var_value_i);
+        inputs.push(element);
+        }
+        if inputs.is_empty() {
+        return Err(serde::de::Error::custom("Any::Let requires at least one argument"));
+        }
+        Ok(Any::Let(inputs))
+        },
+        _ => Err(serde::de::Error::unknown_variant(&op, &["let"]))
+        }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[rstest::rstest]
+    #[case::t_let(serde_json::json!(["let","someNumber",500,["interpolate",["linear"],["var","someNumber"],274,"#edf8e9",1551,"#006d2c"]]))]
+    fn test_example_any_decodes(#[case] example: serde_json::Value) {
+        let _ = serde_json::from_value::<Any>(example).expect("example should decode");
+    }
+}
