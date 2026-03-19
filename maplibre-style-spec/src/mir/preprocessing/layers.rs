@@ -238,9 +238,13 @@ fn reference_to_intermediate_type(references: &str) -> IntermediateType {
 }
 
 pub fn preprocess_layers(reference: &mut decoder::StyleReference) -> IntermediateLayers {
-    let decoder::PrimitiveType::Array { .. } =
-        reference.root.remove("layers").unwrap().as_primitive()
-    else {
+    let Some(layers_item) = reference.root.remove("layers") else {
+        return IntermediateLayers {
+            common_fields: BTreeMap::new(),
+            layer_types: BTreeMap::new(),
+        };
+    };
+    let decoder::PrimitiveType::Array { .. } = layers_item.as_primitive() else {
         panic!("layers must be an array");
     };
 

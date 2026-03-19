@@ -11,6 +11,8 @@ If one tries to construct from v8.json, one will quickly run into issues that it
 - not really valid and
 - has no real self-consistent logic.
 
+Our decoder just tries to decode this and is not the abstaction layer that we need for this.
+
 Example:
 One needs to "know" that
 

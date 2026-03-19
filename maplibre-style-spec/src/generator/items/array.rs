@@ -166,10 +166,12 @@ fn generate_value_default(buffer: &mut String, item: &Value) {
             buffer.push_str("\".to_string()");
         }
         Value::Array(a) => generate_value_array_default(buffer, a, None),
-        Value::Object(o) => unimplemented!(
-            "Object {} in default value",
-            serde_json::to_string(o).unwrap()
-        ),
+        Value::Object(o) => {
+            let json = serde_json::to_string(o).expect("serializing json object must succeed");
+            buffer.push_str(&format!(
+                "serde_json::from_str::<serde_json::Value>({json:?}).expect(\"object default must be valid json\")"
+            ));
+        }
     }
 }
 

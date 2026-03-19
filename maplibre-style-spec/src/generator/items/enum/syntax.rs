@@ -131,8 +131,7 @@ fn generate_multi_overload(
     let mut overloads_tuples = Vec::with_capacity(syntax.overloads.len());
     for overload in &syntax.overloads {
         if overload.is_variadic(&syntax.parameters) {
-            // todo: needs proper variadic codegen
-            overloads_tuples.push(vec!["Vec<serde_json::Value>".to_string()]);
+            overloads_tuples.push(generate_variadic_overload_tuples(scope, (name, var_name), syntax, overload));
         } else {
             let var_name = overload.output_type.to_upper_camel_case();
             let mut tuples = Vec::with_capacity(overload.parameters.len());
@@ -161,6 +160,62 @@ fn generate_multi_overload(
             var.tuple(t);
         }
     }
+}
+
+fn generate_variadic_overload_tuples(
+    scope: &mut Scope,
+    (name, var_name): (&str, &str),
+    syntax: &Syntax,
+    overload: &Overload,
+) -> Vec<String> {
+    let separator_idx = overload.position_of_variadic_separator();
+    let prefix = &overload.parameters[..separator_idx];
+    let after_separator = &overload.parameters[separator_idx + 1..];
+
+    let mut repeating = Vec::new();
+    let mut suffix = Vec::new();
+
+    for param in after_separator {
+        if let Some(mapped) = map_template_n_to_1(param) {
+            repeating.push(mapped);
+        } else {
+            suffix.push(param.clone());
+        }
+    }
+
+    if repeating.is_empty() {
+        repeating = prefix.to_vec();
+    }
+
+    let mut tuple_types = Vec::new();
+    let repeating_types = repeating
+        .iter()
+        .map(|param| generate_parameter_type(scope, (name, var_name, param), &syntax.parameters))
+        .collect::<Vec<_>>();
+
+    if repeating_types.len() == 1 {
+        tuple_types.push(format!("Vec<{}>", repeating_types[0]));
+    } else {
+        tuple_types.push(format!("Vec<({})>", repeating_types.join(",")));
+    }
+
+    tuple_types.extend(
+        suffix
+            .iter()
+            .map(|param| generate_parameter_type(scope, (name, var_name, param), &syntax.parameters)),
+    );
+
+    tuple_types
+}
+
+fn map_template_n_to_1(param: &str) -> Option<String> {
+    if let Some(base) = param.strip_suffix("_n?") {
+        return Some(format!("{base}_1?"));
+    }
+    if let Some(base) = param.strip_suffix("_n") {
+        return Some(format!("{base}_1"));
+    }
+    None
 }
 
 enum OverloadVariantNamingStrategy {
