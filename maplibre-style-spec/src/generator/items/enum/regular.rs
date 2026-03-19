@@ -31,7 +31,7 @@ pub fn generate_regular_enum(
             .ret("Self")
             .line(format!(
                 "Self::{}",
-                to_upper_camel_case(&default.to_string())
+                to_upper_camel_case(default.to_string())
             ));
     }
 }
@@ -40,7 +40,6 @@ pub fn generate_regular_enum(
 mod tests {
     use serde_json::json;
 
-    use super::*;
     use crate::decoder::StyleReference;
     use crate::mir::IntermediateSpec;
 

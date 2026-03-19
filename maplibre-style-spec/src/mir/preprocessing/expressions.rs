@@ -1,9 +1,8 @@
 use std::collections::BTreeMap;
 
 use crate::decoder::TopLevelItem;
-use crate::decoder::r#enum::{ParameterType, Syntax};
 use crate::mir::expressions::{ExpressionGroup, IntermediateExpressions};
-use crate::mir::types::SyntaxVariantDef;
+use crate::mir::types::{MirParameterType, MirSyntax, SyntaxVariantDef};
 
 /// Remove and process `expression_name` and `expression` from the top-level fields,
 /// returning the fully constructed [`IntermediateExpressions`].
@@ -62,12 +61,13 @@ fn build_by_output_type(expression_name: &TopLevelItem) -> BTreeMap<String, Expr
 
     let mut by_output_type: BTreeMap<String, ExpressionGroup> = BTreeMap::new();
     // Tracks output type name → its ParameterType (needed to specialise T below).
-    let mut possible_expressions: BTreeMap<String, ParameterType> = BTreeMap::new();
+    let mut possible_expressions: BTreeMap<String, MirParameterType> = BTreeMap::new();
 
     for (expr_key, syntax_enum) in &syntax_enum_values {
         for overload in &syntax_enum.syntax.overloads {
-            let output_type_name = overload.output_type.to_upper_camel_case();
-            possible_expressions.insert(output_type_name.clone(), overload.output_type.clone());
+            let mir_overload: crate::mir::types::MirOverload = overload.clone().into();
+            let output_type_name = mir_overload.output_type.to_upper_camel_case();
+            possible_expressions.insert(output_type_name.clone(), mir_overload.output_type.clone());
 
             let group = by_output_type
                 .entry(output_type_name.clone())
@@ -79,13 +79,19 @@ fn build_by_output_type(expression_name: &TopLevelItem) -> BTreeMap<String, Expr
                 .variants
                 .entry(expr_key.clone())
                 .and_modify(|def: &mut SyntaxVariantDef| {
-                    def.syntax.overloads.push(overload.clone())
+                    def.syntax.overloads.push(mir_overload.clone())
                 })
                 .or_insert_with(|| SyntaxVariantDef {
                     doc: syntax_enum.doc.clone(),
-                    syntax: Syntax {
-                        overloads: vec![overload.clone()],
-                        parameters: syntax_enum.syntax.parameters.clone(),
+                    syntax: MirSyntax {
+                        overloads: vec![mir_overload],
+                        parameters: syntax_enum
+                            .syntax
+                            .parameters
+                            .clone()
+                            .into_iter()
+                            .map(Into::into)
+                            .collect(),
                     },
                     example: syntax_enum.example.clone(),
                     group: syntax_enum.group.clone(),
@@ -100,12 +106,12 @@ fn build_by_output_type(expression_name: &TopLevelItem) -> BTreeMap<String, Expr
             .expect("T must be in possible_expressions");
         assert_eq!(
             t_param,
-            ParameterType::Reference("T".to_string()),
+            MirParameterType::Reference("T".to_string()),
             "T must be a reference parameter"
         );
 
         // Collect first to avoid borrow-checker conflict while mutating by_output_type.
-        let real_output_types: Vec<(String, ParameterType)> = possible_expressions
+        let real_output_types: Vec<(String, MirParameterType)> = possible_expressions
             .iter()
             .map(|(k, v)| (k.clone(), v.clone()))
             .collect();

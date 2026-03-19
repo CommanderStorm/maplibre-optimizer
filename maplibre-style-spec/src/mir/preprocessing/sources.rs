@@ -67,10 +67,9 @@ fn extract_discriminant(
         values: EnumValues::Enum(ref vals),
         ..
     }) = item
+        && vals.len() == 1
     {
-        if vals.len() == 1 {
-            return Some(vals.keys().next().unwrap().clone());
-        }
+        return Some(vals.keys().next().unwrap().clone());
     }
     // Not a single-variant discriminant — put it back
     group.insert(field_name.to_string(), item);

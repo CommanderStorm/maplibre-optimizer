@@ -220,18 +220,17 @@ fn extract_discriminants(
             };
 
             for (field_name, item) in group {
-                if let ParsedItem::Primitive(PrimitiveType::Enum { values, .. }) = item {
-                    if values.len() == 1 {
-                        if let EnumValues::Enum(enum_map) = values {
-                            let value = enum_map.keys().next().expect("len is 1").clone();
-                            // The tag field name must be consistent across all variants
-                            if found_tag.is_none() {
-                                found_tag = Some(field_name.clone());
-                            }
-                            let variant_name = to_upper_camel_case(join_key);
-                            found_renames.insert(variant_name, value);
-                        }
+                if let ParsedItem::Primitive(PrimitiveType::Enum { values, .. }) = item
+                    && values.len() == 1
+                    && let EnumValues::Enum(enum_map) = values
+                {
+                    let value = enum_map.keys().next().expect("len is 1").clone();
+                    // The tag field name must be consistent across all variants
+                    if found_tag.is_none() {
+                        found_tag = Some(field_name.clone());
                     }
+                    let variant_name = to_upper_camel_case(join_key);
+                    found_renames.insert(variant_name, value);
                 }
             }
         }

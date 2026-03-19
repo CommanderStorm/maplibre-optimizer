@@ -13,7 +13,7 @@ impl From<BTreeMap<String, ParsedItem>> for IntermediateRootPrimitives {
         let mut res = BTreeMap::new();
         for (key, item) in root_items {
             let field = match &item {
-                ParsedItem::Reference { references, .. } => {
+                ParsedItem::Reference { references: _, .. } => {
                     // References in $root are fine — lower them as ReferenceField
                     lower_parsed_item(&key, item)
                 }

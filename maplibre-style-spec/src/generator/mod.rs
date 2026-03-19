@@ -62,7 +62,7 @@ fn generate_root_struct(scope: &mut Scope, spec: &IntermediateSpec) {
 
     for (key, field) in &spec.root.0 {
         let meta = field.meta();
-        let type_name = to_upper_camel_case(&format!("root {key}"));
+        let type_name = to_upper_camel_case(format!("root {key}"));
         let mut field_type = type_name.clone();
         if meta.optional {
             field_type = format!("Option<{field_type}>");
@@ -78,7 +78,7 @@ fn generate_root_struct(scope: &mut Scope, spec: &IntermediateSpec) {
 
     // Generate subtypes for each root field
     for (key, field) in &spec.root.0 {
-        let type_name = to_upper_camel_case(&format!("root {key}"));
+        let type_name = to_upper_camel_case(format!("root {key}"));
         generate_mir_type(scope, &type_name, field);
     }
 }
@@ -97,17 +97,17 @@ fn generate_named_type(scope: &mut Scope, name: &str, named_type: &IntermediateN
 /// Handles the single-star (`*`) wildcard field as a BTreeMap wrapper.
 fn generate_struct_from_fields(scope: &mut Scope, name: &str, fields: &[MirField]) {
     // Special case: single-star field → BTreeMap wrapper
-    if fields.len() == 1 {
-        if let MirField::Star(meta) = &fields[0] {
-            let inner_name = to_upper_camel_case(&format!("Inner {name}"));
-            scope
-                .new_struct(name)
-                .vis("pub")
-                .derive("serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone")
-                .tuple_field(format!("std::collections::BTreeMap<String,{inner_name}>"));
-            items::star::generate(scope, &inner_name, meta);
-            return;
-        }
+    if fields.len() == 1
+        && let MirField::Star(meta) = &fields[0]
+    {
+        let inner_name = to_upper_camel_case(format!("Inner {name}"));
+        scope
+            .new_struct(name)
+            .vis("pub")
+            .derive("serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone")
+            .tuple_field(format!("std::collections::BTreeMap<String,{inner_name}>"));
+        items::star::generate(scope, &inner_name, meta);
+        return;
     }
 
     let s = scope
@@ -117,7 +117,7 @@ fn generate_struct_from_fields(scope: &mut Scope, name: &str, fields: &[MirField
 
     for field in fields {
         let meta = field.meta();
-        let field_type_name = to_upper_camel_case(&format!("{name} {}", meta.spec_name));
+        let field_type_name = to_upper_camel_case(format!("{name} {}", meta.spec_name));
         let mut field_type = if meta.spec_name == "*" {
             format!("std::collections::BTreeMap<String,{field_type_name}>")
         } else {
@@ -132,7 +132,7 @@ fn generate_struct_from_fields(scope: &mut Scope, name: &str, fields: &[MirField
             .doc(&meta.doc);
         if meta.spec_name == "*" {
             sf.annotation("#[serde(flatten)]");
-        } else if &meta.rust_name != meta.spec_name.as_str() {
+        } else if meta.rust_name != meta.spec_name.as_str() {
             sf.annotation(format!("#[serde(rename=\"{}\")]", meta.spec_name));
         }
     }
@@ -144,7 +144,7 @@ fn generate_struct_from_fields(scope: &mut Scope, name: &str, fields: &[MirField
             // Already handled above via star::generate
             continue;
         }
-        let field_type_name = to_upper_camel_case(&format!("{name} {}", meta.spec_name));
+        let field_type_name = to_upper_camel_case(format!("{name} {}", meta.spec_name));
         generate_mir_type(scope, &field_type_name, field);
     }
 }
@@ -193,7 +193,7 @@ fn generate_source_types(scope: &mut Scope, sources: &Sources) {
 
     // Generate a struct per source type
     for (type_name, def) in &sources.source_types {
-        let struct_name = to_upper_camel_case(&format!("{type_name} source"));
+        let struct_name = to_upper_camel_case(format!("{type_name} source"));
         generate_struct_from_fields(scope, &struct_name, &def.fields);
     }
 
@@ -221,7 +221,7 @@ fn generate_source_types(scope: &mut Scope, sources: &Sources) {
         .filter_map(|(k, d)| {
             d.discriminant_value
                 .as_ref()
-                .map(|v| (to_upper_camel_case(&format!("{k}_source")), v.clone()))
+                .map(|v| (to_upper_camel_case(format!("{k}_source")), v.clone()))
         })
         .collect();
 
@@ -249,8 +249,8 @@ fn generate_layer_types(scope: &mut Scope, layers: &Layers) {
 
     // Per-type layout and paint structs
     for (type_key, layer_type) in &layers.layer_types {
-        let layout_name = to_upper_camel_case(&format!("{type_key} layout layer"));
-        let paint_name = to_upper_camel_case(&format!("{type_key} paint layer"));
+        let layout_name = to_upper_camel_case(format!("{type_key} layout layer"));
+        let paint_name = to_upper_camel_case(format!("{type_key} paint layer"));
         let layout_mir: Vec<MirField> = layer_fields_to_mir(&layer_type.layout);
         let paint_mir: Vec<MirField> = layer_fields_to_mir(&layer_type.paint);
         generate_struct_from_fields(scope, &layout_name, &layout_mir);

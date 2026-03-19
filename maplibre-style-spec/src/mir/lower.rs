@@ -1,9 +1,5 @@
-use std::collections::BTreeMap;
-
-use serde_json::Value;
-
 use crate::decoder::array::{ArrayValue, SimpleArrayValue};
-use crate::decoder::r#enum::{EnumValues, Syntax};
+use crate::decoder::r#enum::EnumValues;
 use crate::decoder::{Fields, ParsedItem, PrimitiveType};
 use crate::generator::formatter::to_snake_case;
 use crate::mir::types::{
@@ -198,7 +194,7 @@ pub fn lower_enum_values(values: EnumValues) -> MirEnum {
                         k,
                         SyntaxVariantDef {
                             doc: v.doc,
-                            syntax: v.syntax,
+                            syntax: v.syntax.into(),
                             example: v.example,
                             group: v.group,
                         },

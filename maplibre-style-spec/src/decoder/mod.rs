@@ -39,7 +39,7 @@ pub enum TopLevelItem {
 impl TopLevelItem {
     pub fn as_item(&self) -> &ParsedItem {
         match self {
-            TopLevelItem::Item(item) => &item,
+            TopLevelItem::Item(item) => item,
             TopLevelItem::Group(_) => panic!("cannot get item from group"),
             TopLevelItem::OneOf(_) => panic!("cannot get item from oneof"),
         }

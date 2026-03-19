@@ -177,7 +177,7 @@ impl ParameterType {
                 .collect::<Vec<_>>()
                 .join("Or"),
             ParameterType::Object(_) => "Object".to_string(),
-            ParameterType::Reference(r) => to_upper_camel_case(&r),
+            ParameterType::Reference(r) => to_upper_camel_case(r),
         }
     }
 }

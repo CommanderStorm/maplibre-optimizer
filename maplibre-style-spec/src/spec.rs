@@ -199,13 +199,29 @@ mod test {
     }
 
     #[rstest::rstest]
+    #[case::t_accumulated(serde_json::json!(["accumulated"]))]
+    #[case::t_at(serde_json::json!(["at",1,["literal",["a","b","c"]]]))]
+    #[case::t_case(serde_json::json!(["case",["boolean",["feature-state","hover"],false],1,0.5]))]
+    #[case::t_coalesce(serde_json::json!(["coalesce",["image",["concat",["get","icon"],"_15"]],["image","marker_15"]]))]
+    #[case::t_feature_state(serde_json::json!(["feature-state","hover"]))]
+    #[case::t_get(serde_json::json!(["get","someProperty"]))]
+    #[case::t_global_state(serde_json::json!(["global-state","someProperty"]))]
+    #[case::t_id(serde_json::json!(["id"]))]
+    #[case::t_let(serde_json::json!(["let","someNumber",500,["interpolate",["linear"],["var","someNumber"],274,"#edf8e9",1551,"#006d2c"]]))]
+    #[case::t_match(serde_json::json!(["match",["get","building_type"],"residential","#f00","commercial","#0f0","#000"]))]
+    #[case::t_step(serde_json::json!(["step",["get","point_count"],20,100,30,750,40]))]
+    #[case::t_var(serde_json::json!(["var","density"]))]
+    fn test_example_any_decodes(#[case] example: serde_json::Value) {
+        let _ = serde_json::from_value::<Any>(example).expect("example should decode");
+    }
+
+    #[rstest::rstest]
     #[case::t_array(serde_json::json!(["array","string",3,["literal",["a","b","c"]]]))]
     #[case::t_at(serde_json::json!(["at",1,["literal",["a","b","c"]]]))]
     #[case::t_literal(serde_json::json!(["literal",["DIN Offc Pro Italic","Arial Unicode MS Regular"]]))]
-    #[case::t_slice(serde_json::json!(["slice",["get","name"],0,3]))]
     #[case::t_to_rgba(serde_json::json!(["to-rgba","#ff0000"]))]
-    fn test_example_array_expression_decodes(#[case] example: serde_json::Value) {
-        let _ = serde_json::from_value::<ArrayExpression>(example).expect("example should decode");
+    fn test_example_array_decodes(#[case] example: serde_json::Value) {
+        let _ = serde_json::from_value::<Array>(example).expect("example should decode");
     }
 
     #[rstest::rstest]
@@ -214,6 +230,20 @@ mod test {
     fn test_example_array_less_type_length_greater_decodes(#[case] example: serde_json::Value) {
         let _ = serde_json::from_value::<ArrayLessTypeLengthGreater>(example)
             .expect("example should decode");
+    }
+
+    #[rstest::rstest]
+    #[case::t_at(serde_json::json!(["at",1,["literal",["a","b","c"]]]))]
+    #[case::t_slice(serde_json::json!(["slice",["get","name"],0,3]))]
+    fn test_example_array_of_t_decodes(#[case] example: serde_json::Value) {
+        let _ = serde_json::from_value::<ArrayOfT>(example).expect("example should decode");
+    }
+
+    #[rstest::rstest]
+    #[case::t_array(serde_json::json!(["array","string",3,["literal",["a","b","c"]]]))]
+    #[case::t_at(serde_json::json!(["at",1,["literal",["a","b","c"]]]))]
+    fn test_example_array_of_type_decodes(#[case] example: serde_json::Value) {
+        let _ = serde_json::from_value::<ArrayOfType>(example).expect("example should decode");
     }
 
     #[rstest::rstest]
@@ -233,34 +263,47 @@ mod test {
     #[case::t_is_supported_script(serde_json::json!(["is-supported-script","दिल्ली"]))]
     #[case::t_to_boolean(serde_json::json!(["to-boolean","someProperty"]))]
     #[case::t_within(serde_json::json!(["within",{"coordinates":[[[0,0],[0,5],[5,5],[5,0],[0,0]]],"type":"Polygon"}]))]
-    fn test_example_boolean_expression_decodes(#[case] example: serde_json::Value) {
-        let _ =
-            serde_json::from_value::<BooleanExpression>(example).expect("example should decode");
+    fn test_example_boolean_decodes(#[case] example: serde_json::Value) {
+        let _ = serde_json::from_value::<Boolean>(example).expect("example should decode");
     }
 
     #[rstest::rstest]
     #[case::t_at(serde_json::json!(["at",1,["literal",["a","b","c"]]]))]
     #[case::t_collator(serde_json::json!(["collator",{"case-sensitive":true,"diacritic-sensitive":true,"locale":"fr"}]))]
-    fn test_example_collator_expression_decodes(#[case] example: serde_json::Value) {
-        let _ =
-            serde_json::from_value::<CollatorExpression>(example).expect("example should decode");
+    fn test_example_collator_decodes(#[case] example: serde_json::Value) {
+        let _ = serde_json::from_value::<Collator>(example).expect("example should decode");
     }
 
     #[rstest::rstest]
-    #[case::t_accumulated(serde_json::json!(["accumulated"]))]
     #[case::t_at(serde_json::json!(["at",1,["literal",["a","b","c"]]]))]
-    #[case::t_case(serde_json::json!(["case",["boolean",["feature-state","hover"],false],1,0.5]))]
-    #[case::t_coalesce(serde_json::json!(["coalesce",["image",["concat",["get","icon"],"_15"]],["image","marker_15"]]))]
-    #[case::t_feature_state(serde_json::json!(["feature-state","hover"]))]
-    #[case::t_get(serde_json::json!(["get","someProperty"]))]
-    #[case::t_global_state(serde_json::json!(["global-state","someProperty"]))]
-    #[case::t_id(serde_json::json!(["id"]))]
-    #[case::t_let(serde_json::json!(["let","someNumber",500,["interpolate",["linear"],["var","someNumber"],274,"#edf8e9",1551,"#006d2c"]]))]
-    #[case::t_match(serde_json::json!(["match",["get","building_type"],"residential","#f00","commercial","#0f0","#000"]))]
-    #[case::t_step(serde_json::json!(["step",["get","point_count"],20,100,30,750,40]))]
-    #[case::t_var(serde_json::json!(["var","density"]))]
-    fn test_example_expression_decodes(#[case] example: serde_json::Value) {
-        let _ = serde_json::from_value::<Expression>(example).expect("example should decode");
+    #[case::t_rgb(serde_json::json!(["rgb",255,0,0]))]
+    #[case::t_rgba(serde_json::json!(["rgba",255,0,0,1]))]
+    #[case::t_to_color(serde_json::json!(["to-color","#edf8e9"]))]
+    fn test_example_color_decodes(#[case] example: serde_json::Value) {
+        let _ = serde_json::from_value::<Color>(example).expect("example should decode");
+    }
+
+    #[rstest::rstest]
+    #[case::t_at(serde_json::json!(["at",1,["literal",["a","b","c"]]]))]
+    #[case::t_interpolate_hcl(serde_json::json!(["interpolate-hcl",["linear"],["zoom"],15,"#f00",15.05,"#00f"]))]
+    #[case::t_interpolate_lab(serde_json::json!(["interpolate-lab",["linear"],["zoom"],15,"#f00",15.05,"#00f"]))]
+    fn test_example_color_or_array_of_color_decodes(#[case] example: serde_json::Value) {
+        let _ =
+            serde_json::from_value::<ColorOrArrayOfColor>(example).expect("example should decode");
+    }
+
+    #[rstest::rstest]
+    #[case::t_at(serde_json::json!(["at",1,["literal",["a","b","c"]]]))]
+    #[case::t_format(serde_json::json!(["format",["upcase",["get","FacilityName"]],{"font-scale":0.8},"\n\n",{},["downcase",["get","Comments"]],{"font-scale":0.6,"vertical-align":"center"}]))]
+    fn test_example_formatted_decodes(#[case] example: serde_json::Value) {
+        let _ = serde_json::from_value::<Formatted>(example).expect("example should decode");
+    }
+
+    #[rstest::rstest]
+    #[case::t_at(serde_json::json!(["at",1,["literal",["a","b","c"]]]))]
+    #[case::t_image(serde_json::json!(["image","marker_15"]))]
+    fn test_example_image_decodes(#[case] example: serde_json::Value) {
+        let _ = serde_json::from_value::<Image>(example).expect("example should decode");
     }
 
     #[rstest::rstest]
@@ -299,19 +342,19 @@ mod test {
     #[case::t_tan(serde_json::json!(["tan",1]))]
     #[case::t_to_number(serde_json::json!(["to-number","someProperty"]))]
     #[case::t_interpolate(serde_json::json!(["interpolate",["linear"],["zoom"],15,0,15.05,["get","height"]]))]
-    fn test_example_number_expression_decodes(#[case] example: serde_json::Value) {
-        let _ = serde_json::from_value::<NumberExpression>(example).expect("example should decode");
+    fn test_example_number_decodes(#[case] example: serde_json::Value) {
+        let _ = serde_json::from_value::<Number>(example).expect("example should decode");
     }
 
     #[rstest::rstest]
     #[case::t_at(serde_json::json!(["at",1,["literal",["a","b","c"]]]))]
     #[case::t_interpolate(serde_json::json!(["interpolate",["linear"],["zoom"],15,0,15.05,["get","height"]]))]
-    fn test_example_number_expression_or_array_expression_or_string_expression_or_array_expression_or_projection_decodes(
+    fn test_example_number_or_array_of_number_or_color_or_array_of_color_or_projection_decodes(
         #[case] example: serde_json::Value,
     ) {
-        let _ = serde_json::from_value::<
-            NumberExpressionOrArrayExpressionOrStringExpressionOrArrayExpressionOrProjection,
-        >(example)
+        let _ = serde_json::from_value::<NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection>(
+            example,
+        )
         .expect("example should decode");
     }
 
@@ -320,40 +363,24 @@ mod test {
     #[case::t_literal(serde_json::json!(["literal",["DIN Offc Pro Italic","Arial Unicode MS Regular"]]))]
     #[case::t_object(serde_json::json!(["object",["get","some-property"]]))]
     #[case::t_properties(serde_json::json!(["properties"]))]
-    fn test_example_object_expression_decodes(#[case] example: serde_json::Value) {
-        let _ = serde_json::from_value::<ObjectExpression>(example).expect("example should decode");
+    fn test_example_object_decodes(#[case] example: serde_json::Value) {
+        let _ = serde_json::from_value::<Object>(example).expect("example should decode");
     }
 
     #[rstest::rstest]
     #[case::t_at(serde_json::json!(["at",1,["literal",["a","b","c"]]]))]
     #[case::t_concat(serde_json::json!(["concat","square-rgb-",["get","color"]]))]
     #[case::t_downcase(serde_json::json!(["downcase",["get","name"]]))]
-    #[case::t_format(serde_json::json!(["format",["upcase",["get","FacilityName"]],{"font-scale":0.8},"\n\n",{},["downcase",["get","Comments"]],{"font-scale":0.6,"vertical-align":"center"}]))]
     #[case::t_equal_equal(serde_json::json!(["==",["geometry-type"],"Polygon"]))]
-    #[case::t_image(serde_json::json!(["image","marker_15"]))]
     #[case::t_number_format(serde_json::json!(["number-format",["get","mag"],{"max-fraction-digits":1,"min-fraction-digits":1}]))]
     #[case::t_resolved_locale(serde_json::json!(["resolved-locale",["collator",{"case-sensitive":true,"diacritic-sensitive":false,"locale":"de"}]]))]
-    #[case::t_rgb(serde_json::json!(["rgb",255,0,0]))]
-    #[case::t_rgba(serde_json::json!(["rgba",255,0,0,1]))]
     #[case::t_slice(serde_json::json!(["slice",["get","name"],0,3]))]
     #[case::t_string(serde_json::json!(["string",["get","name"]]))]
-    #[case::t_to_color(serde_json::json!(["to-color","#edf8e9"]))]
     #[case::t_to_string(serde_json::json!(["to-string",["get","mag"]]))]
     #[case::t_typeof(serde_json::json!(["typeof",["get","name"]]))]
     #[case::t_upcase(serde_json::json!(["upcase",["get","name"]]))]
-    fn test_example_string_expression_decodes(#[case] example: serde_json::Value) {
-        let _ = serde_json::from_value::<StringExpression>(example).expect("example should decode");
-    }
-
-    #[rstest::rstest]
-    #[case::t_at(serde_json::json!(["at",1,["literal",["a","b","c"]]]))]
-    #[case::t_interpolate_hcl(serde_json::json!(["interpolate-hcl",["linear"],["zoom"],15,"#f00",15.05,"#00f"]))]
-    #[case::t_interpolate_lab(serde_json::json!(["interpolate-lab",["linear"],["zoom"],15,"#f00",15.05,"#00f"]))]
-    fn test_example_string_expression_or_array_expression_decodes(
-        #[case] example: serde_json::Value,
-    ) {
-        let _ = serde_json::from_value::<StringExpressionOrArrayExpression>(example)
-            .expect("example should decode");
+    fn test_example_string_decodes(#[case] example: serde_json::Value) {
+        let _ = serde_json::from_value::<String>(example).expect("example should decode");
     }
 }
 
@@ -1041,53 +1068,267 @@ impl Default for TransitionDuration {
     }
 }
 
-/// "ArrayExpression"
+/// "Any"
 #[derive(PartialEq, Debug, Clone)]
-pub enum ArrayExpression {
+pub enum Any {
+    /// Gets the value of a cluster property accumulated so far. Can only be used in the `clusterProperties` option of a clustered GeoJSON source.
+    Accumulated,
+    /// Retrieves an item from an array.
+    At(serde_json::Value, serde_json::Value),
+    /// Selects the first output whose corresponding test condition evaluates to true, or the fallback value otherwise.
+    ///
+    ///  - [Create a hover effect](https://maplibre.org/maplibre-gl-js/docs/examples/create-a-hover-effect/)
+    ///
+    ///  - [Display HTML clusters with custom properties](https://maplibre.org/maplibre-gl-js/docs/examples/display-html-clusters-with-custom-properties/)
+    Case(Vec<(Boolean, Any)>),
+    /// Evaluates each expression in turn until the first non-null value is obtained, and returns that value.
+    ///
+    ///  - [Use a fallback image](https://maplibre.org/maplibre-gl-js/docs/examples/use-a-fallback-image/)
+    Coalesce(Vec<Any>),
+    /// Retrieves a property value from the current feature's state. Returns null if the requested property is not present on the feature's state. A feature's state is not part of the GeoJSON or vector tile data, and must be set programmatically on each feature. When `source.promoteId` is not provided, features are identified by their `id` attribute, which must be an integer or a string that can be cast to an integer. When `source.promoteId` is provided, features are identified by their `promoteId` property, which may be a number, string, or any primitive data type. Note that ["feature-state"] can only be used with paint properties that support data-driven styling.
+    ///
+    ///  - [Create a hover effect](https://maplibre.org/maplibre-gl-js/docs/examples/create-a-hover-effect/)
+    FeatureState(serde_json::Value),
+    /// Retrieves a property value from the current feature's properties, or from another object if a second argument is provided. Returns null if the requested property is missing.
+    ///
+    ///  - [Change the case of labels](https://maplibre.org/maplibre-gl-js/docs/examples/change-case-of-labels/)
+    ///
+    ///  - [Display HTML clusters with custom properties](https://maplibre.org/maplibre-gl-js/docs/examples/display-html-clusters-with-custom-properties/)
+    ///
+    ///  - [Extrude polygons for 3D indoor mapping](https://maplibre.org/maplibre-gl-js/docs/examples/extrude-polygons-for-3d-indoor-mapping/)
+    Get(serde_json::Value, Option<serde_json::Value>),
+    /// Retrieves a property value from global state that can be set with platform-specific APIs. Defaults can be provided using the [`state`](https://maplibre.org/maplibre-style-spec/root/#state) root property. Returns `null` if no value nor default value is set for the retrieved property.
+    GlobalState(serde_json::Value),
+    /// Gets the feature's id, if it has one.
+    Id,
+    /// Binds expressions to named variables, which can then be referenced in the result expression using `["var", "variable_name"]`.
+    ///
+    ///  - [Visualize population density](https://maplibre.org/maplibre-gl-js/docs/examples/visualize-population-density/)
+    Let(Vec<(StringLiteral, Any)>),
+    /// Selects the output whose label value matches the input value, or the fallback value if no match is found. The input can be any expression (e.g. `["get", "building_type"]`). Each label must be either:
+    ///
+    ///  - a single literal value; or
+    ///
+    ///  - an array of literal values, whose values must be all strings or all numbers (e.g. `[100, 101]` or `["c", "b"]`). The input matches if any of the values in the array matches, similar to the `"in"` operator.
+    ///
+    /// Each label must be unique. If the input type does not match the type of the labels, the result will be the fallback value.
+    Match(
+        Vec<(
+            StringOrNumber,
+            StringLiteralOrNumberLiteralOrArrayOfStringLiteralOrArrayOfNumberLiteral,
+            Any,
+        )>,
+    ),
+    /// Produces discrete, stepped results by evaluating a piecewise-constant function defined by pairs of input and output values ("stops"). The `input` may be any numeric expression (e.g., `["get", "population"]`). Stop inputs must be numeric literals in strictly ascending order.
+    ///
+    /// Returns the output value of the stop just less than the input, or the first output if the input is less than the first stop.
+    ///
+    ///  - [Create and style clusters](https://maplibre.org/maplibre-gl-js/docs/examples/create-and-style-clusters/)
+    Step(Vec<(Number, Any, NumberLiteral, Any)>),
+    /// References variable bound using `let`.
+    ///
+    ///  - [Visualize population density](https://maplibre.org/maplibre-gl-js/docs/examples/visualize-population-density/)
+    Var(serde_json::Value),
+}
+
+impl<'de> serde::Deserialize<'de> for Any {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        deserializer.deserialize_seq(AnyVisitor)
+    }
+}
+
+/// Visitor for deserializing the syntax enum [`Any`]
+struct AnyVisitor;
+
+impl<'de> serde::de::Visitor<'de> for AnyVisitor {
+    type Value = Any;
+
+    fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+        formatter.write_str(r#"an Any like ["accumulated"]"#)
+    }
+
+    fn visit_seq<A: serde::de::SeqAccess<'de>>(self, mut seq: A) -> Result<Self::Value, A::Error> {
+        use serde::Deserialize;
+        /// Reads the next element from the sequence or reports a missing field error.
+        fn visit_seq_field<'de, A, T>(seq: &mut A, name: &'static str) -> Result<T, A::Error>
+        where
+            A: serde::de::SeqAccess<'de>,
+            T: serde::Deserialize<'de>,
+        {
+            seq.next_element()?
+                .ok_or_else(|| serde::de::Error::missing_field(name))
+        }
+
+        // First element: operator string
+        let op: String = seq
+            .next_element()?
+            .ok_or_else(|| serde::de::Error::custom("missing operator"))?;
+        match op.as_str() {
+            "accumulated" => Ok(Any::Accumulated),
+            "at" => {
+                let index = visit_seq_field(&mut seq, "index")?;
+                let array = visit_seq_field(&mut seq, "array")?;
+                Ok(Any::At(index, array))
+            }
+            "case" => {
+                let mut inputs = Vec::new();
+                while let Some(condition_i) = seq.next_element()? {
+                    let output_i = seq.next_element()?.ok_or_else(|| {
+                        serde::de::Error::custom("expected output_i in Any::Case")
+                    })?;
+                    let element = (condition_i, output_i);
+                    inputs.push(element);
+                }
+                if inputs.is_empty() {
+                    return Err(serde::de::Error::custom(
+                        "Any::Case requires at least one argument",
+                    ));
+                }
+                Ok(Any::Case(inputs))
+            }
+            "coalesce" => {
+                let mut inputs = Vec::new();
+                while let Some(element) = seq.next_element()? {
+                    inputs.push(element);
+                }
+                if inputs.is_empty() {
+                    return Err(serde::de::Error::custom(
+                        "Any::Coalesce requires at least one argument",
+                    ));
+                }
+                Ok(Any::Coalesce(inputs))
+            }
+            "feature-state" => {
+                let property_name = visit_seq_field(&mut seq, "property_name")?;
+                Ok(Any::FeatureState(property_name))
+            }
+            "get" => {
+                let property_name = visit_seq_field(&mut seq, "property_name")?;
+                let object = seq.next_element()?;
+                Ok(Any::Get(property_name, object))
+            }
+            "global-state" => {
+                let property_name = visit_seq_field(&mut seq, "property_name")?;
+                Ok(Any::GlobalState(property_name))
+            }
+            "id" => Ok(Any::Id),
+            "let" => {
+                let mut inputs = Vec::new();
+                while let Some(var_name_i) = seq.next_element()? {
+                    let var_value_i = seq.next_element()?.ok_or_else(|| {
+                        serde::de::Error::custom("expected var_value_i in Any::Let")
+                    })?;
+                    let element = (var_name_i, var_value_i);
+                    inputs.push(element);
+                }
+                if inputs.is_empty() {
+                    return Err(serde::de::Error::custom(
+                        "Any::Let requires at least one argument",
+                    ));
+                }
+                Ok(Any::Let(inputs))
+            }
+            "match" => {
+                let mut inputs = Vec::new();
+                while let Some(input) = seq.next_element()? {
+                    let label_i = seq.next_element()?.ok_or_else(|| {
+                        serde::de::Error::custom("expected label_i in Any::Match")
+                    })?;
+                    let output_i = seq.next_element()?.ok_or_else(|| {
+                        serde::de::Error::custom("expected output_i in Any::Match")
+                    })?;
+                    let element = (input, label_i, output_i);
+                    inputs.push(element);
+                }
+                if inputs.is_empty() {
+                    return Err(serde::de::Error::custom(
+                        "Any::Match requires at least one argument",
+                    ));
+                }
+                Ok(Any::Match(inputs))
+            }
+            "step" => {
+                let mut inputs = Vec::new();
+                while let Some(input) = seq.next_element()? {
+                    let output_0 = seq.next_element()?.ok_or_else(|| {
+                        serde::de::Error::custom("expected output_0 in Any::Step")
+                    })?;
+                    let stop_input_i = seq.next_element()?.ok_or_else(|| {
+                        serde::de::Error::custom("expected stop_input_i in Any::Step")
+                    })?;
+                    let stop_output_i = seq.next_element()?.ok_or_else(|| {
+                        serde::de::Error::custom("expected stop_output_i in Any::Step")
+                    })?;
+                    let element = (input, output_0, stop_input_i, stop_output_i);
+                    inputs.push(element);
+                }
+                if inputs.is_empty() {
+                    return Err(serde::de::Error::custom(
+                        "Any::Step requires at least one argument",
+                    ));
+                }
+                Ok(Any::Step(inputs))
+            }
+            "var" => {
+                let var_name = visit_seq_field(&mut seq, "var_name")?;
+                Ok(Any::Var(var_name))
+            }
+            _ => Err(serde::de::Error::unknown_variant(
+                &op,
+                &[
+                    "accumulated",
+                    "at",
+                    "case",
+                    "coalesce",
+                    "feature-state",
+                    "get",
+                    "global-state",
+                    "id",
+                    "let",
+                    "match",
+                    "step",
+                    "var",
+                ],
+            )),
+        }
+    }
+}
+
+/// "Array"
+#[derive(PartialEq, Debug, Clone)]
+pub enum Array {
     /// Asserts that the input is an array (optionally with a specific item type and length). If, when the input expression is evaluated, it is not of the asserted type or length, then this assertion will cause the whole expression to be aborted.
-    Array(ArrayOptions),
+    Array(serde_json::Value),
     /// Retrieves an item from an array.
     At(serde_json::Value, serde_json::Value),
     /// Provides a literal array or object value.
     ///
     ///  - [Display and style rich text labels](https://maplibre.org/maplibre-gl-js/docs/examples/display-and-style-rich-text-labels/)
     Literal(serde_json::Value),
-    /// Returns a subarray from an array or a substring from a string from a specified start index, or between a start index and an end index if set. The return value is inclusive of the start index but not of the end index. In a string, a UTF-16 surrogate pair counts as a single position.
-    Slice(
-        serde_json::Value,
-        serde_json::Value,
-        Option<serde_json::Value>,
-    ),
     /// Returns a four-element array containing the input color's red, green, blue, and alpha components, in that order.
     ToRgba(serde_json::Value),
 }
 
-/// Options for deserializing the syntax enum variant [`ArrayExpression::Array`]
-#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
-#[serde(untagged)]
-pub enum ArrayOptions {
-    OneParams(Expression),
-    TwoParams(serde_json::Value, Expression),
-}
-
-impl<'de> serde::Deserialize<'de> for ArrayExpression {
+impl<'de> serde::Deserialize<'de> for Array {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: serde::Deserializer<'de>,
     {
-        deserializer.deserialize_seq(ArrayExpressionVisitor)
+        deserializer.deserialize_seq(ArrayVisitor)
     }
 }
 
-/// Visitor for deserializing the syntax enum [`ArrayExpression`]
-struct ArrayExpressionVisitor;
+/// Visitor for deserializing the syntax enum [`Array`]
+struct ArrayVisitor;
 
-impl<'de> serde::de::Visitor<'de> for ArrayExpressionVisitor {
-    type Value = ArrayExpression;
+impl<'de> serde::de::Visitor<'de> for ArrayVisitor {
+    type Value = Array;
 
     fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
-        formatter
-            .write_str(r#"an ArrayExpression like ["array","string",3,["literal",["a","b","c"]]]"#)
+        formatter.write_str(r#"an Array like ["array","string",3,["literal",["a","b","c"]]]"#)
     }
 
     fn visit_seq<A: serde::de::SeqAccess<'de>>(self, mut seq: A) -> Result<Self::Value, A::Error> {
@@ -1108,33 +1349,25 @@ impl<'de> serde::de::Visitor<'de> for ArrayExpressionVisitor {
             .ok_or_else(|| serde::de::Error::custom("missing operator"))?;
         match op.as_str() {
             "array" => {
-                // Delegate the remainder of the sequence to ArrayOptions deserialization
-                let remainder_of_sequence = serde::de::value::SeqAccessDeserializer::new(seq);
-                let options = ArrayOptions::deserialize(remainder_of_sequence)?;
-                Ok(ArrayExpression::Array(options))
+                let value = visit_seq_field(&mut seq, "value")?;
+                Ok(Array::Array(value))
             }
             "at" => {
                 let index = visit_seq_field(&mut seq, "index")?;
                 let array = visit_seq_field(&mut seq, "array")?;
-                Ok(ArrayExpression::At(index, array))
+                Ok(Array::At(index, array))
             }
             "literal" => {
                 let json_array = visit_seq_field(&mut seq, "json_array")?;
-                Ok(ArrayExpression::Literal(json_array))
-            }
-            "slice" => {
-                let array = visit_seq_field(&mut seq, "array")?;
-                let start_index = visit_seq_field(&mut seq, "start_index")?;
-                let end_index = seq.next_element()?;
-                Ok(ArrayExpression::Slice(array, start_index, end_index))
+                Ok(Array::Literal(json_array))
             }
             "to-rgba" => {
                 let color = visit_seq_field(&mut seq, "color")?;
-                Ok(ArrayExpression::ToRgba(color))
+                Ok(Array::ToRgba(color))
             }
             _ => Err(serde::de::Error::unknown_variant(
                 &op,
-                &["array", "at", "literal", "slice", "to-rgba"],
+                &["array", "at", "literal", "to-rgba"],
             )),
         }
     }
@@ -1203,9 +1436,134 @@ impl<'de> serde::de::Visitor<'de> for ArrayLessTypeLengthGreaterVisitor {
     }
 }
 
-/// "BooleanExpression"
+/// "ArrayOfT"
 #[derive(PartialEq, Debug, Clone)]
-pub enum BooleanExpression {
+pub enum ArrayOfT {
+    /// Retrieves an item from an array.
+    At(serde_json::Value, serde_json::Value),
+    /// Returns a subarray from an array or a substring from a string from a specified start index, or between a start index and an end index if set. The return value is inclusive of the start index but not of the end index. In a string, a UTF-16 surrogate pair counts as a single position.
+    Slice(
+        serde_json::Value,
+        serde_json::Value,
+        Option<serde_json::Value>,
+    ),
+}
+
+impl<'de> serde::Deserialize<'de> for ArrayOfT {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        deserializer.deserialize_seq(ArrayOfTVisitor)
+    }
+}
+
+/// Visitor for deserializing the syntax enum [`ArrayOfT`]
+struct ArrayOfTVisitor;
+
+impl<'de> serde::de::Visitor<'de> for ArrayOfTVisitor {
+    type Value = ArrayOfT;
+
+    fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+        formatter.write_str(r#"an ArrayOfT like ["at",1,["literal",["a","b","c"]]]"#)
+    }
+
+    fn visit_seq<A: serde::de::SeqAccess<'de>>(self, mut seq: A) -> Result<Self::Value, A::Error> {
+        use serde::Deserialize;
+        /// Reads the next element from the sequence or reports a missing field error.
+        fn visit_seq_field<'de, A, T>(seq: &mut A, name: &'static str) -> Result<T, A::Error>
+        where
+            A: serde::de::SeqAccess<'de>,
+            T: serde::Deserialize<'de>,
+        {
+            seq.next_element()?
+                .ok_or_else(|| serde::de::Error::missing_field(name))
+        }
+
+        // First element: operator string
+        let op: String = seq
+            .next_element()?
+            .ok_or_else(|| serde::de::Error::custom("missing operator"))?;
+        match op.as_str() {
+            "at" => {
+                let index = visit_seq_field(&mut seq, "index")?;
+                let array = visit_seq_field(&mut seq, "array")?;
+                Ok(ArrayOfT::At(index, array))
+            }
+            "slice" => {
+                let array = visit_seq_field(&mut seq, "array")?;
+                let start_index = visit_seq_field(&mut seq, "start_index")?;
+                let end_index = seq.next_element()?;
+                Ok(ArrayOfT::Slice(array, start_index, end_index))
+            }
+            _ => Err(serde::de::Error::unknown_variant(&op, &["at", "slice"])),
+        }
+    }
+}
+
+/// "ArrayOfType"
+#[derive(PartialEq, Debug, Clone)]
+pub enum ArrayOfType {
+    /// Asserts that the input is an array (optionally with a specific item type and length). If, when the input expression is evaluated, it is not of the asserted type or length, then this assertion will cause the whole expression to be aborted.
+    Array(serde_json::Value, serde_json::Value),
+    /// Retrieves an item from an array.
+    At(serde_json::Value, serde_json::Value),
+}
+
+impl<'de> serde::Deserialize<'de> for ArrayOfType {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        deserializer.deserialize_seq(ArrayOfTypeVisitor)
+    }
+}
+
+/// Visitor for deserializing the syntax enum [`ArrayOfType`]
+struct ArrayOfTypeVisitor;
+
+impl<'de> serde::de::Visitor<'de> for ArrayOfTypeVisitor {
+    type Value = ArrayOfType;
+
+    fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+        formatter.write_str(r#"an ArrayOfType like ["array","string",3,["literal",["a","b","c"]]]"#)
+    }
+
+    fn visit_seq<A: serde::de::SeqAccess<'de>>(self, mut seq: A) -> Result<Self::Value, A::Error> {
+        use serde::Deserialize;
+        /// Reads the next element from the sequence or reports a missing field error.
+        fn visit_seq_field<'de, A, T>(seq: &mut A, name: &'static str) -> Result<T, A::Error>
+        where
+            A: serde::de::SeqAccess<'de>,
+            T: serde::Deserialize<'de>,
+        {
+            seq.next_element()?
+                .ok_or_else(|| serde::de::Error::missing_field(name))
+        }
+
+        // First element: operator string
+        let op: String = seq
+            .next_element()?
+            .ok_or_else(|| serde::de::Error::custom("missing operator"))?;
+        match op.as_str() {
+            "array" => {
+                let r#type = visit_seq_field(&mut seq, "type")?;
+                let value = visit_seq_field(&mut seq, "value")?;
+                Ok(ArrayOfType::Array(r#type, value))
+            }
+            "at" => {
+                let index = visit_seq_field(&mut seq, "index")?;
+                let array = visit_seq_field(&mut seq, "array")?;
+                Ok(ArrayOfType::At(index, array))
+            }
+            _ => Err(serde::de::Error::unknown_variant(&op, &["array", "at"])),
+        }
+    }
+}
+
+/// "Boolean"
+#[derive(PartialEq, Debug, Clone)]
+pub enum Boolean {
     /// Logical negation. Returns `true` if the input is `false`, and `false` if the input is `true`.
     ///
     ///  - [Create and style clusters](https://maplibre.org/maplibre-gl-js/docs/examples/create-and-style-clusters/)
@@ -1247,15 +1605,15 @@ pub enum BooleanExpression {
     /// Returns `true` if all the inputs are `true`, `false` otherwise. The inputs are evaluated in order, and evaluation is short-circuiting: once an input expression evaluates to `false`, the result is `false` and no further input expressions are evaluated.
     ///
     ///  - [Display HTML clusters with custom properties](https://maplibre.org/maplibre-gl-js/docs/examples/display-html-clusters-with-custom-properties/)
-    All(Vec<BooleanExpression>),
+    All(Vec<Boolean>),
     /// Returns `true` if any of the inputs are `true`, `false` otherwise. The inputs are evaluated in order, and evaluation is short-circuiting: once an input expression evaluates to `true`, the result is `true` and no further input expressions are evaluated.
-    Any(Vec<BooleanExpression>),
+    Any(Vec<Boolean>),
     /// Retrieves an item from an array.
     At(serde_json::Value, serde_json::Value),
     /// Asserts that the input value is a boolean. If multiple values are provided, each one is evaluated in order until a boolean is obtained. If none of the inputs are booleans, the expression is an error.
     ///
     ///  - [Create a hover effect](https://maplibre.org/maplibre-gl-js/docs/examples/create-a-hover-effect/)
-    Boolean(Vec<Expression>),
+    Boolean(Vec<Any>),
     /// Tests for the presence of a property value in the current feature's properties, or from another object if a second argument is provided.
     ///
     ///  - [Create and style clusters](https://maplibre.org/maplibre-gl-js/docs/examples/create-and-style-clusters/)
@@ -1276,95 +1634,63 @@ pub enum BooleanExpression {
     Within(serde_json::Value),
 }
 
-/// Options for deserializing the syntax enum variant [`BooleanExpression::Less`]
+/// Options for deserializing the syntax enum variant [`Boolean::Less`]
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
 #[serde(untagged)]
 pub enum LessOptions {
-    Number(
-        StringExpression,
-        StringExpression,
-        Option<CollatorExpression>,
-    ),
-    String(
-        NumberExpression,
-        NumberExpression,
-        Option<CollatorExpression>,
-    ),
+    Number(String, String, Option<Collator>),
+    String(Number, Number, Option<Collator>),
 }
 
-/// Options for deserializing the syntax enum variant [`BooleanExpression::LessEqual`]
+/// Options for deserializing the syntax enum variant [`Boolean::LessEqual`]
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
 #[serde(untagged)]
 pub enum LessEqualOptions {
-    Number(
-        StringExpression,
-        StringExpression,
-        Option<CollatorExpression>,
-    ),
-    String(
-        NumberExpression,
-        NumberExpression,
-        Option<CollatorExpression>,
-    ),
+    Number(String, String, Option<Collator>),
+    String(Number, Number, Option<Collator>),
 }
 
-/// Options for deserializing the syntax enum variant [`BooleanExpression::Greater`]
+/// Options for deserializing the syntax enum variant [`Boolean::Greater`]
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
 #[serde(untagged)]
 pub enum GreaterOptions {
-    Number(
-        StringExpression,
-        StringExpression,
-        Option<CollatorExpression>,
-    ),
-    String(
-        NumberExpression,
-        NumberExpression,
-        Option<CollatorExpression>,
-    ),
+    Number(String, String, Option<Collator>),
+    String(Number, Number, Option<Collator>),
 }
 
-/// Options for deserializing the syntax enum variant [`BooleanExpression::GreaterEqual`]
+/// Options for deserializing the syntax enum variant [`Boolean::GreaterEqual`]
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
 #[serde(untagged)]
 pub enum GreaterEqualOptions {
-    Number(
-        StringExpression,
-        StringExpression,
-        Option<CollatorExpression>,
-    ),
-    String(
-        NumberExpression,
-        NumberExpression,
-        Option<CollatorExpression>,
-    ),
+    Number(String, String, Option<Collator>),
+    String(Number, Number, Option<Collator>),
 }
 
-/// Options for deserializing the syntax enum variant [`BooleanExpression::In`]
+/// Options for deserializing the syntax enum variant [`Boolean::In`]
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
 #[serde(untagged)]
 pub enum InOptions {
-    Item(T, ArrayExpression),
-    Substring(StringExpression, StringExpression),
+    Item(T, ArrayOfT),
+    Substring(String, String),
 }
 
-impl<'de> serde::Deserialize<'de> for BooleanExpression {
+impl<'de> serde::Deserialize<'de> for Boolean {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: serde::Deserializer<'de>,
     {
-        deserializer.deserialize_seq(BooleanExpressionVisitor)
+        deserializer.deserialize_seq(BooleanVisitor)
     }
 }
 
-/// Visitor for deserializing the syntax enum [`BooleanExpression`]
-struct BooleanExpressionVisitor;
+/// Visitor for deserializing the syntax enum [`Boolean`]
+struct BooleanVisitor;
 
-impl<'de> serde::de::Visitor<'de> for BooleanExpressionVisitor {
-    type Value = BooleanExpression;
+impl<'de> serde::de::Visitor<'de> for BooleanVisitor {
+    type Value = Boolean;
 
     fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
-        formatter.write_str(r#"an BooleanExpression like ["!",["has","point_count"]]"#)
+        formatter.write_str(r#"an Boolean like ["!",["has","point_count"]]"#)
     }
 
     fn visit_seq<A: serde::de::SeqAccess<'de>>(self, mut seq: A) -> Result<Self::Value, A::Error> {
@@ -1386,43 +1712,43 @@ impl<'de> serde::de::Visitor<'de> for BooleanExpressionVisitor {
         match op.as_str() {
             "!" => {
                 let input = visit_seq_field(&mut seq, "input")?;
-                Ok(BooleanExpression::Not(input))
+                Ok(Boolean::Not(input))
             }
             "!=" => {
                 let input_1 = visit_seq_field(&mut seq, "input_1")?;
                 let input_2 = visit_seq_field(&mut seq, "input_2")?;
                 let collator = seq.next_element()?;
-                Ok(BooleanExpression::NotEqual(input_1, input_2, collator))
+                Ok(Boolean::NotEqual(input_1, input_2, collator))
             }
             "<" => {
                 // Delegate the remainder of the sequence to LessOptions deserialization
                 let remainder_of_sequence = serde::de::value::SeqAccessDeserializer::new(seq);
                 let options = LessOptions::deserialize(remainder_of_sequence)?;
-                Ok(BooleanExpression::Less(options))
+                Ok(Boolean::Less(options))
             }
             "<=" => {
                 // Delegate the remainder of the sequence to LessEqualOptions deserialization
                 let remainder_of_sequence = serde::de::value::SeqAccessDeserializer::new(seq);
                 let options = LessEqualOptions::deserialize(remainder_of_sequence)?;
-                Ok(BooleanExpression::LessEqual(options))
+                Ok(Boolean::LessEqual(options))
             }
             "==" => {
                 let input_1 = visit_seq_field(&mut seq, "input_1")?;
                 let input_2 = visit_seq_field(&mut seq, "input_2")?;
                 let collator = seq.next_element()?;
-                Ok(BooleanExpression::EqualEqual(input_1, input_2, collator))
+                Ok(Boolean::EqualEqual(input_1, input_2, collator))
             }
             ">" => {
                 // Delegate the remainder of the sequence to GreaterOptions deserialization
                 let remainder_of_sequence = serde::de::value::SeqAccessDeserializer::new(seq);
                 let options = GreaterOptions::deserialize(remainder_of_sequence)?;
-                Ok(BooleanExpression::Greater(options))
+                Ok(Boolean::Greater(options))
             }
             ">=" => {
                 // Delegate the remainder of the sequence to GreaterEqualOptions deserialization
                 let remainder_of_sequence = serde::de::value::SeqAccessDeserializer::new(seq);
                 let options = GreaterEqualOptions::deserialize(remainder_of_sequence)?;
-                Ok(BooleanExpression::GreaterEqual(options))
+                Ok(Boolean::GreaterEqual(options))
             }
             "all" => {
                 let mut inputs = Vec::new();
@@ -1431,10 +1757,10 @@ impl<'de> serde::de::Visitor<'de> for BooleanExpressionVisitor {
                 }
                 if inputs.is_empty() {
                     return Err(serde::de::Error::custom(
-                        "BooleanExpression::All requires at least one argument",
+                        "Boolean::All requires at least one argument",
                     ));
                 }
-                Ok(BooleanExpression::All(inputs))
+                Ok(Boolean::All(inputs))
             }
             "any" => {
                 let mut inputs = Vec::new();
@@ -1443,15 +1769,15 @@ impl<'de> serde::de::Visitor<'de> for BooleanExpressionVisitor {
                 }
                 if inputs.is_empty() {
                     return Err(serde::de::Error::custom(
-                        "BooleanExpression::Any requires at least one argument",
+                        "Boolean::Any requires at least one argument",
                     ));
                 }
-                Ok(BooleanExpression::Any(inputs))
+                Ok(Boolean::Any(inputs))
             }
             "at" => {
                 let index = visit_seq_field(&mut seq, "index")?;
                 let array = visit_seq_field(&mut seq, "array")?;
-                Ok(BooleanExpression::At(index, array))
+                Ok(Boolean::At(index, array))
             }
             "boolean" => {
                 let mut inputs = Vec::new();
@@ -1460,33 +1786,33 @@ impl<'de> serde::de::Visitor<'de> for BooleanExpressionVisitor {
                 }
                 if inputs.is_empty() {
                     return Err(serde::de::Error::custom(
-                        "BooleanExpression::Boolean requires at least one argument",
+                        "Boolean::Boolean requires at least one argument",
                     ));
                 }
-                Ok(BooleanExpression::Boolean(inputs))
+                Ok(Boolean::Boolean(inputs))
             }
             "has" => {
                 let property_name = visit_seq_field(&mut seq, "property_name")?;
                 let object = seq.next_element()?;
-                Ok(BooleanExpression::Has(property_name, object))
+                Ok(Boolean::Has(property_name, object))
             }
             "in" => {
                 // Delegate the remainder of the sequence to InOptions deserialization
                 let remainder_of_sequence = serde::de::value::SeqAccessDeserializer::new(seq);
                 let options = InOptions::deserialize(remainder_of_sequence)?;
-                Ok(BooleanExpression::In(options))
+                Ok(Boolean::In(options))
             }
             "is-supported-script" => {
                 let input = visit_seq_field(&mut seq, "input")?;
-                Ok(BooleanExpression::IsSupportedScript(input))
+                Ok(Boolean::IsSupportedScript(input))
             }
             "to-boolean" => {
                 let value = visit_seq_field(&mut seq, "value")?;
-                Ok(BooleanExpression::ToBoolean(value))
+                Ok(Boolean::ToBoolean(value))
             }
             "within" => {
                 let geojson = visit_seq_field(&mut seq, "geojson")?;
-                Ok(BooleanExpression::Within(geojson))
+                Ok(Boolean::Within(geojson))
             }
             _ => Err(serde::de::Error::unknown_variant(
                 &op,
@@ -1513,32 +1839,32 @@ impl<'de> serde::de::Visitor<'de> for BooleanExpressionVisitor {
     }
 }
 
-/// "CollatorExpression"
+/// "Collator"
 #[derive(PartialEq, Debug, Clone)]
-pub enum CollatorExpression {
+pub enum Collator {
     /// Retrieves an item from an array.
     At(serde_json::Value, serde_json::Value),
     /// Returns a `collator` for use in locale-dependent comparison operations. Use `resolved-locale` to test the results of locale fallback behavior.
     Collator(serde_json::Value),
 }
 
-impl<'de> serde::Deserialize<'de> for CollatorExpression {
+impl<'de> serde::Deserialize<'de> for Collator {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: serde::Deserializer<'de>,
     {
-        deserializer.deserialize_seq(CollatorExpressionVisitor)
+        deserializer.deserialize_seq(CollatorVisitor)
     }
 }
 
-/// Visitor for deserializing the syntax enum [`CollatorExpression`]
-struct CollatorExpressionVisitor;
+/// Visitor for deserializing the syntax enum [`Collator`]
+struct CollatorVisitor;
 
-impl<'de> serde::de::Visitor<'de> for CollatorExpressionVisitor {
-    type Value = CollatorExpression;
+impl<'de> serde::de::Visitor<'de> for CollatorVisitor {
+    type Value = Collator;
 
     fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
-        formatter.write_str(r#"an CollatorExpression like ["at",1,["literal",["a","b","c"]]]"#)
+        formatter.write_str(r#"an Collator like ["at",1,["literal",["a","b","c"]]]"#)
     }
 
     fn visit_seq<A: serde::de::SeqAccess<'de>>(self, mut seq: A) -> Result<Self::Value, A::Error> {
@@ -1561,97 +1887,54 @@ impl<'de> serde::de::Visitor<'de> for CollatorExpressionVisitor {
             "at" => {
                 let index = visit_seq_field(&mut seq, "index")?;
                 let array = visit_seq_field(&mut seq, "array")?;
-                Ok(CollatorExpression::At(index, array))
+                Ok(Collator::At(index, array))
             }
             "collator" => {
                 let options = visit_seq_field(&mut seq, "options")?;
-                Ok(CollatorExpression::Collator(options))
+                Ok(Collator::Collator(options))
             }
             _ => Err(serde::de::Error::unknown_variant(&op, &["at", "collator"])),
         }
     }
 }
 
-/// "Expression"
+/// "Color"
 #[derive(PartialEq, Debug, Clone)]
-pub enum Expression {
-    /// Gets the value of a cluster property accumulated so far. Can only be used in the `clusterProperties` option of a clustered GeoJSON source.
-    Accumulated,
+pub enum Color {
     /// Retrieves an item from an array.
     At(serde_json::Value, serde_json::Value),
-    /// Selects the first output whose corresponding test condition evaluates to true, or the fallback value otherwise.
-    ///
-    ///  - [Create a hover effect](https://maplibre.org/maplibre-gl-js/docs/examples/create-a-hover-effect/)
-    ///
-    ///  - [Display HTML clusters with custom properties](https://maplibre.org/maplibre-gl-js/docs/examples/display-html-clusters-with-custom-properties/)
-    Case(Vec<(BooleanExpression, Expression)>),
-    /// Evaluates each expression in turn until the first non-null value is obtained, and returns that value.
-    ///
-    ///  - [Use a fallback image](https://maplibre.org/maplibre-gl-js/docs/examples/use-a-fallback-image/)
-    Coalesce(Vec<Expression>),
-    /// Retrieves a property value from the current feature's state. Returns null if the requested property is not present on the feature's state. A feature's state is not part of the GeoJSON or vector tile data, and must be set programmatically on each feature. When `source.promoteId` is not provided, features are identified by their `id` attribute, which must be an integer or a string that can be cast to an integer. When `source.promoteId` is provided, features are identified by their `promoteId` property, which may be a number, string, or any primitive data type. Note that ["feature-state"] can only be used with paint properties that support data-driven styling.
-    ///
-    ///  - [Create a hover effect](https://maplibre.org/maplibre-gl-js/docs/examples/create-a-hover-effect/)
-    FeatureState(serde_json::Value),
-    /// Retrieves a property value from the current feature's properties, or from another object if a second argument is provided. Returns null if the requested property is missing.
-    ///
-    ///  - [Change the case of labels](https://maplibre.org/maplibre-gl-js/docs/examples/change-case-of-labels/)
-    ///
-    ///  - [Display HTML clusters with custom properties](https://maplibre.org/maplibre-gl-js/docs/examples/display-html-clusters-with-custom-properties/)
-    ///
-    ///  - [Extrude polygons for 3D indoor mapping](https://maplibre.org/maplibre-gl-js/docs/examples/extrude-polygons-for-3d-indoor-mapping/)
-    Get(serde_json::Value, Option<serde_json::Value>),
-    /// Retrieves a property value from global state that can be set with platform-specific APIs. Defaults can be provided using the [`state`](https://maplibre.org/maplibre-style-spec/root/#state) root property. Returns `null` if no value nor default value is set for the retrieved property.
-    GlobalState(serde_json::Value),
-    /// Gets the feature's id, if it has one.
-    Id,
-    /// Binds expressions to named variables, which can then be referenced in the result expression using `["var", "variable_name"]`.
-    ///
-    ///  - [Visualize population density](https://maplibre.org/maplibre-gl-js/docs/examples/visualize-population-density/)
-    Let(Vec<(StringLiteral, Expression)>),
-    /// Selects the output whose label value matches the input value, or the fallback value if no match is found. The input can be any expression (e.g. `["get", "building_type"]`). Each label must be either:
-    ///
-    ///  - a single literal value; or
-    ///
-    ///  - an array of literal values, whose values must be all strings or all numbers (e.g. `[100, 101]` or `["c", "b"]`). The input matches if any of the values in the array matches, similar to the `"in"` operator.
-    ///
-    /// Each label must be unique. If the input type does not match the type of the labels, the result will be the fallback value.
-    Match(
-        Vec<(
-            StringExpressionOrNumberExpression,
-            StringLiteralOrNumberLiteralOrArrayExpressionOrArrayExpression,
-            Expression,
-        )>,
+    /// Creates a color value from red, green, and blue components, which must range between 0 and 255, and an alpha component of 1. If any component is out of range, the expression is an error.
+    Rgb(serde_json::Value, serde_json::Value, serde_json::Value),
+    /// Creates a color value from red, green, blue components, which must range between 0 and 255, and an alpha component which must range between zero and one. If any component is out of range, the expression is an error.
+    Rgba(
+        serde_json::Value,
+        serde_json::Value,
+        serde_json::Value,
+        serde_json::Value,
     ),
-    /// Produces discrete, stepped results by evaluating a piecewise-constant function defined by pairs of input and output values ("stops"). The `input` may be any numeric expression (e.g., `["get", "population"]`). Stop inputs must be numeric literals in strictly ascending order.
-    ///
-    /// Returns the output value of the stop just less than the input, or the first output if the input is less than the first stop.
-    ///
-    ///  - [Create and style clusters](https://maplibre.org/maplibre-gl-js/docs/examples/create-and-style-clusters/)
-    Step(Vec<(NumberExpression, Expression, NumberLiteral, Expression)>),
-    /// References variable bound using `let`.
+    /// Converts the input value to a color. If multiple values are provided, each one is evaluated in order until the first successful conversion is obtained. If none of the inputs can be converted, the expression is an error.
     ///
     ///  - [Visualize population density](https://maplibre.org/maplibre-gl-js/docs/examples/visualize-population-density/)
-    Var(serde_json::Value),
+    ToColor(Vec<Any>),
 }
 
-impl<'de> serde::Deserialize<'de> for Expression {
+impl<'de> serde::Deserialize<'de> for Color {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: serde::Deserializer<'de>,
     {
-        deserializer.deserialize_seq(ExpressionVisitor)
+        deserializer.deserialize_seq(ColorVisitor)
     }
 }
 
-/// Visitor for deserializing the syntax enum [`Expression`]
-struct ExpressionVisitor;
+/// Visitor for deserializing the syntax enum [`Color`]
+struct ColorVisitor;
 
-impl<'de> serde::de::Visitor<'de> for ExpressionVisitor {
-    type Value = Expression;
+impl<'de> serde::de::Visitor<'de> for ColorVisitor {
+    type Value = Color;
 
     fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
-        formatter.write_str(r#"an Expression like ["accumulated"]"#)
+        formatter.write_str(r#"an Color like ["at",1,["literal",["a","b","c"]]]"#)
     }
 
     fn visit_seq<A: serde::de::SeqAccess<'de>>(self, mut seq: A) -> Result<Self::Value, A::Error> {
@@ -1671,145 +1954,303 @@ impl<'de> serde::de::Visitor<'de> for ExpressionVisitor {
             .next_element()?
             .ok_or_else(|| serde::de::Error::custom("missing operator"))?;
         match op.as_str() {
-            "accumulated" => Ok(Expression::Accumulated),
             "at" => {
                 let index = visit_seq_field(&mut seq, "index")?;
                 let array = visit_seq_field(&mut seq, "array")?;
-                Ok(Expression::At(index, array))
+                Ok(Color::At(index, array))
             }
-            "case" => {
-                let mut inputs = Vec::new();
-                while let Some(condition_i) = seq.next_element()? {
-                    let output_i = seq.next_element()?.ok_or_else(|| {
-                        serde::de::Error::custom("expected output_i in Expression::Case")
-                    })?;
-                    let element = (condition_i, output_i);
-                    inputs.push(element);
-                }
-                if inputs.is_empty() {
-                    return Err(serde::de::Error::custom(
-                        "Expression::Case requires at least one argument",
-                    ));
-                }
-                Ok(Expression::Case(inputs))
+            "rgb" => {
+                let red = visit_seq_field(&mut seq, "red")?;
+                let green = visit_seq_field(&mut seq, "green")?;
+                let blue = visit_seq_field(&mut seq, "blue")?;
+                Ok(Color::Rgb(red, green, blue))
             }
-            "coalesce" => {
+            "rgba" => {
+                let red = visit_seq_field(&mut seq, "red")?;
+                let green = visit_seq_field(&mut seq, "green")?;
+                let blue = visit_seq_field(&mut seq, "blue")?;
+                let alpha = visit_seq_field(&mut seq, "alpha")?;
+                Ok(Color::Rgba(red, green, blue, alpha))
+            }
+            "to-color" => {
                 let mut inputs = Vec::new();
                 while let Some(element) = seq.next_element()? {
                     inputs.push(element);
                 }
                 if inputs.is_empty() {
                     return Err(serde::de::Error::custom(
-                        "Expression::Coalesce requires at least one argument",
+                        "Color::ToColor requires at least one argument",
                     ));
                 }
-                Ok(Expression::Coalesce(inputs))
-            }
-            "feature-state" => {
-                let property_name = visit_seq_field(&mut seq, "property_name")?;
-                Ok(Expression::FeatureState(property_name))
-            }
-            "get" => {
-                let property_name = visit_seq_field(&mut seq, "property_name")?;
-                let object = seq.next_element()?;
-                Ok(Expression::Get(property_name, object))
-            }
-            "global-state" => {
-                let property_name = visit_seq_field(&mut seq, "property_name")?;
-                Ok(Expression::GlobalState(property_name))
-            }
-            "id" => Ok(Expression::Id),
-            "let" => {
-                let mut inputs = Vec::new();
-                while let Some(var_name_i) = seq.next_element()? {
-                    let var_value_i = seq.next_element()?.ok_or_else(|| {
-                        serde::de::Error::custom("expected var_value_i in Expression::Let")
-                    })?;
-                    let element = (var_name_i, var_value_i);
-                    inputs.push(element);
-                }
-                if inputs.is_empty() {
-                    return Err(serde::de::Error::custom(
-                        "Expression::Let requires at least one argument",
-                    ));
-                }
-                Ok(Expression::Let(inputs))
-            }
-            "match" => {
-                let mut inputs = Vec::new();
-                while let Some(input) = seq.next_element()? {
-                    let label_i = seq.next_element()?.ok_or_else(|| {
-                        serde::de::Error::custom("expected label_i in Expression::Match")
-                    })?;
-                    let output_i = seq.next_element()?.ok_or_else(|| {
-                        serde::de::Error::custom("expected output_i in Expression::Match")
-                    })?;
-                    let element = (input, label_i, output_i);
-                    inputs.push(element);
-                }
-                if inputs.is_empty() {
-                    return Err(serde::de::Error::custom(
-                        "Expression::Match requires at least one argument",
-                    ));
-                }
-                Ok(Expression::Match(inputs))
-            }
-            "step" => {
-                let mut inputs = Vec::new();
-                while let Some(input) = seq.next_element()? {
-                    let output_0 = seq.next_element()?.ok_or_else(|| {
-                        serde::de::Error::custom("expected output_0 in Expression::Step")
-                    })?;
-                    let stop_input_i = seq.next_element()?.ok_or_else(|| {
-                        serde::de::Error::custom("expected stop_input_i in Expression::Step")
-                    })?;
-                    let stop_output_i = seq.next_element()?.ok_or_else(|| {
-                        serde::de::Error::custom("expected stop_output_i in Expression::Step")
-                    })?;
-                    let element = (input, output_0, stop_input_i, stop_output_i);
-                    inputs.push(element);
-                }
-                if inputs.is_empty() {
-                    return Err(serde::de::Error::custom(
-                        "Expression::Step requires at least one argument",
-                    ));
-                }
-                Ok(Expression::Step(inputs))
-            }
-            "var" => {
-                let var_name = visit_seq_field(&mut seq, "var_name")?;
-                Ok(Expression::Var(var_name))
+                Ok(Color::ToColor(inputs))
             }
             _ => Err(serde::de::Error::unknown_variant(
                 &op,
-                &[
-                    "accumulated",
-                    "at",
-                    "case",
-                    "coalesce",
-                    "feature-state",
-                    "get",
-                    "global-state",
-                    "id",
-                    "let",
-                    "match",
-                    "step",
-                    "var",
-                ],
+                &["at", "rgb", "rgba", "to-color"],
             )),
         }
     }
 }
 
-/// "NumberExpression"
+/// "ColorOrArrayOfColor"
 #[derive(PartialEq, Debug, Clone)]
-pub enum NumberExpression {
+pub enum ColorOrArrayOfColor {
+    /// Retrieves an item from an array.
+    At(serde_json::Value, serde_json::Value),
+    /// Produces continuous, smooth results by interpolating between pairs of input and output values ("stops"). Works like `interpolate`, but the output type must be `color` or `array<color>`, and the interpolation is performed in the Hue-Chroma-Luminance color space.
+    InterpolateHcl(Vec<(Interpolation, Number, NumberLiteral, ColorOrArrayOfColor)>),
+    /// Produces continuous, smooth results by interpolating between pairs of input and output values ("stops"). Works like `interpolate`, but the output type must be `color` or `array<color>`, and the interpolation is performed in the CIELAB color space.
+    InterpolateLab(Vec<(Interpolation, Number, NumberLiteral, ColorOrArrayOfColor)>),
+}
+
+impl<'de> serde::Deserialize<'de> for ColorOrArrayOfColor {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        deserializer.deserialize_seq(ColorOrArrayOfColorVisitor)
+    }
+}
+
+/// Visitor for deserializing the syntax enum [`ColorOrArrayOfColor`]
+struct ColorOrArrayOfColorVisitor;
+
+impl<'de> serde::de::Visitor<'de> for ColorOrArrayOfColorVisitor {
+    type Value = ColorOrArrayOfColor;
+
+    fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+        formatter.write_str(r#"an ColorOrArrayOfColor like ["at",1,["literal",["a","b","c"]]]"#)
+    }
+
+    fn visit_seq<A: serde::de::SeqAccess<'de>>(self, mut seq: A) -> Result<Self::Value, A::Error> {
+        use serde::Deserialize;
+        /// Reads the next element from the sequence or reports a missing field error.
+        fn visit_seq_field<'de, A, T>(seq: &mut A, name: &'static str) -> Result<T, A::Error>
+        where
+            A: serde::de::SeqAccess<'de>,
+            T: serde::Deserialize<'de>,
+        {
+            seq.next_element()?
+                .ok_or_else(|| serde::de::Error::missing_field(name))
+        }
+
+        // First element: operator string
+        let op: String = seq
+            .next_element()?
+            .ok_or_else(|| serde::de::Error::custom("missing operator"))?;
+        match op.as_str() {
+            "at" => {
+                let index = visit_seq_field(&mut seq, "index")?;
+                let array = visit_seq_field(&mut seq, "array")?;
+                Ok(ColorOrArrayOfColor::At(index, array))
+            }
+            "interpolate-hcl" => {
+                let mut inputs = Vec::new();
+                while let Some(interpolation_type) = seq.next_element()? {
+                    let input = seq.next_element()?.ok_or_else(|| {
+                        serde::de::Error::custom(
+                            "expected input in ColorOrArrayOfColor::InterpolateHcl",
+                        )
+                    })?;
+                    let stop_input_i = seq.next_element()?.ok_or_else(|| {
+                        serde::de::Error::custom(
+                            "expected stop_input_i in ColorOrArrayOfColor::InterpolateHcl",
+                        )
+                    })?;
+                    let stop_output_i = seq.next_element()?.ok_or_else(|| {
+                        serde::de::Error::custom(
+                            "expected stop_output_i in ColorOrArrayOfColor::InterpolateHcl",
+                        )
+                    })?;
+                    let element = (interpolation_type, input, stop_input_i, stop_output_i);
+                    inputs.push(element);
+                }
+                if inputs.is_empty() {
+                    return Err(serde::de::Error::custom(
+                        "ColorOrArrayOfColor::InterpolateHcl requires at least one argument",
+                    ));
+                }
+                Ok(ColorOrArrayOfColor::InterpolateHcl(inputs))
+            }
+            "interpolate-lab" => {
+                let mut inputs = Vec::new();
+                while let Some(interpolation_type) = seq.next_element()? {
+                    let input = seq.next_element()?.ok_or_else(|| {
+                        serde::de::Error::custom(
+                            "expected input in ColorOrArrayOfColor::InterpolateLab",
+                        )
+                    })?;
+                    let stop_input_i = seq.next_element()?.ok_or_else(|| {
+                        serde::de::Error::custom(
+                            "expected stop_input_i in ColorOrArrayOfColor::InterpolateLab",
+                        )
+                    })?;
+                    let stop_output_i = seq.next_element()?.ok_or_else(|| {
+                        serde::de::Error::custom(
+                            "expected stop_output_i in ColorOrArrayOfColor::InterpolateLab",
+                        )
+                    })?;
+                    let element = (interpolation_type, input, stop_input_i, stop_output_i);
+                    inputs.push(element);
+                }
+                if inputs.is_empty() {
+                    return Err(serde::de::Error::custom(
+                        "ColorOrArrayOfColor::InterpolateLab requires at least one argument",
+                    ));
+                }
+                Ok(ColorOrArrayOfColor::InterpolateLab(inputs))
+            }
+            _ => Err(serde::de::Error::unknown_variant(
+                &op,
+                &["at", "interpolate-hcl", "interpolate-lab"],
+            )),
+        }
+    }
+}
+
+/// "Formatted"
+#[derive(PartialEq, Debug, Clone)]
+pub enum Formatted {
+    /// Retrieves an item from an array.
+    At(serde_json::Value, serde_json::Value),
+    /// Returns a `formatted` string for displaying mixed-format text in the `text-field` property. The input may contain a string literal or expression, including an [`'image'`](#image) expression. Strings may be followed by a style override object.
+    ///
+    ///  - [Change the case of labels](https://maplibre.org/maplibre-gl-js/docs/examples/change-case-of-labels/)
+    ///
+    ///  - [Display and style rich text labels](https://maplibre.org/maplibre-gl-js/docs/examples/display-and-style-rich-text-labels/)
+    Format(Vec<(StringOrImage, Object)>),
+}
+
+impl<'de> serde::Deserialize<'de> for Formatted {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        deserializer.deserialize_seq(FormattedVisitor)
+    }
+}
+
+/// Visitor for deserializing the syntax enum [`Formatted`]
+struct FormattedVisitor;
+
+impl<'de> serde::de::Visitor<'de> for FormattedVisitor {
+    type Value = Formatted;
+
+    fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+        formatter.write_str(r#"an Formatted like ["at",1,["literal",["a","b","c"]]]"#)
+    }
+
+    fn visit_seq<A: serde::de::SeqAccess<'de>>(self, mut seq: A) -> Result<Self::Value, A::Error> {
+        use serde::Deserialize;
+        /// Reads the next element from the sequence or reports a missing field error.
+        fn visit_seq_field<'de, A, T>(seq: &mut A, name: &'static str) -> Result<T, A::Error>
+        where
+            A: serde::de::SeqAccess<'de>,
+            T: serde::Deserialize<'de>,
+        {
+            seq.next_element()?
+                .ok_or_else(|| serde::de::Error::missing_field(name))
+        }
+
+        // First element: operator string
+        let op: String = seq
+            .next_element()?
+            .ok_or_else(|| serde::de::Error::custom("missing operator"))?;
+        match op.as_str() {
+            "at" => {
+                let index = visit_seq_field(&mut seq, "index")?;
+                let array = visit_seq_field(&mut seq, "array")?;
+                Ok(Formatted::At(index, array))
+            }
+            "format" => {
+                let mut inputs = Vec::new();
+                while let Some(input_i) = seq.next_element()? {
+                    let style_overrides_i = seq.next_element()?; // optional param
+                    let element = (input_i, style_overrides_i);
+                    inputs.push(element);
+                }
+                if inputs.is_empty() {
+                    return Err(serde::de::Error::custom(
+                        "Formatted::Format requires at least one argument",
+                    ));
+                }
+                Ok(Formatted::Format(inputs))
+            }
+            _ => Err(serde::de::Error::unknown_variant(&op, &["at", "format"])),
+        }
+    }
+}
+
+/// "Image"
+#[derive(PartialEq, Debug, Clone)]
+pub enum Image {
+    /// Retrieves an item from an array.
+    At(serde_json::Value, serde_json::Value),
+    /// Returns an `image` type for use in `icon-image`, `*-pattern` entries and as a section in the `format` expression. If set, the `image` argument will check that the requested image exists in the style and will return either the resolved image name or `null`, depending on whether or not the image is currently in the style. This validation process is synchronous and requires the image to have been added to the style before requesting it in the `image` argument.
+    ///
+    ///  - [Use a fallback image](https://maplibre.org/maplibre-gl-js/docs/examples/use-a-fallback-image/)
+    Image(serde_json::Value),
+}
+
+impl<'de> serde::Deserialize<'de> for Image {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        deserializer.deserialize_seq(ImageVisitor)
+    }
+}
+
+/// Visitor for deserializing the syntax enum [`Image`]
+struct ImageVisitor;
+
+impl<'de> serde::de::Visitor<'de> for ImageVisitor {
+    type Value = Image;
+
+    fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+        formatter.write_str(r#"an Image like ["at",1,["literal",["a","b","c"]]]"#)
+    }
+
+    fn visit_seq<A: serde::de::SeqAccess<'de>>(self, mut seq: A) -> Result<Self::Value, A::Error> {
+        use serde::Deserialize;
+        /// Reads the next element from the sequence or reports a missing field error.
+        fn visit_seq_field<'de, A, T>(seq: &mut A, name: &'static str) -> Result<T, A::Error>
+        where
+            A: serde::de::SeqAccess<'de>,
+            T: serde::Deserialize<'de>,
+        {
+            seq.next_element()?
+                .ok_or_else(|| serde::de::Error::missing_field(name))
+        }
+
+        // First element: operator string
+        let op: String = seq
+            .next_element()?
+            .ok_or_else(|| serde::de::Error::custom("missing operator"))?;
+        match op.as_str() {
+            "at" => {
+                let index = visit_seq_field(&mut seq, "index")?;
+                let array = visit_seq_field(&mut seq, "array")?;
+                Ok(Image::At(index, array))
+            }
+            "image" => {
+                let image_name = visit_seq_field(&mut seq, "image_name")?;
+                Ok(Image::Image(image_name))
+            }
+            _ => Err(serde::de::Error::unknown_variant(&op, &["at", "image"])),
+        }
+    }
+}
+
+/// "Number"
+#[derive(PartialEq, Debug, Clone)]
+pub enum Number {
     /// Returns the remainder after integer division of the first input by the second.
     Percentage(serde_json::Value, serde_json::Value),
     /// Returns the product of the inputs.
-    Star(Vec<NumberExpression>),
+    Star(Vec<Number>),
     /// Returns the sum of the inputs.
-    Plus(Vec<NumberExpression>),
+    Plus(Vec<Number>),
     /// For two inputs, returns the result of subtracting the second input from the first. For a single input, returns the result of subtracting it from 0.
     Minus(MinusOptions),
     /// Returns the result of floating point division of the first input by the second.
@@ -1857,11 +2298,11 @@ pub enum NumberExpression {
     /// Returns the base-two logarithm of the input.
     Log2(serde_json::Value),
     /// Returns the maximum value of the inputs.
-    Max(Vec<NumberExpression>),
+    Max(Vec<Number>),
     /// Returns the minimum value of the inputs.
-    Min(Vec<NumberExpression>),
+    Min(Vec<Number>),
     /// Asserts that the input value is a number. If multiple values are provided, each one is evaluated in order until a number is obtained. If none of the inputs are numbers, the expression is an error.
-    Number(Vec<Expression>),
+    Number(Vec<Any>),
     /// Returns the mathematical constant pi.
     Pi,
     /// Rounds the input to the nearest integer. Halfway values are rounded away from zero. For example, `["round", -1.5]` evaluates to -2.
@@ -1873,44 +2314,44 @@ pub enum NumberExpression {
     /// Returns the tangent of the input.
     Tan(serde_json::Value),
     /// Converts the input value to a number, if possible. If the input is `null` or `false`, the result is 0. If the input is `true`, the result is 1. If the input is a string, it is converted to a number as specified by the ["ToNumber Applied to the String Type" algorithm](https://tc39.github.io/ecma262/#sec-tonumber-applied-to-the-string-type) of the ECMAScript Language Specification. If multiple values are provided, each one is evaluated in order until the first successful conversion is obtained. If none of the inputs can be converted, the expression is an error.
-    ToNumber(Vec<Expression>),
+    ToNumber(Vec<Any>),
     /// Gets the current zoom level.  Note that in style layout and paint properties, ["zoom"] may only appear as the input to a top-level "step" or "interpolate" expression.
     Zoom,
 }
 
-/// Options for deserializing the syntax enum variant [`NumberExpression::Minus`]
+/// Options for deserializing the syntax enum variant [`Number::Minus`]
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
 #[serde(untagged)]
 pub enum MinusOptions {
-    TwoParams(NumberExpression, NumberExpression),
-    OneParams(NumberExpression),
+    TwoParams(Number, Number),
+    OneParams(Number),
 }
 
-/// Options for deserializing the syntax enum variant [`NumberExpression::IndexOf`]
+/// Options for deserializing the syntax enum variant [`Number::IndexOf`]
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
 #[serde(untagged)]
 pub enum IndexOfOptions {
-    Item(T, ArrayExpression, Option<NumberExpression>),
-    Substring(StringExpression, StringExpression, Option<NumberExpression>),
+    Item(T, ArrayOfT, Option<Number>),
+    Substring(String, String, Option<Number>),
 }
 
-impl<'de> serde::Deserialize<'de> for NumberExpression {
+impl<'de> serde::Deserialize<'de> for Number {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: serde::Deserializer<'de>,
     {
-        deserializer.deserialize_seq(NumberExpressionVisitor)
+        deserializer.deserialize_seq(NumberVisitor)
     }
 }
 
-/// Visitor for deserializing the syntax enum [`NumberExpression`]
-struct NumberExpressionVisitor;
+/// Visitor for deserializing the syntax enum [`Number`]
+struct NumberVisitor;
 
-impl<'de> serde::de::Visitor<'de> for NumberExpressionVisitor {
-    type Value = NumberExpression;
+impl<'de> serde::de::Visitor<'de> for NumberVisitor {
+    type Value = Number;
 
     fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
-        formatter.write_str(r#"an NumberExpression like ["%",10,3]"#)
+        formatter.write_str(r#"an Number like ["%",10,3]"#)
     }
 
     fn visit_seq<A: serde::de::SeqAccess<'de>>(self, mut seq: A) -> Result<Self::Value, A::Error> {
@@ -1933,7 +2374,7 @@ impl<'de> serde::de::Visitor<'de> for NumberExpressionVisitor {
             "%" => {
                 let input_1 = visit_seq_field(&mut seq, "input_1")?;
                 let input_2 = visit_seq_field(&mut seq, "input_2")?;
-                Ok(NumberExpression::Percentage(input_1, input_2))
+                Ok(Number::Percentage(input_1, input_2))
             }
             "*" => {
                 let mut inputs = Vec::new();
@@ -1942,10 +2383,10 @@ impl<'de> serde::de::Visitor<'de> for NumberExpressionVisitor {
                 }
                 if inputs.is_empty() {
                     return Err(serde::de::Error::custom(
-                        "NumberExpression::Star requires at least one argument",
+                        "Number::Star requires at least one argument",
                     ));
                 }
-                Ok(NumberExpression::Star(inputs))
+                Ok(Number::Star(inputs))
             }
             "+" => {
                 let mut inputs = Vec::new();
@@ -1954,90 +2395,90 @@ impl<'de> serde::de::Visitor<'de> for NumberExpressionVisitor {
                 }
                 if inputs.is_empty() {
                     return Err(serde::de::Error::custom(
-                        "NumberExpression::Plus requires at least one argument",
+                        "Number::Plus requires at least one argument",
                     ));
                 }
-                Ok(NumberExpression::Plus(inputs))
+                Ok(Number::Plus(inputs))
             }
             "-" => {
                 // Delegate the remainder of the sequence to MinusOptions deserialization
                 let remainder_of_sequence = serde::de::value::SeqAccessDeserializer::new(seq);
                 let options = MinusOptions::deserialize(remainder_of_sequence)?;
-                Ok(NumberExpression::Minus(options))
+                Ok(Number::Minus(options))
             }
             "/" => {
                 let input_1 = visit_seq_field(&mut seq, "input_1")?;
                 let input_2 = visit_seq_field(&mut seq, "input_2")?;
-                Ok(NumberExpression::Slash(input_1, input_2))
+                Ok(Number::Slash(input_1, input_2))
             }
             "^" => {
                 let input_1 = visit_seq_field(&mut seq, "input_1")?;
                 let input_2 = visit_seq_field(&mut seq, "input_2")?;
-                Ok(NumberExpression::Power(input_1, input_2))
+                Ok(Number::Power(input_1, input_2))
             }
             "abs" => {
                 let input = visit_seq_field(&mut seq, "input")?;
-                Ok(NumberExpression::Absolute(input))
+                Ok(Number::Absolute(input))
             }
             "acos" => {
                 let input = visit_seq_field(&mut seq, "input")?;
-                Ok(NumberExpression::Arccosine(input))
+                Ok(Number::Arccosine(input))
             }
             "asin" => {
                 let input = visit_seq_field(&mut seq, "input")?;
-                Ok(NumberExpression::Asin(input))
+                Ok(Number::Asin(input))
             }
             "at" => {
                 let index = visit_seq_field(&mut seq, "index")?;
                 let array = visit_seq_field(&mut seq, "array")?;
-                Ok(NumberExpression::At(index, array))
+                Ok(Number::At(index, array))
             }
             "atan" => {
                 let input = visit_seq_field(&mut seq, "input")?;
-                Ok(NumberExpression::Atan(input))
+                Ok(Number::Atan(input))
             }
             "ceil" => {
                 let input = visit_seq_field(&mut seq, "input")?;
-                Ok(NumberExpression::Ceil(input))
+                Ok(Number::Ceil(input))
             }
             "cos" => {
                 let input = visit_seq_field(&mut seq, "input")?;
-                Ok(NumberExpression::Cos(input))
+                Ok(Number::Cos(input))
             }
             "distance" => {
                 let geojson = visit_seq_field(&mut seq, "geojson")?;
-                Ok(NumberExpression::Distance(geojson))
+                Ok(Number::Distance(geojson))
             }
-            "e" => Ok(NumberExpression::E),
-            "elevation" => Ok(NumberExpression::Elevation),
+            "e" => Ok(Number::E),
+            "elevation" => Ok(Number::Elevation),
             "floor" => {
                 let input = visit_seq_field(&mut seq, "input")?;
-                Ok(NumberExpression::Floor(input))
+                Ok(Number::Floor(input))
             }
-            "heatmap-density" => Ok(NumberExpression::HeatmapDensity),
+            "heatmap-density" => Ok(Number::HeatmapDensity),
             "index-of" => {
                 // Delegate the remainder of the sequence to IndexOfOptions deserialization
                 let remainder_of_sequence = serde::de::value::SeqAccessDeserializer::new(seq);
                 let options = IndexOfOptions::deserialize(remainder_of_sequence)?;
-                Ok(NumberExpression::IndexOf(options))
+                Ok(Number::IndexOf(options))
             }
             "length" => {
                 let array_or_string = visit_seq_field(&mut seq, "array_or_string")?;
-                Ok(NumberExpression::Length(array_or_string))
+                Ok(Number::Length(array_or_string))
             }
-            "line-progress" => Ok(NumberExpression::LineProgress),
+            "line-progress" => Ok(Number::LineProgress),
             "ln" => {
                 let input = visit_seq_field(&mut seq, "input")?;
-                Ok(NumberExpression::Ln(input))
+                Ok(Number::Ln(input))
             }
-            "ln2" => Ok(NumberExpression::Ln2),
+            "ln2" => Ok(Number::Ln2),
             "log10" => {
                 let input = visit_seq_field(&mut seq, "input")?;
-                Ok(NumberExpression::Log10(input))
+                Ok(Number::Log10(input))
             }
             "log2" => {
                 let input = visit_seq_field(&mut seq, "input")?;
-                Ok(NumberExpression::Log2(input))
+                Ok(Number::Log2(input))
             }
             "max" => {
                 let mut inputs = Vec::new();
@@ -2046,10 +2487,10 @@ impl<'de> serde::de::Visitor<'de> for NumberExpressionVisitor {
                 }
                 if inputs.is_empty() {
                     return Err(serde::de::Error::custom(
-                        "NumberExpression::Max requires at least one argument",
+                        "Number::Max requires at least one argument",
                     ));
                 }
-                Ok(NumberExpression::Max(inputs))
+                Ok(Number::Max(inputs))
             }
             "min" => {
                 let mut inputs = Vec::new();
@@ -2058,10 +2499,10 @@ impl<'de> serde::de::Visitor<'de> for NumberExpressionVisitor {
                 }
                 if inputs.is_empty() {
                     return Err(serde::de::Error::custom(
-                        "NumberExpression::Min requires at least one argument",
+                        "Number::Min requires at least one argument",
                     ));
                 }
-                Ok(NumberExpression::Min(inputs))
+                Ok(Number::Min(inputs))
             }
             "number" => {
                 let mut inputs = Vec::new();
@@ -2070,27 +2511,27 @@ impl<'de> serde::de::Visitor<'de> for NumberExpressionVisitor {
                 }
                 if inputs.is_empty() {
                     return Err(serde::de::Error::custom(
-                        "NumberExpression::Number requires at least one argument",
+                        "Number::Number requires at least one argument",
                     ));
                 }
-                Ok(NumberExpression::Number(inputs))
+                Ok(Number::Number(inputs))
             }
-            "pi" => Ok(NumberExpression::Pi),
+            "pi" => Ok(Number::Pi),
             "round" => {
                 let input = visit_seq_field(&mut seq, "input")?;
-                Ok(NumberExpression::Round(input))
+                Ok(Number::Round(input))
             }
             "sin" => {
                 let input = visit_seq_field(&mut seq, "input")?;
-                Ok(NumberExpression::Sin(input))
+                Ok(Number::Sin(input))
             }
             "sqrt" => {
                 let input = visit_seq_field(&mut seq, "input")?;
-                Ok(NumberExpression::Sqrt(input))
+                Ok(Number::Sqrt(input))
             }
             "tan" => {
                 let input = visit_seq_field(&mut seq, "input")?;
-                Ok(NumberExpression::Tan(input))
+                Ok(Number::Tan(input))
             }
             "to-number" => {
                 let mut inputs = Vec::new();
@@ -2099,12 +2540,12 @@ impl<'de> serde::de::Visitor<'de> for NumberExpressionVisitor {
                 }
                 if inputs.is_empty() {
                     return Err(serde::de::Error::custom(
-                        "NumberExpression::ToNumber requires at least one argument",
+                        "Number::ToNumber requires at least one argument",
                     ));
                 }
-                Ok(NumberExpression::ToNumber(inputs))
+                Ok(Number::ToNumber(inputs))
             }
-            "zoom" => Ok(NumberExpression::Zoom),
+            "zoom" => Ok(Number::Zoom),
             _ => Err(serde::de::Error::unknown_variant(
                 &op,
                 &[
@@ -2149,9 +2590,9 @@ impl<'de> serde::de::Visitor<'de> for NumberExpressionVisitor {
     }
 }
 
-/// "NumberExpressionOrArrayExpressionOrStringExpressionOrArrayExpressionOrProjection"
+/// "NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection"
 #[derive(PartialEq, Debug, Clone)]
-pub enum NumberExpressionOrArrayExpressionOrStringExpressionOrArrayExpressionOrProjection {
+pub enum NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection {
     /// Retrieves an item from an array.
     At(serde_json::Value, serde_json::Value),
     /// Produces continuous, smooth results by interpolating between pairs of input and output values ("stops"). The `input` may be any numeric expression (e.g., `["get", "population"]`). Stop inputs must be numeric literals in strictly ascending order. The output type must be `number`, `array<number>`, `color`, `array<color>`, or `projection`.
@@ -2166,36 +2607,32 @@ pub enum NumberExpressionOrArrayExpressionOrStringExpressionOrArrayExpressionOrP
     Interpolate(
         Vec<(
             Interpolation,
-            NumberExpression,
+            Number,
             NumberLiteral,
-            NumberExpressionOrArrayExpressionOrStringExpressionOrArrayExpressionOrProjection,
+            NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection,
         )>,
     ),
 }
 
-impl<'de> serde::Deserialize<'de>
-    for NumberExpressionOrArrayExpressionOrStringExpressionOrArrayExpressionOrProjection
-{
+impl<'de> serde::Deserialize<'de> for NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: serde::Deserializer<'de>,
     {
-        deserializer.deserialize_seq(
-            NumberExpressionOrArrayExpressionOrStringExpressionOrArrayExpressionOrProjectionVisitor,
-        )
+        deserializer.deserialize_seq(NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjectionVisitor)
     }
 }
 
-/// Visitor for deserializing the syntax enum [`NumberExpressionOrArrayExpressionOrStringExpressionOrArrayExpressionOrProjection`]
-struct NumberExpressionOrArrayExpressionOrStringExpressionOrArrayExpressionOrProjectionVisitor;
+/// Visitor for deserializing the syntax enum [`NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection`]
+struct NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjectionVisitor;
 
 impl<'de> serde::de::Visitor<'de>
-    for NumberExpressionOrArrayExpressionOrStringExpressionOrArrayExpressionOrProjectionVisitor
+    for NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjectionVisitor
 {
-    type Value = NumberExpressionOrArrayExpressionOrStringExpressionOrArrayExpressionOrProjection;
+    type Value = NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection;
 
     fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
-        formatter.write_str(r#"an NumberExpressionOrArrayExpressionOrStringExpressionOrArrayExpressionOrProjection like ["at",1,["literal",["a","b","c"]]]"#)
+        formatter.write_str(r#"an NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection like ["at",1,["literal",["a","b","c"]]]"#)
     }
 
     fn visit_seq<A: serde::de::SeqAccess<'de>>(self, mut seq: A) -> Result<Self::Value, A::Error> {
@@ -2218,21 +2655,23 @@ impl<'de> serde::de::Visitor<'de>
             "at" => {
                 let index = visit_seq_field(&mut seq, "index")?;
                 let array = visit_seq_field(&mut seq, "array")?;
-                Ok(NumberExpressionOrArrayExpressionOrStringExpressionOrArrayExpressionOrProjection::At(index, array))
+                Ok(NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection::At(
+                    index, array,
+                ))
             }
             "interpolate" => {
                 let mut inputs = Vec::new();
                 while let Some(interpolation_type) = seq.next_element()? {
-                    let input = seq.next_element()?.ok_or_else(|| serde::de::Error::custom("expected input in NumberExpressionOrArrayExpressionOrStringExpressionOrArrayExpressionOrProjection::Interpolate"))?;
-                    let stop_input_i = seq.next_element()?.ok_or_else(|| serde::de::Error::custom("expected stop_input_i in NumberExpressionOrArrayExpressionOrStringExpressionOrArrayExpressionOrProjection::Interpolate"))?;
-                    let stop_output_i = seq.next_element()?.ok_or_else(|| serde::de::Error::custom("expected stop_output_i in NumberExpressionOrArrayExpressionOrStringExpressionOrArrayExpressionOrProjection::Interpolate"))?;
+                    let input = seq.next_element()?.ok_or_else(|| serde::de::Error::custom("expected input in NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection::Interpolate"))?;
+                    let stop_input_i = seq.next_element()?.ok_or_else(|| serde::de::Error::custom("expected stop_input_i in NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection::Interpolate"))?;
+                    let stop_output_i = seq.next_element()?.ok_or_else(|| serde::de::Error::custom("expected stop_output_i in NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection::Interpolate"))?;
                     let element = (interpolation_type, input, stop_input_i, stop_output_i);
                     inputs.push(element);
                 }
                 if inputs.is_empty() {
-                    return Err(serde::de::Error::custom("NumberExpressionOrArrayExpressionOrStringExpressionOrArrayExpressionOrProjection::Interpolate requires at least one argument"));
+                    return Err(serde::de::Error::custom("NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection::Interpolate requires at least one argument"));
                 }
-                Ok(NumberExpressionOrArrayExpressionOrStringExpressionOrArrayExpressionOrProjection::Interpolate(inputs))
+                Ok(NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection::Interpolate(inputs))
             }
             _ => Err(serde::de::Error::unknown_variant(
                 &op,
@@ -2242,9 +2681,9 @@ impl<'de> serde::de::Visitor<'de>
     }
 }
 
-/// "ObjectExpression"
+/// "Object"
 #[derive(PartialEq, Debug, Clone)]
-pub enum ObjectExpression {
+pub enum Object {
     /// Retrieves an item from an array.
     At(serde_json::Value, serde_json::Value),
     /// Provides a literal array or object value.
@@ -2252,28 +2691,28 @@ pub enum ObjectExpression {
     ///  - [Display and style rich text labels](https://maplibre.org/maplibre-gl-js/docs/examples/display-and-style-rich-text-labels/)
     Literal(serde_json::Value),
     /// Asserts that the input value is an object. If multiple values are provided, each one is evaluated in order until an object is obtained. If none of the inputs are objects, the expression is an error.
-    Object(Vec<Expression>),
+    Object(Vec<Any>),
     /// Gets the feature properties object.  Note that in some cases, it may be more efficient to use ["get", "property_name"] directly.
     Properties,
 }
 
-impl<'de> serde::Deserialize<'de> for ObjectExpression {
+impl<'de> serde::Deserialize<'de> for Object {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: serde::Deserializer<'de>,
     {
-        deserializer.deserialize_seq(ObjectExpressionVisitor)
+        deserializer.deserialize_seq(ObjectVisitor)
     }
 }
 
-/// Visitor for deserializing the syntax enum [`ObjectExpression`]
-struct ObjectExpressionVisitor;
+/// Visitor for deserializing the syntax enum [`Object`]
+struct ObjectVisitor;
 
-impl<'de> serde::de::Visitor<'de> for ObjectExpressionVisitor {
-    type Value = ObjectExpression;
+impl<'de> serde::de::Visitor<'de> for ObjectVisitor {
+    type Value = Object;
 
     fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
-        formatter.write_str(r#"an ObjectExpression like ["at",1,["literal",["a","b","c"]]]"#)
+        formatter.write_str(r#"an Object like ["at",1,["literal",["a","b","c"]]]"#)
     }
 
     fn visit_seq<A: serde::de::SeqAccess<'de>>(self, mut seq: A) -> Result<Self::Value, A::Error> {
@@ -2296,11 +2735,11 @@ impl<'de> serde::de::Visitor<'de> for ObjectExpressionVisitor {
             "at" => {
                 let index = visit_seq_field(&mut seq, "index")?;
                 let array = visit_seq_field(&mut seq, "array")?;
-                Ok(ObjectExpression::At(index, array))
+                Ok(Object::At(index, array))
             }
             "literal" => {
                 let json_object = visit_seq_field(&mut seq, "json_object")?;
-                Ok(ObjectExpression::Literal(json_object))
+                Ok(Object::Literal(json_object))
             }
             "object" => {
                 let mut inputs = Vec::new();
@@ -2309,12 +2748,12 @@ impl<'de> serde::de::Visitor<'de> for ObjectExpressionVisitor {
                 }
                 if inputs.is_empty() {
                     return Err(serde::de::Error::custom(
-                        "ObjectExpression::Object requires at least one argument",
+                        "Object::Object requires at least one argument",
                     ));
                 }
-                Ok(ObjectExpression::Object(inputs))
+                Ok(Object::Object(inputs))
             }
-            "properties" => Ok(ObjectExpression::Properties),
+            "properties" => Ok(Object::Properties),
             _ => Err(serde::de::Error::unknown_variant(
                 &op,
                 &["at", "literal", "object", "properties"],
@@ -2323,9 +2762,9 @@ impl<'de> serde::de::Visitor<'de> for ObjectExpressionVisitor {
     }
 }
 
-/// "StringExpression"
+/// "String"
 #[derive(PartialEq, Debug, Clone)]
-pub enum StringExpression {
+pub enum String {
     /// Retrieves an item from an array.
     At(serde_json::Value, serde_json::Value),
     /// Returns a `string` consisting of the concatenation of the inputs. Each input is converted to a string as if by `to-string`.
@@ -2337,38 +2776,19 @@ pub enum StringExpression {
     ///  - [Use a fallback image](https://maplibre.org/maplibre-gl-js/docs/examples/fallback-image/)
     ///
     ///  - [Variable label placement](https://maplibre.org/maplibre-gl-js/docs/examples/variable-label-placement/)
-    Concat(Vec<Expression>),
+    Concat(Vec<Any>),
     /// Returns the input string converted to lowercase. Follows the Unicode Default Case Conversion algorithm and the locale-insensitive case mappings in the Unicode Character Database.
     ///
     ///  - [Change the case of labels](https://maplibre.org/maplibre-gl-js/docs/examples/change-case-of-labels/)
     Downcase(serde_json::Value),
-    /// Returns a `formatted` string for displaying mixed-format text in the `text-field` property. The input may contain a string literal or expression, including an [`'image'`](#image) expression. Strings may be followed by a style override object.
-    ///
-    ///  - [Change the case of labels](https://maplibre.org/maplibre-gl-js/docs/examples/change-case-of-labels/)
-    ///
-    ///  - [Display and style rich text labels](https://maplibre.org/maplibre-gl-js/docs/examples/display-and-style-rich-text-labels/)
-    Format(Vec<(StringExpressionOrStringExpression, Object)>),
     /// Returns the feature's simple geometry type: `Point`, `LineString`, or `Polygon`. `MultiPoint`, `MultiLineString`, and `MultiPolygon` are returned as `Point`, `LineString`, and `Polygon`, respectively.
     GeometryType,
-    /// Returns an `image` type for use in `icon-image`, `*-pattern` entries and as a section in the `format` expression. If set, the `image` argument will check that the requested image exists in the style and will return either the resolved image name or `null`, depending on whether or not the image is currently in the style. This validation process is synchronous and requires the image to have been added to the style before requesting it in the `image` argument.
-    ///
-    ///  - [Use a fallback image](https://maplibre.org/maplibre-gl-js/docs/examples/use-a-fallback-image/)
-    Image(serde_json::Value),
     /// Converts the input number into a string representation using the provided format_options.
     ///
     ///  - [Display HTML clusters with custom properties](https://maplibre.org/maplibre-gl-js/docs/examples/display-html-clusters-with-custom-properties/)
     NumberFormat(serde_json::Value, serde_json::Value),
     /// Returns the IETF language tag of the locale being used by the provided `collator`. This can be used to determine the default system locale, or to determine if a requested locale was successfully loaded.
     ResolvedLocale(serde_json::Value),
-    /// Creates a color value from red, green, and blue components, which must range between 0 and 255, and an alpha component of 1. If any component is out of range, the expression is an error.
-    Rgb(serde_json::Value, serde_json::Value, serde_json::Value),
-    /// Creates a color value from red, green, blue components, which must range between 0 and 255, and an alpha component which must range between zero and one. If any component is out of range, the expression is an error.
-    Rgba(
-        serde_json::Value,
-        serde_json::Value,
-        serde_json::Value,
-        serde_json::Value,
-    ),
     /// Returns a subarray from an array or a substring from a string from a specified start index, or between a start index and an end index if set. The return value is inclusive of the start index but not of the end index. In a string, a UTF-16 surrogate pair counts as a single position.
     Slice(
         serde_json::Value,
@@ -2376,11 +2796,7 @@ pub enum StringExpression {
         Option<serde_json::Value>,
     ),
     /// Asserts that the input value is a string. If multiple values are provided, each one is evaluated in order until a string is obtained. If none of the inputs are strings, the expression is an error.
-    String(Vec<Expression>),
-    /// Converts the input value to a color. If multiple values are provided, each one is evaluated in order until the first successful conversion is obtained. If none of the inputs can be converted, the expression is an error.
-    ///
-    ///  - [Visualize population density](https://maplibre.org/maplibre-gl-js/docs/examples/visualize-population-density/)
-    ToColor(Vec<Expression>),
+    String(Vec<Any>),
     /// Converts the input value to a string. If the input is `null`, the result is `""`. If the input is a boolean, the result is `"true"` or `"false"`. If the input is a number, it is converted to a string as specified by the ["NumberToString" algorithm](https://tc39.github.io/ecma262/#sec-tostring-applied-to-the-number-type) of the ECMAScript Language Specification. If the input is a color, it is converted to a string of the form `"rgba(r,g,b,a)"`, where `r`, `g`, and `b` are numerals ranging from 0 to 255, and `a` ranges from 0 to 1. Otherwise, the input is converted to a string in the format specified by the [`JSON.stringify`](https://tc39.github.io/ecma262/#sec-json.stringify) function of the ECMAScript Language Specification.
     ///
     ///  - [Create a time slider](https://maplibre.org/maplibre-gl-js/docs/examples/create-a-time-slider/)
@@ -2393,23 +2809,23 @@ pub enum StringExpression {
     Upcase(serde_json::Value),
 }
 
-impl<'de> serde::Deserialize<'de> for StringExpression {
+impl<'de> serde::Deserialize<'de> for String {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: serde::Deserializer<'de>,
     {
-        deserializer.deserialize_seq(StringExpressionVisitor)
+        deserializer.deserialize_seq(StringVisitor)
     }
 }
 
-/// Visitor for deserializing the syntax enum [`StringExpression`]
-struct StringExpressionVisitor;
+/// Visitor for deserializing the syntax enum [`String`]
+struct StringVisitor;
 
-impl<'de> serde::de::Visitor<'de> for StringExpressionVisitor {
-    type Value = StringExpression;
+impl<'de> serde::de::Visitor<'de> for StringVisitor {
+    type Value = String;
 
     fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
-        formatter.write_str(r#"an StringExpression like ["at",1,["literal",["a","b","c"]]]"#)
+        formatter.write_str(r#"an String like ["at",1,["literal",["a","b","c"]]]"#)
     }
 
     fn visit_seq<A: serde::de::SeqAccess<'de>>(self, mut seq: A) -> Result<Self::Value, A::Error> {
@@ -2432,7 +2848,7 @@ impl<'de> serde::de::Visitor<'de> for StringExpressionVisitor {
             "at" => {
                 let index = visit_seq_field(&mut seq, "index")?;
                 let array = visit_seq_field(&mut seq, "array")?;
-                Ok(StringExpression::At(index, array))
+                Ok(String::At(index, array))
             }
             "concat" => {
                 let mut inputs = Vec::new();
@@ -2441,61 +2857,30 @@ impl<'de> serde::de::Visitor<'de> for StringExpressionVisitor {
                 }
                 if inputs.is_empty() {
                     return Err(serde::de::Error::custom(
-                        "StringExpression::Concat requires at least one argument",
+                        "String::Concat requires at least one argument",
                     ));
                 }
-                Ok(StringExpression::Concat(inputs))
+                Ok(String::Concat(inputs))
             }
             "downcase" => {
                 let input = visit_seq_field(&mut seq, "input")?;
-                Ok(StringExpression::Downcase(input))
+                Ok(String::Downcase(input))
             }
-            "format" => {
-                let mut inputs = Vec::new();
-                while let Some(input_i) = seq.next_element()? {
-                    let style_overrides_i = seq.next_element()?; // optional param
-                    let element = (input_i, style_overrides_i);
-                    inputs.push(element);
-                }
-                if inputs.is_empty() {
-                    return Err(serde::de::Error::custom(
-                        "StringExpression::Format requires at least one argument",
-                    ));
-                }
-                Ok(StringExpression::Format(inputs))
-            }
-            "geometry-type" => Ok(StringExpression::GeometryType),
-            "image" => {
-                let image_name = visit_seq_field(&mut seq, "image_name")?;
-                Ok(StringExpression::Image(image_name))
-            }
+            "geometry-type" => Ok(String::GeometryType),
             "number-format" => {
                 let input = visit_seq_field(&mut seq, "input")?;
                 let format_options = visit_seq_field(&mut seq, "format_options")?;
-                Ok(StringExpression::NumberFormat(input, format_options))
+                Ok(String::NumberFormat(input, format_options))
             }
             "resolved-locale" => {
                 let collator = visit_seq_field(&mut seq, "collator")?;
-                Ok(StringExpression::ResolvedLocale(collator))
-            }
-            "rgb" => {
-                let red = visit_seq_field(&mut seq, "red")?;
-                let green = visit_seq_field(&mut seq, "green")?;
-                let blue = visit_seq_field(&mut seq, "blue")?;
-                Ok(StringExpression::Rgb(red, green, blue))
-            }
-            "rgba" => {
-                let red = visit_seq_field(&mut seq, "red")?;
-                let green = visit_seq_field(&mut seq, "green")?;
-                let blue = visit_seq_field(&mut seq, "blue")?;
-                let alpha = visit_seq_field(&mut seq, "alpha")?;
-                Ok(StringExpression::Rgba(red, green, blue, alpha))
+                Ok(String::ResolvedLocale(collator))
             }
             "slice" => {
                 let string = visit_seq_field(&mut seq, "string")?;
                 let start_index = visit_seq_field(&mut seq, "start_index")?;
                 let end_index = seq.next_element()?;
-                Ok(StringExpression::Slice(string, start_index, end_index))
+                Ok(String::Slice(string, start_index, end_index))
             }
             "string" => {
                 let mut inputs = Vec::new();
@@ -2504,34 +2889,22 @@ impl<'de> serde::de::Visitor<'de> for StringExpressionVisitor {
                 }
                 if inputs.is_empty() {
                     return Err(serde::de::Error::custom(
-                        "StringExpression::String requires at least one argument",
+                        "String::String requires at least one argument",
                     ));
                 }
-                Ok(StringExpression::String(inputs))
-            }
-            "to-color" => {
-                let mut inputs = Vec::new();
-                while let Some(element) = seq.next_element()? {
-                    inputs.push(element);
-                }
-                if inputs.is_empty() {
-                    return Err(serde::de::Error::custom(
-                        "StringExpression::ToColor requires at least one argument",
-                    ));
-                }
-                Ok(StringExpression::ToColor(inputs))
+                Ok(String::String(inputs))
             }
             "to-string" => {
                 let value = visit_seq_field(&mut seq, "value")?;
-                Ok(StringExpression::ToString(value))
+                Ok(String::ToString(value))
             }
             "typeof" => {
                 let value = visit_seq_field(&mut seq, "value")?;
-                Ok(StringExpression::Typeof(value))
+                Ok(String::Typeof(value))
             }
             "upcase" => {
                 let input = visit_seq_field(&mut seq, "input")?;
-                Ok(StringExpression::Upcase(input))
+                Ok(String::Upcase(input))
             }
             _ => Err(serde::de::Error::unknown_variant(
                 &op,
@@ -2539,132 +2912,15 @@ impl<'de> serde::de::Visitor<'de> for StringExpressionVisitor {
                     "at",
                     "concat",
                     "downcase",
-                    "format",
                     "geometry-type",
-                    "image",
                     "number-format",
                     "resolved-locale",
-                    "rgb",
-                    "rgba",
                     "slice",
                     "string",
-                    "to-color",
                     "to-string",
                     "typeof",
                     "upcase",
                 ],
-            )),
-        }
-    }
-}
-
-/// "StringExpressionOrArrayExpression"
-#[derive(PartialEq, Debug, Clone)]
-pub enum StringExpressionOrArrayExpression {
-    /// Retrieves an item from an array.
-    At(serde_json::Value, serde_json::Value),
-    /// Produces continuous, smooth results by interpolating between pairs of input and output values ("stops"). Works like `interpolate`, but the output type must be `color` or `array<color>`, and the interpolation is performed in the Hue-Chroma-Luminance color space.
-    InterpolateHcl(
-        Vec<(
-            Interpolation,
-            NumberExpression,
-            NumberLiteral,
-            StringExpressionOrArrayExpression,
-        )>,
-    ),
-    /// Produces continuous, smooth results by interpolating between pairs of input and output values ("stops"). Works like `interpolate`, but the output type must be `color` or `array<color>`, and the interpolation is performed in the CIELAB color space.
-    InterpolateLab(
-        Vec<(
-            Interpolation,
-            NumberExpression,
-            NumberLiteral,
-            StringExpressionOrArrayExpression,
-        )>,
-    ),
-}
-
-impl<'de> serde::Deserialize<'de> for StringExpressionOrArrayExpression {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
-        deserializer.deserialize_seq(StringExpressionOrArrayExpressionVisitor)
-    }
-}
-
-/// Visitor for deserializing the syntax enum [`StringExpressionOrArrayExpression`]
-struct StringExpressionOrArrayExpressionVisitor;
-
-impl<'de> serde::de::Visitor<'de> for StringExpressionOrArrayExpressionVisitor {
-    type Value = StringExpressionOrArrayExpression;
-
-    fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
-        formatter.write_str(
-            r#"an StringExpressionOrArrayExpression like ["at",1,["literal",["a","b","c"]]]"#,
-        )
-    }
-
-    fn visit_seq<A: serde::de::SeqAccess<'de>>(self, mut seq: A) -> Result<Self::Value, A::Error> {
-        use serde::Deserialize;
-        /// Reads the next element from the sequence or reports a missing field error.
-        fn visit_seq_field<'de, A, T>(seq: &mut A, name: &'static str) -> Result<T, A::Error>
-        where
-            A: serde::de::SeqAccess<'de>,
-            T: serde::Deserialize<'de>,
-        {
-            seq.next_element()?
-                .ok_or_else(|| serde::de::Error::missing_field(name))
-        }
-
-        // First element: operator string
-        let op: String = seq
-            .next_element()?
-            .ok_or_else(|| serde::de::Error::custom("missing operator"))?;
-        match op.as_str() {
-            "at" => {
-                let index = visit_seq_field(&mut seq, "index")?;
-                let array = visit_seq_field(&mut seq, "array")?;
-                Ok(StringExpressionOrArrayExpression::At(index, array))
-            }
-            "interpolate-hcl" => {
-                let mut inputs = Vec::new();
-                while let Some(interpolation_type) = seq.next_element()? {
-                    let input = seq.next_element()?.ok_or_else(|| {
-                        serde::de::Error::custom(
-                            "expected input in StringExpressionOrArrayExpression::InterpolateHcl",
-                        )
-                    })?;
-                    let stop_input_i = seq.next_element()?.ok_or_else(|| serde::de::Error::custom("expected stop_input_i in StringExpressionOrArrayExpression::InterpolateHcl"))?;
-                    let stop_output_i = seq.next_element()?.ok_or_else(|| serde::de::Error::custom("expected stop_output_i in StringExpressionOrArrayExpression::InterpolateHcl"))?;
-                    let element = (interpolation_type, input, stop_input_i, stop_output_i);
-                    inputs.push(element);
-                }
-                if inputs.is_empty() {
-                    return Err(serde::de::Error::custom("StringExpressionOrArrayExpression::InterpolateHcl requires at least one argument"));
-                }
-                Ok(StringExpressionOrArrayExpression::InterpolateHcl(inputs))
-            }
-            "interpolate-lab" => {
-                let mut inputs = Vec::new();
-                while let Some(interpolation_type) = seq.next_element()? {
-                    let input = seq.next_element()?.ok_or_else(|| {
-                        serde::de::Error::custom(
-                            "expected input in StringExpressionOrArrayExpression::InterpolateLab",
-                        )
-                    })?;
-                    let stop_input_i = seq.next_element()?.ok_or_else(|| serde::de::Error::custom("expected stop_input_i in StringExpressionOrArrayExpression::InterpolateLab"))?;
-                    let stop_output_i = seq.next_element()?.ok_or_else(|| serde::de::Error::custom("expected stop_output_i in StringExpressionOrArrayExpression::InterpolateLab"))?;
-                    let element = (interpolation_type, input, stop_input_i, stop_output_i);
-                    inputs.push(element);
-                }
-                if inputs.is_empty() {
-                    return Err(serde::de::Error::custom("StringExpressionOrArrayExpression::InterpolateLab requires at least one argument"));
-                }
-                Ok(StringExpressionOrArrayExpression::InterpolateLab(inputs))
-            }
-            _ => Err(serde::de::Error::unknown_variant(
-                &op,
-                &["at", "interpolate-hcl", "interpolate-lab"],
             )),
         }
     }

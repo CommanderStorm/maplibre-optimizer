@@ -20,7 +20,7 @@ pub fn generate_version(
         .repr("u8")
         .derive("serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy");
     for v in &versions.versions {
-        enu.new_variant(to_upper_camel_case(&v.to_string()))
+        enu.new_variant(to_upper_camel_case(v.to_string()))
             .discriminant(v.to_string());
     }
 

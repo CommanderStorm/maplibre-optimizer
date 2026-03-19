@@ -3,10 +3,12 @@ use std::collections::BTreeMap;
 use codegen2::{Function, Impl, Scope};
 use serde_json::Value;
 
-use crate::decoder::r#enum::{Literal, Overload, Parameter, ParameterType, Syntax};
 use crate::generator::autotest::generate_test_from_examples_if_present;
 use crate::generator::formatter::{to_snake_case, to_upper_camel_case};
-use crate::mir::types::SyntaxVariantDef;
+use crate::mir::types::{
+    MirLiteral as Literal, MirOverload as Overload, MirParameter as Parameter,
+    MirParameterType as ParameterType, MirSyntax as Syntax, SyntaxVariantDef,
+};
 
 pub fn generate_syntax_enum(
     scope: &mut Scope,
@@ -94,7 +96,7 @@ fn generate_syntax_enum_body(
                     .collect::<Vec<_>>();
                 let mut tuple_type_names = params[0].r#type.to_upper_camel_case();
                 for p in &params[1..] {
-                    tuple_type_names.push_str(",");
+                    tuple_type_names.push(',');
                     tuple_type_names.push_str(p.r#type.to_upper_camel_case().as_str());
                 }
                 if params.len() > 1 {
@@ -150,7 +152,7 @@ fn generate_multi_overload(
     }
 
     let enu = scope
-        .new_enum(&options_name)
+        .new_enum(options_name)
         .doc(format!(
             "Options for deserializing the syntax enum variant [`{name}::{var_name}`]"
         ))
@@ -294,7 +296,7 @@ impl OverloadVariantNamingStrategy {
         match self {
             OverloadVariantNamingStrategy::OutputType => overload.output_type.to_upper_camel_case(),
             OverloadVariantNamingStrategy::NumberOptions(ns) => {
-                format!("{}Params", to_upper_camel_case(&ns[i].to_string()))
+                format!("{}Params", to_upper_camel_case(ns[i].to_string()))
             }
             OverloadVariantNamingStrategy::ConstantMapping(ms) => ms[i].clone(),
         }
@@ -304,7 +306,7 @@ impl OverloadVariantNamingStrategy {
 fn generate_parameter_type(
     scope: &mut Scope,
     (name, var_name, param): (&str, &str, &str),
-    parameters: &Vec<Parameter>,
+    parameters: &[Parameter],
 ) -> String {
     if let Some(param) = param.strip_suffix('?') {
         let param = parameters.iter()
@@ -327,7 +329,7 @@ fn generate_parameter_variant(scope: &mut Scope, param: &ParameterType) -> Strin
         ParameterType::Expression(e) => e.to_upper_camel_case().to_string(),
         ParameterType::ExpressionAnyOf(_) => "serde_json::Value".to_string(),
         ParameterType::Object(_) => "serde_json::Map".to_string(),
-        ParameterType::Reference(r) => to_upper_camel_case(&r),
+        ParameterType::Reference(r) => to_upper_camel_case(r),
     }
 }
 fn generate_any_of(scope: &mut Scope, any_of: &[Literal]) -> String {
@@ -343,7 +345,7 @@ fn generate_any_of(scope: &mut Scope, any_of: &[Literal]) -> String {
             .vis("pub")
             .derive("serde::Deserialize, PartialEq, Debug, Clone");
         for t in ts {
-            enu.new_variant(&t).tuple(&t);
+            enu.new_variant(t).tuple(t);
         }
     }
     any_of_type
@@ -380,13 +382,13 @@ fn generate_syntax_enum_deserializer(
             if syntax.has_variadic_overload() {
                 generate_syntax_enum_deserializer_regular_variadic_variant(
                     visit_seq,
-                    (&name, &variant_name),
+                    (name, &variant_name),
                     overload,
                 )
             } else {
                 generate_syntax_enum_deserializer_regular_variant(
                     visit_seq,
-                    (&name, &variant_name),
+                    (name, &variant_name),
                     overload,
                 );
             }
@@ -398,7 +400,7 @@ fn generate_syntax_enum_deserializer(
             } else {
                 generate_syntax_enum_deserializer_multi_overload_variant(
                     visit_seq,
-                    (&name, &variant_name),
+                    (name, &variant_name),
                 );
             }
         }
@@ -514,7 +516,7 @@ fn generate_syntax_enum_deserializer_regular_variadic_variant(
     }
     visit_seq.line("inputs.push(element);");
     visit_seq.line("}");
-    visit_seq.line(format!("if inputs.is_empty() {{"));
+    visit_seq.line("if inputs.is_empty() {".to_string());
     visit_seq.line(format!("return Err(serde::de::Error::custom(\"{name}::{variant_name} requires at least one argument\"));"));
     visit_seq.line("}");
     visit_seq.line(format!("Ok({name}::{variant_name}(inputs))"));

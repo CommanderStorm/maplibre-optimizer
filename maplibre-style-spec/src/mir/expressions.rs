@@ -446,14 +446,13 @@ fn deduplicate_template_params(template_refs: &[&str], params: &[Parameter]) -> 
         if let Some(param) = params
             .iter()
             .find(|p| p.matches_overload_parameter_name(base))
+            && seen.insert(param.name.clone())
         {
-            if seen.insert(param.name.clone()) {
-                result.push(ResolvedParam {
-                    name: param.name.clone(),
-                    r#type: ExprParamType::from(&param.r#type),
-                    doc: param.doc.clone(),
-                });
-            }
+            result.push(ResolvedParam {
+                name: param.name.clone(),
+                r#type: ExprParamType::from(&param.r#type),
+                doc: param.doc.clone(),
+            });
         }
     }
 

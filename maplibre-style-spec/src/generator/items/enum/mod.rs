@@ -34,7 +34,7 @@ pub fn generate_mir(scope: &mut Scope, name: &str, field: &EnumField) {
                 .ret("Self")
                 .line(format!(
                     "Self::{}",
-                    to_upper_camel_case(&default.to_string())
+                    to_upper_camel_case(default.to_string())
                 ));
         }
         generate_test_from_example_if_present(scope, name, field.meta.example.as_ref());

@@ -7,7 +7,7 @@ use crate::generator::items::number::generate_number_default;
 use crate::mir::types::{ArrayElement, ArrayField, RegularEnum};
 
 pub fn generate(scope: &mut Scope, name: &str, field: &ArrayField) {
-    let element_type_name = to_upper_camel_case(&format!("{name} Value"));
+    let element_type_name = to_upper_camel_case(format!("{name} Value"));
     let rust_element_type = generate_array_element(scope, &element_type_name, &field.element);
 
     let field_type = if is_direct_element(&field.element) {
@@ -73,8 +73,8 @@ fn generate_array_element(scope: &mut Scope, name: &str, element: &ArrayElement)
         ArrayElement::Either(options) => {
             let mut variant_types = Vec::with_capacity(options.len());
             for (i, option) in options.iter().enumerate() {
-                let enum_variant_name = to_upper_camel_case(&i.to_string());
-                let variant_type_name = to_upper_camel_case(&format!("{name} {enum_variant_name}"));
+                let enum_variant_name = to_upper_camel_case(i.to_string());
+                let variant_type_name = to_upper_camel_case(format!("{name} {enum_variant_name}"));
                 variant_types.push((
                     enum_variant_name,
                     generate_array_element(scope, &variant_type_name, option),

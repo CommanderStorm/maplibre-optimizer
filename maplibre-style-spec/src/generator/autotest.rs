@@ -13,7 +13,7 @@ pub fn generate_test_from_example_if_present(
     };
     let fun = scope
         .get_or_new_module("test")
-        .new_fn(to_snake_case(&format!("test_example_{name}_decodes")))
+        .new_fn(to_snake_case(format!("test_example_{name}_decodes")))
         .attr("test");
     fun.line(format!("let example = serde_json::json!({example});"));
     fun.line(format!(
@@ -28,7 +28,7 @@ pub fn generate_test_from_examples_if_present(
 ) {
     let fun = scope
         .get_or_new_module("test")
-        .new_fn(to_snake_case(&format!("test_example_{name}_decodes")))
+        .new_fn(to_snake_case(format!("test_example_{name}_decodes")))
         .arg("#[case] example", "serde_json::Value")
         .attr("rstest::rstest");
     for example in examples {
