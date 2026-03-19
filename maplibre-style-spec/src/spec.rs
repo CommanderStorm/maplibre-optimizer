@@ -2,22 +2,22 @@
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
 pub struct MaplibreStyleSpecification {
     /// Default bearing, in degrees. The bearing is the compass direction that is "up"; for example, a bearing of 90° orients the map so that east is up. This value will be used only if the map has not been positioned by other means (e.g. map options or user interaction).
-    /// 
+    ///
     /// Range: every 360
     pub bearing: Option<RootBearing>,
     /// Default map center in longitude and latitude.  The style center will be used only if the map has not been positioned by other means (e.g. map options or user interaction).
     pub center: Option<RootCenter>,
     /// Default map center altitude in meters above sea level. The style center altitude defines the altitude where the camera is looking at and will be used only if the map has not been positioned by other means (e.g. map options or user interaction).
-    #[serde(rename="centerAltitude")]
+    #[serde(rename = "centerAltitude")]
     pub center_altitude: Option<RootCenterAltitude>,
     /// The `font-faces` property can be used to specify what font files to use for rendering text. Font faces contain information needed to render complex texts such as [Devanagari](https://en.wikipedia.org/wiki/Devanagari), [Khmer](https://en.wikipedia.org/wiki/Khmer_script) among many others.<h2>Unicode range</h2>The optional `unicode-range` property can be used to only use a particular font file for characters within the specified unicode range(s). Its value should be an array of strings, each indicating a start and end of a unicode range, similar to the [CSS descriptor with the same name](https://developer.mozilla.org/en-US/docs/Web/CSS/@font-face/unicode-range). This allows specifying multiple non-consecutive unicode ranges. When not specified, the default value is `U+0-10FFFF`, meaning the font file will be used for all unicode characters.
-    /// 
+    ///
     /// Refer to the [Unicode Character Code Charts](https://www.unicode.org/charts/) to see ranges for scripts supported by Unicode. To see what unicode code-points are available in a font, use a tool like [FontDrop](https://fontdrop.info/).
-    /// 
+    ///
     /// <h2>Font Resolution</h2>For every name in a symbol layer’s [`text-font`](./layers.md/#text-font) array, characters are matched if they are covered one of the by the font files in the corresponding entry of the `font-faces` map. Any still-unmatched characters then fall back to the [`glyphs`](./glyphs.md) URL if provided.
-    /// 
+    ///
     /// <h2>Supported Fonts</h2>What type of fonts are supported is implementation-defined. Unsupported fonts are ignored.
-    #[serde(rename="font-faces")]
+    #[serde(rename = "font-faces")]
     pub font_faces: Option<RootFontFaces>,
     /// The global light source.
     pub light: Option<RootLight>,
@@ -34,7 +34,7 @@ pub struct MaplibreStyleSpecification {
     /// The map's sky configuration. **Note:** this definition is still experimental and is under development in maplibre-gl-js.
     pub sky: Option<RootSky>,
     /// Sources state which data the map should display. Specify the type of source with the `type` property. Adding a source isn't enough to make data appear on the map because sources don't contain styling details like color or width. Layers refer to a source and give it a visual representation. This makes it possible to style the same source in different ways, like differentiating between types of roads in a highways layer.
-    /// 
+    ///
     /// Tiled sources (vector and raster) must specify their details according to the [TileJSON specification](https://github.com/mapbox/tilejson-spec).
     pub sources: RootSources,
     /// An object used to define default values when using the [`global-state`](https://maplibre.org/maplibre-style-spec/expressions/#global-state) expression.
@@ -57,7 +57,10 @@ pub struct RootBearing(serde_json::Number);
 
 impl Default for RootBearing {
     fn default() -> Self {
-        Self(serde_json::Number::from_i128(0).expect("the number is serialised from a number and is thus always valid"))
+        Self(
+            serde_json::Number::from_i128(0)
+                .expect("the number is serialised from a number and is thus always valid"),
+        )
     }
 }
 
@@ -73,14 +76,15 @@ mod test {
 
     #[test]
     fn test_example_root_center_decodes() {
-        let example = serde_json::json!([-73.9749,40.7736]);
+        let example = serde_json::json!([-73.9749, 40.7736]);
         let _ = serde_json::from_value::<RootCenter>(example).expect("example should decode");
     }
 
     #[test]
     fn test_example_root_center_altitude_decodes() {
         let example = serde_json::json!(123.4);
-        let _ = serde_json::from_value::<RootCenterAltitude>(example).expect("example should decode");
+        let _ =
+            serde_json::from_value::<RootCenterAltitude>(example).expect("example should decode");
     }
 
     #[test]
@@ -178,7 +182,8 @@ mod test {
     #[case::t_exponential(serde_json::json!(["exponential",2]))]
     #[case::t_linear(serde_json::json!(["linear"]))]
     fn test_example_interpolation_name_decodes(#[case] example: serde_json::Value) {
-        let _ = serde_json::from_value::<InterpolationName>(example).expect("example should decode");
+        let _ =
+            serde_json::from_value::<InterpolationName>(example).expect("example should decode");
     }
 
     #[test]
@@ -189,7 +194,7 @@ mod test {
 
     #[test]
     fn test_example_light_position_decodes() {
-        let example = serde_json::json!([1.5,90,80]);
+        let example = serde_json::json!([1.5, 90, 80]);
         let _ = serde_json::from_value::<LightPosition>(example).expect("example should decode");
     }
 
@@ -207,7 +212,8 @@ mod test {
     #[case::t_array(serde_json::json!(["array","string",3,["literal",["a","b","c"]]]))]
     #[case::t_at(serde_json::json!(["at",1,["literal",["a","b","c"]]]))]
     fn test_example_array_less_type_length_greater_decodes(#[case] example: serde_json::Value) {
-        let _ = serde_json::from_value::<ArrayLessTypeLengthGreater>(example).expect("example should decode");
+        let _ = serde_json::from_value::<ArrayLessTypeLengthGreater>(example)
+            .expect("example should decode");
     }
 
     #[rstest::rstest]
@@ -228,14 +234,16 @@ mod test {
     #[case::t_to_boolean(serde_json::json!(["to-boolean","someProperty"]))]
     #[case::t_within(serde_json::json!(["within",{"coordinates":[[[0,0],[0,5],[5,5],[5,0],[0,0]]],"type":"Polygon"}]))]
     fn test_example_boolean_expression_decodes(#[case] example: serde_json::Value) {
-        let _ = serde_json::from_value::<BooleanExpression>(example).expect("example should decode");
+        let _ =
+            serde_json::from_value::<BooleanExpression>(example).expect("example should decode");
     }
 
     #[rstest::rstest]
     #[case::t_at(serde_json::json!(["at",1,["literal",["a","b","c"]]]))]
     #[case::t_collator(serde_json::json!(["collator",{"case-sensitive":true,"diacritic-sensitive":true,"locale":"fr"}]))]
     fn test_example_collator_expression_decodes(#[case] example: serde_json::Value) {
-        let _ = serde_json::from_value::<CollatorExpression>(example).expect("example should decode");
+        let _ =
+            serde_json::from_value::<CollatorExpression>(example).expect("example should decode");
     }
 
     #[rstest::rstest]
@@ -298,8 +306,13 @@ mod test {
     #[rstest::rstest]
     #[case::t_at(serde_json::json!(["at",1,["literal",["a","b","c"]]]))]
     #[case::t_interpolate(serde_json::json!(["interpolate",["linear"],["zoom"],15,0,15.05,["get","height"]]))]
-    fn test_example_number_expression_or_array_expression_or_string_expression_or_array_expression_or_projection_decodes(#[case] example: serde_json::Value) {
-        let _ = serde_json::from_value::<NumberExpressionOrArrayExpressionOrStringExpressionOrArrayExpressionOrProjection>(example).expect("example should decode");
+    fn test_example_number_expression_or_array_expression_or_string_expression_or_array_expression_or_projection_decodes(
+        #[case] example: serde_json::Value,
+    ) {
+        let _ = serde_json::from_value::<
+            NumberExpressionOrArrayExpressionOrStringExpressionOrArrayExpressionOrProjection,
+        >(example)
+        .expect("example should decode");
     }
 
     #[rstest::rstest]
@@ -336,8 +349,11 @@ mod test {
     #[case::t_at(serde_json::json!(["at",1,["literal",["a","b","c"]]]))]
     #[case::t_interpolate_hcl(serde_json::json!(["interpolate-hcl",["linear"],["zoom"],15,"#f00",15.05,"#00f"]))]
     #[case::t_interpolate_lab(serde_json::json!(["interpolate-lab",["linear"],["zoom"],15,"#f00",15.05,"#00f"]))]
-    fn test_example_string_expression_or_array_expression_decodes(#[case] example: serde_json::Value) {
-        let _ = serde_json::from_value::<StringExpressionOrArrayExpression>(example).expect("example should decode");
+    fn test_example_string_expression_or_array_expression_decodes(
+        #[case] example: serde_json::Value,
+    ) {
+        let _ = serde_json::from_value::<StringExpressionOrArrayExpression>(example)
+            .expect("example should decode");
     }
 }
 
@@ -377,7 +393,10 @@ pub struct RootPitch(serde_json::Number);
 
 impl Default for RootPitch {
     fn default() -> Self {
-        Self(serde_json::Number::from_i128(0).expect("the number is serialised from a number and is thus always valid"))
+        Self(
+            serde_json::Number::from_i128(0)
+                .expect("the number is serialised from a number and is thus always valid"),
+        )
     }
 }
 
@@ -391,7 +410,10 @@ pub struct RootRoll(serde_json::Number);
 
 impl Default for RootRoll {
     fn default() -> Self {
-        Self(serde_json::Number::from_i128(0).expect("the number is serialised from a number and is thus always valid"))
+        Self(
+            serde_json::Number::from_i128(0)
+                .expect("the number is serialised from a number and is thus always valid"),
+        )
     }
 }
 
@@ -442,65 +464,65 @@ struct Filter(bool);
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy)]
 pub enum FilterOperator {
     /// `["!=", key, value]` inequality: `feature[key] ≠ value`
-    #[serde(rename="!=")]
+    #[serde(rename = "!=")]
     NotEqual,
     /// `["!has", key]` `feature[key]` does not exist
-    #[serde(rename="!has")]
+    #[serde(rename = "!has")]
     NotHas,
     /// `["!in", key, v0, ..., vn]` set exclusion: `feature[key] ∉ {v0, ..., vn}`
-    #[serde(rename="!in")]
+    #[serde(rename = "!in")]
     NotIn,
     /// `["<", key, value]` less than: `feature[key] < value`
-    #[serde(rename="<")]
+    #[serde(rename = "<")]
     Less,
     /// `["<=", key, value]` less than or equal: `feature[key] ≤ value`
-    #[serde(rename="<=")]
+    #[serde(rename = "<=")]
     LessEqual,
     /// `["==", key, value]` equality: `feature[key] = value`
-    #[serde(rename="==")]
+    #[serde(rename = "==")]
     EqualEqual,
     /// `[">", key, value]` greater than: `feature[key] > value`
-    #[serde(rename=">")]
+    #[serde(rename = ">")]
     Greater,
     /// `[">=", key, value]` greater than or equal: `feature[key] ≥ value`
-    #[serde(rename=">=")]
+    #[serde(rename = ">=")]
     GreaterEqual,
     /// `["all", f0, ..., fn]` logical `AND`: `f0 ∧ ... ∧ fn`
-    #[serde(rename="all")]
+    #[serde(rename = "all")]
     All,
     /// `["any", f0, ..., fn]` logical `OR`: `f0 ∨ ... ∨ fn`
-    #[serde(rename="any")]
+    #[serde(rename = "any")]
     Any,
     /// `["has", key]` `feature[key]` exists
-    #[serde(rename="has")]
+    #[serde(rename = "has")]
     Has,
     /// `["in", key, v0, ..., vn]` set inclusion: `feature[key] ∈ {v0, ..., vn}`
-    #[serde(rename="in")]
+    #[serde(rename = "in")]
     In,
     /// `["none", f0, ..., fn]` logical `NOR`: `¬f0 ∧ ... ∧ ¬fn`
-    #[serde(rename="none")]
+    #[serde(rename = "none")]
     None,
 }
 
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
 pub struct Function {
     /// The exponential base of the interpolation curve. It controls the rate at which the result increases. Higher values make the result increase more towards the high end of the range. With `1` the stops are interpolated linearly.
-    /// 
+    ///
     /// Range: 0..
     pub base: Option<FunctionBase>,
     /// The color space in which colors interpolated. Interpolating colors in perceptual color spaces like LAB and HCL tend to produce color ramps that look more consistent and produce colors that can be differentiated more easily than those interpolated in RGB space.
-    #[serde(rename="colorSpace")]
+    #[serde(rename = "colorSpace")]
     pub color_space: Option<FunctionColorSpace>,
     /// A value to serve as a fallback function result when a value isn't otherwise available. It is used in the following circumstances:
-    /// 
+    ///
     /// * In categorical functions, when the feature value does not match any of the stop domain values.
-    /// 
+    ///
     /// * In property and zoom-and-property functions, when a feature does not contain a value for the specified property.
-    /// 
+    ///
     /// * In identity functions, when the feature value is not valid for the style property (for example, if the function is being used for a `circle-color` property but the feature property value is not a string or not a valid color).
-    /// 
+    ///
     /// * In interval or exponential property and zoom-and-property functions, when the feature value is not numeric.
-    /// 
+    ///
     /// If no default is provided, the style property's default is used in these circumstances.
     pub default: Option<FunctionDefault>,
     /// An expression.
@@ -510,7 +532,7 @@ pub struct Function {
     /// An array of stops.
     pub stops: Option<FunctionStops>,
     /// The interpolation strategy to use in function evaluation.
-    #[serde(rename="type")]
+    #[serde(rename = "type")]
     pub r#type: Option<FunctionType>,
 }
 
@@ -522,7 +544,10 @@ pub struct FunctionBase(serde_json::Number);
 
 impl Default for FunctionBase {
     fn default() -> Self {
-        Self(serde_json::Number::from_i128(1).expect("the number is serialised from a number and is thus always valid"))
+        Self(
+            serde_json::Number::from_i128(1)
+                .expect("the number is serialised from a number and is thus always valid"),
+        )
     }
 }
 
@@ -530,13 +555,13 @@ impl Default for FunctionBase {
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy)]
 pub enum FunctionColorSpace {
     /// Use the HCL color space to interpolate color values, interpolating the Hue, Chroma, and Luminance channels individually.
-    #[serde(rename="hcl")]
+    #[serde(rename = "hcl")]
     Hcl,
     /// Use the LAB color space to interpolate color values.
-    #[serde(rename="lab")]
+    #[serde(rename = "lab")]
     Lab,
     /// Use the RGB color space to interpolate color values
-    #[serde(rename="rgb")]
+    #[serde(rename = "rgb")]
     Rgb,
 }
 
@@ -588,16 +613,16 @@ struct FunctionStops(Vec<FunctionStop>);
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy)]
 pub enum FunctionType {
     /// Return the output value of the stop equal to the function input.
-    #[serde(rename="categorical")]
+    #[serde(rename = "categorical")]
     Categorical,
     /// Generate an output by interpolating between stops just less than and just greater than the function input.
-    #[serde(rename="exponential")]
+    #[serde(rename = "exponential")]
     Exponential,
     /// Return the input value as the output value.
-    #[serde(rename="identity")]
+    #[serde(rename = "identity")]
     Identity,
     /// Return the output value of the stop just less than the function input.
-    #[serde(rename="interval")]
+    #[serde(rename = "interval")]
     Interval,
 }
 
@@ -648,7 +673,12 @@ struct Interpolation(InterpolationName);
 #[derive(PartialEq, Debug, Clone)]
 pub enum InterpolationName {
     /// Interpolates using the cubic bézier curve defined by the given control points.
-    CubicBezier(serde_json::Value, serde_json::Value, serde_json::Value, serde_json::Value),
+    CubicBezier(
+        serde_json::Value,
+        serde_json::Value,
+        serde_json::Value,
+        serde_json::Value,
+    ),
     /// Interpolates exponentially between the stops just less than and just greater than the input.
     Exponential(serde_json::Value),
     /// Interpolates linearly between the pair of stops just less than and just greater than the input
@@ -657,7 +687,8 @@ pub enum InterpolationName {
 
 impl<'de> serde::Deserialize<'de> for InterpolationName {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where D: serde::Deserializer<'de>,
+    where
+        D: serde::Deserializer<'de>,
     {
         deserializer.deserialize_seq(InterpolationNameVisitor)
     }
@@ -677,28 +708,35 @@ impl<'de> serde::de::Visitor<'de> for InterpolationNameVisitor {
         use serde::Deserialize;
         /// Reads the next element from the sequence or reports a missing field error.
         fn visit_seq_field<'de, A, T>(seq: &mut A, name: &'static str) -> Result<T, A::Error>
-        where A: serde::de::SeqAccess<'de>, T: serde::Deserialize<'de> {
-        seq.next_element()?.ok_or_else(|| serde::de::Error::missing_field(name))
+        where
+            A: serde::de::SeqAccess<'de>,
+            T: serde::Deserialize<'de>,
+        {
+            seq.next_element()?
+                .ok_or_else(|| serde::de::Error::missing_field(name))
         }
 
         // First element: operator string
-        let op: String = seq.next_element()?.ok_or_else(|| serde::de::Error::custom("missing operator"))?;
+        let op: String = seq
+            .next_element()?
+            .ok_or_else(|| serde::de::Error::custom("missing operator"))?;
         match op.as_str() {
-        "cubic-bezier" => {
-        let x1 = visit_seq_field(&mut seq, "x1")?;
-        let y1 = visit_seq_field(&mut seq, "y1")?;
-        let x2 = visit_seq_field(&mut seq, "x2")?;
-        let y2 = visit_seq_field(&mut seq, "y2")?;
-        Ok(InterpolationName::CubicBezier(x1, y1, x2, y2))
-        },
-        "exponential" => {
-        let base = visit_seq_field(&mut seq, "base")?;
-        Ok(InterpolationName::Exponential(base))
-        },
-        "linear" => {
-        Ok(InterpolationName::Linear)
-        },
-        _ => Err(serde::de::Error::unknown_variant(&op, &["cubic-bezier", "exponential", "linear"]))
+            "cubic-bezier" => {
+                let x1 = visit_seq_field(&mut seq, "x1")?;
+                let y1 = visit_seq_field(&mut seq, "y1")?;
+                let x2 = visit_seq_field(&mut seq, "x2")?;
+                let y2 = visit_seq_field(&mut seq, "y2")?;
+                Ok(InterpolationName::CubicBezier(x1, y1, x2, y2))
+            }
+            "exponential" => {
+                let base = visit_seq_field(&mut seq, "base")?;
+                Ok(InterpolationName::Exponential(base))
+            }
+            "linear" => Ok(InterpolationName::Linear),
+            _ => Err(serde::de::Error::unknown_variant(
+                &op,
+                &["cubic-bezier", "exponential", "linear"],
+            )),
         }
     }
 }
@@ -710,7 +748,7 @@ pub struct Light {
     /// Color tint for lighting extruded geometries.
     pub color: Option<LightColor>,
     /// Intensity of lighting (on a scale from 0 to 1). Higher numbers will present as more extreme contrast.
-    /// 
+    ///
     /// Range: 0..=1
     pub intensity: Option<LightIntensity>,
     /// Position of the light source relative to lit (extruded) geometries, in [r radial coordinate, a azimuthal angle, p polar angle] where r indicates the distance from the center of the base of an object to its light, a indicates the position of the light relative to 0° (0° when `light.anchor` is set to `viewport` corresponds to the top of the viewport, or 0° when `light.anchor` is set to `map` corresponds to due north, and degrees proceed clockwise), and p indicates the height of the light (from 0°, directly above, to 180°, directly below).
@@ -721,10 +759,10 @@ pub struct Light {
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy)]
 pub enum LightAnchor {
     /// The position of the light source is aligned to the rotation of the map.
-    #[serde(rename="map")]
+    #[serde(rename = "map")]
     Map,
     /// The position of the light source is aligned to the rotation of the viewport.
-    #[serde(rename="viewport")]
+    #[serde(rename = "viewport")]
     Viewport,
 }
 
@@ -758,7 +796,10 @@ pub struct LightIntensity(serde_json::Number);
 
 impl Default for LightIntensity {
     fn default() -> Self {
-        Self(serde_json::Number::from_f64(0.5).expect("the number is serialised from a number and is thus always valid"))
+        Self(
+            serde_json::Number::from_f64(0.5)
+                .expect("the number is serialised from a number and is thus always valid"),
+        )
     }
 }
 
@@ -768,14 +809,21 @@ struct LightPosition(Box<[serde_json::Number; 3]>);
 
 impl Default for LightPosition {
     fn default() -> Self {
-        Self(Box::new([serde_json::Number::from_f64(1.15).expect("the number is serialised from a number and is thus always valid"), serde_json::Number::from_i128(210).expect("the number is serialised from a number and is thus always valid"), serde_json::Number::from_i128(30).expect("the number is serialised from a number and is thus always valid")]))
+        Self(Box::new([
+            serde_json::Number::from_f64(1.15)
+                .expect("the number is serialised from a number and is thus always valid"),
+            serde_json::Number::from_i128(210)
+                .expect("the number is serialised from a number and is thus always valid"),
+            serde_json::Number::from_i128(30)
+                .expect("the number is serialised from a number and is thus always valid"),
+        ]))
     }
 }
 
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
 pub struct Projection {
     /// The projection definition type. Can be specified as a string, a transition state, or an expression.
-    #[serde(rename="type")]
+    #[serde(rename = "type")]
     pub r#type: Option<ProjectionType>,
 }
 
@@ -793,7 +841,7 @@ impl Default for ProjectionType {
 pub struct PromoteId {
     /// A name of a feature property to use as ID for feature state.
     #[serde(flatten)]
-    pub star: Option<std::collections::BTreeMap<String,PromoteIdStar>>,
+    pub star: Option<std::collections::BTreeMap<String, PromoteIdStar>>,
 }
 
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
@@ -802,33 +850,33 @@ pub struct PropertyType;
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
 pub struct Sky {
     /// How to blend the atmosphere. Where 1 is visible atmosphere and 0 is hidden. It is best to interpolate this expression when using globe projection.
-    /// 
+    ///
     /// Range: 0..=1
-    #[serde(rename="atmosphere-blend")]
+    #[serde(rename = "atmosphere-blend")]
     pub atmosphere_blend: Option<SkyAtmosphereBlend>,
     /// The base color for the fog. Requires 3D terrain.
-    #[serde(rename="fog-color")]
+    #[serde(rename = "fog-color")]
     pub fog_color: Option<SkyFogColor>,
     /// How to blend the fog over the 3D terrain. Where 0 is the map center and 1 is the horizon.
-    /// 
+    ///
     /// Range: 0..=1
-    #[serde(rename="fog-ground-blend")]
+    #[serde(rename = "fog-ground-blend")]
     pub fog_ground_blend: Option<SkyFogGroundBlend>,
     /// The base color at the horizon.
-    #[serde(rename="horizon-color")]
+    #[serde(rename = "horizon-color")]
     pub horizon_color: Option<SkyHorizonColor>,
     /// How to blend the fog color and the horizon color. Where 0 is using the horizon color only and 1 is using the fog color only.
-    /// 
+    ///
     /// Range: 0..=1
-    #[serde(rename="horizon-fog-blend")]
+    #[serde(rename = "horizon-fog-blend")]
     pub horizon_fog_blend: Option<SkyHorizonFogBlend>,
     /// The base color for the sky.
-    #[serde(rename="sky-color")]
+    #[serde(rename = "sky-color")]
     pub sky_color: Option<SkySkyColor>,
     /// How to blend the sky color and the horizon color. Where 1 is blending the color at the middle of the sky and 0 is not blending at all and using the sky color only.
-    /// 
+    ///
     /// Range: 0..=1
-    #[serde(rename="sky-horizon-blend")]
+    #[serde(rename = "sky-horizon-blend")]
     pub sky_horizon_blend: Option<SkySkyHorizonBlend>,
 }
 
@@ -840,7 +888,10 @@ pub struct SkyAtmosphereBlend(serde_json::Number);
 
 impl Default for SkyAtmosphereBlend {
     fn default() -> Self {
-        Self(serde_json::Number::from_f64(0.8).expect("the number is serialised from a number and is thus always valid"))
+        Self(
+            serde_json::Number::from_f64(0.8)
+                .expect("the number is serialised from a number and is thus always valid"),
+        )
     }
 }
 
@@ -862,7 +913,10 @@ pub struct SkyFogGroundBlend(serde_json::Number);
 
 impl Default for SkyFogGroundBlend {
     fn default() -> Self {
-        Self(serde_json::Number::from_f64(0.5).expect("the number is serialised from a number and is thus always valid"))
+        Self(
+            serde_json::Number::from_f64(0.5)
+                .expect("the number is serialised from a number and is thus always valid"),
+        )
     }
 }
 
@@ -884,7 +938,10 @@ pub struct SkyHorizonFogBlend(serde_json::Number);
 
 impl Default for SkyHorizonFogBlend {
     fn default() -> Self {
-        Self(serde_json::Number::from_f64(0.8).expect("the number is serialised from a number and is thus always valid"))
+        Self(
+            serde_json::Number::from_f64(0.8)
+                .expect("the number is serialised from a number and is thus always valid"),
+        )
     }
 }
 
@@ -906,14 +963,17 @@ pub struct SkySkyHorizonBlend(serde_json::Number);
 
 impl Default for SkySkyHorizonBlend {
     fn default() -> Self {
-        Self(serde_json::Number::from_f64(0.8).expect("the number is serialised from a number and is thus always valid"))
+        Self(
+            serde_json::Number::from_f64(0.8)
+                .expect("the number is serialised from a number and is thus always valid"),
+        )
     }
 }
 
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
 pub struct Terrain {
     /// The exaggeration of the terrain - how high it will look.
-    /// 
+    ///
     /// Range: 0..
     pub exaggeration: Option<TerrainExaggeration>,
     /// The source for the terrain data.
@@ -928,7 +988,10 @@ pub struct TerrainExaggeration(serde_json::Number);
 
 impl Default for TerrainExaggeration {
     fn default() -> Self {
-        Self(serde_json::Number::from_f64(1.0).expect("the number is serialised from a number and is thus always valid"))
+        Self(
+            serde_json::Number::from_f64(1.0)
+                .expect("the number is serialised from a number and is thus always valid"),
+        )
     }
 }
 
@@ -939,11 +1002,11 @@ pub struct TerrainSource(String);
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
 pub struct Transition {
     /// Length of time before a transition begins.
-    /// 
+    ///
     /// Range: 0..
     pub delay: Option<TransitionDelay>,
     /// Time allotted for transitions to complete.
-    /// 
+    ///
     /// Range: 0..
     pub duration: Option<TransitionDuration>,
 }
@@ -956,7 +1019,10 @@ pub struct TransitionDelay(serde_json::Number);
 
 impl Default for TransitionDelay {
     fn default() -> Self {
-        Self(serde_json::Number::from_i128(0).expect("the number is serialised from a number and is thus always valid"))
+        Self(
+            serde_json::Number::from_i128(0)
+                .expect("the number is serialised from a number and is thus always valid"),
+        )
     }
 }
 
@@ -968,7 +1034,10 @@ pub struct TransitionDuration(serde_json::Number);
 
 impl Default for TransitionDuration {
     fn default() -> Self {
-        Self(serde_json::Number::from_i128(300).expect("the number is serialised from a number and is thus always valid"))
+        Self(
+            serde_json::Number::from_i128(300)
+                .expect("the number is serialised from a number and is thus always valid"),
+        )
     }
 }
 
@@ -980,11 +1049,15 @@ pub enum ArrayExpression {
     /// Retrieves an item from an array.
     At(serde_json::Value, serde_json::Value),
     /// Provides a literal array or object value.
-    /// 
+    ///
     ///  - [Display and style rich text labels](https://maplibre.org/maplibre-gl-js/docs/examples/display-and-style-rich-text-labels/)
     Literal(serde_json::Value),
     /// Returns a subarray from an array or a substring from a string from a specified start index, or between a start index and an end index if set. The return value is inclusive of the start index but not of the end index. In a string, a UTF-16 surrogate pair counts as a single position.
-    Slice(serde_json::Value, serde_json::Value, Option<serde_json::Value>),
+    Slice(
+        serde_json::Value,
+        serde_json::Value,
+        Option<serde_json::Value>,
+    ),
     /// Returns a four-element array containing the input color's red, green, blue, and alpha components, in that order.
     ToRgba(serde_json::Value),
 }
@@ -999,7 +1072,8 @@ pub enum ArrayOptions {
 
 impl<'de> serde::Deserialize<'de> for ArrayExpression {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where D: serde::Deserializer<'de>,
+    where
+        D: serde::Deserializer<'de>,
     {
         deserializer.deserialize_seq(ArrayExpressionVisitor)
     }
@@ -1012,46 +1086,56 @@ impl<'de> serde::de::Visitor<'de> for ArrayExpressionVisitor {
     type Value = ArrayExpression;
 
     fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
-        formatter.write_str(r#"an ArrayExpression like ["array","string",3,["literal",["a","b","c"]]]"#)
+        formatter
+            .write_str(r#"an ArrayExpression like ["array","string",3,["literal",["a","b","c"]]]"#)
     }
 
     fn visit_seq<A: serde::de::SeqAccess<'de>>(self, mut seq: A) -> Result<Self::Value, A::Error> {
         use serde::Deserialize;
         /// Reads the next element from the sequence or reports a missing field error.
         fn visit_seq_field<'de, A, T>(seq: &mut A, name: &'static str) -> Result<T, A::Error>
-        where A: serde::de::SeqAccess<'de>, T: serde::Deserialize<'de> {
-        seq.next_element()?.ok_or_else(|| serde::de::Error::missing_field(name))
+        where
+            A: serde::de::SeqAccess<'de>,
+            T: serde::Deserialize<'de>,
+        {
+            seq.next_element()?
+                .ok_or_else(|| serde::de::Error::missing_field(name))
         }
 
         // First element: operator string
-        let op: String = seq.next_element()?.ok_or_else(|| serde::de::Error::custom("missing operator"))?;
+        let op: String = seq
+            .next_element()?
+            .ok_or_else(|| serde::de::Error::custom("missing operator"))?;
         match op.as_str() {
-        "array" => {
-        // Delegate the remainder of the sequence to ArrayOptions deserialization
-        let remainder_of_sequence = serde::de::value::SeqAccessDeserializer::new(seq);
-        let options = ArrayOptions::deserialize(remainder_of_sequence)?;
-        Ok(ArrayExpression::Array(options))
-        },
-        "at" => {
-        let index = visit_seq_field(&mut seq, "index")?;
-        let array = visit_seq_field(&mut seq, "array")?;
-        Ok(ArrayExpression::At(index, array))
-        },
-        "literal" => {
-        let json_array = visit_seq_field(&mut seq, "json_array")?;
-        Ok(ArrayExpression::Literal(json_array))
-        },
-        "slice" => {
-        let array = visit_seq_field(&mut seq, "array")?;
-        let start_index = visit_seq_field(&mut seq, "start_index")?;
-        let end_index = seq.next_element()?;
-        Ok(ArrayExpression::Slice(array, start_index, end_index))
-        },
-        "to-rgba" => {
-        let color = visit_seq_field(&mut seq, "color")?;
-        Ok(ArrayExpression::ToRgba(color))
-        },
-        _ => Err(serde::de::Error::unknown_variant(&op, &["array", "at", "literal", "slice", "to-rgba"]))
+            "array" => {
+                // Delegate the remainder of the sequence to ArrayOptions deserialization
+                let remainder_of_sequence = serde::de::value::SeqAccessDeserializer::new(seq);
+                let options = ArrayOptions::deserialize(remainder_of_sequence)?;
+                Ok(ArrayExpression::Array(options))
+            }
+            "at" => {
+                let index = visit_seq_field(&mut seq, "index")?;
+                let array = visit_seq_field(&mut seq, "array")?;
+                Ok(ArrayExpression::At(index, array))
+            }
+            "literal" => {
+                let json_array = visit_seq_field(&mut seq, "json_array")?;
+                Ok(ArrayExpression::Literal(json_array))
+            }
+            "slice" => {
+                let array = visit_seq_field(&mut seq, "array")?;
+                let start_index = visit_seq_field(&mut seq, "start_index")?;
+                let end_index = seq.next_element()?;
+                Ok(ArrayExpression::Slice(array, start_index, end_index))
+            }
+            "to-rgba" => {
+                let color = visit_seq_field(&mut seq, "color")?;
+                Ok(ArrayExpression::ToRgba(color))
+            }
+            _ => Err(serde::de::Error::unknown_variant(
+                &op,
+                &["array", "at", "literal", "slice", "to-rgba"],
+            )),
         }
     }
 }
@@ -1067,7 +1151,8 @@ pub enum ArrayLessTypeLengthGreater {
 
 impl<'de> serde::Deserialize<'de> for ArrayLessTypeLengthGreater {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where D: serde::Deserializer<'de>,
+    where
+        D: serde::Deserializer<'de>,
     {
         deserializer.deserialize_seq(ArrayLessTypeLengthGreaterVisitor)
     }
@@ -1080,32 +1165,40 @@ impl<'de> serde::de::Visitor<'de> for ArrayLessTypeLengthGreaterVisitor {
     type Value = ArrayLessTypeLengthGreater;
 
     fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
-        formatter.write_str(r#"an ArrayLessTypeLengthGreater like ["array","string",3,["literal",["a","b","c"]]]"#)
+        formatter.write_str(
+            r#"an ArrayLessTypeLengthGreater like ["array","string",3,["literal",["a","b","c"]]]"#,
+        )
     }
 
     fn visit_seq<A: serde::de::SeqAccess<'de>>(self, mut seq: A) -> Result<Self::Value, A::Error> {
         use serde::Deserialize;
         /// Reads the next element from the sequence or reports a missing field error.
         fn visit_seq_field<'de, A, T>(seq: &mut A, name: &'static str) -> Result<T, A::Error>
-        where A: serde::de::SeqAccess<'de>, T: serde::Deserialize<'de> {
-        seq.next_element()?.ok_or_else(|| serde::de::Error::missing_field(name))
+        where
+            A: serde::de::SeqAccess<'de>,
+            T: serde::Deserialize<'de>,
+        {
+            seq.next_element()?
+                .ok_or_else(|| serde::de::Error::missing_field(name))
         }
 
         // First element: operator string
-        let op: String = seq.next_element()?.ok_or_else(|| serde::de::Error::custom("missing operator"))?;
+        let op: String = seq
+            .next_element()?
+            .ok_or_else(|| serde::de::Error::custom("missing operator"))?;
         match op.as_str() {
-        "array" => {
-        let type = visit_seq_field(&mut seq, "type")?;
-        let length = visit_seq_field(&mut seq, "length")?;
-        let value = visit_seq_field(&mut seq, "value")?;
-        Ok(ArrayLessTypeLengthGreater::Array(type, length, value))
-        },
-        "at" => {
-        let index = visit_seq_field(&mut seq, "index")?;
-        let array = visit_seq_field(&mut seq, "array")?;
-        Ok(ArrayLessTypeLengthGreater::At(index, array))
-        },
-        _ => Err(serde::de::Error::unknown_variant(&op, &["array", "at"]))
+            "array" => {
+                let r#type = visit_seq_field(&mut seq, "type")?;
+                let length = visit_seq_field(&mut seq, "length")?;
+                let value = visit_seq_field(&mut seq, "value")?;
+                Ok(ArrayLessTypeLengthGreater::Array(r#type, length, value))
+            }
+            "at" => {
+                let index = visit_seq_field(&mut seq, "index")?;
+                let array = visit_seq_field(&mut seq, "array")?;
+                Ok(ArrayLessTypeLengthGreater::At(index, array))
+            }
+            _ => Err(serde::de::Error::unknown_variant(&op, &["array", "at"])),
         }
     }
 }
@@ -1114,37 +1207,45 @@ impl<'de> serde::de::Visitor<'de> for ArrayLessTypeLengthGreaterVisitor {
 #[derive(PartialEq, Debug, Clone)]
 pub enum BooleanExpression {
     /// Logical negation. Returns `true` if the input is `false`, and `false` if the input is `true`.
-    /// 
+    ///
     ///  - [Create and style clusters](https://maplibre.org/maplibre-gl-js/docs/examples/create-and-style-clusters/)
     Not(serde_json::Value),
     /// Returns `true` if the input values are not equal, `false` otherwise. The comparison is strictly typed: values of different runtime types are always considered unequal. Cases where the types are known to be different at parse time are considered invalid and will produce a parse error. Accepts an optional `collator` argument to control locale-dependent string comparisons.
-    /// 
+    ///
     ///  - [Display HTML clusters with custom properties](https://maplibre.org/maplibre-gl-js/docs/examples/display-html-clusters-with-custom-properties/)
-    NotEqual(serde_json::Value, serde_json::Value, Option<serde_json::Value>),
+    NotEqual(
+        serde_json::Value,
+        serde_json::Value,
+        Option<serde_json::Value>,
+    ),
     /// Returns `true` if the first input is strictly less than the second, `false` otherwise. The arguments are required to be either both strings or both numbers; if during evaluation they are not, expression evaluation produces an error. Cases where this constraint is known not to hold at parse time are considered in valid and will produce a parse error. Accepts an optional `collator` argument to control locale-dependent string comparisons.
-    /// 
+    ///
     ///  - [Display HTML clusters with custom properties](https://maplibre.org/maplibre-gl-js/docs/examples/display-html-clusters-with-custom-properties/)
     Less(LessOptions),
     /// Returns `true` if the first input is less than or equal to the second, `false` otherwise. The arguments are required to be either both strings or both numbers; if during evaluation they are not, expression evaluation produces an error. Cases where this constraint is known not to hold at parse time are considered in valid and will produce a parse error. Accepts an optional `collator` argument to control locale-dependent string comparisons.
     LessEqual(LessEqualOptions),
     /// Returns `true` if the input values are equal, `false` otherwise. The comparison is strictly typed: values of different runtime types are always considered unequal. Cases where the types are known to be different at parse time are considered invalid and will produce a parse error. Accepts an optional `collator` argument to control locale-dependent string comparisons.
-    /// 
+    ///
     ///  - [Add multiple geometries from one GeoJSON source](https://maplibre.org/maplibre-gl-js/docs/examples/multiple-geometries/)
-    /// 
+    ///
     ///  - [Create a time slider](https://maplibre.org/maplibre-gl-js/docs/examples/timeline-animation/)
-    /// 
+    ///
     ///  - [Display buildings in 3D](https://maplibre.org/maplibre-gl-js/docs/examples/display-buildings-in-3d/)
-    /// 
+    ///
     ///  - [Filter symbols by toggling a list](https://maplibre.org/maplibre-gl-js/docs/examples/filter-symbols-by-toggling-a-list/)
-    EqualEqual(serde_json::Value, serde_json::Value, Option<serde_json::Value>),
+    EqualEqual(
+        serde_json::Value,
+        serde_json::Value,
+        Option<serde_json::Value>,
+    ),
     /// Returns `true` if the first input is strictly greater than the second, `false` otherwise. The arguments are required to be either both strings or both numbers; if during evaluation they are not, expression evaluation produces an error. Cases where this constraint is known not to hold at parse time are considered in valid and will produce a parse error. Accepts an optional `collator` argument to control locale-dependent string comparisons.
     Greater(GreaterOptions),
     /// Returns `true` if the first input is greater than or equal to the second, `false` otherwise. The arguments are required to be either both strings or both numbers; if during evaluation they are not, expression evaluation produces an error. Cases where this constraint is known not to hold at parse time are considered in valid and will produce a parse error. Accepts an optional `collator` argument to control locale-dependent string comparisons.
-    /// 
+    ///
     ///  - [Display HTML clusters with custom properties](https://maplibre.org/maplibre-gl-js/docs/examples/display-html-clusters-with-custom-properties/)
     GreaterEqual(GreaterEqualOptions),
     /// Returns `true` if all the inputs are `true`, `false` otherwise. The inputs are evaluated in order, and evaluation is short-circuiting: once an input expression evaluates to `false`, the result is `false` and no further input expressions are evaluated.
-    /// 
+    ///
     ///  - [Display HTML clusters with custom properties](https://maplibre.org/maplibre-gl-js/docs/examples/display-html-clusters-with-custom-properties/)
     All(Vec<BooleanExpression>),
     /// Returns `true` if any of the inputs are `true`, `false` otherwise. The inputs are evaluated in order, and evaluation is short-circuiting: once an input expression evaluates to `true`, the result is `true` and no further input expressions are evaluated.
@@ -1152,15 +1253,15 @@ pub enum BooleanExpression {
     /// Retrieves an item from an array.
     At(serde_json::Value, serde_json::Value),
     /// Asserts that the input value is a boolean. If multiple values are provided, each one is evaluated in order until a boolean is obtained. If none of the inputs are booleans, the expression is an error.
-    /// 
+    ///
     ///  - [Create a hover effect](https://maplibre.org/maplibre-gl-js/docs/examples/create-a-hover-effect/)
     Boolean(Vec<Expression>),
     /// Tests for the presence of a property value in the current feature's properties, or from another object if a second argument is provided.
-    /// 
+    ///
     ///  - [Create and style clusters](https://maplibre.org/maplibre-gl-js/docs/examples/create-and-style-clusters/)
     Has(serde_json::Value, Option<serde_json::Value>),
     /// Determines whether an item exists in an array or a substring exists in a string.
-    /// 
+    ///
     ///  - [Measure distances](https://maplibre.org/maplibre-gl-js/docs/examples/measure-distances/)
     In(InOptions),
     /// Returns `true` if the input string is expected to render legibly. Returns `false` if the input string contains sections that cannot be rendered without potential loss of meaning (e.g. Indic scripts that require complex text shaping, or right-to-left scripts if the `mapbox-gl-rtl-text` plugin is not in use in MapLibre GL JS).
@@ -1168,9 +1269,9 @@ pub enum BooleanExpression {
     /// Converts the input value to a boolean. The result is `false` when the input is an empty string, 0, `false`, `null`, or `NaN`; otherwise it is `true`.
     ToBoolean(serde_json::Value),
     /// Returns `true` if the evaluated feature is fully contained inside a boundary of the input geometry, `false` otherwise. The input value can be a valid GeoJSON of type `Polygon`, `MultiPolygon`, `Feature`, or `FeatureCollection`. Supported features for evaluation:
-    /// 
+    ///
     /// - `Point`: Returns `false` if a point is on the boundary or falls outside the boundary.
-    /// 
+    ///
     /// - `LineString`: Returns `false` if any part of a line falls outside the boundary, the line intersects the boundary, or a line's endpoint is on the boundary.
     Within(serde_json::Value),
 }
@@ -1179,32 +1280,64 @@ pub enum BooleanExpression {
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
 #[serde(untagged)]
 pub enum LessOptions {
-    Number(StringExpression, StringExpression, Option<CollatorExpression>),
-    String(NumberExpression, NumberExpression, Option<CollatorExpression>),
+    Number(
+        StringExpression,
+        StringExpression,
+        Option<CollatorExpression>,
+    ),
+    String(
+        NumberExpression,
+        NumberExpression,
+        Option<CollatorExpression>,
+    ),
 }
 
 /// Options for deserializing the syntax enum variant [`BooleanExpression::LessEqual`]
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
 #[serde(untagged)]
 pub enum LessEqualOptions {
-    Number(StringExpression, StringExpression, Option<CollatorExpression>),
-    String(NumberExpression, NumberExpression, Option<CollatorExpression>),
+    Number(
+        StringExpression,
+        StringExpression,
+        Option<CollatorExpression>,
+    ),
+    String(
+        NumberExpression,
+        NumberExpression,
+        Option<CollatorExpression>,
+    ),
 }
 
 /// Options for deserializing the syntax enum variant [`BooleanExpression::Greater`]
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
 #[serde(untagged)]
 pub enum GreaterOptions {
-    Number(StringExpression, StringExpression, Option<CollatorExpression>),
-    String(NumberExpression, NumberExpression, Option<CollatorExpression>),
+    Number(
+        StringExpression,
+        StringExpression,
+        Option<CollatorExpression>,
+    ),
+    String(
+        NumberExpression,
+        NumberExpression,
+        Option<CollatorExpression>,
+    ),
 }
 
 /// Options for deserializing the syntax enum variant [`BooleanExpression::GreaterEqual`]
 #[derive(serde::Deserialize, PartialEq, Debug, Clone)]
 #[serde(untagged)]
 pub enum GreaterEqualOptions {
-    Number(StringExpression, StringExpression, Option<CollatorExpression>),
-    String(NumberExpression, NumberExpression, Option<CollatorExpression>),
+    Number(
+        StringExpression,
+        StringExpression,
+        Option<CollatorExpression>,
+    ),
+    String(
+        NumberExpression,
+        NumberExpression,
+        Option<CollatorExpression>,
+    ),
 }
 
 /// Options for deserializing the syntax enum variant [`BooleanExpression::In`]
@@ -1217,7 +1350,8 @@ pub enum InOptions {
 
 impl<'de> serde::Deserialize<'de> for BooleanExpression {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where D: serde::Deserializer<'de>,
+    where
+        D: serde::Deserializer<'de>,
     {
         deserializer.deserialize_seq(BooleanExpressionVisitor)
     }
@@ -1237,112 +1371,144 @@ impl<'de> serde::de::Visitor<'de> for BooleanExpressionVisitor {
         use serde::Deserialize;
         /// Reads the next element from the sequence or reports a missing field error.
         fn visit_seq_field<'de, A, T>(seq: &mut A, name: &'static str) -> Result<T, A::Error>
-        where A: serde::de::SeqAccess<'de>, T: serde::Deserialize<'de> {
-        seq.next_element()?.ok_or_else(|| serde::de::Error::missing_field(name))
+        where
+            A: serde::de::SeqAccess<'de>,
+            T: serde::Deserialize<'de>,
+        {
+            seq.next_element()?
+                .ok_or_else(|| serde::de::Error::missing_field(name))
         }
 
         // First element: operator string
-        let op: String = seq.next_element()?.ok_or_else(|| serde::de::Error::custom("missing operator"))?;
+        let op: String = seq
+            .next_element()?
+            .ok_or_else(|| serde::de::Error::custom("missing operator"))?;
         match op.as_str() {
-        "!" => {
-        let input = visit_seq_field(&mut seq, "input")?;
-        Ok(BooleanExpression::Not(input))
-        },
-        "!=" => {
-        let input_1 = visit_seq_field(&mut seq, "input_1")?;
-        let input_2 = visit_seq_field(&mut seq, "input_2")?;
-        let collator = seq.next_element()?;
-        Ok(BooleanExpression::NotEqual(input_1, input_2, collator))
-        },
-        "<" => {
-        // Delegate the remainder of the sequence to LessOptions deserialization
-        let remainder_of_sequence = serde::de::value::SeqAccessDeserializer::new(seq);
-        let options = LessOptions::deserialize(remainder_of_sequence)?;
-        Ok(BooleanExpression::Less(options))
-        },
-        "<=" => {
-        // Delegate the remainder of the sequence to LessEqualOptions deserialization
-        let remainder_of_sequence = serde::de::value::SeqAccessDeserializer::new(seq);
-        let options = LessEqualOptions::deserialize(remainder_of_sequence)?;
-        Ok(BooleanExpression::LessEqual(options))
-        },
-        "==" => {
-        let input_1 = visit_seq_field(&mut seq, "input_1")?;
-        let input_2 = visit_seq_field(&mut seq, "input_2")?;
-        let collator = seq.next_element()?;
-        Ok(BooleanExpression::EqualEqual(input_1, input_2, collator))
-        },
-        ">" => {
-        // Delegate the remainder of the sequence to GreaterOptions deserialization
-        let remainder_of_sequence = serde::de::value::SeqAccessDeserializer::new(seq);
-        let options = GreaterOptions::deserialize(remainder_of_sequence)?;
-        Ok(BooleanExpression::Greater(options))
-        },
-        ">=" => {
-        // Delegate the remainder of the sequence to GreaterEqualOptions deserialization
-        let remainder_of_sequence = serde::de::value::SeqAccessDeserializer::new(seq);
-        let options = GreaterEqualOptions::deserialize(remainder_of_sequence)?;
-        Ok(BooleanExpression::GreaterEqual(options))
-        },
-        "all" => {
-        let mut inputs = Vec::new();
-        while let Some(element) = seq.next_element()? {
-        inputs.push(element);
-        }
-        if inputs.is_empty() {
-        return Err(serde::de::Error::custom("BooleanExpression::All requires at least one argument"));
-        }
-        Ok(BooleanExpression::All(inputs))
-        },
-        "any" => {
-        let mut inputs = Vec::new();
-        while let Some(element) = seq.next_element()? {
-        inputs.push(element);
-        }
-        if inputs.is_empty() {
-        return Err(serde::de::Error::custom("BooleanExpression::Any requires at least one argument"));
-        }
-        Ok(BooleanExpression::Any(inputs))
-        },
-        "at" => {
-        let index = visit_seq_field(&mut seq, "index")?;
-        let array = visit_seq_field(&mut seq, "array")?;
-        Ok(BooleanExpression::At(index, array))
-        },
-        "boolean" => {
-        let mut inputs = Vec::new();
-        while let Some(element) = seq.next_element()? {
-        inputs.push(element);
-        }
-        if inputs.is_empty() {
-        return Err(serde::de::Error::custom("BooleanExpression::Boolean requires at least one argument"));
-        }
-        Ok(BooleanExpression::Boolean(inputs))
-        },
-        "has" => {
-        let property_name = visit_seq_field(&mut seq, "property_name")?;
-        let object = seq.next_element()?;
-        Ok(BooleanExpression::Has(property_name, object))
-        },
-        "in" => {
-        // Delegate the remainder of the sequence to InOptions deserialization
-        let remainder_of_sequence = serde::de::value::SeqAccessDeserializer::new(seq);
-        let options = InOptions::deserialize(remainder_of_sequence)?;
-        Ok(BooleanExpression::In(options))
-        },
-        "is-supported-script" => {
-        let input = visit_seq_field(&mut seq, "input")?;
-        Ok(BooleanExpression::IsSupportedScript(input))
-        },
-        "to-boolean" => {
-        let value = visit_seq_field(&mut seq, "value")?;
-        Ok(BooleanExpression::ToBoolean(value))
-        },
-        "within" => {
-        let geojson = visit_seq_field(&mut seq, "geojson")?;
-        Ok(BooleanExpression::Within(geojson))
-        },
-        _ => Err(serde::de::Error::unknown_variant(&op, &["!", "!=", "<", "<=", "==", ">", ">=", "all", "any", "at", "boolean", "has", "in", "is-supported-script", "to-boolean", "within"]))
+            "!" => {
+                let input = visit_seq_field(&mut seq, "input")?;
+                Ok(BooleanExpression::Not(input))
+            }
+            "!=" => {
+                let input_1 = visit_seq_field(&mut seq, "input_1")?;
+                let input_2 = visit_seq_field(&mut seq, "input_2")?;
+                let collator = seq.next_element()?;
+                Ok(BooleanExpression::NotEqual(input_1, input_2, collator))
+            }
+            "<" => {
+                // Delegate the remainder of the sequence to LessOptions deserialization
+                let remainder_of_sequence = serde::de::value::SeqAccessDeserializer::new(seq);
+                let options = LessOptions::deserialize(remainder_of_sequence)?;
+                Ok(BooleanExpression::Less(options))
+            }
+            "<=" => {
+                // Delegate the remainder of the sequence to LessEqualOptions deserialization
+                let remainder_of_sequence = serde::de::value::SeqAccessDeserializer::new(seq);
+                let options = LessEqualOptions::deserialize(remainder_of_sequence)?;
+                Ok(BooleanExpression::LessEqual(options))
+            }
+            "==" => {
+                let input_1 = visit_seq_field(&mut seq, "input_1")?;
+                let input_2 = visit_seq_field(&mut seq, "input_2")?;
+                let collator = seq.next_element()?;
+                Ok(BooleanExpression::EqualEqual(input_1, input_2, collator))
+            }
+            ">" => {
+                // Delegate the remainder of the sequence to GreaterOptions deserialization
+                let remainder_of_sequence = serde::de::value::SeqAccessDeserializer::new(seq);
+                let options = GreaterOptions::deserialize(remainder_of_sequence)?;
+                Ok(BooleanExpression::Greater(options))
+            }
+            ">=" => {
+                // Delegate the remainder of the sequence to GreaterEqualOptions deserialization
+                let remainder_of_sequence = serde::de::value::SeqAccessDeserializer::new(seq);
+                let options = GreaterEqualOptions::deserialize(remainder_of_sequence)?;
+                Ok(BooleanExpression::GreaterEqual(options))
+            }
+            "all" => {
+                let mut inputs = Vec::new();
+                while let Some(element) = seq.next_element()? {
+                    inputs.push(element);
+                }
+                if inputs.is_empty() {
+                    return Err(serde::de::Error::custom(
+                        "BooleanExpression::All requires at least one argument",
+                    ));
+                }
+                Ok(BooleanExpression::All(inputs))
+            }
+            "any" => {
+                let mut inputs = Vec::new();
+                while let Some(element) = seq.next_element()? {
+                    inputs.push(element);
+                }
+                if inputs.is_empty() {
+                    return Err(serde::de::Error::custom(
+                        "BooleanExpression::Any requires at least one argument",
+                    ));
+                }
+                Ok(BooleanExpression::Any(inputs))
+            }
+            "at" => {
+                let index = visit_seq_field(&mut seq, "index")?;
+                let array = visit_seq_field(&mut seq, "array")?;
+                Ok(BooleanExpression::At(index, array))
+            }
+            "boolean" => {
+                let mut inputs = Vec::new();
+                while let Some(element) = seq.next_element()? {
+                    inputs.push(element);
+                }
+                if inputs.is_empty() {
+                    return Err(serde::de::Error::custom(
+                        "BooleanExpression::Boolean requires at least one argument",
+                    ));
+                }
+                Ok(BooleanExpression::Boolean(inputs))
+            }
+            "has" => {
+                let property_name = visit_seq_field(&mut seq, "property_name")?;
+                let object = seq.next_element()?;
+                Ok(BooleanExpression::Has(property_name, object))
+            }
+            "in" => {
+                // Delegate the remainder of the sequence to InOptions deserialization
+                let remainder_of_sequence = serde::de::value::SeqAccessDeserializer::new(seq);
+                let options = InOptions::deserialize(remainder_of_sequence)?;
+                Ok(BooleanExpression::In(options))
+            }
+            "is-supported-script" => {
+                let input = visit_seq_field(&mut seq, "input")?;
+                Ok(BooleanExpression::IsSupportedScript(input))
+            }
+            "to-boolean" => {
+                let value = visit_seq_field(&mut seq, "value")?;
+                Ok(BooleanExpression::ToBoolean(value))
+            }
+            "within" => {
+                let geojson = visit_seq_field(&mut seq, "geojson")?;
+                Ok(BooleanExpression::Within(geojson))
+            }
+            _ => Err(serde::de::Error::unknown_variant(
+                &op,
+                &[
+                    "!",
+                    "!=",
+                    "<",
+                    "<=",
+                    "==",
+                    ">",
+                    ">=",
+                    "all",
+                    "any",
+                    "at",
+                    "boolean",
+                    "has",
+                    "in",
+                    "is-supported-script",
+                    "to-boolean",
+                    "within",
+                ],
+            )),
         }
     }
 }
@@ -1358,7 +1524,8 @@ pub enum CollatorExpression {
 
 impl<'de> serde::Deserialize<'de> for CollatorExpression {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where D: serde::Deserializer<'de>,
+    where
+        D: serde::Deserializer<'de>,
     {
         deserializer.deserialize_seq(CollatorExpressionVisitor)
     }
@@ -1378,23 +1545,29 @@ impl<'de> serde::de::Visitor<'de> for CollatorExpressionVisitor {
         use serde::Deserialize;
         /// Reads the next element from the sequence or reports a missing field error.
         fn visit_seq_field<'de, A, T>(seq: &mut A, name: &'static str) -> Result<T, A::Error>
-        where A: serde::de::SeqAccess<'de>, T: serde::Deserialize<'de> {
-        seq.next_element()?.ok_or_else(|| serde::de::Error::missing_field(name))
+        where
+            A: serde::de::SeqAccess<'de>,
+            T: serde::Deserialize<'de>,
+        {
+            seq.next_element()?
+                .ok_or_else(|| serde::de::Error::missing_field(name))
         }
 
         // First element: operator string
-        let op: String = seq.next_element()?.ok_or_else(|| serde::de::Error::custom("missing operator"))?;
+        let op: String = seq
+            .next_element()?
+            .ok_or_else(|| serde::de::Error::custom("missing operator"))?;
         match op.as_str() {
-        "at" => {
-        let index = visit_seq_field(&mut seq, "index")?;
-        let array = visit_seq_field(&mut seq, "array")?;
-        Ok(CollatorExpression::At(index, array))
-        },
-        "collator" => {
-        let options = visit_seq_field(&mut seq, "options")?;
-        Ok(CollatorExpression::Collator(options))
-        },
-        _ => Err(serde::de::Error::unknown_variant(&op, &["at", "collator"]))
+            "at" => {
+                let index = visit_seq_field(&mut seq, "index")?;
+                let array = visit_seq_field(&mut seq, "array")?;
+                Ok(CollatorExpression::At(index, array))
+            }
+            "collator" => {
+                let options = visit_seq_field(&mut seq, "options")?;
+                Ok(CollatorExpression::Collator(options))
+            }
+            _ => Err(serde::de::Error::unknown_variant(&op, &["at", "collator"])),
         }
     }
 }
@@ -1407,25 +1580,25 @@ pub enum Expression {
     /// Retrieves an item from an array.
     At(serde_json::Value, serde_json::Value),
     /// Selects the first output whose corresponding test condition evaluates to true, or the fallback value otherwise.
-    /// 
+    ///
     ///  - [Create a hover effect](https://maplibre.org/maplibre-gl-js/docs/examples/create-a-hover-effect/)
-    /// 
+    ///
     ///  - [Display HTML clusters with custom properties](https://maplibre.org/maplibre-gl-js/docs/examples/display-html-clusters-with-custom-properties/)
-    Case(Vec<(BooleanExpression,Expression)>),
+    Case(Vec<(BooleanExpression, Expression)>),
     /// Evaluates each expression in turn until the first non-null value is obtained, and returns that value.
-    /// 
+    ///
     ///  - [Use a fallback image](https://maplibre.org/maplibre-gl-js/docs/examples/use-a-fallback-image/)
     Coalesce(Vec<Expression>),
     /// Retrieves a property value from the current feature's state. Returns null if the requested property is not present on the feature's state. A feature's state is not part of the GeoJSON or vector tile data, and must be set programmatically on each feature. When `source.promoteId` is not provided, features are identified by their `id` attribute, which must be an integer or a string that can be cast to an integer. When `source.promoteId` is provided, features are identified by their `promoteId` property, which may be a number, string, or any primitive data type. Note that ["feature-state"] can only be used with paint properties that support data-driven styling.
-    /// 
+    ///
     ///  - [Create a hover effect](https://maplibre.org/maplibre-gl-js/docs/examples/create-a-hover-effect/)
     FeatureState(serde_json::Value),
     /// Retrieves a property value from the current feature's properties, or from another object if a second argument is provided. Returns null if the requested property is missing.
-    /// 
+    ///
     ///  - [Change the case of labels](https://maplibre.org/maplibre-gl-js/docs/examples/change-case-of-labels/)
-    /// 
+    ///
     ///  - [Display HTML clusters with custom properties](https://maplibre.org/maplibre-gl-js/docs/examples/display-html-clusters-with-custom-properties/)
-    /// 
+    ///
     ///  - [Extrude polygons for 3D indoor mapping](https://maplibre.org/maplibre-gl-js/docs/examples/extrude-polygons-for-3d-indoor-mapping/)
     Get(serde_json::Value, Option<serde_json::Value>),
     /// Retrieves a property value from global state that can be set with platform-specific APIs. Defaults can be provided using the [`state`](https://maplibre.org/maplibre-style-spec/root/#state) root property. Returns `null` if no value nor default value is set for the retrieved property.
@@ -1433,32 +1606,39 @@ pub enum Expression {
     /// Gets the feature's id, if it has one.
     Id,
     /// Binds expressions to named variables, which can then be referenced in the result expression using `["var", "variable_name"]`.
-    /// 
+    ///
     ///  - [Visualize population density](https://maplibre.org/maplibre-gl-js/docs/examples/visualize-population-density/)
-    Let(Vec<(StringLiteral,Expression)>),
+    Let(Vec<(StringLiteral, Expression)>),
     /// Selects the output whose label value matches the input value, or the fallback value if no match is found. The input can be any expression (e.g. `["get", "building_type"]`). Each label must be either:
-    /// 
+    ///
     ///  - a single literal value; or
-    /// 
+    ///
     ///  - an array of literal values, whose values must be all strings or all numbers (e.g. `[100, 101]` or `["c", "b"]`). The input matches if any of the values in the array matches, similar to the `"in"` operator.
-    /// 
+    ///
     /// Each label must be unique. If the input type does not match the type of the labels, the result will be the fallback value.
-    Match(Vec<(StringExpressionOrNumberExpression,StringLiteralOrNumberLiteralOrArrayExpressionOrArrayExpression,Expression)>),
+    Match(
+        Vec<(
+            StringExpressionOrNumberExpression,
+            StringLiteralOrNumberLiteralOrArrayExpressionOrArrayExpression,
+            Expression,
+        )>,
+    ),
     /// Produces discrete, stepped results by evaluating a piecewise-constant function defined by pairs of input and output values ("stops"). The `input` may be any numeric expression (e.g., `["get", "population"]`). Stop inputs must be numeric literals in strictly ascending order.
-    /// 
+    ///
     /// Returns the output value of the stop just less than the input, or the first output if the input is less than the first stop.
-    /// 
+    ///
     ///  - [Create and style clusters](https://maplibre.org/maplibre-gl-js/docs/examples/create-and-style-clusters/)
-    Step(Vec<(NumberExpression,Expression,NumberLiteral,Expression)>),
+    Step(Vec<(NumberExpression, Expression, NumberLiteral, Expression)>),
     /// References variable bound using `let`.
-    /// 
+    ///
     ///  - [Visualize population density](https://maplibre.org/maplibre-gl-js/docs/examples/visualize-population-density/)
     Var(serde_json::Value),
 }
 
 impl<'de> serde::Deserialize<'de> for Expression {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where D: serde::Deserializer<'de>,
+    where
+        D: serde::Deserializer<'de>,
     {
         deserializer.deserialize_seq(ExpressionVisitor)
     }
@@ -1478,103 +1658,145 @@ impl<'de> serde::de::Visitor<'de> for ExpressionVisitor {
         use serde::Deserialize;
         /// Reads the next element from the sequence or reports a missing field error.
         fn visit_seq_field<'de, A, T>(seq: &mut A, name: &'static str) -> Result<T, A::Error>
-        where A: serde::de::SeqAccess<'de>, T: serde::Deserialize<'de> {
-        seq.next_element()?.ok_or_else(|| serde::de::Error::missing_field(name))
+        where
+            A: serde::de::SeqAccess<'de>,
+            T: serde::Deserialize<'de>,
+        {
+            seq.next_element()?
+                .ok_or_else(|| serde::de::Error::missing_field(name))
         }
 
         // First element: operator string
-        let op: String = seq.next_element()?.ok_or_else(|| serde::de::Error::custom("missing operator"))?;
+        let op: String = seq
+            .next_element()?
+            .ok_or_else(|| serde::de::Error::custom("missing operator"))?;
         match op.as_str() {
-        "accumulated" => {
-        Ok(Expression::Accumulated)
-        },
-        "at" => {
-        let index = visit_seq_field(&mut seq, "index")?;
-        let array = visit_seq_field(&mut seq, "array")?;
-        Ok(Expression::At(index, array))
-        },
-        "case" => {
-        let mut inputs = Vec::new();
-        while let Some(condition_i) = seq.next_element()? {
-        let output_i = seq.next_element()?.ok_or_else(|| serde::de::Error::custom("expected output_i in Expression::Case"))?;
-        let element = (condition_i,output_i);
-        inputs.push(element);
-        }
-        if inputs.is_empty() {
-        return Err(serde::de::Error::custom("Expression::Case requires at least one argument"));
-        }
-        Ok(Expression::Case(inputs))
-        },
-        "coalesce" => {
-        let mut inputs = Vec::new();
-        while let Some(element) = seq.next_element()? {
-        inputs.push(element);
-        }
-        if inputs.is_empty() {
-        return Err(serde::de::Error::custom("Expression::Coalesce requires at least one argument"));
-        }
-        Ok(Expression::Coalesce(inputs))
-        },
-        "feature-state" => {
-        let property_name = visit_seq_field(&mut seq, "property_name")?;
-        Ok(Expression::FeatureState(property_name))
-        },
-        "get" => {
-        let property_name = visit_seq_field(&mut seq, "property_name")?;
-        let object = seq.next_element()?;
-        Ok(Expression::Get(property_name, object))
-        },
-        "global-state" => {
-        let property_name = visit_seq_field(&mut seq, "property_name")?;
-        Ok(Expression::GlobalState(property_name))
-        },
-        "id" => {
-        Ok(Expression::Id)
-        },
-        "let" => {
-        let mut inputs = Vec::new();
-        while let Some(var_name_i) = seq.next_element()? {
-        let var_value_i = seq.next_element()?.ok_or_else(|| serde::de::Error::custom("expected var_value_i in Expression::Let"))?;
-        let element = (var_name_i,var_value_i);
-        inputs.push(element);
-        }
-        if inputs.is_empty() {
-        return Err(serde::de::Error::custom("Expression::Let requires at least one argument"));
-        }
-        Ok(Expression::Let(inputs))
-        },
-        "match" => {
-        let mut inputs = Vec::new();
-        while let Some(input) = seq.next_element()? {
-        let label_i = seq.next_element()?.ok_or_else(|| serde::de::Error::custom("expected label_i in Expression::Match"))?;
-        let output_i = seq.next_element()?.ok_or_else(|| serde::de::Error::custom("expected output_i in Expression::Match"))?;
-        let element = (input,label_i, output_i);
-        inputs.push(element);
-        }
-        if inputs.is_empty() {
-        return Err(serde::de::Error::custom("Expression::Match requires at least one argument"));
-        }
-        Ok(Expression::Match(inputs))
-        },
-        "step" => {
-        let mut inputs = Vec::new();
-        while let Some(input) = seq.next_element()? {
-        let output_0 = seq.next_element()?.ok_or_else(|| serde::de::Error::custom("expected output_0 in Expression::Step"))?;
-        let stop_input_i = seq.next_element()?.ok_or_else(|| serde::de::Error::custom("expected stop_input_i in Expression::Step"))?;
-        let stop_output_i = seq.next_element()?.ok_or_else(|| serde::de::Error::custom("expected stop_output_i in Expression::Step"))?;
-        let element = (input,output_0, stop_input_i, stop_output_i);
-        inputs.push(element);
-        }
-        if inputs.is_empty() {
-        return Err(serde::de::Error::custom("Expression::Step requires at least one argument"));
-        }
-        Ok(Expression::Step(inputs))
-        },
-        "var" => {
-        let var_name = visit_seq_field(&mut seq, "var_name")?;
-        Ok(Expression::Var(var_name))
-        },
-        _ => Err(serde::de::Error::unknown_variant(&op, &["accumulated", "at", "case", "coalesce", "feature-state", "get", "global-state", "id", "let", "match", "step", "var"]))
+            "accumulated" => Ok(Expression::Accumulated),
+            "at" => {
+                let index = visit_seq_field(&mut seq, "index")?;
+                let array = visit_seq_field(&mut seq, "array")?;
+                Ok(Expression::At(index, array))
+            }
+            "case" => {
+                let mut inputs = Vec::new();
+                while let Some(condition_i) = seq.next_element()? {
+                    let output_i = seq.next_element()?.ok_or_else(|| {
+                        serde::de::Error::custom("expected output_i in Expression::Case")
+                    })?;
+                    let element = (condition_i, output_i);
+                    inputs.push(element);
+                }
+                if inputs.is_empty() {
+                    return Err(serde::de::Error::custom(
+                        "Expression::Case requires at least one argument",
+                    ));
+                }
+                Ok(Expression::Case(inputs))
+            }
+            "coalesce" => {
+                let mut inputs = Vec::new();
+                while let Some(element) = seq.next_element()? {
+                    inputs.push(element);
+                }
+                if inputs.is_empty() {
+                    return Err(serde::de::Error::custom(
+                        "Expression::Coalesce requires at least one argument",
+                    ));
+                }
+                Ok(Expression::Coalesce(inputs))
+            }
+            "feature-state" => {
+                let property_name = visit_seq_field(&mut seq, "property_name")?;
+                Ok(Expression::FeatureState(property_name))
+            }
+            "get" => {
+                let property_name = visit_seq_field(&mut seq, "property_name")?;
+                let object = seq.next_element()?;
+                Ok(Expression::Get(property_name, object))
+            }
+            "global-state" => {
+                let property_name = visit_seq_field(&mut seq, "property_name")?;
+                Ok(Expression::GlobalState(property_name))
+            }
+            "id" => Ok(Expression::Id),
+            "let" => {
+                let mut inputs = Vec::new();
+                while let Some(var_name_i) = seq.next_element()? {
+                    let var_value_i = seq.next_element()?.ok_or_else(|| {
+                        serde::de::Error::custom("expected var_value_i in Expression::Let")
+                    })?;
+                    let element = (var_name_i, var_value_i);
+                    inputs.push(element);
+                }
+                if inputs.is_empty() {
+                    return Err(serde::de::Error::custom(
+                        "Expression::Let requires at least one argument",
+                    ));
+                }
+                Ok(Expression::Let(inputs))
+            }
+            "match" => {
+                let mut inputs = Vec::new();
+                while let Some(input) = seq.next_element()? {
+                    let label_i = seq.next_element()?.ok_or_else(|| {
+                        serde::de::Error::custom("expected label_i in Expression::Match")
+                    })?;
+                    let output_i = seq.next_element()?.ok_or_else(|| {
+                        serde::de::Error::custom("expected output_i in Expression::Match")
+                    })?;
+                    let element = (input, label_i, output_i);
+                    inputs.push(element);
+                }
+                if inputs.is_empty() {
+                    return Err(serde::de::Error::custom(
+                        "Expression::Match requires at least one argument",
+                    ));
+                }
+                Ok(Expression::Match(inputs))
+            }
+            "step" => {
+                let mut inputs = Vec::new();
+                while let Some(input) = seq.next_element()? {
+                    let output_0 = seq.next_element()?.ok_or_else(|| {
+                        serde::de::Error::custom("expected output_0 in Expression::Step")
+                    })?;
+                    let stop_input_i = seq.next_element()?.ok_or_else(|| {
+                        serde::de::Error::custom("expected stop_input_i in Expression::Step")
+                    })?;
+                    let stop_output_i = seq.next_element()?.ok_or_else(|| {
+                        serde::de::Error::custom("expected stop_output_i in Expression::Step")
+                    })?;
+                    let element = (input, output_0, stop_input_i, stop_output_i);
+                    inputs.push(element);
+                }
+                if inputs.is_empty() {
+                    return Err(serde::de::Error::custom(
+                        "Expression::Step requires at least one argument",
+                    ));
+                }
+                Ok(Expression::Step(inputs))
+            }
+            "var" => {
+                let var_name = visit_seq_field(&mut seq, "var_name")?;
+                Ok(Expression::Var(var_name))
+            }
+            _ => Err(serde::de::Error::unknown_variant(
+                &op,
+                &[
+                    "accumulated",
+                    "at",
+                    "case",
+                    "coalesce",
+                    "feature-state",
+                    "get",
+                    "global-state",
+                    "id",
+                    "let",
+                    "match",
+                    "step",
+                    "var",
+                ],
+            )),
         }
     }
 }
@@ -1591,7 +1813,7 @@ pub enum NumberExpression {
     /// For two inputs, returns the result of subtracting the second input from the first. For a single input, returns the result of subtracting it from 0.
     Minus(MinusOptions),
     /// Returns the result of floating point division of the first input by the second.
-    /// 
+    ///
     ///  - [Visualize population density](https://maplibre.org/maplibre-gl-js/docs/examples/visualize-population-density/)
     Slash(serde_json::Value, serde_json::Value),
     /// Returns the result of raising the first input to the power specified by the second.
@@ -1674,7 +1896,8 @@ pub enum IndexOfOptions {
 
 impl<'de> serde::Deserialize<'de> for NumberExpression {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where D: serde::Deserializer<'de>,
+    where
+        D: serde::Deserializer<'de>,
     {
         deserializer.deserialize_seq(NumberExpressionVisitor)
     }
@@ -1694,191 +1917,234 @@ impl<'de> serde::de::Visitor<'de> for NumberExpressionVisitor {
         use serde::Deserialize;
         /// Reads the next element from the sequence or reports a missing field error.
         fn visit_seq_field<'de, A, T>(seq: &mut A, name: &'static str) -> Result<T, A::Error>
-        where A: serde::de::SeqAccess<'de>, T: serde::Deserialize<'de> {
-        seq.next_element()?.ok_or_else(|| serde::de::Error::missing_field(name))
+        where
+            A: serde::de::SeqAccess<'de>,
+            T: serde::Deserialize<'de>,
+        {
+            seq.next_element()?
+                .ok_or_else(|| serde::de::Error::missing_field(name))
         }
 
         // First element: operator string
-        let op: String = seq.next_element()?.ok_or_else(|| serde::de::Error::custom("missing operator"))?;
+        let op: String = seq
+            .next_element()?
+            .ok_or_else(|| serde::de::Error::custom("missing operator"))?;
         match op.as_str() {
-        "%" => {
-        let input_1 = visit_seq_field(&mut seq, "input_1")?;
-        let input_2 = visit_seq_field(&mut seq, "input_2")?;
-        Ok(NumberExpression::Percentage(input_1, input_2))
-        },
-        "*" => {
-        let mut inputs = Vec::new();
-        while let Some(element) = seq.next_element()? {
-        inputs.push(element);
-        }
-        if inputs.is_empty() {
-        return Err(serde::de::Error::custom("NumberExpression::Star requires at least one argument"));
-        }
-        Ok(NumberExpression::Star(inputs))
-        },
-        "+" => {
-        let mut inputs = Vec::new();
-        while let Some(element) = seq.next_element()? {
-        inputs.push(element);
-        }
-        if inputs.is_empty() {
-        return Err(serde::de::Error::custom("NumberExpression::Plus requires at least one argument"));
-        }
-        Ok(NumberExpression::Plus(inputs))
-        },
-        "-" => {
-        // Delegate the remainder of the sequence to MinusOptions deserialization
-        let remainder_of_sequence = serde::de::value::SeqAccessDeserializer::new(seq);
-        let options = MinusOptions::deserialize(remainder_of_sequence)?;
-        Ok(NumberExpression::Minus(options))
-        },
-        "/" => {
-        let input_1 = visit_seq_field(&mut seq, "input_1")?;
-        let input_2 = visit_seq_field(&mut seq, "input_2")?;
-        Ok(NumberExpression::Slash(input_1, input_2))
-        },
-        "^" => {
-        let input_1 = visit_seq_field(&mut seq, "input_1")?;
-        let input_2 = visit_seq_field(&mut seq, "input_2")?;
-        Ok(NumberExpression::Power(input_1, input_2))
-        },
-        "abs" => {
-        let input = visit_seq_field(&mut seq, "input")?;
-        Ok(NumberExpression::Absolute(input))
-        },
-        "acos" => {
-        let input = visit_seq_field(&mut seq, "input")?;
-        Ok(NumberExpression::Arccosine(input))
-        },
-        "asin" => {
-        let input = visit_seq_field(&mut seq, "input")?;
-        Ok(NumberExpression::Asin(input))
-        },
-        "at" => {
-        let index = visit_seq_field(&mut seq, "index")?;
-        let array = visit_seq_field(&mut seq, "array")?;
-        Ok(NumberExpression::At(index, array))
-        },
-        "atan" => {
-        let input = visit_seq_field(&mut seq, "input")?;
-        Ok(NumberExpression::Atan(input))
-        },
-        "ceil" => {
-        let input = visit_seq_field(&mut seq, "input")?;
-        Ok(NumberExpression::Ceil(input))
-        },
-        "cos" => {
-        let input = visit_seq_field(&mut seq, "input")?;
-        Ok(NumberExpression::Cos(input))
-        },
-        "distance" => {
-        let geojson = visit_seq_field(&mut seq, "geojson")?;
-        Ok(NumberExpression::Distance(geojson))
-        },
-        "e" => {
-        Ok(NumberExpression::E)
-        },
-        "elevation" => {
-        Ok(NumberExpression::Elevation)
-        },
-        "floor" => {
-        let input = visit_seq_field(&mut seq, "input")?;
-        Ok(NumberExpression::Floor(input))
-        },
-        "heatmap-density" => {
-        Ok(NumberExpression::HeatmapDensity)
-        },
-        "index-of" => {
-        // Delegate the remainder of the sequence to IndexOfOptions deserialization
-        let remainder_of_sequence = serde::de::value::SeqAccessDeserializer::new(seq);
-        let options = IndexOfOptions::deserialize(remainder_of_sequence)?;
-        Ok(NumberExpression::IndexOf(options))
-        },
-        "length" => {
-        let array_or_string = visit_seq_field(&mut seq, "array_or_string")?;
-        Ok(NumberExpression::Length(array_or_string))
-        },
-        "line-progress" => {
-        Ok(NumberExpression::LineProgress)
-        },
-        "ln" => {
-        let input = visit_seq_field(&mut seq, "input")?;
-        Ok(NumberExpression::Ln(input))
-        },
-        "ln2" => {
-        Ok(NumberExpression::Ln2)
-        },
-        "log10" => {
-        let input = visit_seq_field(&mut seq, "input")?;
-        Ok(NumberExpression::Log10(input))
-        },
-        "log2" => {
-        let input = visit_seq_field(&mut seq, "input")?;
-        Ok(NumberExpression::Log2(input))
-        },
-        "max" => {
-        let mut inputs = Vec::new();
-        while let Some(element) = seq.next_element()? {
-        inputs.push(element);
-        }
-        if inputs.is_empty() {
-        return Err(serde::de::Error::custom("NumberExpression::Max requires at least one argument"));
-        }
-        Ok(NumberExpression::Max(inputs))
-        },
-        "min" => {
-        let mut inputs = Vec::new();
-        while let Some(element) = seq.next_element()? {
-        inputs.push(element);
-        }
-        if inputs.is_empty() {
-        return Err(serde::de::Error::custom("NumberExpression::Min requires at least one argument"));
-        }
-        Ok(NumberExpression::Min(inputs))
-        },
-        "number" => {
-        let mut inputs = Vec::new();
-        while let Some(element) = seq.next_element()? {
-        inputs.push(element);
-        }
-        if inputs.is_empty() {
-        return Err(serde::de::Error::custom("NumberExpression::Number requires at least one argument"));
-        }
-        Ok(NumberExpression::Number(inputs))
-        },
-        "pi" => {
-        Ok(NumberExpression::Pi)
-        },
-        "round" => {
-        let input = visit_seq_field(&mut seq, "input")?;
-        Ok(NumberExpression::Round(input))
-        },
-        "sin" => {
-        let input = visit_seq_field(&mut seq, "input")?;
-        Ok(NumberExpression::Sin(input))
-        },
-        "sqrt" => {
-        let input = visit_seq_field(&mut seq, "input")?;
-        Ok(NumberExpression::Sqrt(input))
-        },
-        "tan" => {
-        let input = visit_seq_field(&mut seq, "input")?;
-        Ok(NumberExpression::Tan(input))
-        },
-        "to-number" => {
-        let mut inputs = Vec::new();
-        while let Some(element) = seq.next_element()? {
-        inputs.push(element);
-        }
-        if inputs.is_empty() {
-        return Err(serde::de::Error::custom("NumberExpression::ToNumber requires at least one argument"));
-        }
-        Ok(NumberExpression::ToNumber(inputs))
-        },
-        "zoom" => {
-        Ok(NumberExpression::Zoom)
-        },
-        _ => Err(serde::de::Error::unknown_variant(&op, &["%", "*", "+", "-", "/", "^", "abs", "acos", "asin", "at", "atan", "ceil", "cos", "distance", "e", "elevation", "floor", "heatmap-density", "index-of", "length", "line-progress", "ln", "ln2", "log10", "log2", "max", "min", "number", "pi", "round", "sin", "sqrt", "tan", "to-number", "zoom"]))
+            "%" => {
+                let input_1 = visit_seq_field(&mut seq, "input_1")?;
+                let input_2 = visit_seq_field(&mut seq, "input_2")?;
+                Ok(NumberExpression::Percentage(input_1, input_2))
+            }
+            "*" => {
+                let mut inputs = Vec::new();
+                while let Some(element) = seq.next_element()? {
+                    inputs.push(element);
+                }
+                if inputs.is_empty() {
+                    return Err(serde::de::Error::custom(
+                        "NumberExpression::Star requires at least one argument",
+                    ));
+                }
+                Ok(NumberExpression::Star(inputs))
+            }
+            "+" => {
+                let mut inputs = Vec::new();
+                while let Some(element) = seq.next_element()? {
+                    inputs.push(element);
+                }
+                if inputs.is_empty() {
+                    return Err(serde::de::Error::custom(
+                        "NumberExpression::Plus requires at least one argument",
+                    ));
+                }
+                Ok(NumberExpression::Plus(inputs))
+            }
+            "-" => {
+                // Delegate the remainder of the sequence to MinusOptions deserialization
+                let remainder_of_sequence = serde::de::value::SeqAccessDeserializer::new(seq);
+                let options = MinusOptions::deserialize(remainder_of_sequence)?;
+                Ok(NumberExpression::Minus(options))
+            }
+            "/" => {
+                let input_1 = visit_seq_field(&mut seq, "input_1")?;
+                let input_2 = visit_seq_field(&mut seq, "input_2")?;
+                Ok(NumberExpression::Slash(input_1, input_2))
+            }
+            "^" => {
+                let input_1 = visit_seq_field(&mut seq, "input_1")?;
+                let input_2 = visit_seq_field(&mut seq, "input_2")?;
+                Ok(NumberExpression::Power(input_1, input_2))
+            }
+            "abs" => {
+                let input = visit_seq_field(&mut seq, "input")?;
+                Ok(NumberExpression::Absolute(input))
+            }
+            "acos" => {
+                let input = visit_seq_field(&mut seq, "input")?;
+                Ok(NumberExpression::Arccosine(input))
+            }
+            "asin" => {
+                let input = visit_seq_field(&mut seq, "input")?;
+                Ok(NumberExpression::Asin(input))
+            }
+            "at" => {
+                let index = visit_seq_field(&mut seq, "index")?;
+                let array = visit_seq_field(&mut seq, "array")?;
+                Ok(NumberExpression::At(index, array))
+            }
+            "atan" => {
+                let input = visit_seq_field(&mut seq, "input")?;
+                Ok(NumberExpression::Atan(input))
+            }
+            "ceil" => {
+                let input = visit_seq_field(&mut seq, "input")?;
+                Ok(NumberExpression::Ceil(input))
+            }
+            "cos" => {
+                let input = visit_seq_field(&mut seq, "input")?;
+                Ok(NumberExpression::Cos(input))
+            }
+            "distance" => {
+                let geojson = visit_seq_field(&mut seq, "geojson")?;
+                Ok(NumberExpression::Distance(geojson))
+            }
+            "e" => Ok(NumberExpression::E),
+            "elevation" => Ok(NumberExpression::Elevation),
+            "floor" => {
+                let input = visit_seq_field(&mut seq, "input")?;
+                Ok(NumberExpression::Floor(input))
+            }
+            "heatmap-density" => Ok(NumberExpression::HeatmapDensity),
+            "index-of" => {
+                // Delegate the remainder of the sequence to IndexOfOptions deserialization
+                let remainder_of_sequence = serde::de::value::SeqAccessDeserializer::new(seq);
+                let options = IndexOfOptions::deserialize(remainder_of_sequence)?;
+                Ok(NumberExpression::IndexOf(options))
+            }
+            "length" => {
+                let array_or_string = visit_seq_field(&mut seq, "array_or_string")?;
+                Ok(NumberExpression::Length(array_or_string))
+            }
+            "line-progress" => Ok(NumberExpression::LineProgress),
+            "ln" => {
+                let input = visit_seq_field(&mut seq, "input")?;
+                Ok(NumberExpression::Ln(input))
+            }
+            "ln2" => Ok(NumberExpression::Ln2),
+            "log10" => {
+                let input = visit_seq_field(&mut seq, "input")?;
+                Ok(NumberExpression::Log10(input))
+            }
+            "log2" => {
+                let input = visit_seq_field(&mut seq, "input")?;
+                Ok(NumberExpression::Log2(input))
+            }
+            "max" => {
+                let mut inputs = Vec::new();
+                while let Some(element) = seq.next_element()? {
+                    inputs.push(element);
+                }
+                if inputs.is_empty() {
+                    return Err(serde::de::Error::custom(
+                        "NumberExpression::Max requires at least one argument",
+                    ));
+                }
+                Ok(NumberExpression::Max(inputs))
+            }
+            "min" => {
+                let mut inputs = Vec::new();
+                while let Some(element) = seq.next_element()? {
+                    inputs.push(element);
+                }
+                if inputs.is_empty() {
+                    return Err(serde::de::Error::custom(
+                        "NumberExpression::Min requires at least one argument",
+                    ));
+                }
+                Ok(NumberExpression::Min(inputs))
+            }
+            "number" => {
+                let mut inputs = Vec::new();
+                while let Some(element) = seq.next_element()? {
+                    inputs.push(element);
+                }
+                if inputs.is_empty() {
+                    return Err(serde::de::Error::custom(
+                        "NumberExpression::Number requires at least one argument",
+                    ));
+                }
+                Ok(NumberExpression::Number(inputs))
+            }
+            "pi" => Ok(NumberExpression::Pi),
+            "round" => {
+                let input = visit_seq_field(&mut seq, "input")?;
+                Ok(NumberExpression::Round(input))
+            }
+            "sin" => {
+                let input = visit_seq_field(&mut seq, "input")?;
+                Ok(NumberExpression::Sin(input))
+            }
+            "sqrt" => {
+                let input = visit_seq_field(&mut seq, "input")?;
+                Ok(NumberExpression::Sqrt(input))
+            }
+            "tan" => {
+                let input = visit_seq_field(&mut seq, "input")?;
+                Ok(NumberExpression::Tan(input))
+            }
+            "to-number" => {
+                let mut inputs = Vec::new();
+                while let Some(element) = seq.next_element()? {
+                    inputs.push(element);
+                }
+                if inputs.is_empty() {
+                    return Err(serde::de::Error::custom(
+                        "NumberExpression::ToNumber requires at least one argument",
+                    ));
+                }
+                Ok(NumberExpression::ToNumber(inputs))
+            }
+            "zoom" => Ok(NumberExpression::Zoom),
+            _ => Err(serde::de::Error::unknown_variant(
+                &op,
+                &[
+                    "%",
+                    "*",
+                    "+",
+                    "-",
+                    "/",
+                    "^",
+                    "abs",
+                    "acos",
+                    "asin",
+                    "at",
+                    "atan",
+                    "ceil",
+                    "cos",
+                    "distance",
+                    "e",
+                    "elevation",
+                    "floor",
+                    "heatmap-density",
+                    "index-of",
+                    "length",
+                    "line-progress",
+                    "ln",
+                    "ln2",
+                    "log10",
+                    "log2",
+                    "max",
+                    "min",
+                    "number",
+                    "pi",
+                    "round",
+                    "sin",
+                    "sqrt",
+                    "tan",
+                    "to-number",
+                    "zoom",
+                ],
+            )),
         }
     }
 }
@@ -1889,29 +2155,43 @@ pub enum NumberExpressionOrArrayExpressionOrStringExpressionOrArrayExpressionOrP
     /// Retrieves an item from an array.
     At(serde_json::Value, serde_json::Value),
     /// Produces continuous, smooth results by interpolating between pairs of input and output values ("stops"). The `input` may be any numeric expression (e.g., `["get", "population"]`). Stop inputs must be numeric literals in strictly ascending order. The output type must be `number`, `array<number>`, `color`, `array<color>`, or `projection`.
-    /// 
+    ///
     ///  - [Animate map camera around a point](https://maplibre.org/maplibre-gl-js/docs/examples/animate-camera-around-point/)
-    /// 
+    ///
     ///  - [Change building color based on zoom level](https://maplibre.org/maplibre-gl-js/docs/examples/change-building-color-based-on-zoom-level/)
-    /// 
+    ///
     ///  - [Create a heatmap layer](https://maplibre.org/maplibre-gl-js/docs/examples/heatmap-layer/)
-    /// 
+    ///
     ///  - [Visualize population density](https://maplibre.org/maplibre-gl-js/docs/examples/visualize-population-density/)
-    Interpolate(Vec<(Interpolation,NumberExpression,NumberLiteral,NumberExpressionOrArrayExpressionOrStringExpressionOrArrayExpressionOrProjection)>),
+    Interpolate(
+        Vec<(
+            Interpolation,
+            NumberExpression,
+            NumberLiteral,
+            NumberExpressionOrArrayExpressionOrStringExpressionOrArrayExpressionOrProjection,
+        )>,
+    ),
 }
 
-impl<'de> serde::Deserialize<'de> for NumberExpressionOrArrayExpressionOrStringExpressionOrArrayExpressionOrProjection {
+impl<'de> serde::Deserialize<'de>
+    for NumberExpressionOrArrayExpressionOrStringExpressionOrArrayExpressionOrProjection
+{
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where D: serde::Deserializer<'de>,
+    where
+        D: serde::Deserializer<'de>,
     {
-        deserializer.deserialize_seq(NumberExpressionOrArrayExpressionOrStringExpressionOrArrayExpressionOrProjectionVisitor)
+        deserializer.deserialize_seq(
+            NumberExpressionOrArrayExpressionOrStringExpressionOrArrayExpressionOrProjectionVisitor,
+        )
     }
 }
 
 /// Visitor for deserializing the syntax enum [`NumberExpressionOrArrayExpressionOrStringExpressionOrArrayExpressionOrProjection`]
 struct NumberExpressionOrArrayExpressionOrStringExpressionOrArrayExpressionOrProjectionVisitor;
 
-impl<'de> serde::de::Visitor<'de> for NumberExpressionOrArrayExpressionOrStringExpressionOrArrayExpressionOrProjectionVisitor {
+impl<'de> serde::de::Visitor<'de>
+    for NumberExpressionOrArrayExpressionOrStringExpressionOrArrayExpressionOrProjectionVisitor
+{
     type Value = NumberExpressionOrArrayExpressionOrStringExpressionOrArrayExpressionOrProjection;
 
     fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
@@ -1922,33 +2202,42 @@ impl<'de> serde::de::Visitor<'de> for NumberExpressionOrArrayExpressionOrStringE
         use serde::Deserialize;
         /// Reads the next element from the sequence or reports a missing field error.
         fn visit_seq_field<'de, A, T>(seq: &mut A, name: &'static str) -> Result<T, A::Error>
-        where A: serde::de::SeqAccess<'de>, T: serde::Deserialize<'de> {
-        seq.next_element()?.ok_or_else(|| serde::de::Error::missing_field(name))
+        where
+            A: serde::de::SeqAccess<'de>,
+            T: serde::Deserialize<'de>,
+        {
+            seq.next_element()?
+                .ok_or_else(|| serde::de::Error::missing_field(name))
         }
 
         // First element: operator string
-        let op: String = seq.next_element()?.ok_or_else(|| serde::de::Error::custom("missing operator"))?;
+        let op: String = seq
+            .next_element()?
+            .ok_or_else(|| serde::de::Error::custom("missing operator"))?;
         match op.as_str() {
-        "at" => {
-        let index = visit_seq_field(&mut seq, "index")?;
-        let array = visit_seq_field(&mut seq, "array")?;
-        Ok(NumberExpressionOrArrayExpressionOrStringExpressionOrArrayExpressionOrProjection::At(index, array))
-        },
-        "interpolate" => {
-        let mut inputs = Vec::new();
-        while let Some(interpolation_type) = seq.next_element()? {
-        let input = seq.next_element()?.ok_or_else(|| serde::de::Error::custom("expected input in NumberExpressionOrArrayExpressionOrStringExpressionOrArrayExpressionOrProjection::Interpolate"))?;
-        let stop_input_i = seq.next_element()?.ok_or_else(|| serde::de::Error::custom("expected stop_input_i in NumberExpressionOrArrayExpressionOrStringExpressionOrArrayExpressionOrProjection::Interpolate"))?;
-        let stop_output_i = seq.next_element()?.ok_or_else(|| serde::de::Error::custom("expected stop_output_i in NumberExpressionOrArrayExpressionOrStringExpressionOrArrayExpressionOrProjection::Interpolate"))?;
-        let element = (interpolation_type,input, stop_input_i, stop_output_i);
-        inputs.push(element);
-        }
-        if inputs.is_empty() {
-        return Err(serde::de::Error::custom("NumberExpressionOrArrayExpressionOrStringExpressionOrArrayExpressionOrProjection::Interpolate requires at least one argument"));
-        }
-        Ok(NumberExpressionOrArrayExpressionOrStringExpressionOrArrayExpressionOrProjection::Interpolate(inputs))
-        },
-        _ => Err(serde::de::Error::unknown_variant(&op, &["at", "interpolate"]))
+            "at" => {
+                let index = visit_seq_field(&mut seq, "index")?;
+                let array = visit_seq_field(&mut seq, "array")?;
+                Ok(NumberExpressionOrArrayExpressionOrStringExpressionOrArrayExpressionOrProjection::At(index, array))
+            }
+            "interpolate" => {
+                let mut inputs = Vec::new();
+                while let Some(interpolation_type) = seq.next_element()? {
+                    let input = seq.next_element()?.ok_or_else(|| serde::de::Error::custom("expected input in NumberExpressionOrArrayExpressionOrStringExpressionOrArrayExpressionOrProjection::Interpolate"))?;
+                    let stop_input_i = seq.next_element()?.ok_or_else(|| serde::de::Error::custom("expected stop_input_i in NumberExpressionOrArrayExpressionOrStringExpressionOrArrayExpressionOrProjection::Interpolate"))?;
+                    let stop_output_i = seq.next_element()?.ok_or_else(|| serde::de::Error::custom("expected stop_output_i in NumberExpressionOrArrayExpressionOrStringExpressionOrArrayExpressionOrProjection::Interpolate"))?;
+                    let element = (interpolation_type, input, stop_input_i, stop_output_i);
+                    inputs.push(element);
+                }
+                if inputs.is_empty() {
+                    return Err(serde::de::Error::custom("NumberExpressionOrArrayExpressionOrStringExpressionOrArrayExpressionOrProjection::Interpolate requires at least one argument"));
+                }
+                Ok(NumberExpressionOrArrayExpressionOrStringExpressionOrArrayExpressionOrProjection::Interpolate(inputs))
+            }
+            _ => Err(serde::de::Error::unknown_variant(
+                &op,
+                &["at", "interpolate"],
+            )),
         }
     }
 }
@@ -1959,7 +2248,7 @@ pub enum ObjectExpression {
     /// Retrieves an item from an array.
     At(serde_json::Value, serde_json::Value),
     /// Provides a literal array or object value.
-    /// 
+    ///
     ///  - [Display and style rich text labels](https://maplibre.org/maplibre-gl-js/docs/examples/display-and-style-rich-text-labels/)
     Literal(serde_json::Value),
     /// Asserts that the input value is an object. If multiple values are provided, each one is evaluated in order until an object is obtained. If none of the inputs are objects, the expression is an error.
@@ -1970,7 +2259,8 @@ pub enum ObjectExpression {
 
 impl<'de> serde::Deserialize<'de> for ObjectExpression {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where D: serde::Deserializer<'de>,
+    where
+        D: serde::Deserializer<'de>,
     {
         deserializer.deserialize_seq(ObjectExpressionVisitor)
     }
@@ -1990,36 +2280,45 @@ impl<'de> serde::de::Visitor<'de> for ObjectExpressionVisitor {
         use serde::Deserialize;
         /// Reads the next element from the sequence or reports a missing field error.
         fn visit_seq_field<'de, A, T>(seq: &mut A, name: &'static str) -> Result<T, A::Error>
-        where A: serde::de::SeqAccess<'de>, T: serde::Deserialize<'de> {
-        seq.next_element()?.ok_or_else(|| serde::de::Error::missing_field(name))
+        where
+            A: serde::de::SeqAccess<'de>,
+            T: serde::Deserialize<'de>,
+        {
+            seq.next_element()?
+                .ok_or_else(|| serde::de::Error::missing_field(name))
         }
 
         // First element: operator string
-        let op: String = seq.next_element()?.ok_or_else(|| serde::de::Error::custom("missing operator"))?;
+        let op: String = seq
+            .next_element()?
+            .ok_or_else(|| serde::de::Error::custom("missing operator"))?;
         match op.as_str() {
-        "at" => {
-        let index = visit_seq_field(&mut seq, "index")?;
-        let array = visit_seq_field(&mut seq, "array")?;
-        Ok(ObjectExpression::At(index, array))
-        },
-        "literal" => {
-        let json_object = visit_seq_field(&mut seq, "json_object")?;
-        Ok(ObjectExpression::Literal(json_object))
-        },
-        "object" => {
-        let mut inputs = Vec::new();
-        while let Some(element) = seq.next_element()? {
-        inputs.push(element);
-        }
-        if inputs.is_empty() {
-        return Err(serde::de::Error::custom("ObjectExpression::Object requires at least one argument"));
-        }
-        Ok(ObjectExpression::Object(inputs))
-        },
-        "properties" => {
-        Ok(ObjectExpression::Properties)
-        },
-        _ => Err(serde::de::Error::unknown_variant(&op, &["at", "literal", "object", "properties"]))
+            "at" => {
+                let index = visit_seq_field(&mut seq, "index")?;
+                let array = visit_seq_field(&mut seq, "array")?;
+                Ok(ObjectExpression::At(index, array))
+            }
+            "literal" => {
+                let json_object = visit_seq_field(&mut seq, "json_object")?;
+                Ok(ObjectExpression::Literal(json_object))
+            }
+            "object" => {
+                let mut inputs = Vec::new();
+                while let Some(element) = seq.next_element()? {
+                    inputs.push(element);
+                }
+                if inputs.is_empty() {
+                    return Err(serde::de::Error::custom(
+                        "ObjectExpression::Object requires at least one argument",
+                    ));
+                }
+                Ok(ObjectExpression::Object(inputs))
+            }
+            "properties" => Ok(ObjectExpression::Properties),
+            _ => Err(serde::de::Error::unknown_variant(
+                &op,
+                &["at", "literal", "object", "properties"],
+            )),
         }
     }
 }
@@ -2030,33 +2329,33 @@ pub enum StringExpression {
     /// Retrieves an item from an array.
     At(serde_json::Value, serde_json::Value),
     /// Returns a `string` consisting of the concatenation of the inputs. Each input is converted to a string as if by `to-string`.
-    /// 
+    ///
     ///  - [Add a generated icon to the map](https://maplibre.org/maplibre-gl-js/docs/examples/add-a-generated-icon-to-the-map/)
-    /// 
+    ///
     ///  - [Create a time slider](https://maplibre.org/maplibre-gl-js/docs/examples/create-a-time-slider/)
-    /// 
+    ///
     ///  - [Use a fallback image](https://maplibre.org/maplibre-gl-js/docs/examples/fallback-image/)
-    /// 
+    ///
     ///  - [Variable label placement](https://maplibre.org/maplibre-gl-js/docs/examples/variable-label-placement/)
     Concat(Vec<Expression>),
     /// Returns the input string converted to lowercase. Follows the Unicode Default Case Conversion algorithm and the locale-insensitive case mappings in the Unicode Character Database.
-    /// 
+    ///
     ///  - [Change the case of labels](https://maplibre.org/maplibre-gl-js/docs/examples/change-case-of-labels/)
     Downcase(serde_json::Value),
     /// Returns a `formatted` string for displaying mixed-format text in the `text-field` property. The input may contain a string literal or expression, including an [`'image'`](#image) expression. Strings may be followed by a style override object.
-    /// 
+    ///
     ///  - [Change the case of labels](https://maplibre.org/maplibre-gl-js/docs/examples/change-case-of-labels/)
-    /// 
+    ///
     ///  - [Display and style rich text labels](https://maplibre.org/maplibre-gl-js/docs/examples/display-and-style-rich-text-labels/)
-    Format(Vec<(StringExpressionOrStringExpression,Object)>),
+    Format(Vec<(StringExpressionOrStringExpression, Object)>),
     /// Returns the feature's simple geometry type: `Point`, `LineString`, or `Polygon`. `MultiPoint`, `MultiLineString`, and `MultiPolygon` are returned as `Point`, `LineString`, and `Polygon`, respectively.
     GeometryType,
     /// Returns an `image` type for use in `icon-image`, `*-pattern` entries and as a section in the `format` expression. If set, the `image` argument will check that the requested image exists in the style and will return either the resolved image name or `null`, depending on whether or not the image is currently in the style. This validation process is synchronous and requires the image to have been added to the style before requesting it in the `image` argument.
-    /// 
+    ///
     ///  - [Use a fallback image](https://maplibre.org/maplibre-gl-js/docs/examples/use-a-fallback-image/)
     Image(serde_json::Value),
     /// Converts the input number into a string representation using the provided format_options.
-    /// 
+    ///
     ///  - [Display HTML clusters with custom properties](https://maplibre.org/maplibre-gl-js/docs/examples/display-html-clusters-with-custom-properties/)
     NumberFormat(serde_json::Value, serde_json::Value),
     /// Returns the IETF language tag of the locale being used by the provided `collator`. This can be used to determine the default system locale, or to determine if a requested locale was successfully loaded.
@@ -2064,30 +2363,40 @@ pub enum StringExpression {
     /// Creates a color value from red, green, and blue components, which must range between 0 and 255, and an alpha component of 1. If any component is out of range, the expression is an error.
     Rgb(serde_json::Value, serde_json::Value, serde_json::Value),
     /// Creates a color value from red, green, blue components, which must range between 0 and 255, and an alpha component which must range between zero and one. If any component is out of range, the expression is an error.
-    Rgba(serde_json::Value, serde_json::Value, serde_json::Value, serde_json::Value),
+    Rgba(
+        serde_json::Value,
+        serde_json::Value,
+        serde_json::Value,
+        serde_json::Value,
+    ),
     /// Returns a subarray from an array or a substring from a string from a specified start index, or between a start index and an end index if set. The return value is inclusive of the start index but not of the end index. In a string, a UTF-16 surrogate pair counts as a single position.
-    Slice(serde_json::Value, serde_json::Value, Option<serde_json::Value>),
+    Slice(
+        serde_json::Value,
+        serde_json::Value,
+        Option<serde_json::Value>,
+    ),
     /// Asserts that the input value is a string. If multiple values are provided, each one is evaluated in order until a string is obtained. If none of the inputs are strings, the expression is an error.
     String(Vec<Expression>),
     /// Converts the input value to a color. If multiple values are provided, each one is evaluated in order until the first successful conversion is obtained. If none of the inputs can be converted, the expression is an error.
-    /// 
+    ///
     ///  - [Visualize population density](https://maplibre.org/maplibre-gl-js/docs/examples/visualize-population-density/)
     ToColor(Vec<Expression>),
     /// Converts the input value to a string. If the input is `null`, the result is `""`. If the input is a boolean, the result is `"true"` or `"false"`. If the input is a number, it is converted to a string as specified by the ["NumberToString" algorithm](https://tc39.github.io/ecma262/#sec-tostring-applied-to-the-number-type) of the ECMAScript Language Specification. If the input is a color, it is converted to a string of the form `"rgba(r,g,b,a)"`, where `r`, `g`, and `b` are numerals ranging from 0 to 255, and `a` ranges from 0 to 1. Otherwise, the input is converted to a string in the format specified by the [`JSON.stringify`](https://tc39.github.io/ecma262/#sec-json.stringify) function of the ECMAScript Language Specification.
-    /// 
+    ///
     ///  - [Create a time slider](https://maplibre.org/maplibre-gl-js/docs/examples/create-a-time-slider/)
     ToString(serde_json::Value),
     /// Returns a string describing the type of the given value.
     Typeof(serde_json::Value),
     /// Returns the input string converted to uppercase. Follows the Unicode Default Case Conversion algorithm and the locale-insensitive case mappings in the Unicode Character Database.
-    /// 
+    ///
     ///  - [Change the case of labels](https://maplibre.org/maplibre-gl-js/docs/examples/change-case-of-labels/)
     Upcase(serde_json::Value),
 }
 
 impl<'de> serde::Deserialize<'de> for StringExpression {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where D: serde::Deserializer<'de>,
+    where
+        D: serde::Deserializer<'de>,
     {
         deserializer.deserialize_seq(StringExpressionVisitor)
     }
@@ -2107,112 +2416,144 @@ impl<'de> serde::de::Visitor<'de> for StringExpressionVisitor {
         use serde::Deserialize;
         /// Reads the next element from the sequence or reports a missing field error.
         fn visit_seq_field<'de, A, T>(seq: &mut A, name: &'static str) -> Result<T, A::Error>
-        where A: serde::de::SeqAccess<'de>, T: serde::Deserialize<'de> {
-        seq.next_element()?.ok_or_else(|| serde::de::Error::missing_field(name))
+        where
+            A: serde::de::SeqAccess<'de>,
+            T: serde::Deserialize<'de>,
+        {
+            seq.next_element()?
+                .ok_or_else(|| serde::de::Error::missing_field(name))
         }
 
         // First element: operator string
-        let op: String = seq.next_element()?.ok_or_else(|| serde::de::Error::custom("missing operator"))?;
+        let op: String = seq
+            .next_element()?
+            .ok_or_else(|| serde::de::Error::custom("missing operator"))?;
         match op.as_str() {
-        "at" => {
-        let index = visit_seq_field(&mut seq, "index")?;
-        let array = visit_seq_field(&mut seq, "array")?;
-        Ok(StringExpression::At(index, array))
-        },
-        "concat" => {
-        let mut inputs = Vec::new();
-        while let Some(element) = seq.next_element()? {
-        inputs.push(element);
-        }
-        if inputs.is_empty() {
-        return Err(serde::de::Error::custom("StringExpression::Concat requires at least one argument"));
-        }
-        Ok(StringExpression::Concat(inputs))
-        },
-        "downcase" => {
-        let input = visit_seq_field(&mut seq, "input")?;
-        Ok(StringExpression::Downcase(input))
-        },
-        "format" => {
-        let mut inputs = Vec::new();
-        while let Some(input_i) = seq.next_element()? {
-        let style_overrides_i = seq.next_element()?; // optional param
-        let element = (input_i,style_overrides_i);
-        inputs.push(element);
-        }
-        if inputs.is_empty() {
-        return Err(serde::de::Error::custom("StringExpression::Format requires at least one argument"));
-        }
-        Ok(StringExpression::Format(inputs))
-        },
-        "geometry-type" => {
-        Ok(StringExpression::GeometryType)
-        },
-        "image" => {
-        let image_name = visit_seq_field(&mut seq, "image_name")?;
-        Ok(StringExpression::Image(image_name))
-        },
-        "number-format" => {
-        let input = visit_seq_field(&mut seq, "input")?;
-        let format_options = visit_seq_field(&mut seq, "format_options")?;
-        Ok(StringExpression::NumberFormat(input, format_options))
-        },
-        "resolved-locale" => {
-        let collator = visit_seq_field(&mut seq, "collator")?;
-        Ok(StringExpression::ResolvedLocale(collator))
-        },
-        "rgb" => {
-        let red = visit_seq_field(&mut seq, "red")?;
-        let green = visit_seq_field(&mut seq, "green")?;
-        let blue = visit_seq_field(&mut seq, "blue")?;
-        Ok(StringExpression::Rgb(red, green, blue))
-        },
-        "rgba" => {
-        let red = visit_seq_field(&mut seq, "red")?;
-        let green = visit_seq_field(&mut seq, "green")?;
-        let blue = visit_seq_field(&mut seq, "blue")?;
-        let alpha = visit_seq_field(&mut seq, "alpha")?;
-        Ok(StringExpression::Rgba(red, green, blue, alpha))
-        },
-        "slice" => {
-        let string = visit_seq_field(&mut seq, "string")?;
-        let start_index = visit_seq_field(&mut seq, "start_index")?;
-        let end_index = seq.next_element()?;
-        Ok(StringExpression::Slice(string, start_index, end_index))
-        },
-        "string" => {
-        let mut inputs = Vec::new();
-        while let Some(element) = seq.next_element()? {
-        inputs.push(element);
-        }
-        if inputs.is_empty() {
-        return Err(serde::de::Error::custom("StringExpression::String requires at least one argument"));
-        }
-        Ok(StringExpression::String(inputs))
-        },
-        "to-color" => {
-        let mut inputs = Vec::new();
-        while let Some(element) = seq.next_element()? {
-        inputs.push(element);
-        }
-        if inputs.is_empty() {
-        return Err(serde::de::Error::custom("StringExpression::ToColor requires at least one argument"));
-        }
-        Ok(StringExpression::ToColor(inputs))
-        },
-        "to-string" => {
-        let value = visit_seq_field(&mut seq, "value")?;
-        Ok(StringExpression::ToString(value))
-        },
-        "typeof" => {
-        let value = visit_seq_field(&mut seq, "value")?;
-        Ok(StringExpression::Typeof(value))
-        },
-        "upcase" => {
-        let input = visit_seq_field(&mut seq, "input")?;
-        Ok(StringExpression::Upcase(input))
-        },
-        _ => Err(serde::de::Error::unknown_variant(&op, &["at", "concat", "downcase", "format", "geometry-type", "image", "number-format", "resolved-locale", "rgb", "rgba", "slice", "string", "to-color", "to-string", "typeof", "upcase"]))
+            "at" => {
+                let index = visit_seq_field(&mut seq, "index")?;
+                let array = visit_seq_field(&mut seq, "array")?;
+                Ok(StringExpression::At(index, array))
+            }
+            "concat" => {
+                let mut inputs = Vec::new();
+                while let Some(element) = seq.next_element()? {
+                    inputs.push(element);
+                }
+                if inputs.is_empty() {
+                    return Err(serde::de::Error::custom(
+                        "StringExpression::Concat requires at least one argument",
+                    ));
+                }
+                Ok(StringExpression::Concat(inputs))
+            }
+            "downcase" => {
+                let input = visit_seq_field(&mut seq, "input")?;
+                Ok(StringExpression::Downcase(input))
+            }
+            "format" => {
+                let mut inputs = Vec::new();
+                while let Some(input_i) = seq.next_element()? {
+                    let style_overrides_i = seq.next_element()?; // optional param
+                    let element = (input_i, style_overrides_i);
+                    inputs.push(element);
+                }
+                if inputs.is_empty() {
+                    return Err(serde::de::Error::custom(
+                        "StringExpression::Format requires at least one argument",
+                    ));
+                }
+                Ok(StringExpression::Format(inputs))
+            }
+            "geometry-type" => Ok(StringExpression::GeometryType),
+            "image" => {
+                let image_name = visit_seq_field(&mut seq, "image_name")?;
+                Ok(StringExpression::Image(image_name))
+            }
+            "number-format" => {
+                let input = visit_seq_field(&mut seq, "input")?;
+                let format_options = visit_seq_field(&mut seq, "format_options")?;
+                Ok(StringExpression::NumberFormat(input, format_options))
+            }
+            "resolved-locale" => {
+                let collator = visit_seq_field(&mut seq, "collator")?;
+                Ok(StringExpression::ResolvedLocale(collator))
+            }
+            "rgb" => {
+                let red = visit_seq_field(&mut seq, "red")?;
+                let green = visit_seq_field(&mut seq, "green")?;
+                let blue = visit_seq_field(&mut seq, "blue")?;
+                Ok(StringExpression::Rgb(red, green, blue))
+            }
+            "rgba" => {
+                let red = visit_seq_field(&mut seq, "red")?;
+                let green = visit_seq_field(&mut seq, "green")?;
+                let blue = visit_seq_field(&mut seq, "blue")?;
+                let alpha = visit_seq_field(&mut seq, "alpha")?;
+                Ok(StringExpression::Rgba(red, green, blue, alpha))
+            }
+            "slice" => {
+                let string = visit_seq_field(&mut seq, "string")?;
+                let start_index = visit_seq_field(&mut seq, "start_index")?;
+                let end_index = seq.next_element()?;
+                Ok(StringExpression::Slice(string, start_index, end_index))
+            }
+            "string" => {
+                let mut inputs = Vec::new();
+                while let Some(element) = seq.next_element()? {
+                    inputs.push(element);
+                }
+                if inputs.is_empty() {
+                    return Err(serde::de::Error::custom(
+                        "StringExpression::String requires at least one argument",
+                    ));
+                }
+                Ok(StringExpression::String(inputs))
+            }
+            "to-color" => {
+                let mut inputs = Vec::new();
+                while let Some(element) = seq.next_element()? {
+                    inputs.push(element);
+                }
+                if inputs.is_empty() {
+                    return Err(serde::de::Error::custom(
+                        "StringExpression::ToColor requires at least one argument",
+                    ));
+                }
+                Ok(StringExpression::ToColor(inputs))
+            }
+            "to-string" => {
+                let value = visit_seq_field(&mut seq, "value")?;
+                Ok(StringExpression::ToString(value))
+            }
+            "typeof" => {
+                let value = visit_seq_field(&mut seq, "value")?;
+                Ok(StringExpression::Typeof(value))
+            }
+            "upcase" => {
+                let input = visit_seq_field(&mut seq, "input")?;
+                Ok(StringExpression::Upcase(input))
+            }
+            _ => Err(serde::de::Error::unknown_variant(
+                &op,
+                &[
+                    "at",
+                    "concat",
+                    "downcase",
+                    "format",
+                    "geometry-type",
+                    "image",
+                    "number-format",
+                    "resolved-locale",
+                    "rgb",
+                    "rgba",
+                    "slice",
+                    "string",
+                    "to-color",
+                    "to-string",
+                    "typeof",
+                    "upcase",
+                ],
+            )),
         }
     }
 }
@@ -2223,14 +2564,29 @@ pub enum StringExpressionOrArrayExpression {
     /// Retrieves an item from an array.
     At(serde_json::Value, serde_json::Value),
     /// Produces continuous, smooth results by interpolating between pairs of input and output values ("stops"). Works like `interpolate`, but the output type must be `color` or `array<color>`, and the interpolation is performed in the Hue-Chroma-Luminance color space.
-    InterpolateHcl(Vec<(Interpolation,NumberExpression,NumberLiteral,StringExpressionOrArrayExpression)>),
+    InterpolateHcl(
+        Vec<(
+            Interpolation,
+            NumberExpression,
+            NumberLiteral,
+            StringExpressionOrArrayExpression,
+        )>,
+    ),
     /// Produces continuous, smooth results by interpolating between pairs of input and output values ("stops"). Works like `interpolate`, but the output type must be `color` or `array<color>`, and the interpolation is performed in the CIELAB color space.
-    InterpolateLab(Vec<(Interpolation,NumberExpression,NumberLiteral,StringExpressionOrArrayExpression)>),
+    InterpolateLab(
+        Vec<(
+            Interpolation,
+            NumberExpression,
+            NumberLiteral,
+            StringExpressionOrArrayExpression,
+        )>,
+    ),
 }
 
 impl<'de> serde::Deserialize<'de> for StringExpressionOrArrayExpression {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where D: serde::Deserializer<'de>,
+    where
+        D: serde::Deserializer<'de>,
     {
         deserializer.deserialize_seq(StringExpressionOrArrayExpressionVisitor)
     }
@@ -2243,54 +2599,73 @@ impl<'de> serde::de::Visitor<'de> for StringExpressionOrArrayExpressionVisitor {
     type Value = StringExpressionOrArrayExpression;
 
     fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
-        formatter.write_str(r#"an StringExpressionOrArrayExpression like ["at",1,["literal",["a","b","c"]]]"#)
+        formatter.write_str(
+            r#"an StringExpressionOrArrayExpression like ["at",1,["literal",["a","b","c"]]]"#,
+        )
     }
 
     fn visit_seq<A: serde::de::SeqAccess<'de>>(self, mut seq: A) -> Result<Self::Value, A::Error> {
         use serde::Deserialize;
         /// Reads the next element from the sequence or reports a missing field error.
         fn visit_seq_field<'de, A, T>(seq: &mut A, name: &'static str) -> Result<T, A::Error>
-        where A: serde::de::SeqAccess<'de>, T: serde::Deserialize<'de> {
-        seq.next_element()?.ok_or_else(|| serde::de::Error::missing_field(name))
+        where
+            A: serde::de::SeqAccess<'de>,
+            T: serde::Deserialize<'de>,
+        {
+            seq.next_element()?
+                .ok_or_else(|| serde::de::Error::missing_field(name))
         }
 
         // First element: operator string
-        let op: String = seq.next_element()?.ok_or_else(|| serde::de::Error::custom("missing operator"))?;
+        let op: String = seq
+            .next_element()?
+            .ok_or_else(|| serde::de::Error::custom("missing operator"))?;
         match op.as_str() {
-        "at" => {
-        let index = visit_seq_field(&mut seq, "index")?;
-        let array = visit_seq_field(&mut seq, "array")?;
-        Ok(StringExpressionOrArrayExpression::At(index, array))
-        },
-        "interpolate-hcl" => {
-        let mut inputs = Vec::new();
-        while let Some(interpolation_type) = seq.next_element()? {
-        let input = seq.next_element()?.ok_or_else(|| serde::de::Error::custom("expected input in StringExpressionOrArrayExpression::InterpolateHcl"))?;
-        let stop_input_i = seq.next_element()?.ok_or_else(|| serde::de::Error::custom("expected stop_input_i in StringExpressionOrArrayExpression::InterpolateHcl"))?;
-        let stop_output_i = seq.next_element()?.ok_or_else(|| serde::de::Error::custom("expected stop_output_i in StringExpressionOrArrayExpression::InterpolateHcl"))?;
-        let element = (interpolation_type,input, stop_input_i, stop_output_i);
-        inputs.push(element);
-        }
-        if inputs.is_empty() {
-        return Err(serde::de::Error::custom("StringExpressionOrArrayExpression::InterpolateHcl requires at least one argument"));
-        }
-        Ok(StringExpressionOrArrayExpression::InterpolateHcl(inputs))
-        },
-        "interpolate-lab" => {
-        let mut inputs = Vec::new();
-        while let Some(interpolation_type) = seq.next_element()? {
-        let input = seq.next_element()?.ok_or_else(|| serde::de::Error::custom("expected input in StringExpressionOrArrayExpression::InterpolateLab"))?;
-        let stop_input_i = seq.next_element()?.ok_or_else(|| serde::de::Error::custom("expected stop_input_i in StringExpressionOrArrayExpression::InterpolateLab"))?;
-        let stop_output_i = seq.next_element()?.ok_or_else(|| serde::de::Error::custom("expected stop_output_i in StringExpressionOrArrayExpression::InterpolateLab"))?;
-        let element = (interpolation_type,input, stop_input_i, stop_output_i);
-        inputs.push(element);
-        }
-        if inputs.is_empty() {
-        return Err(serde::de::Error::custom("StringExpressionOrArrayExpression::InterpolateLab requires at least one argument"));
-        }
-        Ok(StringExpressionOrArrayExpression::InterpolateLab(inputs))
-        },
-        _ => Err(serde::de::Error::unknown_variant(&op, &["at", "interpolate-hcl", "interpolate-lab"]))
+            "at" => {
+                let index = visit_seq_field(&mut seq, "index")?;
+                let array = visit_seq_field(&mut seq, "array")?;
+                Ok(StringExpressionOrArrayExpression::At(index, array))
+            }
+            "interpolate-hcl" => {
+                let mut inputs = Vec::new();
+                while let Some(interpolation_type) = seq.next_element()? {
+                    let input = seq.next_element()?.ok_or_else(|| {
+                        serde::de::Error::custom(
+                            "expected input in StringExpressionOrArrayExpression::InterpolateHcl",
+                        )
+                    })?;
+                    let stop_input_i = seq.next_element()?.ok_or_else(|| serde::de::Error::custom("expected stop_input_i in StringExpressionOrArrayExpression::InterpolateHcl"))?;
+                    let stop_output_i = seq.next_element()?.ok_or_else(|| serde::de::Error::custom("expected stop_output_i in StringExpressionOrArrayExpression::InterpolateHcl"))?;
+                    let element = (interpolation_type, input, stop_input_i, stop_output_i);
+                    inputs.push(element);
+                }
+                if inputs.is_empty() {
+                    return Err(serde::de::Error::custom("StringExpressionOrArrayExpression::InterpolateHcl requires at least one argument"));
+                }
+                Ok(StringExpressionOrArrayExpression::InterpolateHcl(inputs))
+            }
+            "interpolate-lab" => {
+                let mut inputs = Vec::new();
+                while let Some(interpolation_type) = seq.next_element()? {
+                    let input = seq.next_element()?.ok_or_else(|| {
+                        serde::de::Error::custom(
+                            "expected input in StringExpressionOrArrayExpression::InterpolateLab",
+                        )
+                    })?;
+                    let stop_input_i = seq.next_element()?.ok_or_else(|| serde::de::Error::custom("expected stop_input_i in StringExpressionOrArrayExpression::InterpolateLab"))?;
+                    let stop_output_i = seq.next_element()?.ok_or_else(|| serde::de::Error::custom("expected stop_output_i in StringExpressionOrArrayExpression::InterpolateLab"))?;
+                    let element = (interpolation_type, input, stop_input_i, stop_output_i);
+                    inputs.push(element);
+                }
+                if inputs.is_empty() {
+                    return Err(serde::de::Error::custom("StringExpressionOrArrayExpression::InterpolateLab requires at least one argument"));
+                }
+                Ok(StringExpressionOrArrayExpression::InterpolateLab(inputs))
+            }
+            _ => Err(serde::de::Error::unknown_variant(
+                &op,
+                &["at", "interpolate-hcl", "interpolate-lab"],
+            )),
         }
     }
 }
@@ -2300,53 +2675,53 @@ pub struct GeojsonSource {
     /// Contains an attribution to be displayed when the map is shown to a user.
     pub attribution: Option<GeojsonSourceAttribution>,
     /// Size of the tile buffer on each side. A value of 0 produces no buffer. A value of 512 produces a buffer as wide as the tile itself. Larger values produce fewer rendering artifacts near tile edges and slower performance.
-    /// 
+    ///
     /// Range: 0..=512
     pub buffer: Option<GeojsonSourceBuffer>,
     /// If the data is a collection of point features, setting this to true clusters the points by radius into groups. Cluster groups become new `Point` features in the source with additional properties:
-    /// 
-    ///  * `cluster` Is `true` if the point is a cluster 
-    /// 
+    ///
+    ///  * `cluster` Is `true` if the point is a cluster
+    ///
     ///  * `cluster_id` A unique id for the cluster to be used in conjunction with the [cluster inspection methods](https://maplibre.org/maplibre-gl-js/docs/API/classes/GeoJSONSource/#getclusterexpansionzoom)
-    /// 
+    ///
     ///  * `point_count` Number of original points grouped into this cluster
-    /// 
+    ///
     ///  * `point_count_abbreviated` An abbreviated point count
     pub cluster: Option<GeojsonSourceCluster>,
     /// Max zoom on which to cluster points if clustering is enabled. Defaults to one zoom less than maxzoom (so that last zoom features are not clustered). Clusters are re-evaluated at integer zoom levels so setting clusterMaxZoom to 14 means the clusters will be displayed until z15.
-    #[serde(rename="clusterMaxZoom")]
+    #[serde(rename = "clusterMaxZoom")]
     pub cluster_max_zoom: Option<GeojsonSourceClusterMaxZoom>,
     /// Minimum number of points necessary to form a cluster if clustering is enabled. Defaults to `2`.
-    #[serde(rename="clusterMinPoints")]
+    #[serde(rename = "clusterMinPoints")]
     pub cluster_min_points: Option<GeojsonSourceClusterMinPoints>,
     /// An object defining custom properties on the generated clusters if clustering is enabled, aggregating values from clustered points. Has the form `{"property_name": [operator, map_expression]}`. `operator` is any expression function that accepts at least 2 operands (e.g. `"+"` or `"max"`) — it accumulates the property value from clusters/points the cluster contains; `map_expression` produces the value of a single point.
-    /// 
+    ///
     /// Example: `{"sum": ["+", ["get", "scalerank"]]}`.
-    /// 
+    ///
     /// For more advanced use cases, in place of `operator`, you can use a custom reduce expression that references a special `["accumulated"]` value, e.g.:
-    /// 
+    ///
     /// `{"sum": [["+", ["accumulated"], ["get", "sum"]], ["get", "scalerank"]]}`
-    #[serde(rename="clusterProperties")]
+    #[serde(rename = "clusterProperties")]
     pub cluster_properties: Option<GeojsonSourceClusterProperties>,
     /// Radius of each cluster if clustering is enabled. A value of 512 indicates a radius equal to the width of a tile.
-    /// 
+    ///
     /// Range: 0..
-    #[serde(rename="clusterRadius")]
+    #[serde(rename = "clusterRadius")]
     pub cluster_radius: Option<GeojsonSourceClusterRadius>,
     /// A URL to a GeoJSON file, or inline GeoJSON.
     pub data: GeojsonSourceData,
     /// An expression for filtering features prior to processing them for rendering.
     pub filter: Option<GeojsonSourceFilter>,
     /// Whether to generate ids for the geojson features. When enabled, the `feature.id` property will be auto assigned based on its index in the `features` array, over-writing any previous values.
-    #[serde(rename="generateId")]
+    #[serde(rename = "generateId")]
     pub generate_id: Option<GeojsonSourceGenerateId>,
     /// Whether to calculate line distance metrics. This is required for line layers that specify `line-gradient` values.
-    #[serde(rename="lineMetrics")]
+    #[serde(rename = "lineMetrics")]
     pub line_metrics: Option<GeojsonSourceLineMetrics>,
     /// Maximum zoom level at which to create vector tiles (higher means greater detail at high zoom levels).
     pub maxzoom: Option<GeojsonSourceMaxzoom>,
     /// A property to use as a feature id (for feature state). Either a property name, or an object of the form `{<sourceLayer>: <propertyName>}`.
-    #[serde(rename="promoteId")]
+    #[serde(rename = "promoteId")]
     pub promote_id: Option<GeojsonSourcePromoteId>,
     /// Douglas-Peucker simplification tolerance (higher means simpler geometries and faster performance).
     pub tolerance: Option<GeojsonSourceTolerance>,
@@ -2364,13 +2739,16 @@ pub struct GeojsonSourceBuffer(serde_json::Number);
 
 impl Default for GeojsonSourceBuffer {
     fn default() -> Self {
-        Self(serde_json::Number::from_i128(128).expect("the number is serialised from a number and is thus always valid"))
+        Self(
+            serde_json::Number::from_i128(128)
+                .expect("the number is serialised from a number and is thus always valid"),
+        )
     }
 }
 
 /// If the data is a collection of point features, setting this to true clusters the points by radius into groups. Cluster groups become new `Point` features in the source with additional properties:
 ///
-///  * `cluster` Is `true` if the point is a cluster 
+///  * `cluster` Is `true` if the point is a cluster
 ///
 ///  * `cluster_id` A unique id for the cluster to be used in conjunction with the [cluster inspection methods](https://maplibre.org/maplibre-gl-js/docs/API/classes/GeoJSONSource/#getclusterexpansionzoom)
 ///
@@ -2412,7 +2790,10 @@ pub struct GeojsonSourceClusterRadius(serde_json::Number);
 
 impl Default for GeojsonSourceClusterRadius {
     fn default() -> Self {
-        Self(serde_json::Number::from_i128(50).expect("the number is serialised from a number and is thus always valid"))
+        Self(
+            serde_json::Number::from_i128(50)
+                .expect("the number is serialised from a number and is thus always valid"),
+        )
     }
 }
 
@@ -2450,7 +2831,10 @@ pub struct GeojsonSourceMaxzoom(serde_json::Number);
 
 impl Default for GeojsonSourceMaxzoom {
     fn default() -> Self {
-        Self(serde_json::Number::from_i128(18).expect("the number is serialised from a number and is thus always valid"))
+        Self(
+            serde_json::Number::from_i128(18)
+                .expect("the number is serialised from a number and is thus always valid"),
+        )
     }
 }
 
@@ -2464,7 +2848,10 @@ pub struct GeojsonSourceTolerance(serde_json::Number);
 
 impl Default for GeojsonSourceTolerance {
     fn default() -> Self {
-        Self(serde_json::Number::from_f64(0.375).expect("the number is serialised from a number and is thus always valid"))
+        Self(
+            serde_json::Number::from_f64(0.375)
+                .expect("the number is serialised from a number and is thus always valid"),
+        )
     }
 }
 
@@ -2501,7 +2888,7 @@ pub struct RasterSource {
     /// Influences the y direction of the tile coordinates. The global-mercator (aka Spherical Mercator) profile is assumed.
     pub scheme: Option<RasterSourceScheme>,
     /// The minimum visual size to display tiles for this layer. Only configurable for raster layers.
-    #[serde(rename="tileSize")]
+    #[serde(rename = "tileSize")]
     pub tile_size: Option<RasterSourceTileSize>,
     /// An array of one or more tile source URLs, as in the TileJSON spec.
     pub tiles: Option<RasterSourceTiles>,
@@ -2521,7 +2908,16 @@ struct RasterSourceBounds(Box<[serde_json::Number; 4]>);
 
 impl Default for RasterSourceBounds {
     fn default() -> Self {
-        Self(Box::new([serde_json::Number::from_i128(-180).expect("the number is serialised from a number and is thus always valid"), serde_json::Number::from_f64(-85.051129).expect("the number is serialised from a number and is thus always valid"), serde_json::Number::from_i128(180).expect("the number is serialised from a number and is thus always valid"), serde_json::Number::from_f64(85.051129).expect("the number is serialised from a number and is thus always valid")]))
+        Self(Box::new([
+            serde_json::Number::from_i128(-180)
+                .expect("the number is serialised from a number and is thus always valid"),
+            serde_json::Number::from_f64(-85.051129)
+                .expect("the number is serialised from a number and is thus always valid"),
+            serde_json::Number::from_i128(180)
+                .expect("the number is serialised from a number and is thus always valid"),
+            serde_json::Number::from_f64(85.051129)
+                .expect("the number is serialised from a number and is thus always valid"),
+        ]))
     }
 }
 
@@ -2531,7 +2927,10 @@ pub struct RasterSourceMaxzoom(serde_json::Number);
 
 impl Default for RasterSourceMaxzoom {
     fn default() -> Self {
-        Self(serde_json::Number::from_i128(22).expect("the number is serialised from a number and is thus always valid"))
+        Self(
+            serde_json::Number::from_i128(22)
+                .expect("the number is serialised from a number and is thus always valid"),
+        )
     }
 }
 
@@ -2541,7 +2940,10 @@ pub struct RasterSourceMinzoom(serde_json::Number);
 
 impl Default for RasterSourceMinzoom {
     fn default() -> Self {
-        Self(serde_json::Number::from_i128(0).expect("the number is serialised from a number and is thus always valid"))
+        Self(
+            serde_json::Number::from_i128(0)
+                .expect("the number is serialised from a number and is thus always valid"),
+        )
     }
 }
 
@@ -2549,10 +2951,10 @@ impl Default for RasterSourceMinzoom {
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy)]
 pub enum RasterSourceScheme {
     /// OSGeo spec scheme.
-    #[serde(rename="tms")]
+    #[serde(rename = "tms")]
     Tms,
     /// Slippy map tilenames scheme.
-    #[serde(rename="xyz")]
+    #[serde(rename = "xyz")]
     Xyz,
 }
 
@@ -2574,7 +2976,10 @@ pub struct RasterSourceTileSize(serde_json::Number);
 
 impl Default for RasterSourceTileSize {
     fn default() -> Self {
-        Self(serde_json::Number::from_i128(512).expect("the number is serialised from a number and is thus always valid"))
+        Self(
+            serde_json::Number::from_i128(512)
+                .expect("the number is serialised from a number and is thus always valid"),
+        )
     }
 }
 
@@ -2601,27 +3006,27 @@ pub struct RasterDemSource {
     /// Contains an attribution to be displayed when the map is shown to a user.
     pub attribution: Option<RasterDemSourceAttribution>,
     /// Value that will be added to the encoding mix when decoding. Only used on custom encodings.
-    #[serde(rename="baseShift")]
+    #[serde(rename = "baseShift")]
     pub base_shift: Option<RasterDemSourceBaseShift>,
     /// Value that will be multiplied by the blue channel value when decoding. Only used on custom encodings.
-    #[serde(rename="blueFactor")]
+    #[serde(rename = "blueFactor")]
     pub blue_factor: Option<RasterDemSourceBlueFactor>,
     /// An array containing the longitude and latitude of the southwest and northeast corners of the source's bounding box in the following order: `[sw.lng, sw.lat, ne.lng, ne.lat]`. When this property is included in a source, no tiles outside of the given bounds are requested by MapLibre.
     pub bounds: Option<RasterDemSourceBounds>,
     /// The encoding used by this source. Mapbox Terrain RGB is used by default.
     pub encoding: Option<RasterDemSourceEncoding>,
     /// Value that will be multiplied by the green channel value when decoding. Only used on custom encodings.
-    #[serde(rename="greenFactor")]
+    #[serde(rename = "greenFactor")]
     pub green_factor: Option<RasterDemSourceGreenFactor>,
     /// Maximum zoom level for which tiles are available, as in the TileJSON spec. Data from tiles at the maxzoom are used when displaying the map at higher zoom levels.
     pub maxzoom: Option<RasterDemSourceMaxzoom>,
     /// Minimum zoom level for which tiles are available, as in the TileJSON spec.
     pub minzoom: Option<RasterDemSourceMinzoom>,
     /// Value that will be multiplied by the red channel value when decoding. Only used on custom encodings.
-    #[serde(rename="redFactor")]
+    #[serde(rename = "redFactor")]
     pub red_factor: Option<RasterDemSourceRedFactor>,
     /// The minimum visual size to display tiles for this layer. Only configurable for raster layers.
-    #[serde(rename="tileSize")]
+    #[serde(rename = "tileSize")]
     pub tile_size: Option<RasterDemSourceTileSize>,
     /// An array of one or more tile source URLs, as in the TileJSON spec.
     pub tiles: Option<RasterDemSourceTiles>,
@@ -2641,7 +3046,10 @@ pub struct RasterDemSourceBaseShift(serde_json::Number);
 
 impl Default for RasterDemSourceBaseShift {
     fn default() -> Self {
-        Self(serde_json::Number::from_f64(0.0).expect("the number is serialised from a number and is thus always valid"))
+        Self(
+            serde_json::Number::from_f64(0.0)
+                .expect("the number is serialised from a number and is thus always valid"),
+        )
     }
 }
 
@@ -2651,7 +3059,10 @@ pub struct RasterDemSourceBlueFactor(serde_json::Number);
 
 impl Default for RasterDemSourceBlueFactor {
     fn default() -> Self {
-        Self(serde_json::Number::from_f64(1.0).expect("the number is serialised from a number and is thus always valid"))
+        Self(
+            serde_json::Number::from_f64(1.0)
+                .expect("the number is serialised from a number and is thus always valid"),
+        )
     }
 }
 
@@ -2661,7 +3072,16 @@ struct RasterDemSourceBounds(Box<[serde_json::Number; 4]>);
 
 impl Default for RasterDemSourceBounds {
     fn default() -> Self {
-        Self(Box::new([serde_json::Number::from_i128(-180).expect("the number is serialised from a number and is thus always valid"), serde_json::Number::from_f64(-85.051129).expect("the number is serialised from a number and is thus always valid"), serde_json::Number::from_i128(180).expect("the number is serialised from a number and is thus always valid"), serde_json::Number::from_f64(85.051129).expect("the number is serialised from a number and is thus always valid")]))
+        Self(Box::new([
+            serde_json::Number::from_i128(-180)
+                .expect("the number is serialised from a number and is thus always valid"),
+            serde_json::Number::from_f64(-85.051129)
+                .expect("the number is serialised from a number and is thus always valid"),
+            serde_json::Number::from_i128(180)
+                .expect("the number is serialised from a number and is thus always valid"),
+            serde_json::Number::from_f64(85.051129)
+                .expect("the number is serialised from a number and is thus always valid"),
+        ]))
     }
 }
 
@@ -2669,13 +3089,13 @@ impl Default for RasterDemSourceBounds {
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy)]
 pub enum RasterDemSourceEncoding {
     /// Decodes tiles using the redFactor, blueFactor, greenFactor, baseShift parameters.
-    #[serde(rename="custom")]
+    #[serde(rename = "custom")]
     Custom,
     /// Mapbox Terrain RGB tiles. See https://www.mapbox.com/help/access-elevation-data/#mapbox-terrain-rgb for more info.
-    #[serde(rename="mapbox")]
+    #[serde(rename = "mapbox")]
     Mapbox,
     /// Terrarium format PNG tiles. See https://aws.amazon.com/es/public-datasets/terrain/ for more info.
-    #[serde(rename="terrarium")]
+    #[serde(rename = "terrarium")]
     Terrarium,
 }
 
@@ -2697,7 +3117,10 @@ pub struct RasterDemSourceGreenFactor(serde_json::Number);
 
 impl Default for RasterDemSourceGreenFactor {
     fn default() -> Self {
-        Self(serde_json::Number::from_f64(1.0).expect("the number is serialised from a number and is thus always valid"))
+        Self(
+            serde_json::Number::from_f64(1.0)
+                .expect("the number is serialised from a number and is thus always valid"),
+        )
     }
 }
 
@@ -2707,7 +3130,10 @@ pub struct RasterDemSourceMaxzoom(serde_json::Number);
 
 impl Default for RasterDemSourceMaxzoom {
     fn default() -> Self {
-        Self(serde_json::Number::from_i128(22).expect("the number is serialised from a number and is thus always valid"))
+        Self(
+            serde_json::Number::from_i128(22)
+                .expect("the number is serialised from a number and is thus always valid"),
+        )
     }
 }
 
@@ -2717,7 +3143,10 @@ pub struct RasterDemSourceMinzoom(serde_json::Number);
 
 impl Default for RasterDemSourceMinzoom {
     fn default() -> Self {
-        Self(serde_json::Number::from_i128(0).expect("the number is serialised from a number and is thus always valid"))
+        Self(
+            serde_json::Number::from_i128(0)
+                .expect("the number is serialised from a number and is thus always valid"),
+        )
     }
 }
 
@@ -2727,7 +3156,10 @@ pub struct RasterDemSourceRedFactor(serde_json::Number);
 
 impl Default for RasterDemSourceRedFactor {
     fn default() -> Self {
-        Self(serde_json::Number::from_f64(1.0).expect("the number is serialised from a number and is thus always valid"))
+        Self(
+            serde_json::Number::from_f64(1.0)
+                .expect("the number is serialised from a number and is thus always valid"),
+        )
     }
 }
 
@@ -2737,7 +3169,10 @@ pub struct RasterDemSourceTileSize(serde_json::Number);
 
 impl Default for RasterDemSourceTileSize {
     fn default() -> Self {
-        Self(serde_json::Number::from_i128(512).expect("the number is serialised from a number and is thus always valid"))
+        Self(
+            serde_json::Number::from_i128(512)
+                .expect("the number is serialised from a number and is thus always valid"),
+        )
     }
 }
 
@@ -2772,7 +3207,7 @@ pub struct VectorSource {
     /// Minimum zoom level for which tiles are available, as in the TileJSON spec.
     pub minzoom: Option<VectorSourceMinzoom>,
     /// A property to use as a feature id (for feature state). Either a property name, or an object of the form `{<sourceLayer>: <propertyName>}`. If specified as a string for a vector tile source, the same property is used across all its source layers.
-    #[serde(rename="promoteId")]
+    #[serde(rename = "promoteId")]
     pub promote_id: Option<VectorSourcePromoteId>,
     /// Influences the y direction of the tile coordinates. The global-mercator (aka Spherical Mercator) profile is assumed.
     pub scheme: Option<VectorSourceScheme>,
@@ -2794,7 +3229,16 @@ struct VectorSourceBounds(Box<[serde_json::Number; 4]>);
 
 impl Default for VectorSourceBounds {
     fn default() -> Self {
-        Self(Box::new([serde_json::Number::from_i128(-180).expect("the number is serialised from a number and is thus always valid"), serde_json::Number::from_f64(-85.051129).expect("the number is serialised from a number and is thus always valid"), serde_json::Number::from_i128(180).expect("the number is serialised from a number and is thus always valid"), serde_json::Number::from_f64(85.051129).expect("the number is serialised from a number and is thus always valid")]))
+        Self(Box::new([
+            serde_json::Number::from_i128(-180)
+                .expect("the number is serialised from a number and is thus always valid"),
+            serde_json::Number::from_f64(-85.051129)
+                .expect("the number is serialised from a number and is thus always valid"),
+            serde_json::Number::from_i128(180)
+                .expect("the number is serialised from a number and is thus always valid"),
+            serde_json::Number::from_f64(85.051129)
+                .expect("the number is serialised from a number and is thus always valid"),
+        ]))
     }
 }
 
@@ -2802,10 +3246,10 @@ impl Default for VectorSourceBounds {
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy)]
 pub enum VectorSourceEncoding {
     /// MapLibre Vector Tiles. See https://github.com/maplibre/maplibre-tile-spec for more info.
-    #[serde(rename="mlt")]
+    #[serde(rename = "mlt")]
     Mlt,
     /// Mapbox Vector Tiles. See http://github.com/mapbox/vector-tile-spec for more info.
-    #[serde(rename="mvt")]
+    #[serde(rename = "mvt")]
     Mvt,
 }
 
@@ -2827,7 +3271,10 @@ pub struct VectorSourceMaxzoom(serde_json::Number);
 
 impl Default for VectorSourceMaxzoom {
     fn default() -> Self {
-        Self(serde_json::Number::from_i128(22).expect("the number is serialised from a number and is thus always valid"))
+        Self(
+            serde_json::Number::from_i128(22)
+                .expect("the number is serialised from a number and is thus always valid"),
+        )
     }
 }
 
@@ -2837,7 +3284,10 @@ pub struct VectorSourceMinzoom(serde_json::Number);
 
 impl Default for VectorSourceMinzoom {
     fn default() -> Self {
-        Self(serde_json::Number::from_i128(0).expect("the number is serialised from a number and is thus always valid"))
+        Self(
+            serde_json::Number::from_i128(0)
+                .expect("the number is serialised from a number and is thus always valid"),
+        )
     }
 }
 
@@ -2849,10 +3299,10 @@ pub struct VectorSourcePromoteId(String);
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy)]
 pub enum VectorSourceScheme {
     /// OSGeo spec scheme.
-    #[serde(rename="tms")]
+    #[serde(rename = "tms")]
     Tms,
     /// Slippy map tilenames scheme.
-    #[serde(rename="xyz")]
+    #[serde(rename = "xyz")]
     Xyz,
 }
 
@@ -2907,19 +3357,19 @@ struct VideoSourceCoordinates(Box<[VideoSourceCoordinatesValue; 4]>);
 struct VideoSourceUrls(Vec<String>);
 
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-#[serde(tag="type")]
+#[serde(tag = "type")]
 pub enum Source {
-    #[serde(rename="geojson")]
+    #[serde(rename = "geojson")]
     GeojsonSource(GeojsonSource),
-    #[serde(rename="image")]
+    #[serde(rename = "image")]
     ImageSource(ImageSource),
-    #[serde(rename="raster")]
+    #[serde(rename = "raster")]
     RasterSource(RasterSource),
-    #[serde(rename="raster-dem")]
+    #[serde(rename = "raster-dem")]
     RasterDemSource(RasterDemSource),
-    #[serde(rename="vector")]
+    #[serde(rename = "vector")]
     VectorSource(VectorSource),
-    #[serde(rename="video")]
+    #[serde(rename = "video")]
     VideoSource(VideoSource),
 }
 
@@ -2938,7 +3388,7 @@ pub struct Layer {
     /// Name of a source description to be used for this layer. Required for all layer types except `background`.
     pub source: Option<LayerSource>,
     /// Layer to use from a vector tile source. Required for vector tile sources; prohibited for all other source types, including GeoJSON sources.
-    #[serde(rename="source-layer")]
+    #[serde(rename = "source-layer")]
     pub source_layer: Option<LayerSourceLayer>,
 }
 
@@ -2979,9 +3429,9 @@ pub struct BackgroundLayoutLayer {
 /// Whether this layer is displayed.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy)]
 pub enum BackgroundLayoutLayerVisibility {
-    #[serde(rename="none")]
+    #[serde(rename = "none")]
     None,
-    #[serde(rename="visible")]
+    #[serde(rename = "visible")]
     Visible,
 }
 
@@ -3000,13 +3450,13 @@ impl Default for BackgroundLayoutLayerVisibility {
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
 pub struct BackgroundPaintLayer {
     /// The color with which the background will be drawn.
-    #[serde(rename="background-color")]
+    #[serde(rename = "background-color")]
     pub background_color: Option<BackgroundPaintLayerBackgroundColor>,
     /// The opacity at which the background will be drawn.
-    #[serde(rename="background-opacity")]
+    #[serde(rename = "background-opacity")]
     pub background_opacity: Option<BackgroundPaintLayerBackgroundOpacity>,
     /// Name of image in sprite to use for drawing an image background. For seamless patterns, image width and height must be a factor of two (2, 4, 8, ..., 512). Note that zoom-dependent expressions will be evaluated only at integer zoom levels.
-    #[serde(rename="background-pattern")]
+    #[serde(rename = "background-pattern")]
     pub background_pattern: Option<BackgroundPaintLayerBackgroundPattern>,
 }
 
@@ -3026,7 +3476,10 @@ pub struct BackgroundPaintLayerBackgroundOpacity(serde_json::Number);
 
 impl Default for BackgroundPaintLayerBackgroundOpacity {
     fn default() -> Self {
-        Self(serde_json::Number::from_i128(1).expect("the number is serialised from a number and is thus always valid"))
+        Self(
+            serde_json::Number::from_i128(1)
+                .expect("the number is serialised from a number and is thus always valid"),
+        )
     }
 }
 
@@ -3037,7 +3490,7 @@ struct BackgroundPaintLayerBackgroundPattern(String);
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
 pub struct CircleLayoutLayer {
     /// Sorts features in ascending order based on this value. Features with a higher sort key will appear above features with a lower sort key.
-    #[serde(rename="circle-sort-key")]
+    #[serde(rename = "circle-sort-key")]
     pub circle_sort_key: Option<CircleLayoutLayerCircleSortKey>,
     /// Whether this layer is displayed.
     pub visibility: Option<CircleLayoutLayerVisibility>,
@@ -3050,9 +3503,9 @@ pub struct CircleLayoutLayerCircleSortKey(serde_json::Number);
 /// Whether this layer is displayed.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy)]
 pub enum CircleLayoutLayerVisibility {
-    #[serde(rename="none")]
+    #[serde(rename = "none")]
     None,
-    #[serde(rename="visible")]
+    #[serde(rename = "visible")]
     Visible,
 }
 
@@ -3071,37 +3524,37 @@ impl Default for CircleLayoutLayerVisibility {
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
 pub struct CirclePaintLayer {
     /// Amount to blur the circle. 1 blurs the circle such that only the centerpoint is full opacity.
-    #[serde(rename="circle-blur")]
+    #[serde(rename = "circle-blur")]
     pub circle_blur: Option<CirclePaintLayerCircleBlur>,
     /// The fill color of the circle.
-    #[serde(rename="circle-color")]
+    #[serde(rename = "circle-color")]
     pub circle_color: Option<CirclePaintLayerCircleColor>,
     /// The opacity at which the circle will be drawn.
-    #[serde(rename="circle-opacity")]
+    #[serde(rename = "circle-opacity")]
     pub circle_opacity: Option<CirclePaintLayerCircleOpacity>,
     /// Orientation of circle when map is pitched.
-    #[serde(rename="circle-pitch-alignment")]
+    #[serde(rename = "circle-pitch-alignment")]
     pub circle_pitch_alignment: Option<CirclePaintLayerCirclePitchAlignment>,
     /// Controls the scaling behavior of the circle when the map is pitched.
-    #[serde(rename="circle-pitch-scale")]
+    #[serde(rename = "circle-pitch-scale")]
     pub circle_pitch_scale: Option<CirclePaintLayerCirclePitchScale>,
     /// Circle radius.
-    #[serde(rename="circle-radius")]
+    #[serde(rename = "circle-radius")]
     pub circle_radius: Option<CirclePaintLayerCircleRadius>,
     /// The stroke color of the circle.
-    #[serde(rename="circle-stroke-color")]
+    #[serde(rename = "circle-stroke-color")]
     pub circle_stroke_color: Option<CirclePaintLayerCircleStrokeColor>,
     /// The opacity of the circle's stroke.
-    #[serde(rename="circle-stroke-opacity")]
+    #[serde(rename = "circle-stroke-opacity")]
     pub circle_stroke_opacity: Option<CirclePaintLayerCircleStrokeOpacity>,
     /// The width of the circle's stroke. Strokes are placed outside of the `circle-radius`.
-    #[serde(rename="circle-stroke-width")]
+    #[serde(rename = "circle-stroke-width")]
     pub circle_stroke_width: Option<CirclePaintLayerCircleStrokeWidth>,
     /// The geometry's offset. Values are [x, y] where negatives indicate left and up, respectively.
-    #[serde(rename="circle-translate")]
+    #[serde(rename = "circle-translate")]
     pub circle_translate: Option<CirclePaintLayerCircleTranslate>,
     /// Controls the frame of reference for `circle-translate`.
-    #[serde(rename="circle-translate-anchor")]
+    #[serde(rename = "circle-translate-anchor")]
     pub circle_translate_anchor: Option<CirclePaintLayerCircleTranslateAnchor>,
 }
 
@@ -3111,7 +3564,10 @@ pub struct CirclePaintLayerCircleBlur(serde_json::Number);
 
 impl Default for CirclePaintLayerCircleBlur {
     fn default() -> Self {
-        Self(serde_json::Number::from_i128(0).expect("the number is serialised from a number and is thus always valid"))
+        Self(
+            serde_json::Number::from_i128(0)
+                .expect("the number is serialised from a number and is thus always valid"),
+        )
     }
 }
 
@@ -3131,16 +3587,19 @@ pub struct CirclePaintLayerCircleOpacity(serde_json::Number);
 
 impl Default for CirclePaintLayerCircleOpacity {
     fn default() -> Self {
-        Self(serde_json::Number::from_i128(1).expect("the number is serialised from a number and is thus always valid"))
+        Self(
+            serde_json::Number::from_i128(1)
+                .expect("the number is serialised from a number and is thus always valid"),
+        )
     }
 }
 
 /// Orientation of circle when map is pitched.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy)]
 pub enum CirclePaintLayerCirclePitchAlignment {
-    #[serde(rename="map")]
+    #[serde(rename = "map")]
     Map,
-    #[serde(rename="viewport")]
+    #[serde(rename = "viewport")]
     Viewport,
 }
 
@@ -3159,9 +3618,9 @@ impl Default for CirclePaintLayerCirclePitchAlignment {
 /// Controls the scaling behavior of the circle when the map is pitched.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy)]
 pub enum CirclePaintLayerCirclePitchScale {
-    #[serde(rename="map")]
+    #[serde(rename = "map")]
     Map,
-    #[serde(rename="viewport")]
+    #[serde(rename = "viewport")]
     Viewport,
 }
 
@@ -3183,7 +3642,10 @@ pub struct CirclePaintLayerCircleRadius(serde_json::Number);
 
 impl Default for CirclePaintLayerCircleRadius {
     fn default() -> Self {
-        Self(serde_json::Number::from_i128(5).expect("the number is serialised from a number and is thus always valid"))
+        Self(
+            serde_json::Number::from_i128(5)
+                .expect("the number is serialised from a number and is thus always valid"),
+        )
     }
 }
 
@@ -3203,7 +3665,10 @@ pub struct CirclePaintLayerCircleStrokeOpacity(serde_json::Number);
 
 impl Default for CirclePaintLayerCircleStrokeOpacity {
     fn default() -> Self {
-        Self(serde_json::Number::from_i128(1).expect("the number is serialised from a number and is thus always valid"))
+        Self(
+            serde_json::Number::from_i128(1)
+                .expect("the number is serialised from a number and is thus always valid"),
+        )
     }
 }
 
@@ -3213,7 +3678,10 @@ pub struct CirclePaintLayerCircleStrokeWidth(serde_json::Number);
 
 impl Default for CirclePaintLayerCircleStrokeWidth {
     fn default() -> Self {
-        Self(serde_json::Number::from_i128(0).expect("the number is serialised from a number and is thus always valid"))
+        Self(
+            serde_json::Number::from_i128(0)
+                .expect("the number is serialised from a number and is thus always valid"),
+        )
     }
 }
 
@@ -3223,16 +3691,21 @@ struct CirclePaintLayerCircleTranslate(Box<[serde_json::Number; 2]>);
 
 impl Default for CirclePaintLayerCircleTranslate {
     fn default() -> Self {
-        Self(Box::new([serde_json::Number::from_i128(0).expect("the number is serialised from a number and is thus always valid"), serde_json::Number::from_i128(0).expect("the number is serialised from a number and is thus always valid")]))
+        Self(Box::new([
+            serde_json::Number::from_i128(0)
+                .expect("the number is serialised from a number and is thus always valid"),
+            serde_json::Number::from_i128(0)
+                .expect("the number is serialised from a number and is thus always valid"),
+        ]))
     }
 }
 
 /// Controls the frame of reference for `circle-translate`.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy)]
 pub enum CirclePaintLayerCircleTranslateAnchor {
-    #[serde(rename="map")]
+    #[serde(rename = "map")]
     Map,
-    #[serde(rename="viewport")]
+    #[serde(rename = "viewport")]
     Viewport,
 }
 
@@ -3257,9 +3730,9 @@ pub struct ColorReliefLayoutLayer {
 /// Whether this layer is displayed.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy)]
 pub enum ColorReliefLayoutLayerVisibility {
-    #[serde(rename="none")]
+    #[serde(rename = "none")]
     None,
-    #[serde(rename="visible")]
+    #[serde(rename = "visible")]
     Visible,
 }
 
@@ -3278,10 +3751,10 @@ impl Default for ColorReliefLayoutLayerVisibility {
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
 pub struct ColorReliefPaintLayer {
     /// Defines the color of each pixel based on its elevation. Should be an expression that uses `["elevation"]` as input.
-    #[serde(rename="color-relief-color")]
+    #[serde(rename = "color-relief-color")]
     pub color_relief_color: Option<ColorReliefPaintLayerColorReliefColor>,
     /// The opacity at which the color-relief will be drawn.
-    #[serde(rename="color-relief-opacity")]
+    #[serde(rename = "color-relief-opacity")]
     pub color_relief_opacity: Option<ColorReliefPaintLayerColorReliefOpacity>,
 }
 
@@ -3295,14 +3768,17 @@ pub struct ColorReliefPaintLayerColorReliefOpacity(serde_json::Number);
 
 impl Default for ColorReliefPaintLayerColorReliefOpacity {
     fn default() -> Self {
-        Self(serde_json::Number::from_i128(1).expect("the number is serialised from a number and is thus always valid"))
+        Self(
+            serde_json::Number::from_i128(1)
+                .expect("the number is serialised from a number and is thus always valid"),
+        )
     }
 }
 
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
 pub struct FillLayoutLayer {
     /// Sorts features in ascending order based on this value. Features with a higher sort key will appear above features with a lower sort key.
-    #[serde(rename="fill-sort-key")]
+    #[serde(rename = "fill-sort-key")]
     pub fill_sort_key: Option<FillLayoutLayerFillSortKey>,
     /// Whether this layer is displayed.
     pub visibility: Option<FillLayoutLayerVisibility>,
@@ -3315,9 +3791,9 @@ pub struct FillLayoutLayerFillSortKey(serde_json::Number);
 /// Whether this layer is displayed.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy)]
 pub enum FillLayoutLayerVisibility {
-    #[serde(rename="none")]
+    #[serde(rename = "none")]
     None,
-    #[serde(rename="visible")]
+    #[serde(rename = "visible")]
     Visible,
 }
 
@@ -3336,25 +3812,25 @@ impl Default for FillLayoutLayerVisibility {
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
 pub struct FillPaintLayer {
     /// Whether or not the fill should be antialiased.
-    #[serde(rename="fill-antialias")]
+    #[serde(rename = "fill-antialias")]
     pub fill_antialias: Option<FillPaintLayerFillAntialias>,
     /// The color of the filled part of this layer. This color can be specified as `rgba` with an alpha component and the color's opacity will not affect the opacity of the 1px stroke, if it is used.
-    #[serde(rename="fill-color")]
+    #[serde(rename = "fill-color")]
     pub fill_color: Option<FillPaintLayerFillColor>,
     /// The opacity of the entire fill layer. In contrast to the `fill-color`, this value will also affect the 1px stroke around the fill, if the stroke is used.
-    #[serde(rename="fill-opacity")]
+    #[serde(rename = "fill-opacity")]
     pub fill_opacity: Option<FillPaintLayerFillOpacity>,
     /// The outline color of the fill. Matches the value of `fill-color` if unspecified.
-    #[serde(rename="fill-outline-color")]
+    #[serde(rename = "fill-outline-color")]
     pub fill_outline_color: Option<FillPaintLayerFillOutlineColor>,
     /// Name of image in sprite to use for drawing image fills. For seamless patterns, image width and height must be a factor of two (2, 4, 8, ..., 512). Note that zoom-dependent expressions will be evaluated only at integer zoom levels.
-    #[serde(rename="fill-pattern")]
+    #[serde(rename = "fill-pattern")]
     pub fill_pattern: Option<FillPaintLayerFillPattern>,
     /// The geometry's offset. Values are [x, y] where negatives indicate left and up, respectively.
-    #[serde(rename="fill-translate")]
+    #[serde(rename = "fill-translate")]
     pub fill_translate: Option<FillPaintLayerFillTranslate>,
     /// Controls the frame of reference for `fill-translate`.
-    #[serde(rename="fill-translate-anchor")]
+    #[serde(rename = "fill-translate-anchor")]
     pub fill_translate_anchor: Option<FillPaintLayerFillTranslateAnchor>,
 }
 
@@ -3384,7 +3860,10 @@ pub struct FillPaintLayerFillOpacity(serde_json::Number);
 
 impl Default for FillPaintLayerFillOpacity {
     fn default() -> Self {
-        Self(serde_json::Number::from_i128(1).expect("the number is serialised from a number and is thus always valid"))
+        Self(
+            serde_json::Number::from_i128(1)
+                .expect("the number is serialised from a number and is thus always valid"),
+        )
     }
 }
 
@@ -3402,16 +3881,21 @@ struct FillPaintLayerFillTranslate(Box<[serde_json::Number; 2]>);
 
 impl Default for FillPaintLayerFillTranslate {
     fn default() -> Self {
-        Self(Box::new([serde_json::Number::from_i128(0).expect("the number is serialised from a number and is thus always valid"), serde_json::Number::from_i128(0).expect("the number is serialised from a number and is thus always valid")]))
+        Self(Box::new([
+            serde_json::Number::from_i128(0)
+                .expect("the number is serialised from a number and is thus always valid"),
+            serde_json::Number::from_i128(0)
+                .expect("the number is serialised from a number and is thus always valid"),
+        ]))
     }
 }
 
 /// Controls the frame of reference for `fill-translate`.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy)]
 pub enum FillPaintLayerFillTranslateAnchor {
-    #[serde(rename="map")]
+    #[serde(rename = "map")]
     Map,
-    #[serde(rename="viewport")]
+    #[serde(rename = "viewport")]
     Viewport,
 }
 
@@ -3436,9 +3920,9 @@ pub struct FillExtrusionLayoutLayer {
 /// Whether this layer is displayed.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy)]
 pub enum FillExtrusionLayoutLayerVisibility {
-    #[serde(rename="none")]
+    #[serde(rename = "none")]
     None,
-    #[serde(rename="visible")]
+    #[serde(rename = "visible")]
     Visible,
 }
 
@@ -3457,29 +3941,31 @@ impl Default for FillExtrusionLayoutLayerVisibility {
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
 pub struct FillExtrusionPaintLayer {
     /// The height with which to extrude the base of this layer. Must be less than or equal to `fill-extrusion-height`.
-    #[serde(rename="fill-extrusion-base")]
+    #[serde(rename = "fill-extrusion-base")]
     pub fill_extrusion_base: Option<FillExtrusionPaintLayerFillExtrusionBase>,
     /// The base color of the extruded fill. The extrusion's surfaces will be shaded differently based on this color in combination with the root `light` settings. If this color is specified as `rgba` with an alpha component, the alpha component will be ignored; use `fill-extrusion-opacity` to set layer opacity.
-    #[serde(rename="fill-extrusion-color")]
+    #[serde(rename = "fill-extrusion-color")]
     pub fill_extrusion_color: Option<FillExtrusionPaintLayerFillExtrusionColor>,
     /// The height with which to extrude this layer.
-    #[serde(rename="fill-extrusion-height")]
+    #[serde(rename = "fill-extrusion-height")]
     pub fill_extrusion_height: Option<FillExtrusionPaintLayerFillExtrusionHeight>,
     /// The opacity of the entire fill extrusion layer. This is rendered on a per-layer, not per-feature, basis, and data-driven styling is not available.
-    #[serde(rename="fill-extrusion-opacity")]
+    #[serde(rename = "fill-extrusion-opacity")]
     pub fill_extrusion_opacity: Option<FillExtrusionPaintLayerFillExtrusionOpacity>,
     /// Name of image in sprite to use for drawing images on extruded fills. For seamless patterns, image width and height must be a factor of two (2, 4, 8, ..., 512). Note that zoom-dependent expressions will be evaluated only at integer zoom levels.
-    #[serde(rename="fill-extrusion-pattern")]
+    #[serde(rename = "fill-extrusion-pattern")]
     pub fill_extrusion_pattern: Option<FillExtrusionPaintLayerFillExtrusionPattern>,
     /// The geometry's offset. Values are [x, y] where negatives indicate left and up (on the flat plane), respectively.
-    #[serde(rename="fill-extrusion-translate")]
+    #[serde(rename = "fill-extrusion-translate")]
     pub fill_extrusion_translate: Option<FillExtrusionPaintLayerFillExtrusionTranslate>,
     /// Controls the frame of reference for `fill-extrusion-translate`.
-    #[serde(rename="fill-extrusion-translate-anchor")]
-    pub fill_extrusion_translate_anchor: Option<FillExtrusionPaintLayerFillExtrusionTranslateAnchor>,
+    #[serde(rename = "fill-extrusion-translate-anchor")]
+    pub fill_extrusion_translate_anchor:
+        Option<FillExtrusionPaintLayerFillExtrusionTranslateAnchor>,
     /// Whether to apply a vertical gradient to the sides of a fill-extrusion layer. If true, sides will be shaded slightly darker farther down.
-    #[serde(rename="fill-extrusion-vertical-gradient")]
-    pub fill_extrusion_vertical_gradient: Option<FillExtrusionPaintLayerFillExtrusionVerticalGradient>,
+    #[serde(rename = "fill-extrusion-vertical-gradient")]
+    pub fill_extrusion_vertical_gradient:
+        Option<FillExtrusionPaintLayerFillExtrusionVerticalGradient>,
 }
 
 /// The height with which to extrude the base of this layer. Must be less than or equal to `fill-extrusion-height`.
@@ -3488,7 +3974,10 @@ pub struct FillExtrusionPaintLayerFillExtrusionBase(serde_json::Number);
 
 impl Default for FillExtrusionPaintLayerFillExtrusionBase {
     fn default() -> Self {
-        Self(serde_json::Number::from_i128(0).expect("the number is serialised from a number and is thus always valid"))
+        Self(
+            serde_json::Number::from_i128(0)
+                .expect("the number is serialised from a number and is thus always valid"),
+        )
     }
 }
 
@@ -3508,7 +3997,10 @@ pub struct FillExtrusionPaintLayerFillExtrusionHeight(serde_json::Number);
 
 impl Default for FillExtrusionPaintLayerFillExtrusionHeight {
     fn default() -> Self {
-        Self(serde_json::Number::from_i128(0).expect("the number is serialised from a number and is thus always valid"))
+        Self(
+            serde_json::Number::from_i128(0)
+                .expect("the number is serialised from a number and is thus always valid"),
+        )
     }
 }
 
@@ -3518,7 +4010,10 @@ pub struct FillExtrusionPaintLayerFillExtrusionOpacity(serde_json::Number);
 
 impl Default for FillExtrusionPaintLayerFillExtrusionOpacity {
     fn default() -> Self {
-        Self(serde_json::Number::from_i128(1).expect("the number is serialised from a number and is thus always valid"))
+        Self(
+            serde_json::Number::from_i128(1)
+                .expect("the number is serialised from a number and is thus always valid"),
+        )
     }
 }
 
@@ -3532,16 +4027,21 @@ struct FillExtrusionPaintLayerFillExtrusionTranslate(Box<[serde_json::Number; 2]
 
 impl Default for FillExtrusionPaintLayerFillExtrusionTranslate {
     fn default() -> Self {
-        Self(Box::new([serde_json::Number::from_i128(0).expect("the number is serialised from a number and is thus always valid"), serde_json::Number::from_i128(0).expect("the number is serialised from a number and is thus always valid")]))
+        Self(Box::new([
+            serde_json::Number::from_i128(0)
+                .expect("the number is serialised from a number and is thus always valid"),
+            serde_json::Number::from_i128(0)
+                .expect("the number is serialised from a number and is thus always valid"),
+        ]))
     }
 }
 
 /// Controls the frame of reference for `fill-extrusion-translate`.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy)]
 pub enum FillExtrusionPaintLayerFillExtrusionTranslateAnchor {
-    #[serde(rename="map")]
+    #[serde(rename = "map")]
     Map,
-    #[serde(rename="viewport")]
+    #[serde(rename = "viewport")]
     Viewport,
 }
 
@@ -3576,9 +4076,9 @@ pub struct HeatmapLayoutLayer {
 /// Whether this layer is displayed.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy)]
 pub enum HeatmapLayoutLayerVisibility {
-    #[serde(rename="none")]
+    #[serde(rename = "none")]
     None,
-    #[serde(rename="visible")]
+    #[serde(rename = "visible")]
     Visible,
 }
 
@@ -3597,19 +4097,19 @@ impl Default for HeatmapLayoutLayerVisibility {
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
 pub struct HeatmapPaintLayer {
     /// Defines the color of each pixel based on its density value in a heatmap.  Should be an expression that uses `["heatmap-density"]` as input.
-    #[serde(rename="heatmap-color")]
+    #[serde(rename = "heatmap-color")]
     pub heatmap_color: Option<HeatmapPaintLayerHeatmapColor>,
     /// Similar to `heatmap-weight` but controls the intensity of the heatmap globally. Primarily used for adjusting the heatmap based on zoom level.
-    #[serde(rename="heatmap-intensity")]
+    #[serde(rename = "heatmap-intensity")]
     pub heatmap_intensity: Option<HeatmapPaintLayerHeatmapIntensity>,
     /// The global opacity at which the heatmap layer will be drawn.
-    #[serde(rename="heatmap-opacity")]
+    #[serde(rename = "heatmap-opacity")]
     pub heatmap_opacity: Option<HeatmapPaintLayerHeatmapOpacity>,
     /// Radius of influence of one heatmap point in pixels. Increasing the value makes the heatmap smoother, but less detailed.
-    #[serde(rename="heatmap-radius")]
+    #[serde(rename = "heatmap-radius")]
     pub heatmap_radius: Option<HeatmapPaintLayerHeatmapRadius>,
     /// A measure of how much an individual point contributes to the heatmap. A value of 10 would be equivalent to having 10 points of weight 1 in the same spot. Especially useful when combined with clustering.
-    #[serde(rename="heatmap-weight")]
+    #[serde(rename = "heatmap-weight")]
     pub heatmap_weight: Option<HeatmapPaintLayerHeatmapWeight>,
 }
 
@@ -3619,8 +4119,25 @@ struct HeatmapPaintLayerHeatmapColor(color::DynamicColor);
 
 impl Default for HeatmapPaintLayerHeatmapColor {
     fn default() -> Self {
-        let default = serde_json::json!(["interpolate",["linear"],["heatmap-density"],0,"rgba(0, 0, 255, 0)",0.1,"royalblue",0.3,"cyan",0.5,"lime",0.7,"yellow",1,"red"]);
-        let default = serde_json::from_value(default).expect("Invalid color specified as the default value");
+        let default = serde_json::json!([
+            "interpolate",
+            ["linear"],
+            ["heatmap-density"],
+            0,
+            "rgba(0, 0, 255, 0)",
+            0.1,
+            "royalblue",
+            0.3,
+            "cyan",
+            0.5,
+            "lime",
+            0.7,
+            "yellow",
+            1,
+            "red"
+        ]);
+        let default =
+            serde_json::from_value(default).expect("Invalid color specified as the default value");
         Self(default)
     }
 }
@@ -3631,7 +4148,10 @@ pub struct HeatmapPaintLayerHeatmapIntensity(serde_json::Number);
 
 impl Default for HeatmapPaintLayerHeatmapIntensity {
     fn default() -> Self {
-        Self(serde_json::Number::from_i128(1).expect("the number is serialised from a number and is thus always valid"))
+        Self(
+            serde_json::Number::from_i128(1)
+                .expect("the number is serialised from a number and is thus always valid"),
+        )
     }
 }
 
@@ -3641,7 +4161,10 @@ pub struct HeatmapPaintLayerHeatmapOpacity(serde_json::Number);
 
 impl Default for HeatmapPaintLayerHeatmapOpacity {
     fn default() -> Self {
-        Self(serde_json::Number::from_i128(1).expect("the number is serialised from a number and is thus always valid"))
+        Self(
+            serde_json::Number::from_i128(1)
+                .expect("the number is serialised from a number and is thus always valid"),
+        )
     }
 }
 
@@ -3651,7 +4174,10 @@ pub struct HeatmapPaintLayerHeatmapRadius(serde_json::Number);
 
 impl Default for HeatmapPaintLayerHeatmapRadius {
     fn default() -> Self {
-        Self(serde_json::Number::from_i128(30).expect("the number is serialised from a number and is thus always valid"))
+        Self(
+            serde_json::Number::from_i128(30)
+                .expect("the number is serialised from a number and is thus always valid"),
+        )
     }
 }
 
@@ -3661,7 +4187,10 @@ pub struct HeatmapPaintLayerHeatmapWeight(serde_json::Number);
 
 impl Default for HeatmapPaintLayerHeatmapWeight {
     fn default() -> Self {
-        Self(serde_json::Number::from_i128(1).expect("the number is serialised from a number and is thus always valid"))
+        Self(
+            serde_json::Number::from_i128(1)
+                .expect("the number is serialised from a number and is thus always valid"),
+        )
     }
 }
 
@@ -3674,9 +4203,9 @@ pub struct HillshadeLayoutLayer {
 /// Whether this layer is displayed.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy)]
 pub enum HillshadeLayoutLayerVisibility {
-    #[serde(rename="none")]
+    #[serde(rename = "none")]
     None,
-    #[serde(rename="visible")]
+    #[serde(rename = "visible")]
     Visible,
 }
 
@@ -3695,28 +4224,28 @@ impl Default for HillshadeLayoutLayerVisibility {
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
 pub struct HillshadePaintLayer {
     /// The shading color used to accentuate rugged terrain like sharp cliffs and gorges.
-    #[serde(rename="hillshade-accent-color")]
+    #[serde(rename = "hillshade-accent-color")]
     pub hillshade_accent_color: Option<HillshadePaintLayerHillshadeAccentColor>,
     /// Intensity of the hillshade
-    #[serde(rename="hillshade-exaggeration")]
+    #[serde(rename = "hillshade-exaggeration")]
     pub hillshade_exaggeration: Option<HillshadePaintLayerHillshadeExaggeration>,
     /// The shading color of areas that faces towards the light source(s). Only when `hillshade-method` is set to `multidirectional` can you specify multiple light sources.
-    #[serde(rename="hillshade-highlight-color")]
+    #[serde(rename = "hillshade-highlight-color")]
     pub hillshade_highlight_color: Option<HillshadePaintLayerHillshadeHighlightColor>,
     /// The altitude of the light source(s) used to generate the hillshading with 0 as sunset and 90 as noon. Only when `hillshade-method` is set to `multidirectional` can you specify multiple light sources.
-    #[serde(rename="hillshade-illumination-altitude")]
+    #[serde(rename = "hillshade-illumination-altitude")]
     pub hillshade_illumination_altitude: Option<HillshadePaintLayerHillshadeIlluminationAltitude>,
     /// Direction of light source when map is rotated.
-    #[serde(rename="hillshade-illumination-anchor")]
+    #[serde(rename = "hillshade-illumination-anchor")]
     pub hillshade_illumination_anchor: Option<HillshadePaintLayerHillshadeIlluminationAnchor>,
     /// The direction of the light source(s) used to generate the hillshading with 0 as the top of the viewport if `hillshade-illumination-anchor` is set to `viewport` and due north if `hillshade-illumination-anchor` is set to `map`. Only when `hillshade-method` is set to `multidirectional` can you specify multiple light sources.
-    #[serde(rename="hillshade-illumination-direction")]
+    #[serde(rename = "hillshade-illumination-direction")]
     pub hillshade_illumination_direction: Option<HillshadePaintLayerHillshadeIlluminationDirection>,
     /// The hillshade algorithm to use, one of `standard`, `basic`, `combined`, `igor`, or `multidirectional`. ![image](assets/hillshade_methods.png)
-    #[serde(rename="hillshade-method")]
+    #[serde(rename = "hillshade-method")]
     pub hillshade_method: Option<HillshadePaintLayerHillshadeMethod>,
     /// The shading color of areas that face away from the light source(s). Only when `hillshade-method` is set to `multidirectional` can you specify multiple light sources.
-    #[serde(rename="hillshade-shadow-color")]
+    #[serde(rename = "hillshade-shadow-color")]
     pub hillshade_shadow_color: Option<HillshadePaintLayerHillshadeShadowColor>,
 }
 
@@ -3736,7 +4265,10 @@ pub struct HillshadePaintLayerHillshadeExaggeration(serde_json::Number);
 
 impl Default for HillshadePaintLayerHillshadeExaggeration {
     fn default() -> Self {
-        Self(serde_json::Number::from_f64(0.5).expect("the number is serialised from a number and is thus always valid"))
+        Self(
+            serde_json::Number::from_f64(0.5)
+                .expect("the number is serialised from a number and is thus always valid"),
+        )
     }
 }
 
@@ -3752,7 +4284,9 @@ pub enum HillshadePaintLayerHillshadeHighlightColor {
 
 impl Default for HillshadePaintLayerHillshadeHighlightColor {
     fn default() -> Self {
-        Self::One(color::parse_color("#FFFFFF").expect("Invalid color specified as the default value"))
+        Self::One(
+            color::parse_color("#FFFFFF").expect("Invalid color specified as the default value"),
+        )
     }
 }
 
@@ -3766,16 +4300,19 @@ pub enum HillshadePaintLayerHillshadeIlluminationAltitude {
 
 impl Default for HillshadePaintLayerHillshadeIlluminationAltitude {
     fn default() -> Self {
-        Self::One(serde_json::Number::from_i128(45).expect("the number is serialised from a number and is thus always valid"))
+        Self::One(
+            serde_json::Number::from_i128(45)
+                .expect("the number is serialised from a number and is thus always valid"),
+        )
     }
 }
 
 /// Direction of light source when map is rotated.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy)]
 pub enum HillshadePaintLayerHillshadeIlluminationAnchor {
-    #[serde(rename="map")]
+    #[serde(rename = "map")]
     Map,
-    #[serde(rename="viewport")]
+    #[serde(rename = "viewport")]
     Viewport,
 }
 
@@ -3801,22 +4338,25 @@ pub enum HillshadePaintLayerHillshadeIlluminationDirection {
 
 impl Default for HillshadePaintLayerHillshadeIlluminationDirection {
     fn default() -> Self {
-        Self::One(serde_json::Number::from_i128(335).expect("the number is serialised from a number and is thus always valid"))
+        Self::One(
+            serde_json::Number::from_i128(335)
+                .expect("the number is serialised from a number and is thus always valid"),
+        )
     }
 }
 
 /// The hillshade algorithm to use, one of `standard`, `basic`, `combined`, `igor`, or `multidirectional`. ![image](assets/hillshade_methods.png)
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy)]
 pub enum HillshadePaintLayerHillshadeMethod {
-    #[serde(rename="basic")]
+    #[serde(rename = "basic")]
     Basic,
-    #[serde(rename="combined")]
+    #[serde(rename = "combined")]
     Combined,
-    #[serde(rename="igor")]
+    #[serde(rename = "igor")]
     Igor,
-    #[serde(rename="multidirectional")]
+    #[serde(rename = "multidirectional")]
     Multidirectional,
-    #[serde(rename="standard")]
+    #[serde(rename = "standard")]
     Standard,
 }
 
@@ -3844,26 +4384,28 @@ pub enum HillshadePaintLayerHillshadeShadowColor {
 
 impl Default for HillshadePaintLayerHillshadeShadowColor {
     fn default() -> Self {
-        Self::One(color::parse_color("#000000").expect("Invalid color specified as the default value"))
+        Self::One(
+            color::parse_color("#000000").expect("Invalid color specified as the default value"),
+        )
     }
 }
 
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
 pub struct LineLayoutLayer {
     /// The display of line endings.
-    #[serde(rename="line-cap")]
+    #[serde(rename = "line-cap")]
     pub line_cap: Option<LineLayoutLayerLineCap>,
     /// The display of lines when joining.
-    #[serde(rename="line-join")]
+    #[serde(rename = "line-join")]
     pub line_join: Option<LineLayoutLayerLineJoin>,
     /// Used to automatically convert miter joins to bevel joins for sharp angles.
-    #[serde(rename="line-miter-limit")]
+    #[serde(rename = "line-miter-limit")]
     pub line_miter_limit: Option<LineLayoutLayerLineMiterLimit>,
     /// Used to automatically convert round joins to miter joins for shallow angles.
-    #[serde(rename="line-round-limit")]
+    #[serde(rename = "line-round-limit")]
     pub line_round_limit: Option<LineLayoutLayerLineRoundLimit>,
     /// Sorts features in ascending order based on this value. Features with a higher sort key will appear above features with a lower sort key.
-    #[serde(rename="line-sort-key")]
+    #[serde(rename = "line-sort-key")]
     pub line_sort_key: Option<LineLayoutLayerLineSortKey>,
     /// Whether this layer is displayed.
     pub visibility: Option<LineLayoutLayerVisibility>,
@@ -3872,11 +4414,11 @@ pub struct LineLayoutLayer {
 /// The display of line endings.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy)]
 pub enum LineLayoutLayerLineCap {
-    #[serde(rename="butt")]
+    #[serde(rename = "butt")]
     Butt,
-    #[serde(rename="round")]
+    #[serde(rename = "round")]
     Round,
-    #[serde(rename="square")]
+    #[serde(rename = "square")]
     Square,
 }
 
@@ -3895,11 +4437,11 @@ impl Default for LineLayoutLayerLineCap {
 /// The display of lines when joining.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy)]
 pub enum LineLayoutLayerLineJoin {
-    #[serde(rename="bevel")]
+    #[serde(rename = "bevel")]
     Bevel,
-    #[serde(rename="miter")]
+    #[serde(rename = "miter")]
     Miter,
-    #[serde(rename="round")]
+    #[serde(rename = "round")]
     Round,
 }
 
@@ -3921,7 +4463,10 @@ pub struct LineLayoutLayerLineMiterLimit(serde_json::Number);
 
 impl Default for LineLayoutLayerLineMiterLimit {
     fn default() -> Self {
-        Self(serde_json::Number::from_i128(2).expect("the number is serialised from a number and is thus always valid"))
+        Self(
+            serde_json::Number::from_i128(2)
+                .expect("the number is serialised from a number and is thus always valid"),
+        )
     }
 }
 
@@ -3931,7 +4476,10 @@ pub struct LineLayoutLayerLineRoundLimit(serde_json::Number);
 
 impl Default for LineLayoutLayerLineRoundLimit {
     fn default() -> Self {
-        Self(serde_json::Number::from_f64(1.05).expect("the number is serialised from a number and is thus always valid"))
+        Self(
+            serde_json::Number::from_f64(1.05)
+                .expect("the number is serialised from a number and is thus always valid"),
+        )
     }
 }
 
@@ -3942,9 +4490,9 @@ pub struct LineLayoutLayerLineSortKey(serde_json::Number);
 /// Whether this layer is displayed.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy)]
 pub enum LineLayoutLayerVisibility {
-    #[serde(rename="none")]
+    #[serde(rename = "none")]
     None,
-    #[serde(rename="visible")]
+    #[serde(rename = "visible")]
     Visible,
 }
 
@@ -3963,37 +4511,37 @@ impl Default for LineLayoutLayerVisibility {
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
 pub struct LinePaintLayer {
     /// Blur applied to the line, in pixels.
-    #[serde(rename="line-blur")]
+    #[serde(rename = "line-blur")]
     pub line_blur: Option<LinePaintLayerLineBlur>,
     /// The color with which the line will be drawn.
-    #[serde(rename="line-color")]
+    #[serde(rename = "line-color")]
     pub line_color: Option<LinePaintLayerLineColor>,
     /// Specifies the lengths of the alternating dashes and gaps that form the dash pattern. The lengths are later scaled by the line width. To convert a dash length to pixels, multiply the length by the current line width. GeoJSON sources with `lineMetrics: true` specified won't render dashed lines to the expected scale. Zoom-dependent expressions will be evaluated only at integer zoom levels. The only way to create an array value is using `["literal", [...]]`; arrays cannot be read from or derived from feature properties.
-    #[serde(rename="line-dasharray")]
+    #[serde(rename = "line-dasharray")]
     pub line_dasharray: Option<LinePaintLayerLineDasharray>,
     /// Draws a line casing outside of a line's actual path. Value indicates the width of the inner gap.
-    #[serde(rename="line-gap-width")]
+    #[serde(rename = "line-gap-width")]
     pub line_gap_width: Option<LinePaintLayerLineGapWidth>,
     /// Defines a gradient with which to color a line feature. Can only be used with GeoJSON sources that specify `"lineMetrics": true`.
-    #[serde(rename="line-gradient")]
+    #[serde(rename = "line-gradient")]
     pub line_gradient: Option<LinePaintLayerLineGradient>,
     /// The line's offset. For linear features, a positive value offsets the line to the right, relative to the direction of the line, and a negative value to the left. For polygon features, a positive value results in an inset, and a negative value results in an outset.
-    #[serde(rename="line-offset")]
+    #[serde(rename = "line-offset")]
     pub line_offset: Option<LinePaintLayerLineOffset>,
     /// The opacity at which the line will be drawn.
-    #[serde(rename="line-opacity")]
+    #[serde(rename = "line-opacity")]
     pub line_opacity: Option<LinePaintLayerLineOpacity>,
     /// Name of image in sprite to use for drawing image lines. For seamless patterns, image width must be a factor of two (2, 4, 8, ..., 512). Note that zoom-dependent expressions will be evaluated only at integer zoom levels.
-    #[serde(rename="line-pattern")]
+    #[serde(rename = "line-pattern")]
     pub line_pattern: Option<LinePaintLayerLinePattern>,
     /// The geometry's offset. Values are [x, y] where negatives indicate left and up, respectively.
-    #[serde(rename="line-translate")]
+    #[serde(rename = "line-translate")]
     pub line_translate: Option<LinePaintLayerLineTranslate>,
     /// Controls the frame of reference for `line-translate`.
-    #[serde(rename="line-translate-anchor")]
+    #[serde(rename = "line-translate-anchor")]
     pub line_translate_anchor: Option<LinePaintLayerLineTranslateAnchor>,
     /// Stroke thickness.
-    #[serde(rename="line-width")]
+    #[serde(rename = "line-width")]
     pub line_width: Option<LinePaintLayerLineWidth>,
 }
 
@@ -4003,7 +4551,10 @@ pub struct LinePaintLayerLineBlur(serde_json::Number);
 
 impl Default for LinePaintLayerLineBlur {
     fn default() -> Self {
-        Self(serde_json::Number::from_i128(0).expect("the number is serialised from a number and is thus always valid"))
+        Self(
+            serde_json::Number::from_i128(0)
+                .expect("the number is serialised from a number and is thus always valid"),
+        )
     }
 }
 
@@ -4027,7 +4578,10 @@ pub struct LinePaintLayerLineGapWidth(serde_json::Number);
 
 impl Default for LinePaintLayerLineGapWidth {
     fn default() -> Self {
-        Self(serde_json::Number::from_i128(0).expect("the number is serialised from a number and is thus always valid"))
+        Self(
+            serde_json::Number::from_i128(0)
+                .expect("the number is serialised from a number and is thus always valid"),
+        )
     }
 }
 
@@ -4041,7 +4595,10 @@ pub struct LinePaintLayerLineOffset(serde_json::Number);
 
 impl Default for LinePaintLayerLineOffset {
     fn default() -> Self {
-        Self(serde_json::Number::from_i128(0).expect("the number is serialised from a number and is thus always valid"))
+        Self(
+            serde_json::Number::from_i128(0)
+                .expect("the number is serialised from a number and is thus always valid"),
+        )
     }
 }
 
@@ -4051,7 +4608,10 @@ pub struct LinePaintLayerLineOpacity(serde_json::Number);
 
 impl Default for LinePaintLayerLineOpacity {
     fn default() -> Self {
-        Self(serde_json::Number::from_i128(1).expect("the number is serialised from a number and is thus always valid"))
+        Self(
+            serde_json::Number::from_i128(1)
+                .expect("the number is serialised from a number and is thus always valid"),
+        )
     }
 }
 
@@ -4065,16 +4625,21 @@ struct LinePaintLayerLineTranslate(Box<[serde_json::Number; 2]>);
 
 impl Default for LinePaintLayerLineTranslate {
     fn default() -> Self {
-        Self(Box::new([serde_json::Number::from_i128(0).expect("the number is serialised from a number and is thus always valid"), serde_json::Number::from_i128(0).expect("the number is serialised from a number and is thus always valid")]))
+        Self(Box::new([
+            serde_json::Number::from_i128(0)
+                .expect("the number is serialised from a number and is thus always valid"),
+            serde_json::Number::from_i128(0)
+                .expect("the number is serialised from a number and is thus always valid"),
+        ]))
     }
 }
 
 /// Controls the frame of reference for `line-translate`.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy)]
 pub enum LinePaintLayerLineTranslateAnchor {
-    #[serde(rename="map")]
+    #[serde(rename = "map")]
     Map,
-    #[serde(rename="viewport")]
+    #[serde(rename = "viewport")]
     Viewport,
 }
 
@@ -4096,7 +4661,10 @@ pub struct LinePaintLayerLineWidth(serde_json::Number);
 
 impl Default for LinePaintLayerLineWidth {
     fn default() -> Self {
-        Self(serde_json::Number::from_i128(1).expect("the number is serialised from a number and is thus always valid"))
+        Self(
+            serde_json::Number::from_i128(1)
+                .expect("the number is serialised from a number and is thus always valid"),
+        )
     }
 }
 
@@ -4109,9 +4677,9 @@ pub struct RasterLayoutLayer {
 /// Whether this layer is displayed.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy)]
 pub enum RasterLayoutLayerVisibility {
-    #[serde(rename="none")]
+    #[serde(rename = "none")]
     None,
-    #[serde(rename="visible")]
+    #[serde(rename = "visible")]
     Visible,
 }
 
@@ -4130,28 +4698,28 @@ impl Default for RasterLayoutLayerVisibility {
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
 pub struct RasterPaintLayer {
     /// Increase or reduce the brightness of the image. The value is the maximum brightness.
-    #[serde(rename="raster-brightness-max")]
+    #[serde(rename = "raster-brightness-max")]
     pub raster_brightness_max: Option<RasterPaintLayerRasterBrightnessMax>,
     /// Increase or reduce the brightness of the image. The value is the minimum brightness.
-    #[serde(rename="raster-brightness-min")]
+    #[serde(rename = "raster-brightness-min")]
     pub raster_brightness_min: Option<RasterPaintLayerRasterBrightnessMin>,
     /// Increase or reduce the contrast of the image.
-    #[serde(rename="raster-contrast")]
+    #[serde(rename = "raster-contrast")]
     pub raster_contrast: Option<RasterPaintLayerRasterContrast>,
     /// Fade duration when a new tile is added, or when a video is started or its coordinates are updated.
-    #[serde(rename="raster-fade-duration")]
+    #[serde(rename = "raster-fade-duration")]
     pub raster_fade_duration: Option<RasterPaintLayerRasterFadeDuration>,
     /// Rotates hues around the color wheel.
-    #[serde(rename="raster-hue-rotate")]
+    #[serde(rename = "raster-hue-rotate")]
     pub raster_hue_rotate: Option<RasterPaintLayerRasterHueRotate>,
     /// The opacity at which the image will be drawn.
-    #[serde(rename="raster-opacity")]
+    #[serde(rename = "raster-opacity")]
     pub raster_opacity: Option<RasterPaintLayerRasterOpacity>,
     /// The resampling/interpolation method to use for overscaling, also known as texture magnification filter
-    #[serde(rename="raster-resampling")]
+    #[serde(rename = "raster-resampling")]
     pub raster_resampling: Option<RasterPaintLayerRasterResampling>,
     /// Increase or reduce the saturation of the image.
-    #[serde(rename="raster-saturation")]
+    #[serde(rename = "raster-saturation")]
     pub raster_saturation: Option<RasterPaintLayerRasterSaturation>,
 }
 
@@ -4161,7 +4729,10 @@ pub struct RasterPaintLayerRasterBrightnessMax(serde_json::Number);
 
 impl Default for RasterPaintLayerRasterBrightnessMax {
     fn default() -> Self {
-        Self(serde_json::Number::from_i128(1).expect("the number is serialised from a number and is thus always valid"))
+        Self(
+            serde_json::Number::from_i128(1)
+                .expect("the number is serialised from a number and is thus always valid"),
+        )
     }
 }
 
@@ -4171,7 +4742,10 @@ pub struct RasterPaintLayerRasterBrightnessMin(serde_json::Number);
 
 impl Default for RasterPaintLayerRasterBrightnessMin {
     fn default() -> Self {
-        Self(serde_json::Number::from_i128(0).expect("the number is serialised from a number and is thus always valid"))
+        Self(
+            serde_json::Number::from_i128(0)
+                .expect("the number is serialised from a number and is thus always valid"),
+        )
     }
 }
 
@@ -4181,7 +4755,10 @@ pub struct RasterPaintLayerRasterContrast(serde_json::Number);
 
 impl Default for RasterPaintLayerRasterContrast {
     fn default() -> Self {
-        Self(serde_json::Number::from_i128(0).expect("the number is serialised from a number and is thus always valid"))
+        Self(
+            serde_json::Number::from_i128(0)
+                .expect("the number is serialised from a number and is thus always valid"),
+        )
     }
 }
 
@@ -4191,7 +4768,10 @@ pub struct RasterPaintLayerRasterFadeDuration(serde_json::Number);
 
 impl Default for RasterPaintLayerRasterFadeDuration {
     fn default() -> Self {
-        Self(serde_json::Number::from_i128(300).expect("the number is serialised from a number and is thus always valid"))
+        Self(
+            serde_json::Number::from_i128(300)
+                .expect("the number is serialised from a number and is thus always valid"),
+        )
     }
 }
 
@@ -4201,7 +4781,10 @@ pub struct RasterPaintLayerRasterHueRotate(serde_json::Number);
 
 impl Default for RasterPaintLayerRasterHueRotate {
     fn default() -> Self {
-        Self(serde_json::Number::from_i128(0).expect("the number is serialised from a number and is thus always valid"))
+        Self(
+            serde_json::Number::from_i128(0)
+                .expect("the number is serialised from a number and is thus always valid"),
+        )
     }
 }
 
@@ -4211,16 +4794,19 @@ pub struct RasterPaintLayerRasterOpacity(serde_json::Number);
 
 impl Default for RasterPaintLayerRasterOpacity {
     fn default() -> Self {
-        Self(serde_json::Number::from_i128(1).expect("the number is serialised from a number and is thus always valid"))
+        Self(
+            serde_json::Number::from_i128(1)
+                .expect("the number is serialised from a number and is thus always valid"),
+        )
     }
 }
 
 /// The resampling/interpolation method to use for overscaling, also known as texture magnification filter
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy)]
 pub enum RasterPaintLayerRasterResampling {
-    #[serde(rename="linear")]
+    #[serde(rename = "linear")]
     Linear,
-    #[serde(rename="nearest")]
+    #[serde(rename = "nearest")]
     Nearest,
 }
 
@@ -4242,157 +4828,160 @@ pub struct RasterPaintLayerRasterSaturation(serde_json::Number);
 
 impl Default for RasterPaintLayerRasterSaturation {
     fn default() -> Self {
-        Self(serde_json::Number::from_i128(0).expect("the number is serialised from a number and is thus always valid"))
+        Self(
+            serde_json::Number::from_i128(0)
+                .expect("the number is serialised from a number and is thus always valid"),
+        )
     }
 }
 
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
 pub struct SymbolLayoutLayer {
     /// If true, the icon will be visible even if it collides with other previously drawn symbols.
-    #[serde(rename="icon-allow-overlap")]
+    #[serde(rename = "icon-allow-overlap")]
     pub icon_allow_overlap: Option<SymbolLayoutLayerIconAllowOverlap>,
     /// Part of the icon placed closest to the anchor.
-    #[serde(rename="icon-anchor")]
+    #[serde(rename = "icon-anchor")]
     pub icon_anchor: Option<SymbolLayoutLayerIconAnchor>,
     /// If true, other symbols can be visible even if they collide with the icon.
-    #[serde(rename="icon-ignore-placement")]
+    #[serde(rename = "icon-ignore-placement")]
     pub icon_ignore_placement: Option<SymbolLayoutLayerIconIgnorePlacement>,
     /// Name of image in sprite to use for drawing an image background.
-    #[serde(rename="icon-image")]
+    #[serde(rename = "icon-image")]
     pub icon_image: Option<SymbolLayoutLayerIconImage>,
     /// If true, the icon may be flipped to prevent it from being rendered upside-down.
-    #[serde(rename="icon-keep-upright")]
+    #[serde(rename = "icon-keep-upright")]
     pub icon_keep_upright: Option<SymbolLayoutLayerIconKeepUpright>,
     /// Offset distance of icon from its anchor. Positive values indicate right and down, while negative values indicate left and up. Each component is multiplied by the value of `icon-size` to obtain the final offset in pixels. When combined with `icon-rotate` the offset will be as if the rotated direction was up.
-    #[serde(rename="icon-offset")]
+    #[serde(rename = "icon-offset")]
     pub icon_offset: Option<SymbolLayoutLayerIconOffset>,
     /// If true, text will display without their corresponding icons when the icon collides with other symbols and the text does not.
-    #[serde(rename="icon-optional")]
+    #[serde(rename = "icon-optional")]
     pub icon_optional: Option<SymbolLayoutLayerIconOptional>,
     /// Allows for control over whether to show an icon when it overlaps other symbols on the map. If `icon-overlap` is not set, `icon-allow-overlap` is used instead.
-    #[serde(rename="icon-overlap")]
+    #[serde(rename = "icon-overlap")]
     pub icon_overlap: Option<SymbolLayoutLayerIconOverlap>,
     /// Size of additional area round the icon bounding box used for detecting symbol collisions.
-    #[serde(rename="icon-padding")]
+    #[serde(rename = "icon-padding")]
     pub icon_padding: Option<SymbolLayoutLayerIconPadding>,
     /// Orientation of icon when map is pitched.
-    #[serde(rename="icon-pitch-alignment")]
+    #[serde(rename = "icon-pitch-alignment")]
     pub icon_pitch_alignment: Option<SymbolLayoutLayerIconPitchAlignment>,
     /// Rotates the icon clockwise.
-    #[serde(rename="icon-rotate")]
+    #[serde(rename = "icon-rotate")]
     pub icon_rotate: Option<SymbolLayoutLayerIconRotate>,
     /// In combination with `symbol-placement`, determines the rotation behavior of icons.
-    #[serde(rename="icon-rotation-alignment")]
+    #[serde(rename = "icon-rotation-alignment")]
     pub icon_rotation_alignment: Option<SymbolLayoutLayerIconRotationAlignment>,
     /// Scales the original size of the icon by the provided factor. The new pixel size of the image will be the original pixel size multiplied by `icon-size`. 1 is the original size; 3 triples the size of the image.
-    #[serde(rename="icon-size")]
+    #[serde(rename = "icon-size")]
     pub icon_size: Option<SymbolLayoutLayerIconSize>,
     /// Scales the icon to fit around the associated text.
-    #[serde(rename="icon-text-fit")]
+    #[serde(rename = "icon-text-fit")]
     pub icon_text_fit: Option<SymbolLayoutLayerIconTextFit>,
     /// Size of the additional area added to dimensions determined by `icon-text-fit`, in clockwise order: top, right, bottom, left.
-    #[serde(rename="icon-text-fit-padding")]
+    #[serde(rename = "icon-text-fit-padding")]
     pub icon_text_fit_padding: Option<SymbolLayoutLayerIconTextFitPadding>,
     /// If true, the symbols will not cross tile edges to avoid mutual collisions. Recommended in layers that don't have enough padding in the vector tile to prevent collisions, or if it is a point symbol layer placed after a line symbol layer. When using a client that supports global collision detection, like MapLibre GL JS version 0.42.0 or greater, enabling this property is not needed to prevent clipped labels at tile boundaries.
-    #[serde(rename="symbol-avoid-edges")]
+    #[serde(rename = "symbol-avoid-edges")]
     pub symbol_avoid_edges: Option<SymbolLayoutLayerSymbolAvoidEdges>,
     /// Label placement relative to its geometry.
-    #[serde(rename="symbol-placement")]
+    #[serde(rename = "symbol-placement")]
     pub symbol_placement: Option<SymbolLayoutLayerSymbolPlacement>,
     /// Sorts features in ascending order based on this value. Features with lower sort keys are drawn and placed first.  When `icon-allow-overlap` or `text-allow-overlap` is `false`, features with a lower sort key will have priority during placement. When `icon-allow-overlap` or `text-allow-overlap` is set to `true`, features with a higher sort key will overlap over features with a lower sort key.
-    #[serde(rename="symbol-sort-key")]
+    #[serde(rename = "symbol-sort-key")]
     pub symbol_sort_key: Option<SymbolLayoutLayerSymbolSortKey>,
     /// Distance between two symbol anchors.
-    #[serde(rename="symbol-spacing")]
+    #[serde(rename = "symbol-spacing")]
     pub symbol_spacing: Option<SymbolLayoutLayerSymbolSpacing>,
     /// Determines whether overlapping symbols in the same layer are rendered in the order that they appear in the data source or by their y-position relative to the viewport. To control the order and prioritization of symbols otherwise, use `symbol-sort-key`.
-    #[serde(rename="symbol-z-order")]
+    #[serde(rename = "symbol-z-order")]
     pub symbol_z_order: Option<SymbolLayoutLayerSymbolZOrder>,
     /// If true, the text will be visible even if it collides with other previously drawn symbols.
-    #[serde(rename="text-allow-overlap")]
+    #[serde(rename = "text-allow-overlap")]
     pub text_allow_overlap: Option<SymbolLayoutLayerTextAllowOverlap>,
     /// Part of the text placed closest to the anchor.
-    #[serde(rename="text-anchor")]
+    #[serde(rename = "text-anchor")]
     pub text_anchor: Option<SymbolLayoutLayerTextAnchor>,
     /// Value to use for a text label. If a plain `string` is provided, it will be treated as a `formatted` with default/inherited formatting options.
-    #[serde(rename="text-field")]
+    #[serde(rename = "text-field")]
     pub text_field: Option<SymbolLayoutLayerTextField>,
     /// Fonts to use for displaying text. If the `glyphs` root property is specified, this array is joined together and interpreted as a font stack name. Otherwise, it is interpreted as a cascading fallback list of local font names.
-    #[serde(rename="text-font")]
+    #[serde(rename = "text-font")]
     pub text_font: Option<SymbolLayoutLayerTextFont>,
     /// If true, other symbols can be visible even if they collide with the text.
-    #[serde(rename="text-ignore-placement")]
+    #[serde(rename = "text-ignore-placement")]
     pub text_ignore_placement: Option<SymbolLayoutLayerTextIgnorePlacement>,
     /// Text justification options.
-    #[serde(rename="text-justify")]
+    #[serde(rename = "text-justify")]
     pub text_justify: Option<SymbolLayoutLayerTextJustify>,
     /// If true, the text may be flipped vertically to prevent it from being rendered upside-down.
-    #[serde(rename="text-keep-upright")]
+    #[serde(rename = "text-keep-upright")]
     pub text_keep_upright: Option<SymbolLayoutLayerTextKeepUpright>,
     /// Text tracking amount.
-    #[serde(rename="text-letter-spacing")]
+    #[serde(rename = "text-letter-spacing")]
     pub text_letter_spacing: Option<SymbolLayoutLayerTextLetterSpacing>,
     /// Text leading value for multi-line text.
-    #[serde(rename="text-line-height")]
+    #[serde(rename = "text-line-height")]
     pub text_line_height: Option<SymbolLayoutLayerTextLineHeight>,
     /// Maximum angle change between adjacent characters.
-    #[serde(rename="text-max-angle")]
+    #[serde(rename = "text-max-angle")]
     pub text_max_angle: Option<SymbolLayoutLayerTextMaxAngle>,
     /// The maximum line width for text wrapping.
-    #[serde(rename="text-max-width")]
+    #[serde(rename = "text-max-width")]
     pub text_max_width: Option<SymbolLayoutLayerTextMaxWidth>,
     /// Offset distance of text from its anchor. Positive values indicate right and down, while negative values indicate left and up. If used with text-variable-anchor, input values will be taken as absolute values. Offsets along the x- and y-axis will be applied automatically based on the anchor position.
-    #[serde(rename="text-offset")]
+    #[serde(rename = "text-offset")]
     pub text_offset: Option<SymbolLayoutLayerTextOffset>,
     /// If true, icons will display without their corresponding text when the text collides with other symbols and the icon does not.
-    #[serde(rename="text-optional")]
+    #[serde(rename = "text-optional")]
     pub text_optional: Option<SymbolLayoutLayerTextOptional>,
     /// Allows for control over whether to show symbol text when it overlaps other symbols on the map. If `text-overlap` is not set, `text-allow-overlap` is used instead
-    #[serde(rename="text-overlap")]
+    #[serde(rename = "text-overlap")]
     pub text_overlap: Option<SymbolLayoutLayerTextOverlap>,
     /// Size of the additional area around the text bounding box used for detecting symbol collisions.
-    #[serde(rename="text-padding")]
+    #[serde(rename = "text-padding")]
     pub text_padding: Option<SymbolLayoutLayerTextPadding>,
     /// Orientation of text when map is pitched.
-    #[serde(rename="text-pitch-alignment")]
+    #[serde(rename = "text-pitch-alignment")]
     pub text_pitch_alignment: Option<SymbolLayoutLayerTextPitchAlignment>,
     /// Radial offset of text, in the direction of the symbol's anchor. Useful in combination with `text-variable-anchor`, which defaults to using the two-dimensional `text-offset` if present.
-    #[serde(rename="text-radial-offset")]
+    #[serde(rename = "text-radial-offset")]
     pub text_radial_offset: Option<SymbolLayoutLayerTextRadialOffset>,
     /// Rotates the text clockwise.
-    #[serde(rename="text-rotate")]
+    #[serde(rename = "text-rotate")]
     pub text_rotate: Option<SymbolLayoutLayerTextRotate>,
     /// In combination with `symbol-placement`, determines the rotation behavior of the individual glyphs forming the text.
-    #[serde(rename="text-rotation-alignment")]
+    #[serde(rename = "text-rotation-alignment")]
     pub text_rotation_alignment: Option<SymbolLayoutLayerTextRotationAlignment>,
     /// Font size.
-    #[serde(rename="text-size")]
+    #[serde(rename = "text-size")]
     pub text_size: Option<SymbolLayoutLayerTextSize>,
     /// Specifies how to capitalize text, similar to the CSS `text-transform` property.
-    #[serde(rename="text-transform")]
+    #[serde(rename = "text-transform")]
     pub text_transform: Option<SymbolLayoutLayerTextTransform>,
     /// To increase the chance of placing high-priority labels on the map, you can provide an array of `text-anchor` locations: the renderer will attempt to place the label at each location, in order, before moving onto the next label. Use `text-justify: auto` to choose justification based on anchor position. To apply an offset, use the `text-radial-offset` or the two-dimensional `text-offset`.
-    #[serde(rename="text-variable-anchor")]
+    #[serde(rename = "text-variable-anchor")]
     pub text_variable_anchor: Option<SymbolLayoutLayerTextVariableAnchor>,
-    /// To increase the chance of placing high-priority labels on the map, you can provide an array of `text-anchor` locations, each paired with an offset value. The renderer will attempt to place the label at each location, in order, before moving on to the next location+offset. Use `text-justify: auto` to choose justification based on anchor position. 
-    /// 
-    ///  The length of the array must be even, and must alternate between enum and point entries. i.e., each anchor location must be accompanied by a point, and that point defines the offset when the corresponding anchor location is used. Positive offset values indicate right and down, while negative values indicate left and up. Anchor locations may repeat, allowing the renderer to try multiple offsets to try and place a label using the same anchor. 
-    /// 
-    ///  When present, this property takes precedence over `text-anchor`, `text-variable-anchor`, `text-offset`, and `text-radial-offset`. 
-    /// 
-    ///  ```json 
-    /// 
-    ///  { "text-variable-anchor-offset": ["top", [0, 4], "left", [3,0], "bottom", [1, 1]] } 
-    /// 
-    ///  ``` 
-    /// 
-    ///  When the renderer chooses the `top` anchor, `[0, 4]` will be used for `text-offset`; the text will be shifted down by 4 ems. 
-    /// 
+    /// To increase the chance of placing high-priority labels on the map, you can provide an array of `text-anchor` locations, each paired with an offset value. The renderer will attempt to place the label at each location, in order, before moving on to the next location+offset. Use `text-justify: auto` to choose justification based on anchor position.
+    ///
+    ///  The length of the array must be even, and must alternate between enum and point entries. i.e., each anchor location must be accompanied by a point, and that point defines the offset when the corresponding anchor location is used. Positive offset values indicate right and down, while negative values indicate left and up. Anchor locations may repeat, allowing the renderer to try multiple offsets to try and place a label using the same anchor.
+    ///
+    ///  When present, this property takes precedence over `text-anchor`, `text-variable-anchor`, `text-offset`, and `text-radial-offset`.
+    ///
+    ///  ```json
+    ///
+    ///  { "text-variable-anchor-offset": ["top", [0, 4], "left", [3,0], "bottom", [1, 1]] }
+    ///
+    ///  ```
+    ///
+    ///  When the renderer chooses the `top` anchor, `[0, 4]` will be used for `text-offset`; the text will be shifted down by 4 ems.
+    ///
     ///  When the renderer chooses the `left` anchor, `[3, 0]` will be used for `text-offset`; the text will be shifted right by 3 ems.
-    #[serde(rename="text-variable-anchor-offset")]
+    #[serde(rename = "text-variable-anchor-offset")]
     pub text_variable_anchor_offset: Option<SymbolLayoutLayerTextVariableAnchorOffset>,
     /// The property allows control over a symbol's orientation. Note that the property values act as a hint, so that a symbol whose language doesn’t support the provided orientation will be laid out in its natural orientation. Example: English point symbol will be rendered horizontally even if array value contains single 'vertical' enum value. The order of elements in an array define priority order for the placement of an orientation variant.
-    #[serde(rename="text-writing-mode")]
+    #[serde(rename = "text-writing-mode")]
     pub text_writing_mode: Option<SymbolLayoutLayerTextWritingMode>,
     /// Whether this layer is displayed.
     pub visibility: Option<SymbolLayoutLayerVisibility>,
@@ -4411,23 +5000,23 @@ impl Default for SymbolLayoutLayerIconAllowOverlap {
 /// Part of the icon placed closest to the anchor.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy)]
 pub enum SymbolLayoutLayerIconAnchor {
-    #[serde(rename="bottom")]
+    #[serde(rename = "bottom")]
     Bottom,
-    #[serde(rename="bottom-left")]
+    #[serde(rename = "bottom-left")]
     BottomLeft,
-    #[serde(rename="bottom-right")]
+    #[serde(rename = "bottom-right")]
     BottomRight,
-    #[serde(rename="center")]
+    #[serde(rename = "center")]
     Center,
-    #[serde(rename="left")]
+    #[serde(rename = "left")]
     Left,
-    #[serde(rename="right")]
+    #[serde(rename = "right")]
     Right,
-    #[serde(rename="top")]
+    #[serde(rename = "top")]
     Top,
-    #[serde(rename="top-left")]
+    #[serde(rename = "top-left")]
     TopLeft,
-    #[serde(rename="top-right")]
+    #[serde(rename = "top-right")]
     TopRight,
 }
 
@@ -4473,7 +5062,12 @@ struct SymbolLayoutLayerIconOffset(Box<[serde_json::Number; 2]>);
 
 impl Default for SymbolLayoutLayerIconOffset {
     fn default() -> Self {
-        Self(Box::new([serde_json::Number::from_i128(0).expect("the number is serialised from a number and is thus always valid"), serde_json::Number::from_i128(0).expect("the number is serialised from a number and is thus always valid")]))
+        Self(Box::new([
+            serde_json::Number::from_i128(0)
+                .expect("the number is serialised from a number and is thus always valid"),
+            serde_json::Number::from_i128(0)
+                .expect("the number is serialised from a number and is thus always valid"),
+        ]))
     }
 }
 
@@ -4490,11 +5084,11 @@ impl Default for SymbolLayoutLayerIconOptional {
 /// Allows for control over whether to show an icon when it overlaps other symbols on the map. If `icon-overlap` is not set, `icon-allow-overlap` is used instead.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy)]
 pub enum SymbolLayoutLayerIconOverlap {
-    #[serde(rename="always")]
+    #[serde(rename = "always")]
     Always,
-    #[serde(rename="cooperative")]
+    #[serde(rename = "cooperative")]
     Cooperative,
-    #[serde(rename="never")]
+    #[serde(rename = "never")]
     Never,
 }
 
@@ -4503,7 +5097,7 @@ pub enum SymbolLayoutLayerIconOverlap {
 #[serde(untagged)]
 pub enum SymbolLayoutLayerIconPadding {
     /// A single value applies to all four sides.
-    /// 
+    ///
     /// Only avaliable for backwards compatibility.
     #[deprecated = "Please see [`Self::One`] instead"]
     Unwrapped(serde_json::Number),
@@ -4526,11 +5120,11 @@ impl Default for SymbolLayoutLayerIconPadding {
 /// Orientation of icon when map is pitched.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy)]
 pub enum SymbolLayoutLayerIconPitchAlignment {
-    #[serde(rename="auto")]
+    #[serde(rename = "auto")]
     Auto,
-    #[serde(rename="map")]
+    #[serde(rename = "map")]
     Map,
-    #[serde(rename="viewport")]
+    #[serde(rename = "viewport")]
     Viewport,
 }
 
@@ -4552,18 +5146,21 @@ pub struct SymbolLayoutLayerIconRotate(serde_json::Number);
 
 impl Default for SymbolLayoutLayerIconRotate {
     fn default() -> Self {
-        Self(serde_json::Number::from_i128(0).expect("the number is serialised from a number and is thus always valid"))
+        Self(
+            serde_json::Number::from_i128(0)
+                .expect("the number is serialised from a number and is thus always valid"),
+        )
     }
 }
 
 /// In combination with `symbol-placement`, determines the rotation behavior of icons.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy)]
 pub enum SymbolLayoutLayerIconRotationAlignment {
-    #[serde(rename="auto")]
+    #[serde(rename = "auto")]
     Auto,
-    #[serde(rename="map")]
+    #[serde(rename = "map")]
     Map,
-    #[serde(rename="viewport")]
+    #[serde(rename = "viewport")]
     Viewport,
 }
 
@@ -4585,20 +5182,23 @@ pub struct SymbolLayoutLayerIconSize(serde_json::Number);
 
 impl Default for SymbolLayoutLayerIconSize {
     fn default() -> Self {
-        Self(serde_json::Number::from_i128(1).expect("the number is serialised from a number and is thus always valid"))
+        Self(
+            serde_json::Number::from_i128(1)
+                .expect("the number is serialised from a number and is thus always valid"),
+        )
     }
 }
 
 /// Scales the icon to fit around the associated text.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy)]
 pub enum SymbolLayoutLayerIconTextFit {
-    #[serde(rename="both")]
+    #[serde(rename = "both")]
     Both,
-    #[serde(rename="height")]
+    #[serde(rename = "height")]
     Height,
-    #[serde(rename="none")]
+    #[serde(rename = "none")]
     None,
-    #[serde(rename="width")]
+    #[serde(rename = "width")]
     Width,
 }
 
@@ -4620,7 +5220,16 @@ struct SymbolLayoutLayerIconTextFitPadding(Box<[serde_json::Number; 4]>);
 
 impl Default for SymbolLayoutLayerIconTextFitPadding {
     fn default() -> Self {
-        Self(Box::new([serde_json::Number::from_i128(0).expect("the number is serialised from a number and is thus always valid"), serde_json::Number::from_i128(0).expect("the number is serialised from a number and is thus always valid"), serde_json::Number::from_i128(0).expect("the number is serialised from a number and is thus always valid"), serde_json::Number::from_i128(0).expect("the number is serialised from a number and is thus always valid")]))
+        Self(Box::new([
+            serde_json::Number::from_i128(0)
+                .expect("the number is serialised from a number and is thus always valid"),
+            serde_json::Number::from_i128(0)
+                .expect("the number is serialised from a number and is thus always valid"),
+            serde_json::Number::from_i128(0)
+                .expect("the number is serialised from a number and is thus always valid"),
+            serde_json::Number::from_i128(0)
+                .expect("the number is serialised from a number and is thus always valid"),
+        ]))
     }
 }
 
@@ -4637,11 +5246,11 @@ impl Default for SymbolLayoutLayerSymbolAvoidEdges {
 /// Label placement relative to its geometry.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy)]
 pub enum SymbolLayoutLayerSymbolPlacement {
-    #[serde(rename="line")]
+    #[serde(rename = "line")]
     Line,
-    #[serde(rename="line-center")]
+    #[serde(rename = "line-center")]
     LineCenter,
-    #[serde(rename="point")]
+    #[serde(rename = "point")]
     Point,
 }
 
@@ -4667,18 +5276,21 @@ pub struct SymbolLayoutLayerSymbolSpacing(serde_json::Number);
 
 impl Default for SymbolLayoutLayerSymbolSpacing {
     fn default() -> Self {
-        Self(serde_json::Number::from_i128(250).expect("the number is serialised from a number and is thus always valid"))
+        Self(
+            serde_json::Number::from_i128(250)
+                .expect("the number is serialised from a number and is thus always valid"),
+        )
     }
 }
 
 /// Determines whether overlapping symbols in the same layer are rendered in the order that they appear in the data source or by their y-position relative to the viewport. To control the order and prioritization of symbols otherwise, use `symbol-sort-key`.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy)]
 pub enum SymbolLayoutLayerSymbolZOrder {
-    #[serde(rename="auto")]
+    #[serde(rename = "auto")]
     Auto,
-    #[serde(rename="source")]
+    #[serde(rename = "source")]
     Source,
-    #[serde(rename="viewport-y")]
+    #[serde(rename = "viewport-y")]
     ViewportY,
 }
 
@@ -4707,23 +5319,23 @@ impl Default for SymbolLayoutLayerTextAllowOverlap {
 /// Part of the text placed closest to the anchor.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy)]
 pub enum SymbolLayoutLayerTextAnchor {
-    #[serde(rename="bottom")]
+    #[serde(rename = "bottom")]
     Bottom,
-    #[serde(rename="bottom-left")]
+    #[serde(rename = "bottom-left")]
     BottomLeft,
-    #[serde(rename="bottom-right")]
+    #[serde(rename = "bottom-right")]
     BottomRight,
-    #[serde(rename="center")]
+    #[serde(rename = "center")]
     Center,
-    #[serde(rename="left")]
+    #[serde(rename = "left")]
     Left,
-    #[serde(rename="right")]
+    #[serde(rename = "right")]
     Right,
-    #[serde(rename="top")]
+    #[serde(rename = "top")]
     Top,
-    #[serde(rename="top-left")]
+    #[serde(rename = "top-left")]
     TopLeft,
-    #[serde(rename="top-right")]
+    #[serde(rename = "top-right")]
     TopRight,
 }
 
@@ -4755,7 +5367,10 @@ struct SymbolLayoutLayerTextFont(Vec<String>);
 
 impl Default for SymbolLayoutLayerTextFont {
     fn default() -> Self {
-        Self(Vec::from(["Open Sans Regular".to_string(), "Arial Unicode MS Regular".to_string()]))
+        Self(Vec::from([
+            "Open Sans Regular".to_string(),
+            "Arial Unicode MS Regular".to_string(),
+        ]))
     }
 }
 
@@ -4772,13 +5387,13 @@ impl Default for SymbolLayoutLayerTextIgnorePlacement {
 /// Text justification options.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy)]
 pub enum SymbolLayoutLayerTextJustify {
-    #[serde(rename="auto")]
+    #[serde(rename = "auto")]
     Auto,
-    #[serde(rename="center")]
+    #[serde(rename = "center")]
     Center,
-    #[serde(rename="left")]
+    #[serde(rename = "left")]
     Left,
-    #[serde(rename="right")]
+    #[serde(rename = "right")]
     Right,
 }
 
@@ -4810,7 +5425,10 @@ pub struct SymbolLayoutLayerTextLetterSpacing(serde_json::Number);
 
 impl Default for SymbolLayoutLayerTextLetterSpacing {
     fn default() -> Self {
-        Self(serde_json::Number::from_i128(0).expect("the number is serialised from a number and is thus always valid"))
+        Self(
+            serde_json::Number::from_i128(0)
+                .expect("the number is serialised from a number and is thus always valid"),
+        )
     }
 }
 
@@ -4820,7 +5438,10 @@ pub struct SymbolLayoutLayerTextLineHeight(serde_json::Number);
 
 impl Default for SymbolLayoutLayerTextLineHeight {
     fn default() -> Self {
-        Self(serde_json::Number::from_f64(1.2).expect("the number is serialised from a number and is thus always valid"))
+        Self(
+            serde_json::Number::from_f64(1.2)
+                .expect("the number is serialised from a number and is thus always valid"),
+        )
     }
 }
 
@@ -4830,7 +5451,10 @@ pub struct SymbolLayoutLayerTextMaxAngle(serde_json::Number);
 
 impl Default for SymbolLayoutLayerTextMaxAngle {
     fn default() -> Self {
-        Self(serde_json::Number::from_i128(45).expect("the number is serialised from a number and is thus always valid"))
+        Self(
+            serde_json::Number::from_i128(45)
+                .expect("the number is serialised from a number and is thus always valid"),
+        )
     }
 }
 
@@ -4840,7 +5464,10 @@ pub struct SymbolLayoutLayerTextMaxWidth(serde_json::Number);
 
 impl Default for SymbolLayoutLayerTextMaxWidth {
     fn default() -> Self {
-        Self(serde_json::Number::from_i128(10).expect("the number is serialised from a number and is thus always valid"))
+        Self(
+            serde_json::Number::from_i128(10)
+                .expect("the number is serialised from a number and is thus always valid"),
+        )
     }
 }
 
@@ -4850,7 +5477,12 @@ struct SymbolLayoutLayerTextOffset(Box<[serde_json::Number; 2]>);
 
 impl Default for SymbolLayoutLayerTextOffset {
     fn default() -> Self {
-        Self(Box::new([serde_json::Number::from_i128(0).expect("the number is serialised from a number and is thus always valid"), serde_json::Number::from_i128(0).expect("the number is serialised from a number and is thus always valid")]))
+        Self(Box::new([
+            serde_json::Number::from_i128(0)
+                .expect("the number is serialised from a number and is thus always valid"),
+            serde_json::Number::from_i128(0)
+                .expect("the number is serialised from a number and is thus always valid"),
+        ]))
     }
 }
 
@@ -4867,11 +5499,11 @@ impl Default for SymbolLayoutLayerTextOptional {
 /// Allows for control over whether to show symbol text when it overlaps other symbols on the map. If `text-overlap` is not set, `text-allow-overlap` is used instead
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy)]
 pub enum SymbolLayoutLayerTextOverlap {
-    #[serde(rename="always")]
+    #[serde(rename = "always")]
     Always,
-    #[serde(rename="cooperative")]
+    #[serde(rename = "cooperative")]
     Cooperative,
-    #[serde(rename="never")]
+    #[serde(rename = "never")]
     Never,
 }
 
@@ -4881,18 +5513,21 @@ pub struct SymbolLayoutLayerTextPadding(serde_json::Number);
 
 impl Default for SymbolLayoutLayerTextPadding {
     fn default() -> Self {
-        Self(serde_json::Number::from_i128(2).expect("the number is serialised from a number and is thus always valid"))
+        Self(
+            serde_json::Number::from_i128(2)
+                .expect("the number is serialised from a number and is thus always valid"),
+        )
     }
 }
 
 /// Orientation of text when map is pitched.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy)]
 pub enum SymbolLayoutLayerTextPitchAlignment {
-    #[serde(rename="auto")]
+    #[serde(rename = "auto")]
     Auto,
-    #[serde(rename="map")]
+    #[serde(rename = "map")]
     Map,
-    #[serde(rename="viewport")]
+    #[serde(rename = "viewport")]
     Viewport,
 }
 
@@ -4914,7 +5549,10 @@ pub struct SymbolLayoutLayerTextRadialOffset(serde_json::Number);
 
 impl Default for SymbolLayoutLayerTextRadialOffset {
     fn default() -> Self {
-        Self(serde_json::Number::from_i128(0).expect("the number is serialised from a number and is thus always valid"))
+        Self(
+            serde_json::Number::from_i128(0)
+                .expect("the number is serialised from a number and is thus always valid"),
+        )
     }
 }
 
@@ -4924,20 +5562,23 @@ pub struct SymbolLayoutLayerTextRotate(serde_json::Number);
 
 impl Default for SymbolLayoutLayerTextRotate {
     fn default() -> Self {
-        Self(serde_json::Number::from_i128(0).expect("the number is serialised from a number and is thus always valid"))
+        Self(
+            serde_json::Number::from_i128(0)
+                .expect("the number is serialised from a number and is thus always valid"),
+        )
     }
 }
 
 /// In combination with `symbol-placement`, determines the rotation behavior of the individual glyphs forming the text.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy)]
 pub enum SymbolLayoutLayerTextRotationAlignment {
-    #[serde(rename="auto")]
+    #[serde(rename = "auto")]
     Auto,
-    #[serde(rename="map")]
+    #[serde(rename = "map")]
     Map,
-    #[serde(rename="viewport")]
+    #[serde(rename = "viewport")]
     Viewport,
-    #[serde(rename="viewport-glyph")]
+    #[serde(rename = "viewport-glyph")]
     ViewportGlyph,
 }
 
@@ -4959,18 +5600,21 @@ pub struct SymbolLayoutLayerTextSize(serde_json::Number);
 
 impl Default for SymbolLayoutLayerTextSize {
     fn default() -> Self {
-        Self(serde_json::Number::from_i128(16).expect("the number is serialised from a number and is thus always valid"))
+        Self(
+            serde_json::Number::from_i128(16)
+                .expect("the number is serialised from a number and is thus always valid"),
+        )
     }
 }
 
 /// Specifies how to capitalize text, similar to the CSS `text-transform` property.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy)]
 pub enum SymbolLayoutLayerTextTransform {
-    #[serde(rename="lowercase")]
+    #[serde(rename = "lowercase")]
     Lowercase,
-    #[serde(rename="none")]
+    #[serde(rename = "none")]
     None,
-    #[serde(rename="uppercase")]
+    #[serde(rename = "uppercase")]
     Uppercase,
 }
 
@@ -4988,23 +5632,23 @@ impl Default for SymbolLayoutLayerTextTransform {
 
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy)]
 pub enum SymbolLayoutLayerTextVariableAnchorValue {
-    #[serde(rename="bottom")]
+    #[serde(rename = "bottom")]
     Bottom,
-    #[serde(rename="bottom-left")]
+    #[serde(rename = "bottom-left")]
     BottomLeft,
-    #[serde(rename="bottom-right")]
+    #[serde(rename = "bottom-right")]
     BottomRight,
-    #[serde(rename="center")]
+    #[serde(rename = "center")]
     Center,
-    #[serde(rename="left")]
+    #[serde(rename = "left")]
     Left,
-    #[serde(rename="right")]
+    #[serde(rename = "right")]
     Right,
-    #[serde(rename="top")]
+    #[serde(rename = "top")]
     Top,
-    #[serde(rename="top-left")]
+    #[serde(rename = "top-left")]
     TopLeft,
-    #[serde(rename="top-right")]
+    #[serde(rename = "top-right")]
     TopRight,
 }
 
@@ -5012,19 +5656,19 @@ pub enum SymbolLayoutLayerTextVariableAnchorValue {
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
 struct SymbolLayoutLayerTextVariableAnchor(Vec<SymbolLayoutLayerTextVariableAnchorValue>);
 
-/// To increase the chance of placing high-priority labels on the map, you can provide an array of `text-anchor` locations, each paired with an offset value. The renderer will attempt to place the label at each location, in order, before moving on to the next location+offset. Use `text-justify: auto` to choose justification based on anchor position. 
+/// To increase the chance of placing high-priority labels on the map, you can provide an array of `text-anchor` locations, each paired with an offset value. The renderer will attempt to place the label at each location, in order, before moving on to the next location+offset. Use `text-justify: auto` to choose justification based on anchor position.
 ///
-///  The length of the array must be even, and must alternate between enum and point entries. i.e., each anchor location must be accompanied by a point, and that point defines the offset when the corresponding anchor location is used. Positive offset values indicate right and down, while negative values indicate left and up. Anchor locations may repeat, allowing the renderer to try multiple offsets to try and place a label using the same anchor. 
+///  The length of the array must be even, and must alternate between enum and point entries. i.e., each anchor location must be accompanied by a point, and that point defines the offset when the corresponding anchor location is used. Positive offset values indicate right and down, while negative values indicate left and up. Anchor locations may repeat, allowing the renderer to try multiple offsets to try and place a label using the same anchor.
 ///
-///  When present, this property takes precedence over `text-anchor`, `text-variable-anchor`, `text-offset`, and `text-radial-offset`. 
+///  When present, this property takes precedence over `text-anchor`, `text-variable-anchor`, `text-offset`, and `text-radial-offset`.
 ///
-///  ```json 
+///  ```json
 ///
-///  { "text-variable-anchor-offset": ["top", [0, 4], "left", [3,0], "bottom", [1, 1]] } 
+///  { "text-variable-anchor-offset": ["top", [0, 4], "left", [3,0], "bottom", [1, 1]] }
 ///
-///  ``` 
+///  ```
 ///
-///  When the renderer chooses the `top` anchor, `[0, 4]` will be used for `text-offset`; the text will be shifted down by 4 ems. 
+///  When the renderer chooses the `top` anchor, `[0, 4]` will be used for `text-offset`; the text will be shifted down by 4 ems.
 ///
 ///  When the renderer chooses the `left` anchor, `[3, 0]` will be used for `text-offset`; the text will be shifted right by 3 ems.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
@@ -5032,9 +5676,9 @@ pub struct SymbolLayoutLayerTextVariableAnchorOffset(serde_json::Value);
 
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy)]
 pub enum SymbolLayoutLayerTextWritingModeValue {
-    #[serde(rename="horizontal")]
+    #[serde(rename = "horizontal")]
     Horizontal,
-    #[serde(rename="vertical")]
+    #[serde(rename = "vertical")]
     Vertical,
 }
 
@@ -5045,9 +5689,9 @@ struct SymbolLayoutLayerTextWritingMode(Vec<SymbolLayoutLayerTextWritingModeValu
 /// Whether this layer is displayed.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy)]
 pub enum SymbolLayoutLayerVisibility {
-    #[serde(rename="none")]
+    #[serde(rename = "none")]
     None,
-    #[serde(rename="visible")]
+    #[serde(rename = "visible")]
     Visible,
 }
 
@@ -5066,48 +5710,48 @@ impl Default for SymbolLayoutLayerVisibility {
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
 pub struct SymbolPaintLayer {
     /// The color of the icon. This can only be used with SDF icons.
-    #[serde(rename="icon-color")]
+    #[serde(rename = "icon-color")]
     pub icon_color: Option<SymbolPaintLayerIconColor>,
     /// Fade out the halo towards the outside.
-    #[serde(rename="icon-halo-blur")]
+    #[serde(rename = "icon-halo-blur")]
     pub icon_halo_blur: Option<SymbolPaintLayerIconHaloBlur>,
     /// The color of the icon's halo. Icon halos can only be used with SDF icons.
-    #[serde(rename="icon-halo-color")]
+    #[serde(rename = "icon-halo-color")]
     pub icon_halo_color: Option<SymbolPaintLayerIconHaloColor>,
-    /// Distance of halo to the icon outline. 
-    /// 
+    /// Distance of halo to the icon outline.
+    ///
     /// The unit is in pixels only for SDF sprites that were created with a blur radius of 8, multiplied by the display density. I.e., the radius needs to be 16 for `@2x` sprites, etc.
-    #[serde(rename="icon-halo-width")]
+    #[serde(rename = "icon-halo-width")]
     pub icon_halo_width: Option<SymbolPaintLayerIconHaloWidth>,
     /// The opacity at which the icon will be drawn.
-    #[serde(rename="icon-opacity")]
+    #[serde(rename = "icon-opacity")]
     pub icon_opacity: Option<SymbolPaintLayerIconOpacity>,
     /// Distance that the icon's anchor is moved from its original placement. Positive values indicate right and down, while negative values indicate left and up.
-    #[serde(rename="icon-translate")]
+    #[serde(rename = "icon-translate")]
     pub icon_translate: Option<SymbolPaintLayerIconTranslate>,
     /// Controls the frame of reference for `icon-translate`.
-    #[serde(rename="icon-translate-anchor")]
+    #[serde(rename = "icon-translate-anchor")]
     pub icon_translate_anchor: Option<SymbolPaintLayerIconTranslateAnchor>,
     /// The color with which the text will be drawn.
-    #[serde(rename="text-color")]
+    #[serde(rename = "text-color")]
     pub text_color: Option<SymbolPaintLayerTextColor>,
     /// The halo's fadeout distance towards the outside.
-    #[serde(rename="text-halo-blur")]
+    #[serde(rename = "text-halo-blur")]
     pub text_halo_blur: Option<SymbolPaintLayerTextHaloBlur>,
     /// The color of the text's halo, which helps it stand out from backgrounds.
-    #[serde(rename="text-halo-color")]
+    #[serde(rename = "text-halo-color")]
     pub text_halo_color: Option<SymbolPaintLayerTextHaloColor>,
     /// Distance of halo to the font outline. Max text halo width is 1/4 of the font-size.
-    #[serde(rename="text-halo-width")]
+    #[serde(rename = "text-halo-width")]
     pub text_halo_width: Option<SymbolPaintLayerTextHaloWidth>,
     /// The opacity at which the text will be drawn.
-    #[serde(rename="text-opacity")]
+    #[serde(rename = "text-opacity")]
     pub text_opacity: Option<SymbolPaintLayerTextOpacity>,
     /// Distance that the text's anchor is moved from its original placement. Positive values indicate right and down, while negative values indicate left and up.
-    #[serde(rename="text-translate")]
+    #[serde(rename = "text-translate")]
     pub text_translate: Option<SymbolPaintLayerTextTranslate>,
     /// Controls the frame of reference for `text-translate`.
-    #[serde(rename="text-translate-anchor")]
+    #[serde(rename = "text-translate-anchor")]
     pub text_translate_anchor: Option<SymbolPaintLayerTextTranslateAnchor>,
 }
 
@@ -5127,7 +5771,10 @@ pub struct SymbolPaintLayerIconHaloBlur(serde_json::Number);
 
 impl Default for SymbolPaintLayerIconHaloBlur {
     fn default() -> Self {
-        Self(serde_json::Number::from_i128(0).expect("the number is serialised from a number and is thus always valid"))
+        Self(
+            serde_json::Number::from_i128(0)
+                .expect("the number is serialised from a number and is thus always valid"),
+        )
     }
 }
 
@@ -5137,11 +5784,14 @@ struct SymbolPaintLayerIconHaloColor(color::DynamicColor);
 
 impl Default for SymbolPaintLayerIconHaloColor {
     fn default() -> Self {
-        Self(color::parse_color("rgba(0, 0, 0, 0)").expect("Invalid color specified as the default value"))
+        Self(
+            color::parse_color("rgba(0, 0, 0, 0)")
+                .expect("Invalid color specified as the default value"),
+        )
     }
 }
 
-/// Distance of halo to the icon outline. 
+/// Distance of halo to the icon outline.
 ///
 /// The unit is in pixels only for SDF sprites that were created with a blur radius of 8, multiplied by the display density. I.e., the radius needs to be 16 for `@2x` sprites, etc.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
@@ -5149,7 +5799,10 @@ pub struct SymbolPaintLayerIconHaloWidth(serde_json::Number);
 
 impl Default for SymbolPaintLayerIconHaloWidth {
     fn default() -> Self {
-        Self(serde_json::Number::from_i128(0).expect("the number is serialised from a number and is thus always valid"))
+        Self(
+            serde_json::Number::from_i128(0)
+                .expect("the number is serialised from a number and is thus always valid"),
+        )
     }
 }
 
@@ -5159,7 +5812,10 @@ pub struct SymbolPaintLayerIconOpacity(serde_json::Number);
 
 impl Default for SymbolPaintLayerIconOpacity {
     fn default() -> Self {
-        Self(serde_json::Number::from_i128(1).expect("the number is serialised from a number and is thus always valid"))
+        Self(
+            serde_json::Number::from_i128(1)
+                .expect("the number is serialised from a number and is thus always valid"),
+        )
     }
 }
 
@@ -5169,16 +5825,21 @@ struct SymbolPaintLayerIconTranslate(Box<[serde_json::Number; 2]>);
 
 impl Default for SymbolPaintLayerIconTranslate {
     fn default() -> Self {
-        Self(Box::new([serde_json::Number::from_i128(0).expect("the number is serialised from a number and is thus always valid"), serde_json::Number::from_i128(0).expect("the number is serialised from a number and is thus always valid")]))
+        Self(Box::new([
+            serde_json::Number::from_i128(0)
+                .expect("the number is serialised from a number and is thus always valid"),
+            serde_json::Number::from_i128(0)
+                .expect("the number is serialised from a number and is thus always valid"),
+        ]))
     }
 }
 
 /// Controls the frame of reference for `icon-translate`.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy)]
 pub enum SymbolPaintLayerIconTranslateAnchor {
-    #[serde(rename="map")]
+    #[serde(rename = "map")]
     Map,
-    #[serde(rename="viewport")]
+    #[serde(rename = "viewport")]
     Viewport,
 }
 
@@ -5210,7 +5871,10 @@ pub struct SymbolPaintLayerTextHaloBlur(serde_json::Number);
 
 impl Default for SymbolPaintLayerTextHaloBlur {
     fn default() -> Self {
-        Self(serde_json::Number::from_i128(0).expect("the number is serialised from a number and is thus always valid"))
+        Self(
+            serde_json::Number::from_i128(0)
+                .expect("the number is serialised from a number and is thus always valid"),
+        )
     }
 }
 
@@ -5220,7 +5884,10 @@ struct SymbolPaintLayerTextHaloColor(color::DynamicColor);
 
 impl Default for SymbolPaintLayerTextHaloColor {
     fn default() -> Self {
-        Self(color::parse_color("rgba(0, 0, 0, 0)").expect("Invalid color specified as the default value"))
+        Self(
+            color::parse_color("rgba(0, 0, 0, 0)")
+                .expect("Invalid color specified as the default value"),
+        )
     }
 }
 
@@ -5230,7 +5897,10 @@ pub struct SymbolPaintLayerTextHaloWidth(serde_json::Number);
 
 impl Default for SymbolPaintLayerTextHaloWidth {
     fn default() -> Self {
-        Self(serde_json::Number::from_i128(0).expect("the number is serialised from a number and is thus always valid"))
+        Self(
+            serde_json::Number::from_i128(0)
+                .expect("the number is serialised from a number and is thus always valid"),
+        )
     }
 }
 
@@ -5240,7 +5910,10 @@ pub struct SymbolPaintLayerTextOpacity(serde_json::Number);
 
 impl Default for SymbolPaintLayerTextOpacity {
     fn default() -> Self {
-        Self(serde_json::Number::from_i128(1).expect("the number is serialised from a number and is thus always valid"))
+        Self(
+            serde_json::Number::from_i128(1)
+                .expect("the number is serialised from a number and is thus always valid"),
+        )
     }
 }
 
@@ -5250,16 +5923,21 @@ struct SymbolPaintLayerTextTranslate(Box<[serde_json::Number; 2]>);
 
 impl Default for SymbolPaintLayerTextTranslate {
     fn default() -> Self {
-        Self(Box::new([serde_json::Number::from_i128(0).expect("the number is serialised from a number and is thus always valid"), serde_json::Number::from_i128(0).expect("the number is serialised from a number and is thus always valid")]))
+        Self(Box::new([
+            serde_json::Number::from_i128(0)
+                .expect("the number is serialised from a number and is thus always valid"),
+            serde_json::Number::from_i128(0)
+                .expect("the number is serialised from a number and is thus always valid"),
+        ]))
     }
 }
 
 /// Controls the frame of reference for `text-translate`.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy)]
 pub enum SymbolPaintLayerTextTranslateAnchor {
-    #[serde(rename="map")]
+    #[serde(rename = "map")]
     Map,
-    #[serde(rename="viewport")]
+    #[serde(rename = "viewport")]
     Viewport,
 }
 

@@ -527,6 +527,10 @@ fn generate_syntax_enum_deserializer_regular_variant(
     for param in &overload.parameters {
         if let Some(param) = param.strip_suffix('?') {
             visit_seq.line(format!("let {param} = seq.next_element()?;"));
+        } else if param == "type" {
+            visit_seq.line(format!(
+                "let r#{param} = visit_seq_field(&mut seq, \"{param}\")?;"
+            ));
         } else {
             visit_seq.line(format!(
                 "let {param} = visit_seq_field(&mut seq, \"{param}\")?;"
@@ -540,6 +544,13 @@ fn generate_syntax_enum_deserializer_regular_variant(
             .parameters
             .iter()
             .map(|p| p.strip_suffix('?').unwrap_or(p))
+            .map(|p| {
+                if p == "type" {
+                    format!("r#{}", p)
+                } else {
+                    p.to_string()
+                }
+            })
             .collect::<Vec<_>>();
         visit_seq.line(format!(
             "Ok({name}::{variant_name}({params}))",
