@@ -235,7 +235,12 @@ impl PrimitiveType {
 
     pub fn as_number(&self) -> (&Fields, Option<f64>, Option<f64>) {
         match self {
-            Self::Number { common, minimum, maximum, .. } => (
+            Self::Number {
+                common,
+                minimum,
+                maximum,
+                ..
+            } => (
                 common,
                 minimum.as_ref().and_then(|n| n.as_f64()),
                 maximum.as_ref().and_then(|n| n.as_f64()),
@@ -274,7 +279,12 @@ impl PrimitiveType {
 
     pub fn as_number_array(&self) -> (&Fields, Option<f64>, Option<f64>) {
         match self {
-            Self::NumberArray { common, minimum, maximum, .. } => (
+            Self::NumberArray {
+                common,
+                minimum,
+                maximum,
+                ..
+            } => (
                 common,
                 minimum.as_ref().and_then(|n| n.as_f64()),
                 maximum.as_ref().and_then(|n| n.as_f64()),
@@ -346,12 +356,24 @@ impl PrimitiveType {
         }
     }
 
-    pub fn is_number(&self) -> bool { matches!(self, Self::Number { .. }) }
-    pub fn is_string(&self) -> bool { matches!(self, Self::String { .. }) }
-    pub fn is_boolean(&self) -> bool { matches!(self, Self::Boolean { .. }) }
-    pub fn is_color(&self) -> bool { matches!(self, Self::Color { .. }) }
-    pub fn is_enum(&self) -> bool { matches!(self, Self::Enum { .. }) }
-    pub fn is_array(&self) -> bool { matches!(self, Self::Array { .. }) }
+    pub fn is_number(&self) -> bool {
+        matches!(self, Self::Number { .. })
+    }
+    pub fn is_string(&self) -> bool {
+        matches!(self, Self::String { .. })
+    }
+    pub fn is_boolean(&self) -> bool {
+        matches!(self, Self::Boolean { .. })
+    }
+    pub fn is_color(&self) -> bool {
+        matches!(self, Self::Color { .. })
+    }
+    pub fn is_enum(&self) -> bool {
+        matches!(self, Self::Enum { .. })
+    }
+    pub fn is_array(&self) -> bool {
+        matches!(self, Self::Array { .. })
+    }
 }
 
 #[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]

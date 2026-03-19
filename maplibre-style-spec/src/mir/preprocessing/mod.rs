@@ -4,10 +4,11 @@ mod sources;
 
 use std::collections::{BTreeMap, HashMap};
 
-use crate::decoder::{ParsedItem, TopLevelItem};
 pub use expressions::preprocess_expression;
 pub use layers::preprocess_layers;
 pub use sources::preprocess_sources;
+
+use crate::decoder::{ParsedItem, TopLevelItem};
 
 /// Pops a `OneOf` entry keyed by `key` from `fields`, then removes each referenced
 /// group from `fields` and returns them as a map from (stripped) group name → fields.
@@ -15,7 +16,9 @@ pub fn pop_one_of_as_group(
     fields: &mut BTreeMap<String, TopLevelItem>,
     key: &str,
 ) -> HashMap<String, BTreeMap<String, ParsedItem>> {
-    let one_of = fields.remove(key).unwrap_or_else(|| panic!("expected '{key}' in fields"));
+    let one_of = fields
+        .remove(key)
+        .unwrap_or_else(|| panic!("expected '{key}' in fields"));
     let one_of_items = one_of.as_one_of();
 
     let prefix = format!("{key}_");
@@ -26,7 +29,9 @@ pub fn pop_one_of_as_group(
             .unwrap_or_else(|| panic!("'{item}' should start with prefix '{prefix}'"));
         let group = fields
             .remove(item)
-            .unwrap_or_else(|| panic!("'{item}' referenced in '{key}' OneOf but not found in fields"))
+            .unwrap_or_else(|| {
+                panic!("'{item}' referenced in '{key}' OneOf but not found in fields")
+            })
             .as_group()
             .clone();
         set.insert(clean_group_name.to_string(), group);

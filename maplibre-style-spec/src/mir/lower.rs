@@ -9,8 +9,8 @@ use crate::generator::formatter::to_snake_case;
 use crate::mir::types::{
     ArrayElement, ArrayField, BooleanField, ColorArrayField, ColorField, EnumField,
     ExpressionCapabilities, FieldMeta, FormattedTextField, MirEnum, MirField, NumberArrayField,
-    NumberField, PaddingField, ProjectionDefinitionField, ResolvedImageField, ReferenceField,
-    RegularEnum, RegularVariant, StateField, StringField, SyntaxEnumMap, SyntaxVariantDef,
+    NumberField, PaddingField, ProjectionDefinitionField, ReferenceField, RegularEnum,
+    RegularVariant, ResolvedImageField, StateField, StringField, SyntaxEnumMap, SyntaxVariantDef,
     VersionEnum,
 };
 
@@ -181,10 +181,7 @@ pub fn lower_enum_values(values: EnumValues) -> MirEnum {
         EnumValues::Version(numbers) => MirEnum::Version(VersionEnum {
             versions: numbers
                 .iter()
-                .map(|n| {
-                    n.as_u64()
-                        .expect("version number must be a u64") as u32
-                })
+                .map(|n| n.as_u64().expect("version number must be a u64") as u32)
                 .collect(),
         }),
         EnumValues::Enum(map) => MirEnum::Regular(RegularEnum {
@@ -220,10 +217,15 @@ fn lower_array_element(
 ) -> ArrayElement {
     match value {
         ArrayValue::Simple(s) => lower_simple_array_value(s, enum_values),
-        ArrayValue::Either(options) => {
-            ArrayElement::Either(options.into_iter().map(|v| lower_array_element(v, None)).collect())
+        ArrayValue::Either(options) => ArrayElement::Either(
+            options
+                .into_iter()
+                .map(|v| lower_array_element(v, None))
+                .collect(),
+        ),
+        ArrayValue::Complex(item) => {
+            ArrayElement::Complex(Box::new(lower_parsed_item("element", *item)))
         }
-        ArrayValue::Complex(item) => ArrayElement::Complex(Box::new(lower_parsed_item("element", *item))),
     }
 }
 
@@ -281,7 +283,12 @@ fn lower_expression(e: &crate::decoder::Expression) -> ExpressionCapabilities {
 
 /// Compute a doc string with optional range annotation — matches the existing
 /// `Fields::doc_with_range` format exactly.
-pub fn doc_with_range(doc: &str, max: Option<f64>, min: Option<f64>, period: Option<f64>) -> String {
+pub fn doc_with_range(
+    doc: &str,
+    max: Option<f64>,
+    min: Option<f64>,
+    period: Option<f64>,
+) -> String {
     if max.is_none() && min.is_none() && period.is_none() {
         return doc.to_string();
     }

@@ -69,7 +69,10 @@ mod tests {
             &mut scope,
             "Foo",
             &NumberField {
-                meta: FieldMeta { doc, ..FieldMeta::default() },
+                meta: FieldMeta {
+                    doc,
+                    ..FieldMeta::default()
+                },
                 default: None,
                 min: Some(360.0),
                 max: Some(1.0),

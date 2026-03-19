@@ -17,7 +17,9 @@ pub fn preprocess_sources(fields: &mut BTreeMap<String, TopLevelItem>) -> Interm
 
     // If there is no "source" OneOf entry (e.g. in unit tests), return empty.
     if !fields.contains_key("source") {
-        return IntermediateSources { source_types: BTreeMap::new() };
+        return IntermediateSources {
+            source_types: BTreeMap::new(),
+        };
     }
 
     let source_groups = pop_one_of_as_group(fields, "source");
@@ -31,14 +33,23 @@ pub fn preprocess_sources(fields: &mut BTreeMap<String, TopLevelItem>) -> Interm
                 .into_iter()
                 .filter(|(k, _)| k != "*" && k != "property-type")
                 .filter(|(_, v)| {
-                    !matches!(v, crate::decoder::ParsedItem::Primitive(
-                        crate::decoder::PrimitiveType::PropertyType(_)
-                    ))
+                    !matches!(
+                        v,
+                        crate::decoder::ParsedItem::Primitive(
+                            crate::decoder::PrimitiveType::PropertyType(_)
+                        )
+                    )
                 })
                 .map(|(k, v)| lower_parsed_item(&k, v))
                 .collect();
 
-            (type_name, SourceTypeDef { fields: mir_fields, discriminant_value })
+            (
+                type_name,
+                SourceTypeDef {
+                    fields: mir_fields,
+                    discriminant_value,
+                },
+            )
         })
         .collect();
 
@@ -53,7 +64,8 @@ fn extract_discriminant(
 ) -> Option<String> {
     let item = group.remove(field_name)?;
     if let ParsedItem::Primitive(PrimitiveType::Enum {
-        values: EnumValues::Enum(ref vals), ..
+        values: EnumValues::Enum(ref vals),
+        ..
     }) = item
     {
         if vals.len() == 1 {
@@ -87,12 +99,18 @@ mod tests {
 
         let sources = preprocess_sources(&mut reference.fields);
 
-        let mut keys: Vec<&str> =
-            sources.source_types.keys().map(|s| s.as_str()).collect();
+        let mut keys: Vec<&str> = sources.source_types.keys().map(|s| s.as_str()).collect();
         keys.sort();
         assert_eq!(
             keys,
-            vec!["geojson", "image", "raster", "raster_dem", "vector", "video"],
+            vec![
+                "geojson",
+                "image",
+                "raster",
+                "raster_dem",
+                "vector",
+                "video"
+            ],
             "expected exactly the six MapLibre source types"
         );
 
@@ -108,24 +126,34 @@ mod tests {
         }
 
         // Spot-check: vector source should have url, tiles, minzoom, maxzoom fields
-        let vector_names: Vec<&str> = sources
-            .source_types["vector"]
+        let vector_names: Vec<&str> = sources.source_types["vector"]
             .fields
             .iter()
             .map(|f| f.meta().spec_name.as_str())
             .collect();
         assert!(vector_names.contains(&"url"), "vector source must have url");
-        assert!(vector_names.contains(&"tiles"), "vector source must have tiles");
-        assert!(vector_names.contains(&"minzoom"), "vector source must have minzoom");
-        assert!(vector_names.contains(&"maxzoom"), "vector source must have maxzoom");
+        assert!(
+            vector_names.contains(&"tiles"),
+            "vector source must have tiles"
+        );
+        assert!(
+            vector_names.contains(&"minzoom"),
+            "vector source must have minzoom"
+        );
+        assert!(
+            vector_names.contains(&"maxzoom"),
+            "vector source must have maxzoom"
+        );
 
         // Spot-check: geojson source must have data field
-        let geojson_names: Vec<&str> = sources
-            .source_types["geojson"]
+        let geojson_names: Vec<&str> = sources.source_types["geojson"]
             .fields
             .iter()
             .map(|f| f.meta().spec_name.as_str())
             .collect();
-        assert!(geojson_names.contains(&"data"), "geojson source must have data");
+        assert!(
+            geojson_names.contains(&"data"),
+            "geojson source must have data"
+        );
     }
 }

@@ -240,10 +240,7 @@ pub struct SyntaxVariantDef {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum ArrayElement {
     String,
-    Number {
-        min: Option<f64>,
-        max: Option<f64>,
-    },
+    Number { min: Option<f64>, max: Option<f64> },
     Boolean,
     Color,
     Enum(RegularEnum),
@@ -274,16 +271,31 @@ pub struct ExpressionCapabilities {
 /// Clean representation of a field's type, abstracting over the decoder's `PrimitiveType`.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum IntermediateType {
-    Number { min: Option<f64>, max: Option<f64> },
+    Number {
+        min: Option<f64>,
+        max: Option<f64>,
+    },
     String,
     Boolean,
     Color,
-    Enum { values: Vec<String> },
-    Array { element: ArrayElementType, length: Option<usize> },
+    Enum {
+        values: Vec<String>,
+    },
+    Array {
+        element: ArrayElementType,
+        length: Option<usize>,
+    },
     Padding,
-    Formatted { tokens: bool },
-    ResolvedImage { tokens: bool },
-    NumberArray { min: Option<f64>, max: Option<f64> },
+    Formatted {
+        tokens: bool,
+    },
+    ResolvedImage {
+        tokens: bool,
+    },
+    NumberArray {
+        min: Option<f64>,
+        max: Option<f64>,
+    },
     ColorArray,
     State,
     /// Catch-all open object type (from spec's `*` type)

@@ -131,7 +131,12 @@ fn generate_multi_overload(
     let mut overloads_tuples = Vec::with_capacity(syntax.overloads.len());
     for overload in &syntax.overloads {
         if overload.is_variadic(&syntax.parameters) {
-            overloads_tuples.push(generate_variadic_overload_tuples(scope, (name, var_name), syntax, overload));
+            overloads_tuples.push(generate_variadic_overload_tuples(
+                scope,
+                (name, var_name),
+                syntax,
+                overload,
+            ));
         } else {
             let var_name = overload.output_type.to_upper_camel_case();
             let mut tuples = Vec::with_capacity(overload.parameters.len());
@@ -200,9 +205,9 @@ fn generate_variadic_overload_tuples(
     }
 
     tuple_types.extend(
-        suffix
-            .iter()
-            .map(|param| generate_parameter_type(scope, (name, var_name, param), &syntax.parameters)),
+        suffix.iter().map(|param| {
+            generate_parameter_type(scope, (name, var_name, param), &syntax.parameters)
+        }),
     );
 
     tuple_types

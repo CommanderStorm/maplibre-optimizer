@@ -4,17 +4,16 @@ use codegen2::Scope;
 
 use crate::generator::formatter::{to_snake_case, to_upper_camel_case};
 use crate::generator::literals::generate_literals;
-use crate::mir::{
-    IntermediateLayerField, IntermediateNamedType, IntermediateOneOf, IntermediateSpec,
-    Expressions, Layers, Sources,
-};
 use crate::mir::types::{
-    ArrayElement, BooleanField, ColorArrayField, ColorField, EnumField, FieldMeta,
-    FormattedTextField, MirEnum, MirField, NumberArrayField, NumberField, PaddingField,
-    ProjectionDefinitionField, ResolvedImageField, RegularEnum, RegularVariant,
-    StateField, StringField,
+    ArrayElement, ArrayElementType, BooleanField, ColorArrayField, ColorField, EnumField,
+    FieldMeta, FormattedTextField, IntermediateType, MirEnum, MirField, NumberArrayField,
+    NumberField, PaddingField, ProjectionDefinitionField, RegularEnum, RegularVariant,
+    ResolvedImageField, StateField, StringField,
 };
-use crate::mir::types::{ArrayElementType, IntermediateType};
+use crate::mir::{
+    Expressions, IntermediateLayerField, IntermediateNamedType, IntermediateOneOf,
+    IntermediateSpec, Layers, Sources,
+};
 
 mod autotest;
 pub mod formatter;
@@ -105,9 +104,7 @@ fn generate_struct_from_fields(scope: &mut Scope, name: &str, fields: &[MirField
                 .new_struct(name)
                 .vis("pub")
                 .derive("serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone")
-                .tuple_field(format!(
-                    "std::collections::BTreeMap<String,{inner_name}>"
-                ));
+                .tuple_field(format!("std::collections::BTreeMap<String,{inner_name}>"));
             items::star::generate(scope, &inner_name, meta);
             return;
         }
@@ -222,9 +219,9 @@ fn generate_source_types(scope: &mut Scope, sources: &Sources) {
         .source_types
         .iter()
         .filter_map(|(k, d)| {
-            d.discriminant_value.as_ref().map(|v| {
-                (to_upper_camel_case(&format!("{k}_source")), v.clone())
-            })
+            d.discriminant_value
+                .as_ref()
+                .map(|v| (to_upper_camel_case(&format!("{k}_source")), v.clone()))
         })
         .collect();
 
@@ -264,7 +261,10 @@ fn generate_layer_types(scope: &mut Scope, layers: &Layers) {
 fn layer_fields_to_mir(
     fields: &std::collections::BTreeMap<String, IntermediateLayerField>,
 ) -> Vec<MirField> {
-    fields.iter().map(|(name, f)| layer_field_to_mir(name, f)).collect()
+    fields
+        .iter()
+        .map(|(name, f)| layer_field_to_mir(name, f))
+        .collect()
 }
 
 fn layer_field_to_mir(spec_name: &str, f: &IntermediateLayerField) -> MirField {
@@ -282,14 +282,20 @@ fn layer_field_to_mir(spec_name: &str, f: &IntermediateLayerField) -> MirField {
     match &f.r#type {
         IntermediateType::Number { min, max } => MirField::Number(NumberField {
             meta,
-            default: f.default.as_ref().and_then(|v| serde_json::from_value(v.clone()).ok()),
+            default: f
+                .default
+                .as_ref()
+                .and_then(|v| serde_json::from_value(v.clone()).ok()),
             min: *min,
             max: *max,
             period: None,
         }),
         IntermediateType::String => MirField::String(StringField {
             meta,
-            default: f.default.as_ref().and_then(|v| v.as_str().map(|s| s.to_string())),
+            default: f
+                .default
+                .as_ref()
+                .and_then(|v| v.as_str().map(|s| s.to_string())),
         }),
         IntermediateType::Boolean => MirField::Boolean(BooleanField {
             meta,
@@ -340,21 +346,25 @@ fn layer_field_to_mir(spec_name: &str, f: &IntermediateLayerField) -> MirField {
                 .and_then(|v| v.as_str().map(|s| s.to_string()))
                 .unwrap_or_default(),
         }),
-        IntermediateType::ResolvedImage { tokens } => {
-            MirField::ResolvedImage(ResolvedImageField {
-                meta,
-                tokens: Some(*tokens),
-            })
-        }
+        IntermediateType::ResolvedImage { tokens } => MirField::ResolvedImage(ResolvedImageField {
+            meta,
+            tokens: Some(*tokens),
+        }),
         IntermediateType::NumberArray { min, max } => MirField::NumberArray(NumberArrayField {
             meta,
-            default: f.default.as_ref().and_then(|v| serde_json::from_value(v.clone()).ok()),
+            default: f
+                .default
+                .as_ref()
+                .and_then(|v| serde_json::from_value(v.clone()).ok()),
             min: *min,
             max: *max,
         }),
         IntermediateType::ColorArray => MirField::ColorArray(ColorArrayField {
             meta,
-            default: f.default.as_ref().and_then(|v| v.as_str().map(|s| s.to_string())),
+            default: f
+                .default
+                .as_ref()
+                .and_then(|v| v.as_str().map(|s| s.to_string())),
         }),
         IntermediateType::State => MirField::State(StateField {
             meta,
@@ -382,7 +392,10 @@ fn layer_field_to_mir(spec_name: &str, f: &IntermediateLayerField) -> MirField {
 fn array_element_type_to_mir(element: &ArrayElementType) -> ArrayElement {
     match element {
         ArrayElementType::String => ArrayElement::String,
-        ArrayElementType::Number => ArrayElement::Number { min: None, max: None },
+        ArrayElementType::Number => ArrayElement::Number {
+            min: None,
+            max: None,
+        },
         ArrayElementType::Color => ArrayElement::Color,
         ArrayElementType::Enum(values) => ArrayElement::Enum(RegularEnum {
             variants: values
@@ -427,10 +440,9 @@ pub fn generate_mir_type(scope: &mut Scope, name: &str, field: &MirField) {
 mod tests {
     use serde_json::json;
 
+    use super::*;
     use crate::decoder::StyleReference;
     use crate::mir::IntermediateSpec;
-
-    use super::*;
 
     #[test]
     fn test_generate_spec_items() {

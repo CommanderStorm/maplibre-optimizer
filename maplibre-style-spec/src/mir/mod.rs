@@ -9,6 +9,20 @@ pub mod types;
 
 use std::collections::BTreeMap;
 
+pub use expressions::{
+    ExprParamType, ExprType, ExpressionGroup, ExpressionOperator, ExpressionOverload,
+    ExpressionParam, IntermediateExpressions as Expressions, LiteralKind, OverloadParams,
+    ResolvedParam,
+};
+pub use layers::{IntermediateLayerField, IntermediateLayerType, IntermediateLayers as Layers};
+pub use sources::{IntermediateSources as Sources, SourceTypeDef};
+pub use types::{
+    ArrayElement, ArrayField, BooleanField, ColorArrayField, ColorField, EnumField,
+    ExpressionCapabilities, FieldMeta, FormattedTextField, MirEnum, NumberArrayField, NumberField,
+    PaddingField, ProjectionDefinitionField, ReferenceField, RegularEnum, RegularVariant,
+    ResolvedImageField, StateField, StringField, SyntaxEnumMap, SyntaxVariantDef, VersionEnum,
+};
+
 use crate::decoder;
 use crate::decoder::{ParsedItem, PrimitiveType, TopLevelItem};
 use crate::mir::expressions::IntermediateExpressions;
@@ -18,21 +32,6 @@ use crate::mir::resources::{IntermediateFontResources, IntermediateSpriteResourc
 use crate::mir::root::IntermediateRootPrimitives;
 use crate::mir::sources::IntermediateSources;
 use crate::mir::types::MirField;
-
-pub use expressions::{
-    ExprParamType, ExprType, ExpressionGroup, ExpressionOperator, ExpressionOverload,
-    ExpressionParam, IntermediateExpressions as Expressions, LiteralKind, OverloadParams,
-    ResolvedParam,
-};
-pub use layers::{IntermediateLayerField, IntermediateLayerType, IntermediateLayers as Layers};
-pub use sources::SourceTypeDef;
-pub use sources::IntermediateSources as Sources;
-pub use types::{
-    ArrayElement, ArrayField, BooleanField, ColorArrayField, ColorField, EnumField,
-    ExpressionCapabilities, FieldMeta, FormattedTextField, MirEnum, NumberArrayField, NumberField,
-    PaddingField, ProjectionDefinitionField, ResolvedImageField, ReferenceField, RegularEnum,
-    RegularVariant, StateField, StringField, SyntaxEnumMap, SyntaxVariantDef, VersionEnum,
-};
 
 // ── IntermediateNamedType ─────────────────────────────────────────────────────
 
@@ -92,7 +91,9 @@ impl From<decoder::StyleReference> for IntermediateSpec {
             let url_template = value.root.remove("glyphs").and_then(|item| {
                 if let ParsedItem::Primitive(PrimitiveType::String { common, default }) = item {
                     default.or_else(|| {
-                        common.example.and_then(|v| v.as_str().map(|s| s.to_string()))
+                        common
+                            .example
+                            .and_then(|v| v.as_str().map(|s| s.to_string()))
                     })
                 } else {
                     None
@@ -141,9 +142,15 @@ fn lower_remaining_fields(
 
     for (key, item) in fields {
         match item {
-            TopLevelItem::Group(g) => { groups.insert(key, g); }
-            TopLevelItem::OneOf(v) => { one_ofs.insert(key, v); }
-            TopLevelItem::Item(i) => { items.insert(key, *i); }
+            TopLevelItem::Group(g) => {
+                groups.insert(key, g);
+            }
+            TopLevelItem::OneOf(v) => {
+                one_ofs.insert(key, v);
+            }
+            TopLevelItem::Item(i) => {
+                items.insert(key, *i);
+            }
         }
     }
 
@@ -179,7 +186,11 @@ fn lower_remaining_fields(
 
         result.insert(
             key,
-            IntermediateNamedType::OneOf(IntermediateOneOf { variants, tag, renames }),
+            IntermediateNamedType::OneOf(IntermediateOneOf {
+                variants,
+                tag,
+                renames,
+            }),
         );
     }
 
@@ -204,7 +215,9 @@ fn extract_discriminants(
         let mut found_renames: BTreeMap<String, String> = BTreeMap::new();
 
         for join_key in join_keys {
-            let Some(group) = groups.get(join_key) else { continue };
+            let Some(group) = groups.get(join_key) else {
+                continue;
+            };
 
             for (field_name, item) in group {
                 if let ParsedItem::Primitive(PrimitiveType::Enum { values, .. }) = item {

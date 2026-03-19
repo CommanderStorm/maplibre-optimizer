@@ -4,8 +4,8 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 use crate::decoder;
-use crate::decoder::r#enum::{Literal, Overload, Parameter, ParameterType, SyntaxEnum};
 use crate::decoder::TopLevelItem;
+use crate::decoder::r#enum::{Literal, Overload, Parameter, ParameterType, SyntaxEnum};
 use crate::mir::types::SyntaxVariantDef;
 
 // ── Generator-facing view (unchanged) ─────────────────────────────────────────
@@ -272,7 +272,12 @@ impl IntermediateExpressions {
         let syntax_map = extract_syntax_enum(expression_name);
         syntax_map
             .iter()
-            .map(|(name, syntax_enum)| (name.clone(), ExpressionOperator::from_syntax_enum(syntax_enum)))
+            .map(|(name, syntax_enum)| {
+                (
+                    name.clone(),
+                    ExpressionOperator::from_syntax_enum(syntax_enum),
+                )
+            })
             .collect()
     }
 }
@@ -280,7 +285,12 @@ impl IntermediateExpressions {
 impl ExpressionOperator {
     /// Convert a single `SyntaxEnum` entry from the decoder into a fully resolved MIR operator.
     pub fn from_syntax_enum(s: &SyntaxEnum) -> Self {
-        let parameters: Vec<ExpressionParam> = s.syntax.parameters.iter().map(ExpressionParam::from).collect();
+        let parameters: Vec<ExpressionParam> = s
+            .syntax
+            .parameters
+            .iter()
+            .map(ExpressionParam::from)
+            .collect();
         let overloads = s
             .syntax
             .overloads
@@ -306,7 +316,10 @@ impl ExpressionOperator {
 fn resolve_overload(overload: &Overload, params: &[Parameter]) -> ExpressionOverload {
     let output = ExprType::from(&overload.output_type);
     let call_params = resolve_overload_params(overload, params);
-    ExpressionOverload { params: call_params, output }
+    ExpressionOverload {
+        params: call_params,
+        output,
+    }
 }
 
 fn resolve_overload_params(overload: &Overload, params: &[Parameter]) -> OverloadParams {
@@ -334,7 +347,11 @@ fn resolve_overload_params(overload: &Overload, params: &[Parameter]) -> Overloa
         OverloadParams::WithOptional { required, optional }
     } else {
         OverloadParams::Fixed(
-            overload.parameters.iter().map(|p| resolve_param_ref(p, params)).collect(),
+            overload
+                .parameters
+                .iter()
+                .map(|p| resolve_param_ref(p, params))
+                .collect(),
         )
     }
 }
@@ -353,11 +370,21 @@ fn resolve_explicit_variadic(overload: &Overload, params: &[Parameter]) -> Overl
 
     let (prefix_refs, template_refs) = partition_prefix_and_template(before_dot, params);
 
-    let prefix = prefix_refs.iter().map(|p| resolve_param_ref(p, params)).collect();
+    let prefix = prefix_refs
+        .iter()
+        .map(|p| resolve_param_ref(p, params))
+        .collect();
     let repeating = deduplicate_template_params(&template_refs, params);
-    let suffix = after_dot.iter().map(|p| resolve_param_ref(p, params)).collect();
+    let suffix = after_dot
+        .iter()
+        .map(|p| resolve_param_ref(p, params))
+        .collect();
 
-    OverloadParams::Variadic { prefix, repeating, suffix }
+    OverloadParams::Variadic {
+        prefix,
+        repeating,
+        suffix,
+    }
 }
 
 /// Resolve an overload that is variadic through template expansion without `"..."`.
@@ -366,9 +393,16 @@ fn resolve_explicit_variadic(overload: &Overload, params: &[Parameter]) -> Overl
 /// can only match a `val_i` template parameter (since only `_1`/`_2` are defined).
 fn resolve_template_variadic(overload: &Overload, params: &[Parameter]) -> OverloadParams {
     let (prefix_refs, template_refs) = partition_prefix_and_template(&overload.parameters, params);
-    let prefix = prefix_refs.iter().map(|p| resolve_param_ref(p, params)).collect();
+    let prefix = prefix_refs
+        .iter()
+        .map(|p| resolve_param_ref(p, params))
+        .collect();
     let repeating = deduplicate_template_params(&template_refs, params);
-    OverloadParams::Variadic { prefix, repeating, suffix: Vec::new() }
+    OverloadParams::Variadic {
+        prefix,
+        repeating,
+        suffix: Vec::new(),
+    }
 }
 
 /// Split a parameter reference list into a non-template prefix and a template section.
@@ -386,9 +420,9 @@ fn partition_prefix_and_template<'a>(
 
     for p in param_refs {
         let base = p.strip_suffix('?').unwrap_or(p.as_str());
-        let is_template_instance = params.iter().any(|param| {
-            param.name.ends_with("_i") && param.matches_overload_parameter_name(base)
-        });
+        let is_template_instance = params
+            .iter()
+            .any(|param| param.name.ends_with("_i") && param.matches_overload_parameter_name(base));
         if is_template_instance {
             in_template = true;
             template.push(p.as_str());
@@ -403,16 +437,16 @@ fn partition_prefix_and_template<'a>(
 
 /// Deduplicate a list of template-instance parameter references into the canonical
 /// `_i` definitions, preserving order and without repeating the same template param.
-fn deduplicate_template_params(
-    template_refs: &[&str],
-    params: &[Parameter],
-) -> Vec<ResolvedParam> {
+fn deduplicate_template_params(template_refs: &[&str], params: &[Parameter]) -> Vec<ResolvedParam> {
     let mut seen: std::collections::BTreeSet<String> = std::collections::BTreeSet::new();
     let mut result = Vec::new();
 
     for ref_name in template_refs {
         let base = ref_name.strip_suffix('?').unwrap_or(ref_name);
-        if let Some(param) = params.iter().find(|p| p.matches_overload_parameter_name(base)) {
+        if let Some(param) = params
+            .iter()
+            .find(|p| p.matches_overload_parameter_name(base))
+        {
             if seen.insert(param.name.clone()) {
                 result.push(ResolvedParam {
                     name: param.name.clone(),
@@ -441,7 +475,10 @@ fn resolve_param_ref(param_ref: &str, params: &[Parameter]) -> ResolvedParam {
     let base = param_ref.strip_suffix('?').unwrap_or(param_ref);
 
     // Primary lookup.
-    if let Some(param) = params.iter().find(|p| p.matches_overload_parameter_name(base)) {
+    if let Some(param) = params
+        .iter()
+        .find(|p| p.matches_overload_parameter_name(base))
+    {
         return ResolvedParam {
             name: param_ref.to_string(),
             r#type: ExprParamType::from(&param.r#type),

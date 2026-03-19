@@ -1,7 +1,7 @@
 use std::collections::BTreeMap;
 
-use crate::decoder::r#enum::{ParameterType, Syntax};
 use crate::decoder::TopLevelItem;
+use crate::decoder::r#enum::{ParameterType, Syntax};
 use crate::mir::expressions::{ExpressionGroup, IntermediateExpressions};
 use crate::mir::types::SyntaxVariantDef;
 
@@ -38,7 +38,10 @@ pub fn preprocess_expression(
     // by output-type name and T is expanded into every concrete output type.
     let by_output_type = build_by_output_type(&expression_name);
 
-    IntermediateExpressions { by_output_type, operators }
+    IntermediateExpressions {
+        by_output_type,
+        operators,
+    }
 }
 
 // ── Generator view construction ───────────────────────────────────────────────
@@ -47,12 +50,13 @@ pub fn preprocess_expression(
 ///
 /// This exactly mirrors the generator's `reorder_expressions` but operates on
 /// the already-decoded types rather than raw JSON.
-fn build_by_output_type(
-    expression_name: &TopLevelItem,
-) -> BTreeMap<String, ExpressionGroup> {
+fn build_by_output_type(expression_name: &TopLevelItem) -> BTreeMap<String, ExpressionGroup> {
     let syntax_enum_values = {
         let (values, _common, default) = expression_name.as_item().as_primitive().as_enum();
-        assert_eq!(default, None, "expression_name must not have a default value");
+        assert_eq!(
+            default, None,
+            "expression_name must not have a default value"
+        );
         values.as_syntax_enum().clone()
     };
 
@@ -65,14 +69,18 @@ fn build_by_output_type(
             let output_type_name = overload.output_type.to_upper_camel_case();
             possible_expressions.insert(output_type_name.clone(), overload.output_type.clone());
 
-            let group = by_output_type.entry(output_type_name.clone()).or_insert_with(|| {
-                ExpressionGroup { variants: BTreeMap::new() }
-            });
+            let group = by_output_type
+                .entry(output_type_name.clone())
+                .or_insert_with(|| ExpressionGroup {
+                    variants: BTreeMap::new(),
+                });
 
             group
                 .variants
                 .entry(expr_key.clone())
-                .and_modify(|def: &mut SyntaxVariantDef| def.syntax.overloads.push(overload.clone()))
+                .and_modify(|def: &mut SyntaxVariantDef| {
+                    def.syntax.overloads.push(overload.clone())
+                })
                 .or_insert_with(|| SyntaxVariantDef {
                     doc: syntax_enum.doc.clone(),
                     syntax: Syntax {
@@ -97,8 +105,10 @@ fn build_by_output_type(
         );
 
         // Collect first to avoid borrow-checker conflict while mutating by_output_type.
-        let real_output_types: Vec<(String, ParameterType)> =
-            possible_expressions.iter().map(|(k, v)| (k.clone(), v.clone())).collect();
+        let real_output_types: Vec<(String, ParameterType)> = possible_expressions
+            .iter()
+            .map(|(k, v)| (k.clone(), v.clone()))
+            .collect();
 
         for (output_type_name, output_type_param) in real_output_types {
             let group = by_output_type
@@ -145,8 +155,9 @@ mod tests {
     fn test_operators_not_expanded() {
         // Verify that polymorphic T operators appear with TypeVar output,
         // not expanded into concrete types.
-        use crate::mir::expressions::ExprType;
         use serde_json::json;
+
+        use crate::mir::expressions::ExprType;
 
         let fixture = json!({
             "$version": 8,
@@ -177,8 +188,15 @@ mod tests {
         let mut fields = reference.fields;
         let exprs = preprocess_expression(&mut fields);
 
-        let literal = exprs.operators.get("literal").expect("literal operator must exist");
-        assert_eq!(literal.overloads.len(), 1, "literal must have exactly one overload");
+        let literal = exprs
+            .operators
+            .get("literal")
+            .expect("literal operator must exist");
+        assert_eq!(
+            literal.overloads.len(),
+            1,
+            "literal must have exactly one overload"
+        );
         assert_eq!(
             literal.overloads[0].output,
             ExprType::TypeVar("T".to_string()),

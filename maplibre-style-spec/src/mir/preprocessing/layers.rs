@@ -43,18 +43,22 @@ fn parsed_item_to_layer_field(item: ParsedItem) -> IntermediateLayerField {
 
 fn primitive_to_layer_field(p: PrimitiveType) -> IntermediateLayerField {
     match p {
-        PrimitiveType::Number { common, default, maximum, minimum, period: _ } => {
-            IntermediateLayerField {
-                r#type: IntermediateType::Number {
-                    min: minimum.as_ref().and_then(|n| n.as_f64()),
-                    max: maximum.as_ref().and_then(|n| n.as_f64()),
-                },
-                default: default.map(Value::Number),
-                doc: common.doc,
-                required: common.required.unwrap_or(false),
-                expression: common.expression.as_ref().map(lower_expression_caps),
-            }
-        }
+        PrimitiveType::Number {
+            common,
+            default,
+            maximum,
+            minimum,
+            period: _,
+        } => IntermediateLayerField {
+            r#type: IntermediateType::Number {
+                min: minimum.as_ref().and_then(|n| n.as_f64()),
+                max: maximum.as_ref().and_then(|n| n.as_f64()),
+            },
+            default: default.map(Value::Number),
+            doc: common.doc,
+            required: common.required.unwrap_or(false),
+            expression: common.expression.as_ref().map(lower_expression_caps),
+        },
         PrimitiveType::Boolean { common, default } => IntermediateLayerField {
             r#type: IntermediateType::Boolean,
             default: default.map(Value::Bool),
@@ -76,14 +80,28 @@ fn primitive_to_layer_field(p: PrimitiveType) -> IntermediateLayerField {
             required: common.required.unwrap_or(false),
             expression: common.expression.as_ref().map(lower_expression_caps),
         },
-        PrimitiveType::Enum { common, default, values } => IntermediateLayerField {
-            r#type: IntermediateType::Enum { values: enum_values_to_strings(&values) },
+        PrimitiveType::Enum {
+            common,
+            default,
+            values,
+        } => IntermediateLayerField {
+            r#type: IntermediateType::Enum {
+                values: enum_values_to_strings(&values),
+            },
             default,
             doc: common.doc,
             required: common.required.unwrap_or(false),
             expression: common.expression.as_ref().map(lower_expression_caps),
         },
-        PrimitiveType::Array { common, default, value, values, minimum: _, maximum: _, length } => {
+        PrimitiveType::Array {
+            common,
+            default,
+            value,
+            values,
+            minimum: _,
+            maximum: _,
+            length,
+        } => {
             let element = array_value_to_element_type(value, values);
             IntermediateLayerField {
                 r#type: IntermediateType::Array { element, length },
@@ -93,7 +111,12 @@ fn primitive_to_layer_field(p: PrimitiveType) -> IntermediateLayerField {
                 expression: common.expression.as_ref().map(lower_expression_caps),
             }
         }
-        PrimitiveType::NumberArray { common, default, minimum, maximum } => IntermediateLayerField {
+        PrimitiveType::NumberArray {
+            common,
+            default,
+            minimum,
+            maximum,
+        } => IntermediateLayerField {
             r#type: IntermediateType::NumberArray {
                 min: minimum.as_ref().and_then(|n| n.as_f64()),
                 max: maximum.as_ref().and_then(|n| n.as_f64()),
@@ -119,7 +142,11 @@ fn primitive_to_layer_field(p: PrimitiveType) -> IntermediateLayerField {
             required: common.required.unwrap_or(false),
             expression: common.expression.as_ref().map(lower_expression_caps),
         },
-        PrimitiveType::Formatted { common, tokens, default } => IntermediateLayerField {
+        PrimitiveType::Formatted {
+            common,
+            tokens,
+            default,
+        } => IntermediateLayerField {
             r#type: IntermediateType::Formatted { tokens },
             default: Some(Value::String(default)),
             doc: common.doc,
@@ -127,7 +154,9 @@ fn primitive_to_layer_field(p: PrimitiveType) -> IntermediateLayerField {
             expression: common.expression.as_ref().map(lower_expression_caps),
         },
         PrimitiveType::ResolvedImage { common, tokens } => IntermediateLayerField {
-            r#type: IntermediateType::ResolvedImage { tokens: tokens.unwrap_or(false) },
+            r#type: IntermediateType::ResolvedImage {
+                tokens: tokens.unwrap_or(false),
+            },
             default: None,
             doc: common.doc,
             required: common.required.unwrap_or(false),
@@ -135,7 +164,11 @@ fn primitive_to_layer_field(p: PrimitiveType) -> IntermediateLayerField {
         },
         PrimitiveType::State { common, default } => IntermediateLayerField {
             r#type: IntermediateType::State,
-            default: if default == Value::Null { None } else { Some(default) },
+            default: if default == Value::Null {
+                None
+            } else {
+                Some(default)
+            },
             doc: common.doc,
             required: common.required.unwrap_or(false),
             expression: common.expression.as_ref().map(lower_expression_caps),
@@ -221,7 +254,10 @@ fn reference_to_intermediate_type(references: &str) -> IntermediateType {
     match references {
         "color" => IntermediateType::Color,
         "string" => IntermediateType::String,
-        "number" => IntermediateType::Number { min: None, max: None },
+        "number" => IntermediateType::Number {
+            min: None,
+            max: None,
+        },
         "boolean" => IntermediateType::Boolean,
         "enum" => IntermediateType::Enum { values: vec![] },
         "array" => IntermediateType::Array {
@@ -253,8 +289,7 @@ pub fn preprocess_layers(reference: &mut decoder::StyleReference) -> Intermediat
     let layer_type_item = layer.remove("type").unwrap();
     let (layer_type_values, _layer_type_common, _layer_type_default) =
         layer_type_item.as_primitive().as_enum();
-    let layer_type_keys: Vec<String> =
-        layer_type_values.as_enum().keys().cloned().collect();
+    let layer_type_keys: Vec<String> = layer_type_values.as_enum().keys().cloned().collect();
 
     layer.remove("layout");
     let mut layout = pop_one_of_as_group(&mut reference.fields, "layout");
@@ -276,7 +311,10 @@ pub fn preprocess_layers(reference: &mut decoder::StyleReference) -> Intermediat
         layer_types.insert(key, IntermediateLayerType { layout, paint });
     }
 
-    IntermediateLayers { common_fields, layer_types }
+    IntermediateLayers {
+        common_fields,
+        layer_types,
+    }
 }
 
 #[cfg(test)]
@@ -290,8 +328,14 @@ mod tests {
             serde_json::from_str(include_str!("../../../../upstream/src/reference/v8.json"))
                 .unwrap();
         let layers = preprocess_layers(&mut reference);
-        assert!(!layers.layer_types.is_empty(), "must have at least one layer type");
-        assert!(!layers.common_fields.is_empty(), "layers must have common fields");
+        assert!(
+            !layers.layer_types.is_empty(),
+            "must have at least one layer type"
+        );
+        assert!(
+            !layers.common_fields.is_empty(),
+            "layers must have common fields"
+        );
         insta::assert_json_snapshot!("decode_top_level", layers);
     }
 }

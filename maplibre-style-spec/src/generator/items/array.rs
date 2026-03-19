@@ -134,11 +134,7 @@ fn generate_font_faces(scope: &mut Scope) {
         .tuple("Vec<FontWithRange>");
 }
 
-fn generate_value_array_default(
-    buffer: &mut String,
-    items: &[Value],
-    length: Option<&usize>,
-) {
+fn generate_value_array_default(buffer: &mut String, items: &[Value], length: Option<&usize>) {
     if length.is_some() {
         buffer.push_str("Box::new([");
     } else {
