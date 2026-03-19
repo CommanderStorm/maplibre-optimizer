@@ -19,7 +19,11 @@ use crate::mir::root::IntermediateRootPrimitives;
 use crate::mir::sources::IntermediateSources;
 use crate::mir::types::MirField;
 
-pub use expressions::{ExpressionGroup, IntermediateExpressions as Expressions};
+pub use expressions::{
+    ExprParamType, ExprType, ExpressionGroup, ExpressionOperator, ExpressionOverload,
+    ExpressionParam, IntermediateExpressions as Expressions, LiteralKind, OverloadParams,
+    ResolvedParam,
+};
 pub use layers::{IntermediateLayerField, IntermediateLayerType, IntermediateLayers as Layers};
 pub use sources::SourceTypeDef;
 pub use sources::IntermediateSources as Sources;
