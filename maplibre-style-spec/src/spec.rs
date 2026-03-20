@@ -262,7 +262,6 @@ mod test {
     }
 
     #[rstest::rstest]
-    #[case::t_array(serde_json::json!(["array","string",3,["literal",["a","b","c"]]]))]
     #[case::t_literal(serde_json::json!(["literal",["DIN Offc Pro Italic","Arial Unicode MS Regular"]]))]
     #[case::t_slice(serde_json::json!(["slice",["get","name"],0,3]))]
     #[case::t_to_rgba(serde_json::json!(["to-rgba","#ff0000"]))]
@@ -275,12 +274,6 @@ mod test {
     fn test_example_array_less_type_length_greater_decodes(#[case] example: serde_json::Value) {
         let _ = serde_json::from_value::<ArrayLessTypeLengthGreater>(example)
             .expect("example should decode");
-    }
-
-    #[rstest::rstest]
-    #[case::t_array(serde_json::json!(["array","string",3,["literal",["a","b","c"]]]))]
-    fn test_example_array_of_type_decodes(#[case] example: serde_json::Value) {
-        let _ = serde_json::from_value::<ArrayOfType>(example).expect("example should decode");
     }
 
     #[rstest::rstest]
@@ -371,7 +364,6 @@ mod test {
     #[case::t_sqrt(serde_json::json!(["sqrt",9]))]
     #[case::t_tan(serde_json::json!(["tan",1]))]
     #[case::t_to_number(serde_json::json!(["to-number","someProperty"]))]
-    #[case::t_interpolate(serde_json::json!(["interpolate",["linear"],["zoom"],15,0,15.05,["get","height"]]))]
     fn test_example_number_decodes(#[case] example: serde_json::Value) {
         let _ = serde_json::from_value::<Number>(example).expect("example should decode");
     }
@@ -398,7 +390,6 @@ mod test {
     #[rstest::rstest]
     #[case::t_concat(serde_json::json!(["concat","square-rgb-",["get","color"]]))]
     #[case::t_downcase(serde_json::json!(["downcase",["get","name"]]))]
-    #[case::t_equal_equal(serde_json::json!(["==",["geometry-type"],"Polygon"]))]
     #[case::t_number_format(serde_json::json!(["number-format",["get","mag"],{"max-fraction-digits":1,"min-fraction-digits":1}]))]
     #[case::t_resolved_locale(serde_json::json!(["resolved-locale",["collator",{"case-sensitive":true,"diacritic-sensitive":false,"locale":"de"}]]))]
     #[case::t_slice(serde_json::json!(["slice",["get","name"],0,3]))]
@@ -901,18 +892,40 @@ pub enum LightAnchor {
     Viewport,
 }
 
+/// Nested expression: ramp (`interpolate-hcl`, …) or [`Color`] operators.
+#[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[serde(untagged)]
+pub enum LightColorExpression {
+    Color(Color),
+    Ramp(ColorOrArrayOfColor),
+}
+
 /// Color tint for lighting extruded geometries.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub struct LightColor(
-    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_dynamic_color))]
-    color::DynamicColor,
-);
+#[serde(untagged)]
+pub enum LightColor {
+    Expr(LightColorExpression),
+    Literal(
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
+        serde_json::Value,
+    ),
+}
 
 impl Default for LightColor {
     fn default() -> Self {
-        Self(color::parse_color("#ffffff").expect("Invalid color specified as the default value"))
+        Self::Literal(serde_json::json!("#ffffff"))
     }
+}
+
+/// Nested expression: ramp (`interpolate` / …) or regular [`Number`] operators.
+#[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[serde(untagged)]
+pub enum LightIntensityExpression {
+    Number(Number),
+    Ramp(NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection),
 }
 
 /// Intensity of lighting (on a scale from 0 to 1). Higher numbers will present as more extreme contrast.
@@ -920,14 +933,18 @@ impl Default for LightColor {
 /// Range: 0..=1
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub struct LightIntensity(
-    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
-    serde_json::Number,
-);
+#[serde(untagged)]
+pub enum LightIntensity {
+    Expr(LightIntensityExpression),
+    Literal(
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
+        serde_json::Number,
+    ),
+}
 
 impl Default for LightIntensity {
     fn default() -> Self {
-        Self(
+        Self::Literal(
             serde_json::Number::from_f64(0.5)
                 .expect("the number is serialised from a number and is thus always valid"),
         )
@@ -964,13 +981,17 @@ pub struct Projection {
 }
 
 /// The projection definition type. Can be specified as a string, a transition state, or an expression.
-#[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone)]
+#[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub struct ProjectionType(std::string::String);
+#[serde(untagged)]
+pub enum ProjectionType {
+    Expr(NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection),
+    Literal(std::string::String),
+}
 
 impl Default for ProjectionType {
     fn default() -> Self {
-        Self("mercator".to_string())
+        Self::Literal("mercator".to_string())
     }
 }
 
@@ -1025,37 +1046,72 @@ pub struct Sky {
     pub sky_horizon_blend: Option<SkySkyHorizonBlend>,
 }
 
+/// Nested expression: ramp (`interpolate` / …) or regular [`Number`] operators.
+#[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[serde(untagged)]
+pub enum SkyAtmosphereBlendExpression {
+    Number(Number),
+    Ramp(NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection),
+}
+
 /// How to blend the atmosphere. Where 1 is visible atmosphere and 0 is hidden. It is best to interpolate this expression when using globe projection.
 ///
 /// Range: 0..=1
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub struct SkyAtmosphereBlend(
-    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
-    serde_json::Number,
-);
+#[serde(untagged)]
+pub enum SkyAtmosphereBlend {
+    Expr(SkyAtmosphereBlendExpression),
+    Literal(
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
+        serde_json::Number,
+    ),
+}
 
 impl Default for SkyAtmosphereBlend {
     fn default() -> Self {
-        Self(
+        Self::Literal(
             serde_json::Number::from_f64(0.8)
                 .expect("the number is serialised from a number and is thus always valid"),
         )
     }
 }
 
+/// Nested expression: ramp (`interpolate-hcl`, …) or [`Color`] operators.
+#[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[serde(untagged)]
+pub enum SkyFogColorExpression {
+    Color(Color),
+    Ramp(ColorOrArrayOfColor),
+}
+
 /// The base color for the fog. Requires 3D terrain.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub struct SkyFogColor(
-    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_dynamic_color))]
-    color::DynamicColor,
-);
+#[serde(untagged)]
+pub enum SkyFogColor {
+    Expr(SkyFogColorExpression),
+    Literal(
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
+        serde_json::Value,
+    ),
+}
 
 impl Default for SkyFogColor {
     fn default() -> Self {
-        Self(color::parse_color("#ffffff").expect("Invalid color specified as the default value"))
+        Self::Literal(serde_json::json!("#ffffff"))
     }
+}
+
+/// Nested expression: ramp (`interpolate` / …) or regular [`Number`] operators.
+#[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[serde(untagged)]
+pub enum SkyFogGroundBlendExpression {
+    Number(Number),
+    Ramp(NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection),
 }
 
 /// How to blend the fog over the 3D terrain. Where 0 is the map center and 1 is the horizon.
@@ -1063,32 +1119,58 @@ impl Default for SkyFogColor {
 /// Range: 0..=1
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub struct SkyFogGroundBlend(
-    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
-    serde_json::Number,
-);
+#[serde(untagged)]
+pub enum SkyFogGroundBlend {
+    Expr(SkyFogGroundBlendExpression),
+    Literal(
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
+        serde_json::Number,
+    ),
+}
 
 impl Default for SkyFogGroundBlend {
     fn default() -> Self {
-        Self(
+        Self::Literal(
             serde_json::Number::from_f64(0.5)
                 .expect("the number is serialised from a number and is thus always valid"),
         )
     }
 }
 
+/// Nested expression: ramp (`interpolate-hcl`, …) or [`Color`] operators.
+#[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[serde(untagged)]
+pub enum SkyHorizonColorExpression {
+    Color(Color),
+    Ramp(ColorOrArrayOfColor),
+}
+
 /// The base color at the horizon.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub struct SkyHorizonColor(
-    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_dynamic_color))]
-    color::DynamicColor,
-);
+#[serde(untagged)]
+pub enum SkyHorizonColor {
+    Expr(SkyHorizonColorExpression),
+    Literal(
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
+        serde_json::Value,
+    ),
+}
 
 impl Default for SkyHorizonColor {
     fn default() -> Self {
-        Self(color::parse_color("#ffffff").expect("Invalid color specified as the default value"))
+        Self::Literal(serde_json::json!("#ffffff"))
     }
+}
+
+/// Nested expression: ramp (`interpolate` / …) or regular [`Number`] operators.
+#[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[serde(untagged)]
+pub enum SkyHorizonFogBlendExpression {
+    Number(Number),
+    Ramp(NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection),
 }
 
 /// How to blend the fog color and the horizon color. Where 0 is using the horizon color only and 1 is using the fog color only.
@@ -1096,32 +1178,58 @@ impl Default for SkyHorizonColor {
 /// Range: 0..=1
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub struct SkyHorizonFogBlend(
-    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
-    serde_json::Number,
-);
+#[serde(untagged)]
+pub enum SkyHorizonFogBlend {
+    Expr(SkyHorizonFogBlendExpression),
+    Literal(
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
+        serde_json::Number,
+    ),
+}
 
 impl Default for SkyHorizonFogBlend {
     fn default() -> Self {
-        Self(
+        Self::Literal(
             serde_json::Number::from_f64(0.8)
                 .expect("the number is serialised from a number and is thus always valid"),
         )
     }
 }
 
+/// Nested expression: ramp (`interpolate-hcl`, …) or [`Color`] operators.
+#[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[serde(untagged)]
+pub enum SkySkyColorExpression {
+    Color(Color),
+    Ramp(ColorOrArrayOfColor),
+}
+
 /// The base color for the sky.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub struct SkySkyColor(
-    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_dynamic_color))]
-    color::DynamicColor,
-);
+#[serde(untagged)]
+pub enum SkySkyColor {
+    Expr(SkySkyColorExpression),
+    Literal(
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
+        serde_json::Value,
+    ),
+}
 
 impl Default for SkySkyColor {
     fn default() -> Self {
-        Self(color::parse_color("#88C6FC").expect("Invalid color specified as the default value"))
+        Self::Literal(serde_json::json!("#88C6FC"))
     }
+}
+
+/// Nested expression: ramp (`interpolate` / …) or regular [`Number`] operators.
+#[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[serde(untagged)]
+pub enum SkySkyHorizonBlendExpression {
+    Number(Number),
+    Ramp(NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection),
 }
 
 /// How to blend the sky color and the horizon color. Where 1 is blending the color at the middle of the sky and 0 is not blending at all and using the sky color only.
@@ -1129,14 +1237,18 @@ impl Default for SkySkyColor {
 /// Range: 0..=1
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub struct SkySkyHorizonBlend(
-    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
-    serde_json::Number,
-);
+#[serde(untagged)]
+pub enum SkySkyHorizonBlend {
+    Expr(SkySkyHorizonBlendExpression),
+    Literal(
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
+        serde_json::Number,
+    ),
+}
 
 impl Default for SkySkyHorizonBlend {
     fn default() -> Self {
-        Self(
+        Self::Literal(
             serde_json::Number::from_f64(0.8)
                 .expect("the number is serialised from a number and is thus always valid"),
         )
@@ -1231,14 +1343,6 @@ impl Default for TransitionDuration {
 
 /// Either of the below variants
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum StringOrNumberAsUnion {
-    String(String),
-    Number(Number),
-}
-
-/// Either of the below variants
-#[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
 #[serde(untagged)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum StringLiteralOrNumberLiteralOrArrayOfStringLiteralOrArrayOfNumberLiteralAsUnion {
@@ -1246,6 +1350,15 @@ pub enum StringLiteralOrNumberLiteralOrArrayOfStringLiteralOrArrayOfNumberLitera
     NumberLiteral(NumberLiteral),
     ArrayOfStringLiteral(ArrayOfStringLiteral),
     ArrayOfNumberLiteral(ArrayOfNumberLiteral),
+}
+
+/// Either of the below variants
+#[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+#[serde(untagged)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+pub enum NumberLiteralOrNumberAsUnion {
+    NumberLiteral(NumberLiteral),
+    Number(Box<Number>),
 }
 
 /// "Any"
@@ -1266,11 +1379,11 @@ pub enum Any {
     ///  - [Create a hover effect](https://maplibre.org/maplibre-gl-js/docs/examples/create-a-hover-effect/)
     ///
     ///  - [Display HTML clusters with custom properties](https://maplibre.org/maplibre-gl-js/docs/examples/display-html-clusters-with-custom-properties/)
-    Case(Vec<(Boolean, Box<Any>)>),
+    Case((Vec<(Boolean, serde_json::Value)>, serde_json::Value)),
     /// Evaluates each expression in turn until the first non-null value is obtained, and returns that value.
     ///
     ///  - [Use a fallback image](https://maplibre.org/maplibre-gl-js/docs/examples/use-a-fallback-image/)
-    Coalesce(Vec<Box<Any>>),
+    Coalesce(Vec<serde_json::Value>),
     /// Retrieves a property value from the current feature's state. Returns null if the requested property is not present on the feature's state. A feature's state is not part of the GeoJSON or vector tile data, and must be set programmatically on each feature. When `source.promoteId` is not provided, features are identified by their `id` attribute, which must be an integer or a string that can be cast to an integer. When `source.promoteId` is provided, features are identified by their `promoteId` property, which may be a number, string, or any primitive data type. Note that ["feature-state"] can only be used with paint properties that support data-driven styling.
     ///
     ///  - [Create a hover effect](https://maplibre.org/maplibre-gl-js/docs/examples/create-a-hover-effect/)
@@ -1301,7 +1414,7 @@ pub enum Any {
     /// Binds expressions to named variables, which can then be referenced in the result expression using `["var", "variable_name"]`.
     ///
     ///  - [Visualize population density](https://maplibre.org/maplibre-gl-js/docs/examples/visualize-population-density/)
-    Let(Vec<(StringLiteral, Box<Any>)>),
+    Let((Vec<(StringLiteral, serde_json::Value)>, serde_json::Value)),
     /// Selects the output whose label value matches the input value, or the fallback value if no match is found. The input can be any expression (e.g. `["get", "building_type"]`). Each label must be either:
     ///
     ///  - a single literal value; or
@@ -1310,18 +1423,27 @@ pub enum Any {
     ///
     /// Each label must be unique. If the input type does not match the type of the labels, the result will be the fallback value.
     Match(
-        Vec<(
-            StringOrNumberAsUnion,
-            StringLiteralOrNumberLiteralOrArrayOfStringLiteralOrArrayOfNumberLiteralAsUnion,
-            Box<Any>,
-        )>,
+        (
+            serde_json::Value,
+            Vec<(
+                StringLiteralOrNumberLiteralOrArrayOfStringLiteralOrArrayOfNumberLiteralAsUnion,
+                serde_json::Value,
+            )>,
+            serde_json::Value,
+        ),
     ),
     /// Produces discrete, stepped results by evaluating a piecewise-constant function defined by pairs of input and output values ("stops"). The `input` may be any numeric expression (e.g., `["get", "population"]`). Stop inputs must be numeric literals in strictly ascending order.
     ///
     /// Returns the output value of the stop just less than the input, or the first output if the input is less than the first stop.
     ///
     ///  - [Create and style clusters](https://maplibre.org/maplibre-gl-js/docs/examples/create-and-style-clusters/)
-    Step(Vec<(Number, Box<Any>, NumberLiteral, Box<Any>)>),
+    Step(
+        (
+            NumberLiteralOrNumberAsUnion,
+            serde_json::Value,
+            Vec<(NumberLiteral, serde_json::Value)>,
+        ),
+    ),
     /// References variable bound using `let`.
     ///
     ///  - [Visualize population density](https://maplibre.org/maplibre-gl-js/docs/examples/visualize-population-density/)
@@ -1387,7 +1509,8 @@ impl<'de> serde::de::Visitor<'de> for AnyVisitor {
                         "Any::Case requires at least one argument",
                     ));
                 }
-                Ok(Any::Case(inputs))
+                let fallback = visit_seq_field(&mut seq, "fallback")?;
+                Ok(Any::Case((inputs, fallback)))
             }
             "coalesce" => {
                 let mut inputs = Vec::new();
@@ -1429,48 +1552,57 @@ impl<'de> serde::de::Visitor<'de> for AnyVisitor {
                         "Any::Let requires at least one argument",
                     ));
                 }
-                Ok(Any::Let(inputs))
+                let expression = visit_seq_field(&mut seq, "expression")?;
+                Ok(Any::Let((inputs, expression)))
             }
             "match" => {
-                let mut inputs = Vec::new();
-                while let Some(input) = seq.next_element()? {
-                    let label_i = seq.next_element()?.ok_or_else(|| {
-                        serde::de::Error::custom("expected label_i in Any::Match")
-                    })?;
-                    let output_i = seq.next_element()?.ok_or_else(|| {
-                        serde::de::Error::custom("expected output_i in Any::Match")
-                    })?;
-                    let element = (input, label_i, output_i);
-                    inputs.push(element);
+                let mut rest: Vec<serde_json::Value> = Vec::new();
+                while let Some(v) = seq.next_element()? {
+                    rest.push(v);
                 }
-                if inputs.is_empty() {
+                if rest.len() < 2 {
+                    return Err(serde::de::Error::custom("Any::Match: too few arguments"));
+                }
+                if rest.len() % 2 != 0 {
                     return Err(serde::de::Error::custom(
-                        "Any::Match requires at least one argument",
+                        "Any::Match: expected an even number of arguments after operator (input + label/output pairs + fallback)",
                     ));
                 }
-                Ok(Any::Match(inputs))
+                let fallback_v = rest.pop().unwrap();
+                let input = rest.remove(0);
+                let mut pairs = Vec::new();
+                for chunk in rest.chunks_exact(2) {
+                    let label_i: StringLiteralOrNumberLiteralOrArrayOfStringLiteralOrArrayOfNumberLiteralAsUnion = serde_json::from_value(chunk[0].clone()).map_err(serde::de::Error::custom)?;
+                    let output_i: serde_json::Value = serde_json::from_value(chunk[1].clone())
+                        .map_err(serde::de::Error::custom)?;
+                    pairs.push((label_i, output_i));
+                }
+                if pairs.is_empty() {
+                    return Err(serde::de::Error::custom(
+                        "Any::Match: missing label/output pairs",
+                    ));
+                }
+                let fallback: serde_json::Value =
+                    serde_json::from_value(fallback_v).map_err(serde::de::Error::custom)?;
+                Ok(Any::Match((input, pairs, fallback)))
             }
             "step" => {
-                let mut inputs = Vec::new();
-                while let Some(input) = seq.next_element()? {
-                    let output_0 = seq.next_element()?.ok_or_else(|| {
-                        serde::de::Error::custom("expected output_0 in Any::Step")
-                    })?;
-                    let stop_input_i = seq.next_element()?.ok_or_else(|| {
-                        serde::de::Error::custom("expected stop_input_i in Any::Step")
-                    })?;
-                    let stop_output_i = seq.next_element()?.ok_or_else(|| {
-                        serde::de::Error::custom("expected stop_output_i in Any::Step")
-                    })?;
-                    let element = (input, output_0, stop_input_i, stop_output_i);
-                    inputs.push(element);
+                let input: NumberLiteralOrNumberAsUnion = visit_seq_field(&mut seq, "input")?;
+                let output_0: serde_json::Value = visit_seq_field(&mut seq, "output_0")?;
+                let mut stops = Vec::new();
+                while let Some(stop_input_i) = seq.next_element::<NumberLiteral>()? {
+                    let stop_output_i: serde_json::Value =
+                        seq.next_element()?.ok_or_else(|| {
+                            serde::de::Error::custom("expected stop_output_i in Any::Step")
+                        })?;
+                    stops.push((stop_input_i, stop_output_i));
                 }
-                if inputs.is_empty() {
+                if stops.is_empty() {
                     return Err(serde::de::Error::custom(
-                        "Any::Step requires at least one argument",
+                        "Any::Step requires at least one stop pair",
                     ));
                 }
-                Ok(Any::Step(inputs))
+                Ok(Any::Step((input, output_0, stops)))
             }
             "var" => {
                 let var_name = visit_seq_field(&mut seq, "var_name")?;
@@ -1545,7 +1677,7 @@ impl<'de> serde::de::Visitor<'de> for ArrayVisitor {
     type Value = Array;
 
     fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
-        formatter.write_str("an Array expression (example: [\"array\",\"string\",3,[\"literal\",[\"a\",\"b\",\"c\"]]])")
+        formatter.write_str("an Array expression (example: [\"literal\",[\"DIN Offc Pro Italic\",\"Arial Unicode MS Regular\"]])")
     }
 
     fn visit_seq<A: serde::de::SeqAccess<'de>>(self, mut seq: A) -> Result<Self::Value, A::Error> {
@@ -1781,7 +1913,7 @@ pub enum Boolean {
     /// Asserts that the input value is a boolean. If multiple values are provided, each one is evaluated in order until a boolean is obtained. If none of the inputs are booleans, the expression is an error.
     ///
     ///  - [Create a hover effect](https://maplibre.org/maplibre-gl-js/docs/examples/create-a-hover-effect/)
-    Boolean(Vec<Any>),
+    Boolean(Vec<serde_json::Value>),
     /// Tests for the presence of a property value in the current feature's properties, or from another object if a second argument is provided.
     ///
     ///  - [Create and style clusters](https://maplibre.org/maplibre-gl-js/docs/examples/create-and-style-clusters/)
@@ -1818,38 +1950,54 @@ pub enum Boolean {
 
 /// Options for deserializing the syntax enum variant [`Boolean::Less`]
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-#[serde(untagged)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum LessOptions {
-    Number(String),
-    String(Number),
+    Args(
+        (
+            serde_json::Value,
+            serde_json::Value,
+            Option<serde_json::Value>,
+        ),
+    ),
 }
 
 /// Options for deserializing the syntax enum variant [`Boolean::LessEqual`]
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-#[serde(untagged)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum LessEqualOptions {
-    Number(String),
-    String(Number),
+    Args(
+        (
+            serde_json::Value,
+            serde_json::Value,
+            Option<serde_json::Value>,
+        ),
+    ),
 }
 
 /// Options for deserializing the syntax enum variant [`Boolean::Greater`]
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-#[serde(untagged)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum GreaterOptions {
-    Number(String),
-    String(Number),
+    Args(
+        (
+            serde_json::Value,
+            serde_json::Value,
+            Option<serde_json::Value>,
+        ),
+    ),
 }
 
 /// Options for deserializing the syntax enum variant [`Boolean::GreaterEqual`]
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-#[serde(untagged)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum GreaterEqualOptions {
-    Number(String),
-    String(Number),
+    Args(
+        (
+            serde_json::Value,
+            serde_json::Value,
+            Option<serde_json::Value>,
+        ),
+    ),
 }
 
 /// Options for deserializing the syntax enum variant [`Boolean::In`]
@@ -1857,8 +2005,13 @@ pub enum GreaterEqualOptions {
 #[serde(untagged)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum InOptions {
-    Item(Any),
-    Substring(String),
+    Item(
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
+        serde_json::Value,
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
+        serde_json::Value,
+    ),
+    Substring(String, String),
 }
 
 impl<'de> serde::Deserialize<'de> for Boolean {
@@ -2109,7 +2262,7 @@ pub enum Color {
     /// Converts the input value to a color. If multiple values are provided, each one is evaluated in order until the first successful conversion is obtained. If none of the inputs can be converted, the expression is an error.
     ///
     ///  - [Visualize population density](https://maplibre.org/maplibre-gl-js/docs/examples/visualize-population-density/)
-    ToColor(Vec<Any>),
+    ToColor(Vec<serde_json::Value>),
 }
 
 impl<'de> serde::Deserialize<'de> for Color {
@@ -2183,8 +2336,10 @@ impl<'de> serde::de::Visitor<'de> for ColorVisitor {
 
 /// Either of the below variants
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+#[serde(untagged)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum ColorOrArrayOfColorAsUnion {
+pub enum StringLiteralOrColorOrArrayOfColorAsUnion {
+    StringLiteral(StringLiteral),
     Color(Color),
     ArrayOfColor(ColorOrArrayOfColor),
 }
@@ -2195,21 +2350,19 @@ pub enum ColorOrArrayOfColorAsUnion {
 pub enum ColorOrArrayOfColor {
     /// Produces continuous, smooth results by interpolating between pairs of input and output values ("stops"). Works like `interpolate`, but the output type must be `color` or `array<color>`, and the interpolation is performed in the Hue-Chroma-Luminance color space.
     InterpolateHcl(
-        Vec<(
+        (
             Interpolation,
-            Number,
-            NumberLiteral,
-            ColorOrArrayOfColorAsUnion,
-        )>,
+            NumberLiteralOrNumberAsUnion,
+            Vec<(NumberLiteral, StringLiteralOrColorOrArrayOfColorAsUnion)>,
+        ),
     ),
     /// Produces continuous, smooth results by interpolating between pairs of input and output values ("stops"). Works like `interpolate`, but the output type must be `color` or `array<color>`, and the interpolation is performed in the CIELAB color space.
     InterpolateLab(
-        Vec<(
+        (
             Interpolation,
-            Number,
-            NumberLiteral,
-            ColorOrArrayOfColorAsUnion,
-        )>,
+            NumberLiteralOrNumberAsUnion,
+            Vec<(NumberLiteral, StringLiteralOrColorOrArrayOfColorAsUnion)>,
+        ),
     ),
 }
 
@@ -2250,60 +2403,54 @@ impl<'de> serde::de::Visitor<'de> for ColorOrArrayOfColorVisitor {
             .ok_or_else(|| serde::de::Error::custom("missing operator"))?;
         match op.as_str() {
             "interpolate-hcl" => {
-                let mut inputs = Vec::new();
-                while let Some(interpolation_type) = seq.next_element()? {
-                    let input = seq.next_element()?.ok_or_else(|| {
-                        serde::de::Error::custom(
-                            "expected input in ColorOrArrayOfColor::InterpolateHcl",
-                        )
-                    })?;
-                    let stop_input_i = seq.next_element()?.ok_or_else(|| {
-                        serde::de::Error::custom(
-                            "expected stop_input_i in ColorOrArrayOfColor::InterpolateHcl",
-                        )
-                    })?;
-                    let stop_output_i = seq.next_element()?.ok_or_else(|| {
-                        serde::de::Error::custom(
-                            "expected stop_output_i in ColorOrArrayOfColor::InterpolateHcl",
-                        )
-                    })?;
-                    let element = (interpolation_type, input, stop_input_i, stop_output_i);
-                    inputs.push(element);
+                let interpolation_type: Interpolation =
+                    visit_seq_field(&mut seq, "interpolation_type")?;
+                let input: NumberLiteralOrNumberAsUnion = visit_seq_field(&mut seq, "input")?;
+                let mut stops = Vec::new();
+                while let Some(stop_input_i) = seq.next_element::<NumberLiteral>()? {
+                    let stop_output_i: StringLiteralOrColorOrArrayOfColorAsUnion =
+                        seq.next_element()?.ok_or_else(|| {
+                            serde::de::Error::custom(
+                                "expected stop_output_i in ColorOrArrayOfColor::InterpolateHcl",
+                            )
+                        })?;
+                    stops.push((stop_input_i, stop_output_i));
                 }
-                if inputs.is_empty() {
+                if stops.is_empty() {
                     return Err(serde::de::Error::custom(
-                        "ColorOrArrayOfColor::InterpolateHcl requires at least one argument",
+                        "ColorOrArrayOfColor::InterpolateHcl requires at least one stop pair",
                     ));
                 }
-                Ok(ColorOrArrayOfColor::InterpolateHcl(inputs))
+                Ok(ColorOrArrayOfColor::InterpolateHcl((
+                    interpolation_type,
+                    input,
+                    stops,
+                )))
             }
             "interpolate-lab" => {
-                let mut inputs = Vec::new();
-                while let Some(interpolation_type) = seq.next_element()? {
-                    let input = seq.next_element()?.ok_or_else(|| {
-                        serde::de::Error::custom(
-                            "expected input in ColorOrArrayOfColor::InterpolateLab",
-                        )
-                    })?;
-                    let stop_input_i = seq.next_element()?.ok_or_else(|| {
-                        serde::de::Error::custom(
-                            "expected stop_input_i in ColorOrArrayOfColor::InterpolateLab",
-                        )
-                    })?;
-                    let stop_output_i = seq.next_element()?.ok_or_else(|| {
-                        serde::de::Error::custom(
-                            "expected stop_output_i in ColorOrArrayOfColor::InterpolateLab",
-                        )
-                    })?;
-                    let element = (interpolation_type, input, stop_input_i, stop_output_i);
-                    inputs.push(element);
+                let interpolation_type: Interpolation =
+                    visit_seq_field(&mut seq, "interpolation_type")?;
+                let input: NumberLiteralOrNumberAsUnion = visit_seq_field(&mut seq, "input")?;
+                let mut stops = Vec::new();
+                while let Some(stop_input_i) = seq.next_element::<NumberLiteral>()? {
+                    let stop_output_i: StringLiteralOrColorOrArrayOfColorAsUnion =
+                        seq.next_element()?.ok_or_else(|| {
+                            serde::de::Error::custom(
+                                "expected stop_output_i in ColorOrArrayOfColor::InterpolateLab",
+                            )
+                        })?;
+                    stops.push((stop_input_i, stop_output_i));
                 }
-                if inputs.is_empty() {
+                if stops.is_empty() {
                     return Err(serde::de::Error::custom(
-                        "ColorOrArrayOfColor::InterpolateLab requires at least one argument",
+                        "ColorOrArrayOfColor::InterpolateLab requires at least one stop pair",
                     ));
                 }
-                Ok(ColorOrArrayOfColor::InterpolateLab(inputs))
+                Ok(ColorOrArrayOfColor::InterpolateLab((
+                    interpolation_type,
+                    input,
+                    stops,
+                )))
             }
             _ => Err(serde::de::Error::unknown_variant(
                 &op,
@@ -2477,9 +2624,9 @@ pub enum Number {
         serde_json::Value,
     ),
     /// Returns the product of the inputs.
-    Star(Vec<Box<Number>>),
+    Star(Vec<NumberLiteralOrNumberAsUnion>),
     /// Returns the sum of the inputs.
-    Plus(Vec<Box<Number>>),
+    Plus(Vec<NumberLiteralOrNumberAsUnion>),
     /// For two inputs, returns the result of subtracting the second input from the first. For a single input, returns the result of subtracting it from 0.
     Minus(MinusOptions),
     /// Returns the result of floating point division of the first input by the second.
@@ -2571,11 +2718,11 @@ pub enum Number {
         serde_json::Value,
     ),
     /// Returns the maximum value of the inputs.
-    Max(Vec<Box<Number>>),
+    Max(Vec<NumberLiteralOrNumberAsUnion>),
     /// Returns the minimum value of the inputs.
-    Min(Vec<Box<Number>>),
+    Min(Vec<NumberLiteralOrNumberAsUnion>),
     /// Asserts that the input value is a number. If multiple values are provided, each one is evaluated in order until a number is obtained. If none of the inputs are numbers, the expression is an error.
-    Number(Vec<Box<Any>>),
+    Number(Vec<serde_json::Value>),
     /// Returns the mathematical constant pi.
     Pi,
     /// Rounds the input to the nearest integer. Halfway values are rounded away from zero. For example, `["round", -1.5]` evaluates to -2.
@@ -2599,7 +2746,7 @@ pub enum Number {
         serde_json::Value,
     ),
     /// Converts the input value to a number, if possible. If the input is `null` or `false`, the result is 0. If the input is `true`, the result is 1. If the input is a string, it is converted to a number as specified by the ["ToNumber Applied to the String Type" algorithm](https://tc39.github.io/ecma262/#sec-tonumber-applied-to-the-string-type) of the ECMAScript Language Specification. If multiple values are provided, each one is evaluated in order until the first successful conversion is obtained. If none of the inputs can be converted, the expression is an error.
-    ToNumber(Vec<Box<Any>>),
+    ToNumber(Vec<serde_json::Value>),
     /// Gets the current zoom level.  Note that in style layout and paint properties, ["zoom"] may only appear as the input to a top-level "step" or "interpolate" expression.
     Zoom,
 }
@@ -2609,8 +2756,8 @@ pub enum Number {
 #[serde(untagged)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum MinusOptions {
-    TwoParams(Box<Number>),
-    OneParams(Box<Number>),
+    TwoParams(NumberLiteralOrNumberAsUnion, NumberLiteralOrNumberAsUnion),
+    OneParams(NumberLiteralOrNumberAsUnion),
 }
 
 /// Options for deserializing the syntax enum variant [`Number::IndexOf`]
@@ -2618,8 +2765,14 @@ pub enum MinusOptions {
 #[serde(untagged)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum IndexOfOptions {
-    Item(Box<Any>),
-    Substring(String),
+    Item(
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
+        serde_json::Value,
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
+        serde_json::Value,
+        #[serde(default)] Option<serde_json::Value>,
+    ),
+    Substring(String, String, #[serde(default)] Option<serde_json::Value>),
 }
 
 impl<'de> serde::Deserialize<'de> for Number {
@@ -2688,11 +2841,25 @@ impl<'de> serde::de::Visitor<'de> for NumberVisitor {
                 Ok(Number::Plus(inputs))
             }
             "-" => {
-                // Delegate the remainder of the sequence to MinusOptions deserialization
-                let remainder_of_sequence = serde::de::value::SeqAccessDeserializer::new(seq);
-                let options =
-                    <MinusOptions as serde::Deserialize>::deserialize(remainder_of_sequence)?;
-                Ok(Number::Minus(options))
+                let mut rest: Vec<serde_json::Value> = Vec::new();
+                while let Some(v) = seq.next_element()? {
+                    rest.push(v);
+                }
+                match rest.len() {
+                    2 => Ok(Number::Minus(MinusOptions::TwoParams(
+                        serde_json::from_value::<NumberLiteralOrNumberAsUnion>(rest[0].clone())
+                            .map_err(serde::de::Error::custom)?,
+                        serde_json::from_value::<NumberLiteralOrNumberAsUnion>(rest[1].clone())
+                            .map_err(serde::de::Error::custom)?,
+                    ))),
+                    1 => Ok(Number::Minus(MinusOptions::OneParams(
+                        serde_json::from_value::<NumberLiteralOrNumberAsUnion>(rest[0].clone())
+                            .map_err(serde::de::Error::custom)?,
+                    ))),
+                    len => Err(serde::de::Error::custom(format!(
+                        "'-': expected 1 or 2 arguments, got {len}"
+                    ))),
+                }
             }
             "/" => {
                 let input_1 = visit_seq_field(&mut seq, "input_1")?;
@@ -2875,16 +3042,17 @@ impl<'de> serde::de::Visitor<'de> for NumberVisitor {
 
 /// Either of the below variants
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+#[serde(untagged)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjectionAsUnion {
-    Number(Number),
+    Number(NumberLiteral),
     ArrayOfNumber(
         #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
         serde_json::Value,
     ),
     Color(Color),
     ArrayOfColor(ColorOrArrayOfColor),
-    Projection(Projection),
+    Projection(Box<ProjectionType>),
 }
 
 /// "NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection"
@@ -2901,12 +3069,14 @@ pub enum NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection {
     ///
     ///  - [Visualize population density](https://maplibre.org/maplibre-gl-js/docs/examples/visualize-population-density/)
     Interpolate(
-        Vec<(
+        (
             Interpolation,
-            Number,
-            NumberLiteral,
-            NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjectionAsUnion,
-        )>,
+            NumberLiteralOrNumberAsUnion,
+            Vec<(
+                NumberLiteral,
+                NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjectionAsUnion,
+            )>,
+        ),
     ),
 }
 
@@ -2949,20 +3119,26 @@ impl<'de> serde::de::Visitor<'de>
             .ok_or_else(|| serde::de::Error::custom("missing operator"))?;
         match op.as_str() {
             "interpolate" => {
-                let mut inputs = Vec::new();
-                while let Some(interpolation_type) = seq.next_element()? {
-                    let input = seq.next_element()?.ok_or_else(|| serde::de::Error::custom("expected input in NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection::Interpolate"))?;
-                    let stop_input_i = seq.next_element()?.ok_or_else(|| serde::de::Error::custom("expected stop_input_i in NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection::Interpolate"))?;
-                    let stop_output_i = seq.next_element()?.ok_or_else(|| serde::de::Error::custom("expected stop_output_i in NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection::Interpolate"))?;
-                    let element = (interpolation_type, input, stop_input_i, stop_output_i);
-                    inputs.push(element);
+                let interpolation_type: Interpolation =
+                    visit_seq_field(&mut seq, "interpolation_type")?;
+                let input: NumberLiteralOrNumberAsUnion = visit_seq_field(&mut seq, "input")?;
+                let mut stops = Vec::new();
+                while let Some(stop_input_i) = seq.next_element::<NumberLiteral>()? {
+                    let stop_output_i: NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjectionAsUnion = seq.next_element()?.ok_or_else(|| serde::de::Error::custom("expected stop_output_i in NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection::Interpolate"))?;
+                    stops.push((stop_input_i, stop_output_i));
                 }
-                if inputs.is_empty() {
+                if stops.is_empty() {
                     return Err(serde::de::Error::custom(
-                        "NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection::Interpolate requires at least one argument",
+                        "NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection::Interpolate requires at least one stop pair",
                     ));
                 }
-                Ok(NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection::Interpolate(inputs))
+                Ok(
+                    NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection::Interpolate((
+                        interpolation_type,
+                        input,
+                        stops,
+                    )),
+                )
             }
             _ => Err(serde::de::Error::unknown_variant(&op, &["interpolate"])),
         }
@@ -2981,7 +3157,7 @@ pub enum Object {
         serde_json::Value,
     ),
     /// Asserts that the input value is an object. If multiple values are provided, each one is evaluated in order until an object is obtained. If none of the inputs are objects, the expression is an error.
-    Object(Vec<Any>),
+    Object(Vec<serde_json::Value>),
     /// Gets the feature properties object.  Note that in some cases, it may be more efficient to use ["get", "property_name"] directly.
     Properties,
 }
@@ -3060,7 +3236,7 @@ pub enum String {
     ///  - [Use a fallback image](https://maplibre.org/maplibre-gl-js/docs/examples/fallback-image/)
     ///
     ///  - [Variable label placement](https://maplibre.org/maplibre-gl-js/docs/examples/variable-label-placement/)
-    Concat(Vec<Any>),
+    Concat(Vec<serde_json::Value>),
     /// Returns the input string converted to lowercase. Follows the Unicode Default Case Conversion algorithm and the locale-insensitive case mappings in the Unicode Character Database.
     ///
     ///  - [Change the case of labels](https://maplibre.org/maplibre-gl-js/docs/examples/change-case-of-labels/)
@@ -3094,7 +3270,7 @@ pub enum String {
          Option<serde_json::Value>,
     ),
     /// Asserts that the input value is a string. If multiple values are provided, each one is evaluated in order until a string is obtained. If none of the inputs are strings, the expression is an error.
-    String(Vec<Any>),
+    String(Vec<serde_json::Value>),
     /// Converts the input value to a string. If the input is `null`, the result is `""`. If the input is a boolean, the result is `"true"` or `"false"`. If the input is a number, it is converted to a string as specified by the ["NumberToString" algorithm](https://tc39.github.io/ecma262/#sec-tostring-applied-to-the-number-type) of the ECMAScript Language Specification. If the input is a color, it is converted to a string of the form `"rgba(r,g,b,a)"`, where `r`, `g`, and `b` are numerals ranging from 0 to 255, and `a` ranges from 0 to 1. Otherwise, the input is converted to a string in the format specified by the [`JSON.stringify`](https://tc39.github.io/ecma262/#sec-json.stringify) function of the ECMAScript Language Specification.
     ///
     ///  - [Create a time slider](https://maplibre.org/maplibre-gl-js/docs/examples/create-a-time-slider/)
@@ -4118,31 +4294,57 @@ pub struct BackgroundPaintLayer {
     pub background_pattern: Option<BackgroundPaintLayerBackgroundPattern>,
 }
 
+/// Nested expression: ramp (`interpolate-hcl`, …) or [`Color`] operators.
+#[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[serde(untagged)]
+pub enum BackgroundPaintLayerBackgroundColorExpression {
+    Color(Color),
+    Ramp(ColorOrArrayOfColor),
+}
+
 /// The color with which the background will be drawn.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub struct BackgroundPaintLayerBackgroundColor(
-    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_dynamic_color))]
-    color::DynamicColor,
-);
+#[serde(untagged)]
+pub enum BackgroundPaintLayerBackgroundColor {
+    Expr(BackgroundPaintLayerBackgroundColorExpression),
+    Literal(
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
+        serde_json::Value,
+    ),
+}
 
 impl Default for BackgroundPaintLayerBackgroundColor {
     fn default() -> Self {
-        Self(color::parse_color("#000000").expect("Invalid color specified as the default value"))
+        Self::Literal(serde_json::json!("#000000"))
     }
+}
+
+/// Nested expression: ramp (`interpolate` / …) or regular [`Number`] operators.
+#[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[serde(untagged)]
+pub enum BackgroundPaintLayerBackgroundOpacityExpression {
+    Number(Number),
+    Ramp(NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection),
 }
 
 /// The opacity at which the background will be drawn.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub struct BackgroundPaintLayerBackgroundOpacity(
-    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
-    serde_json::Number,
-);
+#[serde(untagged)]
+pub enum BackgroundPaintLayerBackgroundOpacity {
+    Expr(BackgroundPaintLayerBackgroundOpacityExpression),
+    Literal(
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
+        serde_json::Number,
+    ),
+}
 
 impl Default for BackgroundPaintLayerBackgroundOpacity {
     fn default() -> Self {
-        Self(
+        Self::Literal(
             serde_json::Number::from_i128(1)
                 .expect("the number is serialised from a number and is thus always valid"),
         )
@@ -4164,13 +4366,26 @@ pub struct CircleLayoutLayer {
     pub visibility: Option<CircleLayoutLayerVisibility>,
 }
 
+/// Nested expression: ramp (`interpolate` / …) or regular [`Number`] operators.
+#[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[serde(untagged)]
+pub enum CircleLayoutLayerCircleSortKeyExpression {
+    Number(Number),
+    Ramp(NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection),
+}
+
 /// Sorts features in ascending order based on this value. Features with a higher sort key will appear above features with a lower sort key.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub struct CircleLayoutLayerCircleSortKey(
-    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
-    serde_json::Number,
-);
+#[serde(untagged)]
+pub enum CircleLayoutLayerCircleSortKey {
+    Expr(CircleLayoutLayerCircleSortKeyExpression),
+    Literal(
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
+        serde_json::Number,
+    ),
+}
 
 /// Whether this layer is displayed.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy, Default)]
@@ -4221,48 +4436,87 @@ pub struct CirclePaintLayer {
     pub circle_translate_anchor: Option<CirclePaintLayerCircleTranslateAnchor>,
 }
 
+/// Nested expression: ramp (`interpolate` / …) or regular [`Number`] operators.
+#[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[serde(untagged)]
+pub enum CirclePaintLayerCircleBlurExpression {
+    Number(Number),
+    Ramp(NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection),
+}
+
 /// Amount to blur the circle. 1 blurs the circle such that only the centerpoint is full opacity.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub struct CirclePaintLayerCircleBlur(
-    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
-    serde_json::Number,
-);
+#[serde(untagged)]
+pub enum CirclePaintLayerCircleBlur {
+    Expr(CirclePaintLayerCircleBlurExpression),
+    Literal(
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
+        serde_json::Number,
+    ),
+}
 
 impl Default for CirclePaintLayerCircleBlur {
     fn default() -> Self {
-        Self(
+        Self::Literal(
             serde_json::Number::from_i128(0)
                 .expect("the number is serialised from a number and is thus always valid"),
         )
     }
 }
 
+/// Nested expression: ramp (`interpolate-hcl`, …) or [`Color`] operators.
+#[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[serde(untagged)]
+pub enum CirclePaintLayerCircleColorExpression {
+    Color(Color),
+    Ramp(ColorOrArrayOfColor),
+}
+
 /// The fill color of the circle.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub struct CirclePaintLayerCircleColor(
-    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_dynamic_color))]
-    color::DynamicColor,
-);
+#[serde(untagged)]
+pub enum CirclePaintLayerCircleColor {
+    Expr(CirclePaintLayerCircleColorExpression),
+    Literal(
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
+        serde_json::Value,
+    ),
+}
 
 impl Default for CirclePaintLayerCircleColor {
     fn default() -> Self {
-        Self(color::parse_color("#000000").expect("Invalid color specified as the default value"))
+        Self::Literal(serde_json::json!("#000000"))
     }
+}
+
+/// Nested expression: ramp (`interpolate` / …) or regular [`Number`] operators.
+#[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[serde(untagged)]
+pub enum CirclePaintLayerCircleOpacityExpression {
+    Number(Number),
+    Ramp(NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection),
 }
 
 /// The opacity at which the circle will be drawn.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub struct CirclePaintLayerCircleOpacity(
-    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
-    serde_json::Number,
-);
+#[serde(untagged)]
+pub enum CirclePaintLayerCircleOpacity {
+    Expr(CirclePaintLayerCircleOpacityExpression),
+    Literal(
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
+        serde_json::Number,
+    ),
+}
 
 impl Default for CirclePaintLayerCircleOpacity {
     fn default() -> Self {
-        Self(
+        Self::Literal(
             serde_json::Number::from_i128(1)
                 .expect("the number is serialised from a number and is thus always valid"),
         )
@@ -4291,65 +4545,117 @@ pub enum CirclePaintLayerCirclePitchScale {
     Viewport,
 }
 
+/// Nested expression: ramp (`interpolate` / …) or regular [`Number`] operators.
+#[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[serde(untagged)]
+pub enum CirclePaintLayerCircleRadiusExpression {
+    Number(Number),
+    Ramp(NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection),
+}
+
 /// Circle radius.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub struct CirclePaintLayerCircleRadius(
-    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
-    serde_json::Number,
-);
+#[serde(untagged)]
+pub enum CirclePaintLayerCircleRadius {
+    Expr(CirclePaintLayerCircleRadiusExpression),
+    Literal(
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
+        serde_json::Number,
+    ),
+}
 
 impl Default for CirclePaintLayerCircleRadius {
     fn default() -> Self {
-        Self(
+        Self::Literal(
             serde_json::Number::from_i128(5)
                 .expect("the number is serialised from a number and is thus always valid"),
         )
     }
 }
 
+/// Nested expression: ramp (`interpolate-hcl`, …) or [`Color`] operators.
+#[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[serde(untagged)]
+pub enum CirclePaintLayerCircleStrokeColorExpression {
+    Color(Color),
+    Ramp(ColorOrArrayOfColor),
+}
+
 /// The stroke color of the circle.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub struct CirclePaintLayerCircleStrokeColor(
-    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_dynamic_color))]
-    color::DynamicColor,
-);
+#[serde(untagged)]
+pub enum CirclePaintLayerCircleStrokeColor {
+    Expr(CirclePaintLayerCircleStrokeColorExpression),
+    Literal(
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
+        serde_json::Value,
+    ),
+}
 
 impl Default for CirclePaintLayerCircleStrokeColor {
     fn default() -> Self {
-        Self(color::parse_color("#000000").expect("Invalid color specified as the default value"))
+        Self::Literal(serde_json::json!("#000000"))
     }
+}
+
+/// Nested expression: ramp (`interpolate` / …) or regular [`Number`] operators.
+#[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[serde(untagged)]
+pub enum CirclePaintLayerCircleStrokeOpacityExpression {
+    Number(Number),
+    Ramp(NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection),
 }
 
 /// The opacity of the circle's stroke.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub struct CirclePaintLayerCircleStrokeOpacity(
-    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
-    serde_json::Number,
-);
+#[serde(untagged)]
+pub enum CirclePaintLayerCircleStrokeOpacity {
+    Expr(CirclePaintLayerCircleStrokeOpacityExpression),
+    Literal(
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
+        serde_json::Number,
+    ),
+}
 
 impl Default for CirclePaintLayerCircleStrokeOpacity {
     fn default() -> Self {
-        Self(
+        Self::Literal(
             serde_json::Number::from_i128(1)
                 .expect("the number is serialised from a number and is thus always valid"),
         )
     }
 }
 
+/// Nested expression: ramp (`interpolate` / …) or regular [`Number`] operators.
+#[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[serde(untagged)]
+pub enum CirclePaintLayerCircleStrokeWidthExpression {
+    Number(Number),
+    Ramp(NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection),
+}
+
 /// The width of the circle's stroke. Strokes are placed outside of the `circle-radius`.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub struct CirclePaintLayerCircleStrokeWidth(
-    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
-    serde_json::Number,
-);
+#[serde(untagged)]
+pub enum CirclePaintLayerCircleStrokeWidth {
+    Expr(CirclePaintLayerCircleStrokeWidthExpression),
+    Literal(
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
+        serde_json::Number,
+    ),
+}
 
 impl Default for CirclePaintLayerCircleStrokeWidth {
     fn default() -> Self {
-        Self(
+        Self::Literal(
             serde_json::Number::from_i128(0)
                 .expect("the number is serialised from a number and is thus always valid"),
         )
@@ -4415,25 +4721,51 @@ pub struct ColorReliefPaintLayer {
     pub color_relief_opacity: Option<ColorReliefPaintLayerColorReliefOpacity>,
 }
 
+/// Nested expression: ramp (`interpolate-hcl`, …) or [`Color`] operators.
+#[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[serde(untagged)]
+pub enum ColorReliefPaintLayerColorReliefColorExpression {
+    Color(Color),
+    Ramp(ColorOrArrayOfColor),
+}
+
 /// Defines the color of each pixel based on its elevation. Should be an expression that uses `["elevation"]` as input.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub struct ColorReliefPaintLayerColorReliefColor(
-    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_dynamic_color))]
-    color::DynamicColor,
-);
+#[serde(untagged)]
+pub enum ColorReliefPaintLayerColorReliefColor {
+    Expr(ColorReliefPaintLayerColorReliefColorExpression),
+    Literal(
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
+        serde_json::Value,
+    ),
+}
+
+/// Nested expression: ramp (`interpolate` / …) or regular [`Number`] operators.
+#[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[serde(untagged)]
+pub enum ColorReliefPaintLayerColorReliefOpacityExpression {
+    Number(Number),
+    Ramp(NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection),
+}
 
 /// The opacity at which the color-relief will be drawn.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub struct ColorReliefPaintLayerColorReliefOpacity(
-    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
-    serde_json::Number,
-);
+#[serde(untagged)]
+pub enum ColorReliefPaintLayerColorReliefOpacity {
+    Expr(ColorReliefPaintLayerColorReliefOpacityExpression),
+    Literal(
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
+        serde_json::Number,
+    ),
+}
 
 impl Default for ColorReliefPaintLayerColorReliefOpacity {
     fn default() -> Self {
-        Self(
+        Self::Literal(
             serde_json::Number::from_i128(1)
                 .expect("the number is serialised from a number and is thus always valid"),
         )
@@ -4450,13 +4782,26 @@ pub struct FillLayoutLayer {
     pub visibility: Option<FillLayoutLayerVisibility>,
 }
 
+/// Nested expression: ramp (`interpolate` / …) or regular [`Number`] operators.
+#[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[serde(untagged)]
+pub enum FillLayoutLayerFillSortKeyExpression {
+    Number(Number),
+    Ramp(NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection),
+}
+
 /// Sorts features in ascending order based on this value. Features with a higher sort key will appear above features with a lower sort key.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub struct FillLayoutLayerFillSortKey(
-    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
-    serde_json::Number,
-);
+#[serde(untagged)]
+pub enum FillLayoutLayerFillSortKey {
+    Expr(FillLayoutLayerFillSortKeyExpression),
+    Literal(
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
+        serde_json::Number,
+    ),
+}
 
 /// Whether this layer is displayed.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy, Default)]
@@ -4506,44 +4851,83 @@ impl Default for FillPaintLayerFillAntialias {
     }
 }
 
+/// Nested expression: ramp (`interpolate-hcl`, …) or [`Color`] operators.
+#[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[serde(untagged)]
+pub enum FillPaintLayerFillColorExpression {
+    Color(Color),
+    Ramp(ColorOrArrayOfColor),
+}
+
 /// The color of the filled part of this layer. This color can be specified as `rgba` with an alpha component and the color's opacity will not affect the opacity of the 1px stroke, if it is used.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub struct FillPaintLayerFillColor(
-    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_dynamic_color))]
-    color::DynamicColor,
-);
+#[serde(untagged)]
+pub enum FillPaintLayerFillColor {
+    Expr(FillPaintLayerFillColorExpression),
+    Literal(
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
+        serde_json::Value,
+    ),
+}
 
 impl Default for FillPaintLayerFillColor {
     fn default() -> Self {
-        Self(color::parse_color("#000000").expect("Invalid color specified as the default value"))
+        Self::Literal(serde_json::json!("#000000"))
     }
+}
+
+/// Nested expression: ramp (`interpolate` / …) or regular [`Number`] operators.
+#[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[serde(untagged)]
+pub enum FillPaintLayerFillOpacityExpression {
+    Number(Number),
+    Ramp(NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection),
 }
 
 /// The opacity of the entire fill layer. In contrast to the `fill-color`, this value will also affect the 1px stroke around the fill, if the stroke is used.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub struct FillPaintLayerFillOpacity(
-    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
-    serde_json::Number,
-);
+#[serde(untagged)]
+pub enum FillPaintLayerFillOpacity {
+    Expr(FillPaintLayerFillOpacityExpression),
+    Literal(
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
+        serde_json::Number,
+    ),
+}
 
 impl Default for FillPaintLayerFillOpacity {
     fn default() -> Self {
-        Self(
+        Self::Literal(
             serde_json::Number::from_i128(1)
                 .expect("the number is serialised from a number and is thus always valid"),
         )
     }
 }
 
+/// Nested expression: ramp (`interpolate-hcl`, …) or [`Color`] operators.
+#[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[serde(untagged)]
+pub enum FillPaintLayerFillOutlineColorExpression {
+    Color(Color),
+    Ramp(ColorOrArrayOfColor),
+}
+
 /// The outline color of the fill. Matches the value of `fill-color` if unspecified.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub struct FillPaintLayerFillOutlineColor(
-    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_dynamic_color))]
-    color::DynamicColor,
-);
+#[serde(untagged)]
+pub enum FillPaintLayerFillOutlineColor {
+    Expr(FillPaintLayerFillOutlineColorExpression),
+    Literal(
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
+        serde_json::Value,
+    ),
+}
 
 /// Name of image in sprite to use for drawing image fills. For seamless patterns, image width and height must be a factor of two (2, 4, 8, ..., 512). Note that zoom-dependent expressions will be evaluated only at integer zoom levels.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone)]
@@ -4629,65 +5013,117 @@ pub struct FillExtrusionPaintLayer {
         Option<FillExtrusionPaintLayerFillExtrusionVerticalGradient>,
 }
 
+/// Nested expression: ramp (`interpolate` / …) or regular [`Number`] operators.
+#[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[serde(untagged)]
+pub enum FillExtrusionPaintLayerFillExtrusionBaseExpression {
+    Number(Number),
+    Ramp(NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection),
+}
+
 /// The height with which to extrude the base of this layer. Must be less than or equal to `fill-extrusion-height`.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub struct FillExtrusionPaintLayerFillExtrusionBase(
-    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
-    serde_json::Number,
-);
+#[serde(untagged)]
+pub enum FillExtrusionPaintLayerFillExtrusionBase {
+    Expr(FillExtrusionPaintLayerFillExtrusionBaseExpression),
+    Literal(
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
+        serde_json::Number,
+    ),
+}
 
 impl Default for FillExtrusionPaintLayerFillExtrusionBase {
     fn default() -> Self {
-        Self(
+        Self::Literal(
             serde_json::Number::from_i128(0)
                 .expect("the number is serialised from a number and is thus always valid"),
         )
     }
+}
+
+/// Nested expression: ramp (`interpolate-hcl`, …) or [`Color`] operators.
+#[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[serde(untagged)]
+pub enum FillExtrusionPaintLayerFillExtrusionColorExpression {
+    Color(Color),
+    Ramp(ColorOrArrayOfColor),
 }
 
 /// The base color of the extruded fill. The extrusion's surfaces will be shaded differently based on this color in combination with the root `light` settings. If this color is specified as `rgba` with an alpha component, the alpha component will be ignored; use `fill-extrusion-opacity` to set layer opacity.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub struct FillExtrusionPaintLayerFillExtrusionColor(
-    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_dynamic_color))]
-    color::DynamicColor,
-);
+#[serde(untagged)]
+pub enum FillExtrusionPaintLayerFillExtrusionColor {
+    Expr(FillExtrusionPaintLayerFillExtrusionColorExpression),
+    Literal(
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
+        serde_json::Value,
+    ),
+}
 
 impl Default for FillExtrusionPaintLayerFillExtrusionColor {
     fn default() -> Self {
-        Self(color::parse_color("#000000").expect("Invalid color specified as the default value"))
+        Self::Literal(serde_json::json!("#000000"))
     }
+}
+
+/// Nested expression: ramp (`interpolate` / …) or regular [`Number`] operators.
+#[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[serde(untagged)]
+pub enum FillExtrusionPaintLayerFillExtrusionHeightExpression {
+    Number(Number),
+    Ramp(NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection),
 }
 
 /// The height with which to extrude this layer.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub struct FillExtrusionPaintLayerFillExtrusionHeight(
-    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
-    serde_json::Number,
-);
+#[serde(untagged)]
+pub enum FillExtrusionPaintLayerFillExtrusionHeight {
+    Expr(FillExtrusionPaintLayerFillExtrusionHeightExpression),
+    Literal(
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
+        serde_json::Number,
+    ),
+}
 
 impl Default for FillExtrusionPaintLayerFillExtrusionHeight {
     fn default() -> Self {
-        Self(
+        Self::Literal(
             serde_json::Number::from_i128(0)
                 .expect("the number is serialised from a number and is thus always valid"),
         )
     }
 }
 
+/// Nested expression: ramp (`interpolate` / …) or regular [`Number`] operators.
+#[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[serde(untagged)]
+pub enum FillExtrusionPaintLayerFillExtrusionOpacityExpression {
+    Number(Number),
+    Ramp(NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection),
+}
+
 /// The opacity of the entire fill extrusion layer. This is rendered on a per-layer, not per-feature, basis, and data-driven styling is not available.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub struct FillExtrusionPaintLayerFillExtrusionOpacity(
-    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
-    serde_json::Number,
-);
+#[serde(untagged)]
+pub enum FillExtrusionPaintLayerFillExtrusionOpacity {
+    Expr(FillExtrusionPaintLayerFillExtrusionOpacityExpression),
+    Literal(
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
+        serde_json::Number,
+    ),
+}
 
 impl Default for FillExtrusionPaintLayerFillExtrusionOpacity {
     fn default() -> Self {
-        Self(
+        Self::Literal(
             serde_json::Number::from_i128(1)
                 .expect("the number is serialised from a number and is thus always valid"),
         )
@@ -4778,17 +5214,30 @@ pub struct HeatmapPaintLayer {
     pub heatmap_weight: Option<HeatmapPaintLayerHeatmapWeight>,
 }
 
+/// Nested expression: ramp (`interpolate-hcl`, …) or [`Color`] operators.
+#[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[serde(untagged)]
+pub enum HeatmapPaintLayerHeatmapColorExpression {
+    Color(Color),
+    Ramp(ColorOrArrayOfColor),
+}
+
 /// Defines the color of each pixel based on its density value in a heatmap.  Should be an expression that uses `["heatmap-density"]` as input.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub struct HeatmapPaintLayerHeatmapColor(
-    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_dynamic_color))]
-    color::DynamicColor,
-);
+#[serde(untagged)]
+pub enum HeatmapPaintLayerHeatmapColor {
+    Expr(HeatmapPaintLayerHeatmapColorExpression),
+    Literal(
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
+        serde_json::Value,
+    ),
+}
 
 impl Default for HeatmapPaintLayerHeatmapColor {
     fn default() -> Self {
-        let default = serde_json::json!([
+        Self::Literal(serde_json::json!([
             "interpolate",
             ["linear"],
             ["heatmap-density"],
@@ -4804,75 +5253,124 @@ impl Default for HeatmapPaintLayerHeatmapColor {
             "yellow",
             1,
             "red"
-        ]);
-        let default =
-            serde_json::from_value(default).expect("Invalid color specified as the default value");
-        Self(default)
+        ]))
     }
+}
+
+/// Nested expression: ramp (`interpolate` / …) or regular [`Number`] operators.
+#[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[serde(untagged)]
+pub enum HeatmapPaintLayerHeatmapIntensityExpression {
+    Number(Number),
+    Ramp(NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection),
 }
 
 /// Similar to `heatmap-weight` but controls the intensity of the heatmap globally. Primarily used for adjusting the heatmap based on zoom level.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub struct HeatmapPaintLayerHeatmapIntensity(
-    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
-    serde_json::Number,
-);
+#[serde(untagged)]
+pub enum HeatmapPaintLayerHeatmapIntensity {
+    Expr(HeatmapPaintLayerHeatmapIntensityExpression),
+    Literal(
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
+        serde_json::Number,
+    ),
+}
 
 impl Default for HeatmapPaintLayerHeatmapIntensity {
     fn default() -> Self {
-        Self(
+        Self::Literal(
             serde_json::Number::from_i128(1)
                 .expect("the number is serialised from a number and is thus always valid"),
         )
     }
+}
+
+/// Nested expression: ramp (`interpolate` / …) or regular [`Number`] operators.
+#[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[serde(untagged)]
+pub enum HeatmapPaintLayerHeatmapOpacityExpression {
+    Number(Number),
+    Ramp(NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection),
 }
 
 /// The global opacity at which the heatmap layer will be drawn.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub struct HeatmapPaintLayerHeatmapOpacity(
-    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
-    serde_json::Number,
-);
+#[serde(untagged)]
+pub enum HeatmapPaintLayerHeatmapOpacity {
+    Expr(HeatmapPaintLayerHeatmapOpacityExpression),
+    Literal(
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
+        serde_json::Number,
+    ),
+}
 
 impl Default for HeatmapPaintLayerHeatmapOpacity {
     fn default() -> Self {
-        Self(
+        Self::Literal(
             serde_json::Number::from_i128(1)
                 .expect("the number is serialised from a number and is thus always valid"),
         )
     }
 }
 
+/// Nested expression: ramp (`interpolate` / …) or regular [`Number`] operators.
+#[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[serde(untagged)]
+pub enum HeatmapPaintLayerHeatmapRadiusExpression {
+    Number(Number),
+    Ramp(NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection),
+}
+
 /// Radius of influence of one heatmap point in pixels. Increasing the value makes the heatmap smoother, but less detailed.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub struct HeatmapPaintLayerHeatmapRadius(
-    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
-    serde_json::Number,
-);
+#[serde(untagged)]
+pub enum HeatmapPaintLayerHeatmapRadius {
+    Expr(HeatmapPaintLayerHeatmapRadiusExpression),
+    Literal(
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
+        serde_json::Number,
+    ),
+}
 
 impl Default for HeatmapPaintLayerHeatmapRadius {
     fn default() -> Self {
-        Self(
+        Self::Literal(
             serde_json::Number::from_i128(30)
                 .expect("the number is serialised from a number and is thus always valid"),
         )
     }
 }
 
+/// Nested expression: ramp (`interpolate` / …) or regular [`Number`] operators.
+#[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[serde(untagged)]
+pub enum HeatmapPaintLayerHeatmapWeightExpression {
+    Number(Number),
+    Ramp(NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection),
+}
+
 /// A measure of how much an individual point contributes to the heatmap. A value of 10 would be equivalent to having 10 points of weight 1 in the same spot. Especially useful when combined with clustering.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub struct HeatmapPaintLayerHeatmapWeight(
-    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
-    serde_json::Number,
-);
+#[serde(untagged)]
+pub enum HeatmapPaintLayerHeatmapWeight {
+    Expr(HeatmapPaintLayerHeatmapWeightExpression),
+    Literal(
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
+        serde_json::Number,
+    ),
+}
 
 impl Default for HeatmapPaintLayerHeatmapWeight {
     fn default() -> Self {
-        Self(
+        Self::Literal(
             serde_json::Number::from_i128(1)
                 .expect("the number is serialised from a number and is thus always valid"),
         )
@@ -4926,31 +5424,57 @@ pub struct HillshadePaintLayer {
     pub hillshade_shadow_color: Option<HillshadePaintLayerHillshadeShadowColor>,
 }
 
+/// Nested expression: ramp (`interpolate-hcl`, …) or [`Color`] operators.
+#[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[serde(untagged)]
+pub enum HillshadePaintLayerHillshadeAccentColorExpression {
+    Color(Color),
+    Ramp(ColorOrArrayOfColor),
+}
+
 /// The shading color used to accentuate rugged terrain like sharp cliffs and gorges.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub struct HillshadePaintLayerHillshadeAccentColor(
-    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_dynamic_color))]
-    color::DynamicColor,
-);
+#[serde(untagged)]
+pub enum HillshadePaintLayerHillshadeAccentColor {
+    Expr(HillshadePaintLayerHillshadeAccentColorExpression),
+    Literal(
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
+        serde_json::Value,
+    ),
+}
 
 impl Default for HillshadePaintLayerHillshadeAccentColor {
     fn default() -> Self {
-        Self(color::parse_color("#000000").expect("Invalid color specified as the default value"))
+        Self::Literal(serde_json::json!("#000000"))
     }
+}
+
+/// Nested expression: ramp (`interpolate` / …) or regular [`Number`] operators.
+#[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[serde(untagged)]
+pub enum HillshadePaintLayerHillshadeExaggerationExpression {
+    Number(Number),
+    Ramp(NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection),
 }
 
 /// Intensity of the hillshade
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub struct HillshadePaintLayerHillshadeExaggeration(
-    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
-    serde_json::Number,
-);
+#[serde(untagged)]
+pub enum HillshadePaintLayerHillshadeExaggeration {
+    Expr(HillshadePaintLayerHillshadeExaggerationExpression),
+    Literal(
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
+        serde_json::Number,
+    ),
+}
 
 impl Default for HillshadePaintLayerHillshadeExaggeration {
     fn default() -> Self {
-        Self(
+        Self::Literal(
             serde_json::Number::from_f64(0.5)
                 .expect("the number is serialised from a number and is thus always valid"),
         )
@@ -5131,47 +5655,86 @@ pub enum LineLayoutLayerLineJoin {
     Round,
 }
 
+/// Nested expression: ramp (`interpolate` / …) or regular [`Number`] operators.
+#[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[serde(untagged)]
+pub enum LineLayoutLayerLineMiterLimitExpression {
+    Number(Number),
+    Ramp(NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection),
+}
+
 /// Used to automatically convert miter joins to bevel joins for sharp angles.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub struct LineLayoutLayerLineMiterLimit(
-    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
-    serde_json::Number,
-);
+#[serde(untagged)]
+pub enum LineLayoutLayerLineMiterLimit {
+    Expr(LineLayoutLayerLineMiterLimitExpression),
+    Literal(
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
+        serde_json::Number,
+    ),
+}
 
 impl Default for LineLayoutLayerLineMiterLimit {
     fn default() -> Self {
-        Self(
+        Self::Literal(
             serde_json::Number::from_i128(2)
                 .expect("the number is serialised from a number and is thus always valid"),
         )
     }
 }
 
+/// Nested expression: ramp (`interpolate` / …) or regular [`Number`] operators.
+#[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[serde(untagged)]
+pub enum LineLayoutLayerLineRoundLimitExpression {
+    Number(Number),
+    Ramp(NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection),
+}
+
 /// Used to automatically convert round joins to miter joins for shallow angles.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub struct LineLayoutLayerLineRoundLimit(
-    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
-    serde_json::Number,
-);
+#[serde(untagged)]
+pub enum LineLayoutLayerLineRoundLimit {
+    Expr(LineLayoutLayerLineRoundLimitExpression),
+    Literal(
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
+        serde_json::Number,
+    ),
+}
 
 impl Default for LineLayoutLayerLineRoundLimit {
     fn default() -> Self {
-        Self(
+        Self::Literal(
             serde_json::Number::from_f64(1.05)
                 .expect("the number is serialised from a number and is thus always valid"),
         )
     }
 }
 
+/// Nested expression: ramp (`interpolate` / …) or regular [`Number`] operators.
+#[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[serde(untagged)]
+pub enum LineLayoutLayerLineSortKeyExpression {
+    Number(Number),
+    Ramp(NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection),
+}
+
 /// Sorts features in ascending order based on this value. Features with a higher sort key will appear above features with a lower sort key.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub struct LineLayoutLayerLineSortKey(
-    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
-    serde_json::Number,
-);
+#[serde(untagged)]
+pub enum LineLayoutLayerLineSortKey {
+    Expr(LineLayoutLayerLineSortKeyExpression),
+    Literal(
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
+        serde_json::Number,
+    ),
+}
 
 /// Whether this layer is displayed.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy, Default)]
@@ -5222,34 +5785,60 @@ pub struct LinePaintLayer {
     pub line_width: Option<LinePaintLayerLineWidth>,
 }
 
+/// Nested expression: ramp (`interpolate` / …) or regular [`Number`] operators.
+#[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[serde(untagged)]
+pub enum LinePaintLayerLineBlurExpression {
+    Number(Number),
+    Ramp(NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection),
+}
+
 /// Blur applied to the line, in pixels.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub struct LinePaintLayerLineBlur(
-    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
-    serde_json::Number,
-);
+#[serde(untagged)]
+pub enum LinePaintLayerLineBlur {
+    Expr(LinePaintLayerLineBlurExpression),
+    Literal(
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
+        serde_json::Number,
+    ),
+}
 
 impl Default for LinePaintLayerLineBlur {
     fn default() -> Self {
-        Self(
+        Self::Literal(
             serde_json::Number::from_i128(0)
                 .expect("the number is serialised from a number and is thus always valid"),
         )
     }
 }
 
+/// Nested expression: ramp (`interpolate-hcl`, …) or [`Color`] operators.
+#[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[serde(untagged)]
+pub enum LinePaintLayerLineColorExpression {
+    Color(Color),
+    Ramp(ColorOrArrayOfColor),
+}
+
 /// The color with which the line will be drawn.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub struct LinePaintLayerLineColor(
-    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_dynamic_color))]
-    color::DynamicColor,
-);
+#[serde(untagged)]
+pub enum LinePaintLayerLineColor {
+    Expr(LinePaintLayerLineColorExpression),
+    Literal(
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
+        serde_json::Value,
+    ),
+}
 
 impl Default for LinePaintLayerLineColor {
     fn default() -> Self {
-        Self(color::parse_color("#000000").expect("Invalid color specified as the default value"))
+        Self::Literal(serde_json::json!("#000000"))
     }
 }
 
@@ -5261,59 +5850,111 @@ pub struct LinePaintLayerLineDasharray(
     Vec<serde_json::Number>,
 );
 
+/// Nested expression: ramp (`interpolate` / …) or regular [`Number`] operators.
+#[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[serde(untagged)]
+pub enum LinePaintLayerLineGapWidthExpression {
+    Number(Number),
+    Ramp(NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection),
+}
+
 /// Draws a line casing outside of a line's actual path. Value indicates the width of the inner gap.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub struct LinePaintLayerLineGapWidth(
-    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
-    serde_json::Number,
-);
+#[serde(untagged)]
+pub enum LinePaintLayerLineGapWidth {
+    Expr(LinePaintLayerLineGapWidthExpression),
+    Literal(
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
+        serde_json::Number,
+    ),
+}
 
 impl Default for LinePaintLayerLineGapWidth {
     fn default() -> Self {
-        Self(
+        Self::Literal(
             serde_json::Number::from_i128(0)
                 .expect("the number is serialised from a number and is thus always valid"),
         )
     }
+}
+
+/// Nested expression: ramp (`interpolate-hcl`, …) or [`Color`] operators.
+#[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[serde(untagged)]
+pub enum LinePaintLayerLineGradientExpression {
+    Color(Color),
+    Ramp(ColorOrArrayOfColor),
 }
 
 /// Defines a gradient with which to color a line feature. Can only be used with GeoJSON sources that specify `"lineMetrics": true`.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub struct LinePaintLayerLineGradient(
-    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_dynamic_color))]
-    color::DynamicColor,
-);
+#[serde(untagged)]
+pub enum LinePaintLayerLineGradient {
+    Expr(LinePaintLayerLineGradientExpression),
+    Literal(
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
+        serde_json::Value,
+    ),
+}
+
+/// Nested expression: ramp (`interpolate` / …) or regular [`Number`] operators.
+#[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[serde(untagged)]
+pub enum LinePaintLayerLineOffsetExpression {
+    Number(Number),
+    Ramp(NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection),
+}
 
 /// The line's offset. For linear features, a positive value offsets the line to the right, relative to the direction of the line, and a negative value to the left. For polygon features, a positive value results in an inset, and a negative value results in an outset.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub struct LinePaintLayerLineOffset(
-    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
-    serde_json::Number,
-);
+#[serde(untagged)]
+pub enum LinePaintLayerLineOffset {
+    Expr(LinePaintLayerLineOffsetExpression),
+    Literal(
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
+        serde_json::Number,
+    ),
+}
 
 impl Default for LinePaintLayerLineOffset {
     fn default() -> Self {
-        Self(
+        Self::Literal(
             serde_json::Number::from_i128(0)
                 .expect("the number is serialised from a number and is thus always valid"),
         )
     }
 }
 
+/// Nested expression: ramp (`interpolate` / …) or regular [`Number`] operators.
+#[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[serde(untagged)]
+pub enum LinePaintLayerLineOpacityExpression {
+    Number(Number),
+    Ramp(NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection),
+}
+
 /// The opacity at which the line will be drawn.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub struct LinePaintLayerLineOpacity(
-    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
-    serde_json::Number,
-);
+#[serde(untagged)]
+pub enum LinePaintLayerLineOpacity {
+    Expr(LinePaintLayerLineOpacityExpression),
+    Literal(
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
+        serde_json::Number,
+    ),
+}
 
 impl Default for LinePaintLayerLineOpacity {
     fn default() -> Self {
-        Self(
+        Self::Literal(
             serde_json::Number::from_i128(1)
                 .expect("the number is serialised from a number and is thus always valid"),
         )
@@ -5355,17 +5996,30 @@ pub enum LinePaintLayerLineTranslateAnchor {
     Viewport,
 }
 
+/// Nested expression: ramp (`interpolate` / …) or regular [`Number`] operators.
+#[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[serde(untagged)]
+pub enum LinePaintLayerLineWidthExpression {
+    Number(Number),
+    Ramp(NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection),
+}
+
 /// Stroke thickness.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub struct LinePaintLayerLineWidth(
-    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
-    serde_json::Number,
-);
+#[serde(untagged)]
+pub enum LinePaintLayerLineWidth {
+    Expr(LinePaintLayerLineWidthExpression),
+    Literal(
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
+        serde_json::Number,
+    ),
+}
 
 impl Default for LinePaintLayerLineWidth {
     fn default() -> Self {
-        Self(
+        Self::Literal(
             serde_json::Number::from_i128(1)
                 .expect("the number is serialised from a number and is thus always valid"),
         )
@@ -5419,102 +6073,180 @@ pub struct RasterPaintLayer {
     pub raster_saturation: Option<RasterPaintLayerRasterSaturation>,
 }
 
+/// Nested expression: ramp (`interpolate` / …) or regular [`Number`] operators.
+#[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[serde(untagged)]
+pub enum RasterPaintLayerRasterBrightnessMaxExpression {
+    Number(Number),
+    Ramp(NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection),
+}
+
 /// Increase or reduce the brightness of the image. The value is the maximum brightness.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub struct RasterPaintLayerRasterBrightnessMax(
-    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
-    serde_json::Number,
-);
+#[serde(untagged)]
+pub enum RasterPaintLayerRasterBrightnessMax {
+    Expr(RasterPaintLayerRasterBrightnessMaxExpression),
+    Literal(
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
+        serde_json::Number,
+    ),
+}
 
 impl Default for RasterPaintLayerRasterBrightnessMax {
     fn default() -> Self {
-        Self(
+        Self::Literal(
             serde_json::Number::from_i128(1)
                 .expect("the number is serialised from a number and is thus always valid"),
         )
     }
 }
 
+/// Nested expression: ramp (`interpolate` / …) or regular [`Number`] operators.
+#[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[serde(untagged)]
+pub enum RasterPaintLayerRasterBrightnessMinExpression {
+    Number(Number),
+    Ramp(NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection),
+}
+
 /// Increase or reduce the brightness of the image. The value is the minimum brightness.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub struct RasterPaintLayerRasterBrightnessMin(
-    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
-    serde_json::Number,
-);
+#[serde(untagged)]
+pub enum RasterPaintLayerRasterBrightnessMin {
+    Expr(RasterPaintLayerRasterBrightnessMinExpression),
+    Literal(
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
+        serde_json::Number,
+    ),
+}
 
 impl Default for RasterPaintLayerRasterBrightnessMin {
     fn default() -> Self {
-        Self(
+        Self::Literal(
             serde_json::Number::from_i128(0)
                 .expect("the number is serialised from a number and is thus always valid"),
         )
     }
+}
+
+/// Nested expression: ramp (`interpolate` / …) or regular [`Number`] operators.
+#[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[serde(untagged)]
+pub enum RasterPaintLayerRasterContrastExpression {
+    Number(Number),
+    Ramp(NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection),
 }
 
 /// Increase or reduce the contrast of the image.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub struct RasterPaintLayerRasterContrast(
-    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
-    serde_json::Number,
-);
+#[serde(untagged)]
+pub enum RasterPaintLayerRasterContrast {
+    Expr(RasterPaintLayerRasterContrastExpression),
+    Literal(
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
+        serde_json::Number,
+    ),
+}
 
 impl Default for RasterPaintLayerRasterContrast {
     fn default() -> Self {
-        Self(
+        Self::Literal(
             serde_json::Number::from_i128(0)
                 .expect("the number is serialised from a number and is thus always valid"),
         )
     }
 }
 
+/// Nested expression: ramp (`interpolate` / …) or regular [`Number`] operators.
+#[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[serde(untagged)]
+pub enum RasterPaintLayerRasterFadeDurationExpression {
+    Number(Number),
+    Ramp(NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection),
+}
+
 /// Fade duration when a new tile is added, or when a video is started or its coordinates are updated.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub struct RasterPaintLayerRasterFadeDuration(
-    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
-    serde_json::Number,
-);
+#[serde(untagged)]
+pub enum RasterPaintLayerRasterFadeDuration {
+    Expr(RasterPaintLayerRasterFadeDurationExpression),
+    Literal(
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
+        serde_json::Number,
+    ),
+}
 
 impl Default for RasterPaintLayerRasterFadeDuration {
     fn default() -> Self {
-        Self(
+        Self::Literal(
             serde_json::Number::from_i128(300)
                 .expect("the number is serialised from a number and is thus always valid"),
         )
     }
 }
 
+/// Nested expression: ramp (`interpolate` / …) or regular [`Number`] operators.
+#[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[serde(untagged)]
+pub enum RasterPaintLayerRasterHueRotateExpression {
+    Number(Number),
+    Ramp(NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection),
+}
+
 /// Rotates hues around the color wheel.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub struct RasterPaintLayerRasterHueRotate(
-    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
-    serde_json::Number,
-);
+#[serde(untagged)]
+pub enum RasterPaintLayerRasterHueRotate {
+    Expr(RasterPaintLayerRasterHueRotateExpression),
+    Literal(
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
+        serde_json::Number,
+    ),
+}
 
 impl Default for RasterPaintLayerRasterHueRotate {
     fn default() -> Self {
-        Self(
+        Self::Literal(
             serde_json::Number::from_i128(0)
                 .expect("the number is serialised from a number and is thus always valid"),
         )
     }
 }
 
+/// Nested expression: ramp (`interpolate` / …) or regular [`Number`] operators.
+#[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[serde(untagged)]
+pub enum RasterPaintLayerRasterOpacityExpression {
+    Number(Number),
+    Ramp(NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection),
+}
+
 /// The opacity at which the image will be drawn.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub struct RasterPaintLayerRasterOpacity(
-    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
-    serde_json::Number,
-);
+#[serde(untagged)]
+pub enum RasterPaintLayerRasterOpacity {
+    Expr(RasterPaintLayerRasterOpacityExpression),
+    Literal(
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
+        serde_json::Number,
+    ),
+}
 
 impl Default for RasterPaintLayerRasterOpacity {
     fn default() -> Self {
-        Self(
+        Self::Literal(
             serde_json::Number::from_i128(1)
                 .expect("the number is serialised from a number and is thus always valid"),
         )
@@ -5532,17 +6264,30 @@ pub enum RasterPaintLayerRasterResampling {
     Nearest,
 }
 
+/// Nested expression: ramp (`interpolate` / …) or regular [`Number`] operators.
+#[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[serde(untagged)]
+pub enum RasterPaintLayerRasterSaturationExpression {
+    Number(Number),
+    Ramp(NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection),
+}
+
 /// Increase or reduce the saturation of the image.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub struct RasterPaintLayerRasterSaturation(
-    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
-    serde_json::Number,
-);
+#[serde(untagged)]
+pub enum RasterPaintLayerRasterSaturation {
+    Expr(RasterPaintLayerRasterSaturationExpression),
+    Literal(
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
+        serde_json::Number,
+    ),
+}
 
 impl Default for RasterPaintLayerRasterSaturation {
     fn default() -> Self {
-        Self(
+        Self::Literal(
             serde_json::Number::from_i128(0)
                 .expect("the number is serialised from a number and is thus always valid"),
         )
@@ -5853,17 +6598,30 @@ pub enum SymbolLayoutLayerIconPitchAlignment {
     Viewport,
 }
 
+/// Nested expression: ramp (`interpolate` / …) or regular [`Number`] operators.
+#[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[serde(untagged)]
+pub enum SymbolLayoutLayerIconRotateExpression {
+    Number(Number),
+    Ramp(NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection),
+}
+
 /// Rotates the icon clockwise.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub struct SymbolLayoutLayerIconRotate(
-    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
-    serde_json::Number,
-);
+#[serde(untagged)]
+pub enum SymbolLayoutLayerIconRotate {
+    Expr(SymbolLayoutLayerIconRotateExpression),
+    Literal(
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
+        serde_json::Number,
+    ),
+}
 
 impl Default for SymbolLayoutLayerIconRotate {
     fn default() -> Self {
-        Self(
+        Self::Literal(
             serde_json::Number::from_i128(0)
                 .expect("the number is serialised from a number and is thus always valid"),
         )
@@ -5883,17 +6641,30 @@ pub enum SymbolLayoutLayerIconRotationAlignment {
     Viewport,
 }
 
+/// Nested expression: ramp (`interpolate` / …) or regular [`Number`] operators.
+#[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[serde(untagged)]
+pub enum SymbolLayoutLayerIconSizeExpression {
+    Number(Number),
+    Ramp(NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection),
+}
+
 /// Scales the original size of the icon by the provided factor. The new pixel size of the image will be the original pixel size multiplied by `icon-size`. 1 is the original size; 3 triples the size of the image.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub struct SymbolLayoutLayerIconSize(
-    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
-    serde_json::Number,
-);
+#[serde(untagged)]
+pub enum SymbolLayoutLayerIconSize {
+    Expr(SymbolLayoutLayerIconSizeExpression),
+    Literal(
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
+        serde_json::Number,
+    ),
+}
 
 impl Default for SymbolLayoutLayerIconSize {
     fn default() -> Self {
-        Self(
+        Self::Literal(
             serde_json::Number::from_i128(1)
                 .expect("the number is serialised from a number and is thus always valid"),
         )
@@ -5962,25 +6733,51 @@ pub enum SymbolLayoutLayerSymbolPlacement {
     Point,
 }
 
+/// Nested expression: ramp (`interpolate` / …) or regular [`Number`] operators.
+#[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[serde(untagged)]
+pub enum SymbolLayoutLayerSymbolSortKeyExpression {
+    Number(Number),
+    Ramp(NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection),
+}
+
 /// Sorts features in ascending order based on this value. Features with lower sort keys are drawn and placed first.  When `icon-allow-overlap` or `text-allow-overlap` is `false`, features with a lower sort key will have priority during placement. When `icon-allow-overlap` or `text-allow-overlap` is set to `true`, features with a higher sort key will overlap over features with a lower sort key.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub struct SymbolLayoutLayerSymbolSortKey(
-    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
-    serde_json::Number,
-);
+#[serde(untagged)]
+pub enum SymbolLayoutLayerSymbolSortKey {
+    Expr(SymbolLayoutLayerSymbolSortKeyExpression),
+    Literal(
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
+        serde_json::Number,
+    ),
+}
+
+/// Nested expression: ramp (`interpolate` / …) or regular [`Number`] operators.
+#[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[serde(untagged)]
+pub enum SymbolLayoutLayerSymbolSpacingExpression {
+    Number(Number),
+    Ramp(NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection),
+}
 
 /// Distance between two symbol anchors.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub struct SymbolLayoutLayerSymbolSpacing(
-    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
-    serde_json::Number,
-);
+#[serde(untagged)]
+pub enum SymbolLayoutLayerSymbolSpacing {
+    Expr(SymbolLayoutLayerSymbolSpacingExpression),
+    Literal(
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
+        serde_json::Number,
+    ),
+}
 
 impl Default for SymbolLayoutLayerSymbolSpacing {
     fn default() -> Self {
-        Self(
+        Self::Literal(
             serde_json::Number::from_i128(250)
                 .expect("the number is serialised from a number and is thus always valid"),
         )
@@ -6098,68 +6895,120 @@ impl Default for SymbolLayoutLayerTextKeepUpright {
     }
 }
 
+/// Nested expression: ramp (`interpolate` / …) or regular [`Number`] operators.
+#[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[serde(untagged)]
+pub enum SymbolLayoutLayerTextLetterSpacingExpression {
+    Number(Number),
+    Ramp(NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection),
+}
+
 /// Text tracking amount.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub struct SymbolLayoutLayerTextLetterSpacing(
-    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
-    serde_json::Number,
-);
+#[serde(untagged)]
+pub enum SymbolLayoutLayerTextLetterSpacing {
+    Expr(SymbolLayoutLayerTextLetterSpacingExpression),
+    Literal(
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
+        serde_json::Number,
+    ),
+}
 
 impl Default for SymbolLayoutLayerTextLetterSpacing {
     fn default() -> Self {
-        Self(
+        Self::Literal(
             serde_json::Number::from_i128(0)
                 .expect("the number is serialised from a number and is thus always valid"),
         )
     }
 }
 
+/// Nested expression: ramp (`interpolate` / …) or regular [`Number`] operators.
+#[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[serde(untagged)]
+pub enum SymbolLayoutLayerTextLineHeightExpression {
+    Number(Number),
+    Ramp(NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection),
+}
+
 /// Text leading value for multi-line text.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub struct SymbolLayoutLayerTextLineHeight(
-    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
-    serde_json::Number,
-);
+#[serde(untagged)]
+pub enum SymbolLayoutLayerTextLineHeight {
+    Expr(SymbolLayoutLayerTextLineHeightExpression),
+    Literal(
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
+        serde_json::Number,
+    ),
+}
 
 impl Default for SymbolLayoutLayerTextLineHeight {
     fn default() -> Self {
-        Self(
+        Self::Literal(
             serde_json::Number::from_f64(1.2)
                 .expect("the number is serialised from a number and is thus always valid"),
         )
     }
 }
 
+/// Nested expression: ramp (`interpolate` / …) or regular [`Number`] operators.
+#[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[serde(untagged)]
+pub enum SymbolLayoutLayerTextMaxAngleExpression {
+    Number(Number),
+    Ramp(NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection),
+}
+
 /// Maximum angle change between adjacent characters.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub struct SymbolLayoutLayerTextMaxAngle(
-    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
-    serde_json::Number,
-);
+#[serde(untagged)]
+pub enum SymbolLayoutLayerTextMaxAngle {
+    Expr(SymbolLayoutLayerTextMaxAngleExpression),
+    Literal(
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
+        serde_json::Number,
+    ),
+}
 
 impl Default for SymbolLayoutLayerTextMaxAngle {
     fn default() -> Self {
-        Self(
+        Self::Literal(
             serde_json::Number::from_i128(45)
                 .expect("the number is serialised from a number and is thus always valid"),
         )
     }
 }
 
+/// Nested expression: ramp (`interpolate` / …) or regular [`Number`] operators.
+#[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[serde(untagged)]
+pub enum SymbolLayoutLayerTextMaxWidthExpression {
+    Number(Number),
+    Ramp(NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection),
+}
+
 /// The maximum line width for text wrapping.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub struct SymbolLayoutLayerTextMaxWidth(
-    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
-    serde_json::Number,
-);
+#[serde(untagged)]
+pub enum SymbolLayoutLayerTextMaxWidth {
+    Expr(SymbolLayoutLayerTextMaxWidthExpression),
+    Literal(
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
+        serde_json::Number,
+    ),
+}
 
 impl Default for SymbolLayoutLayerTextMaxWidth {
     fn default() -> Self {
-        Self(
+        Self::Literal(
             serde_json::Number::from_i128(10)
                 .expect("the number is serialised from a number and is thus always valid"),
         )
@@ -6208,17 +7057,30 @@ pub enum SymbolLayoutLayerTextOverlap {
     Never,
 }
 
+/// Nested expression: ramp (`interpolate` / …) or regular [`Number`] operators.
+#[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[serde(untagged)]
+pub enum SymbolLayoutLayerTextPaddingExpression {
+    Number(Number),
+    Ramp(NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection),
+}
+
 /// Size of the additional area around the text bounding box used for detecting symbol collisions.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub struct SymbolLayoutLayerTextPadding(
-    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
-    serde_json::Number,
-);
+#[serde(untagged)]
+pub enum SymbolLayoutLayerTextPadding {
+    Expr(SymbolLayoutLayerTextPaddingExpression),
+    Literal(
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
+        serde_json::Number,
+    ),
+}
 
 impl Default for SymbolLayoutLayerTextPadding {
     fn default() -> Self {
-        Self(
+        Self::Literal(
             serde_json::Number::from_i128(2)
                 .expect("the number is serialised from a number and is thus always valid"),
         )
@@ -6238,34 +7100,60 @@ pub enum SymbolLayoutLayerTextPitchAlignment {
     Viewport,
 }
 
+/// Nested expression: ramp (`interpolate` / …) or regular [`Number`] operators.
+#[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[serde(untagged)]
+pub enum SymbolLayoutLayerTextRadialOffsetExpression {
+    Number(Number),
+    Ramp(NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection),
+}
+
 /// Radial offset of text, in the direction of the symbol's anchor. Useful in combination with `text-variable-anchor`, which defaults to using the two-dimensional `text-offset` if present.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub struct SymbolLayoutLayerTextRadialOffset(
-    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
-    serde_json::Number,
-);
+#[serde(untagged)]
+pub enum SymbolLayoutLayerTextRadialOffset {
+    Expr(SymbolLayoutLayerTextRadialOffsetExpression),
+    Literal(
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
+        serde_json::Number,
+    ),
+}
 
 impl Default for SymbolLayoutLayerTextRadialOffset {
     fn default() -> Self {
-        Self(
+        Self::Literal(
             serde_json::Number::from_i128(0)
                 .expect("the number is serialised from a number and is thus always valid"),
         )
     }
 }
 
+/// Nested expression: ramp (`interpolate` / …) or regular [`Number`] operators.
+#[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[serde(untagged)]
+pub enum SymbolLayoutLayerTextRotateExpression {
+    Number(Number),
+    Ramp(NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection),
+}
+
 /// Rotates the text clockwise.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub struct SymbolLayoutLayerTextRotate(
-    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
-    serde_json::Number,
-);
+#[serde(untagged)]
+pub enum SymbolLayoutLayerTextRotate {
+    Expr(SymbolLayoutLayerTextRotateExpression),
+    Literal(
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
+        serde_json::Number,
+    ),
+}
 
 impl Default for SymbolLayoutLayerTextRotate {
     fn default() -> Self {
-        Self(
+        Self::Literal(
             serde_json::Number::from_i128(0)
                 .expect("the number is serialised from a number and is thus always valid"),
         )
@@ -6287,17 +7175,30 @@ pub enum SymbolLayoutLayerTextRotationAlignment {
     ViewportGlyph,
 }
 
+/// Nested expression: ramp (`interpolate` / …) or regular [`Number`] operators.
+#[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[serde(untagged)]
+pub enum SymbolLayoutLayerTextSizeExpression {
+    Number(Number),
+    Ramp(NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection),
+}
+
 /// Font size.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub struct SymbolLayoutLayerTextSize(
-    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
-    serde_json::Number,
-);
+#[serde(untagged)]
+pub enum SymbolLayoutLayerTextSize {
+    Expr(SymbolLayoutLayerTextSizeExpression),
+    Literal(
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
+        serde_json::Number,
+    ),
+}
 
 impl Default for SymbolLayoutLayerTextSize {
     fn default() -> Self {
-        Self(
+        Self::Literal(
             serde_json::Number::from_i128(16)
                 .expect("the number is serialised from a number and is thus always valid"),
         )
@@ -6441,52 +7342,97 @@ pub struct SymbolPaintLayer {
     pub text_translate_anchor: Option<SymbolPaintLayerTextTranslateAnchor>,
 }
 
+/// Nested expression: ramp (`interpolate-hcl`, …) or [`Color`] operators.
+#[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[serde(untagged)]
+pub enum SymbolPaintLayerIconColorExpression {
+    Color(Color),
+    Ramp(ColorOrArrayOfColor),
+}
+
 /// The color of the icon. This can only be used with SDF icons.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub struct SymbolPaintLayerIconColor(
-    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_dynamic_color))]
-    color::DynamicColor,
-);
+#[serde(untagged)]
+pub enum SymbolPaintLayerIconColor {
+    Expr(SymbolPaintLayerIconColorExpression),
+    Literal(
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
+        serde_json::Value,
+    ),
+}
 
 impl Default for SymbolPaintLayerIconColor {
     fn default() -> Self {
-        Self(color::parse_color("#000000").expect("Invalid color specified as the default value"))
+        Self::Literal(serde_json::json!("#000000"))
     }
+}
+
+/// Nested expression: ramp (`interpolate` / …) or regular [`Number`] operators.
+#[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[serde(untagged)]
+pub enum SymbolPaintLayerIconHaloBlurExpression {
+    Number(Number),
+    Ramp(NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection),
 }
 
 /// Fade out the halo towards the outside.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub struct SymbolPaintLayerIconHaloBlur(
-    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
-    serde_json::Number,
-);
+#[serde(untagged)]
+pub enum SymbolPaintLayerIconHaloBlur {
+    Expr(SymbolPaintLayerIconHaloBlurExpression),
+    Literal(
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
+        serde_json::Number,
+    ),
+}
 
 impl Default for SymbolPaintLayerIconHaloBlur {
     fn default() -> Self {
-        Self(
+        Self::Literal(
             serde_json::Number::from_i128(0)
                 .expect("the number is serialised from a number and is thus always valid"),
         )
     }
 }
 
+/// Nested expression: ramp (`interpolate-hcl`, …) or [`Color`] operators.
+#[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[serde(untagged)]
+pub enum SymbolPaintLayerIconHaloColorExpression {
+    Color(Color),
+    Ramp(ColorOrArrayOfColor),
+}
+
 /// The color of the icon's halo. Icon halos can only be used with SDF icons.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub struct SymbolPaintLayerIconHaloColor(
-    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_dynamic_color))]
-    color::DynamicColor,
-);
+#[serde(untagged)]
+pub enum SymbolPaintLayerIconHaloColor {
+    Expr(SymbolPaintLayerIconHaloColorExpression),
+    Literal(
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
+        serde_json::Value,
+    ),
+}
 
 impl Default for SymbolPaintLayerIconHaloColor {
     fn default() -> Self {
-        Self(
-            color::parse_color("rgba(0, 0, 0, 0)")
-                .expect("Invalid color specified as the default value"),
-        )
+        Self::Literal(serde_json::json!("rgba(0, 0, 0, 0)"))
     }
+}
+
+/// Nested expression: ramp (`interpolate` / …) or regular [`Number`] operators.
+#[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[serde(untagged)]
+pub enum SymbolPaintLayerIconHaloWidthExpression {
+    Number(Number),
+    Ramp(NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection),
 }
 
 /// Distance of halo to the icon outline.
@@ -6494,31 +7440,48 @@ impl Default for SymbolPaintLayerIconHaloColor {
 /// The unit is in pixels only for SDF sprites that were created with a blur radius of 8, multiplied by the display density. I.e., the radius needs to be 16 for `@2x` sprites, etc.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub struct SymbolPaintLayerIconHaloWidth(
-    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
-    serde_json::Number,
-);
+#[serde(untagged)]
+pub enum SymbolPaintLayerIconHaloWidth {
+    Expr(SymbolPaintLayerIconHaloWidthExpression),
+    Literal(
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
+        serde_json::Number,
+    ),
+}
 
 impl Default for SymbolPaintLayerIconHaloWidth {
     fn default() -> Self {
-        Self(
+        Self::Literal(
             serde_json::Number::from_i128(0)
                 .expect("the number is serialised from a number and is thus always valid"),
         )
     }
 }
 
+/// Nested expression: ramp (`interpolate` / …) or regular [`Number`] operators.
+#[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[serde(untagged)]
+pub enum SymbolPaintLayerIconOpacityExpression {
+    Number(Number),
+    Ramp(NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection),
+}
+
 /// The opacity at which the icon will be drawn.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub struct SymbolPaintLayerIconOpacity(
-    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
-    serde_json::Number,
-);
+#[serde(untagged)]
+pub enum SymbolPaintLayerIconOpacity {
+    Expr(SymbolPaintLayerIconOpacityExpression),
+    Literal(
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
+        serde_json::Number,
+    ),
+}
 
 impl Default for SymbolPaintLayerIconOpacity {
     fn default() -> Self {
-        Self(
+        Self::Literal(
             serde_json::Number::from_i128(1)
                 .expect("the number is serialised from a number and is thus always valid"),
         )
@@ -6555,82 +7518,144 @@ pub enum SymbolPaintLayerIconTranslateAnchor {
     Viewport,
 }
 
+/// Nested expression: ramp (`interpolate-hcl`, …) or [`Color`] operators.
+#[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[serde(untagged)]
+pub enum SymbolPaintLayerTextColorExpression {
+    Color(Color),
+    Ramp(ColorOrArrayOfColor),
+}
+
 /// The color with which the text will be drawn.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub struct SymbolPaintLayerTextColor(
-    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_dynamic_color))]
-    color::DynamicColor,
-);
+#[serde(untagged)]
+pub enum SymbolPaintLayerTextColor {
+    Expr(SymbolPaintLayerTextColorExpression),
+    Literal(
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
+        serde_json::Value,
+    ),
+}
 
 impl Default for SymbolPaintLayerTextColor {
     fn default() -> Self {
-        Self(color::parse_color("#000000").expect("Invalid color specified as the default value"))
+        Self::Literal(serde_json::json!("#000000"))
     }
+}
+
+/// Nested expression: ramp (`interpolate` / …) or regular [`Number`] operators.
+#[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[serde(untagged)]
+pub enum SymbolPaintLayerTextHaloBlurExpression {
+    Number(Number),
+    Ramp(NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection),
 }
 
 /// The halo's fadeout distance towards the outside.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub struct SymbolPaintLayerTextHaloBlur(
-    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
-    serde_json::Number,
-);
+#[serde(untagged)]
+pub enum SymbolPaintLayerTextHaloBlur {
+    Expr(SymbolPaintLayerTextHaloBlurExpression),
+    Literal(
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
+        serde_json::Number,
+    ),
+}
 
 impl Default for SymbolPaintLayerTextHaloBlur {
     fn default() -> Self {
-        Self(
+        Self::Literal(
             serde_json::Number::from_i128(0)
                 .expect("the number is serialised from a number and is thus always valid"),
         )
     }
+}
+
+/// Nested expression: ramp (`interpolate-hcl`, …) or [`Color`] operators.
+#[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[serde(untagged)]
+pub enum SymbolPaintLayerTextHaloColorExpression {
+    Color(Color),
+    Ramp(ColorOrArrayOfColor),
 }
 
 /// The color of the text's halo, which helps it stand out from backgrounds.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub struct SymbolPaintLayerTextHaloColor(
-    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_dynamic_color))]
-    color::DynamicColor,
-);
+#[serde(untagged)]
+pub enum SymbolPaintLayerTextHaloColor {
+    Expr(SymbolPaintLayerTextHaloColorExpression),
+    Literal(
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
+        serde_json::Value,
+    ),
+}
 
 impl Default for SymbolPaintLayerTextHaloColor {
     fn default() -> Self {
-        Self(
-            color::parse_color("rgba(0, 0, 0, 0)")
-                .expect("Invalid color specified as the default value"),
-        )
+        Self::Literal(serde_json::json!("rgba(0, 0, 0, 0)"))
     }
+}
+
+/// Nested expression: ramp (`interpolate` / …) or regular [`Number`] operators.
+#[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[serde(untagged)]
+pub enum SymbolPaintLayerTextHaloWidthExpression {
+    Number(Number),
+    Ramp(NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection),
 }
 
 /// Distance of halo to the font outline. Max text halo width is 1/4 of the font-size.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub struct SymbolPaintLayerTextHaloWidth(
-    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
-    serde_json::Number,
-);
+#[serde(untagged)]
+pub enum SymbolPaintLayerTextHaloWidth {
+    Expr(SymbolPaintLayerTextHaloWidthExpression),
+    Literal(
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
+        serde_json::Number,
+    ),
+}
 
 impl Default for SymbolPaintLayerTextHaloWidth {
     fn default() -> Self {
-        Self(
+        Self::Literal(
             serde_json::Number::from_i128(0)
                 .expect("the number is serialised from a number and is thus always valid"),
         )
     }
 }
 
+/// Nested expression: ramp (`interpolate` / …) or regular [`Number`] operators.
+#[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[serde(untagged)]
+pub enum SymbolPaintLayerTextOpacityExpression {
+    Number(Number),
+    Ramp(NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection),
+}
+
 /// The opacity at which the text will be drawn.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub struct SymbolPaintLayerTextOpacity(
-    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
-    serde_json::Number,
-);
+#[serde(untagged)]
+pub enum SymbolPaintLayerTextOpacity {
+    Expr(SymbolPaintLayerTextOpacityExpression),
+    Literal(
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
+        serde_json::Number,
+    ),
+}
 
 impl Default for SymbolPaintLayerTextOpacity {
     fn default() -> Self {
-        Self(
+        Self::Literal(
             serde_json::Number::from_i128(1)
                 .expect("the number is serialised from a number and is thus always valid"),
         )

@@ -32,13 +32,71 @@ pub fn generate_syntax_enum(
     let variadic_row_struct_names = generate_syntax_enum_body(scope, name, doc, values);
     // pass 2: generate the previously referenced enum variants for overloaded variants
     generate_referenced_multi_overload_options_enums(scope, name, values);
-    let examples = values
-        .values()
-        .filter_map(|e| e.example.as_ref())
-        .collect::<Vec<_>>();
-    generate_syntax_enum_deserializer(scope, name, values, examples[0], &variadic_row_struct_names);
+    let examples: Vec<&serde_json::Value> = values
+        .iter()
+        .filter_map(|(operator_key, def)| {
+            def.example.as_ref().filter(|ex| {
+                example_json_operator_matches_variant_key(ex, operator_key.as_str())
+                    && example_matches_fixed_arity_overload(def, ex)
+            })
+        })
+        .collect();
+    let example_for_visitor = examples
+        .first()
+        .copied()
+        .or_else(|| values.values().find_map(|d| d.example.as_ref()))
+        .expect("syntax enum must have at least one example");
+    generate_syntax_enum_deserializer(
+        scope,
+        name,
+        values,
+        example_for_visitor,
+        &variadic_row_struct_names,
+    );
 
     generate_test_from_examples_if_present(scope, name, examples);
+}
+
+/// For generated `#[rstest]` decode checks, only attach an `example` to the variant for
+/// which its JSON leading operator matches that variant's operator key.
+fn example_json_operator_matches_variant_key(
+    example: &serde_json::Value,
+    operator_key: &str,
+) -> bool {
+    match example {
+        serde_json::Value::Array(elems) => elems
+            .first()
+            .and_then(|v| v.as_str())
+            .is_some_and(|head| head == operator_key),
+        // Non-array examples (should be rare for syntax enums): accept only if they cannot be classified.
+        _ => true,
+    }
+}
+
+/// Drop examples whose argument count cannot match any **non-variadic** overload for this variant
+/// (e.g. the global `array` example is 4 elements but the `array` *output* group only includes the
+/// 1-arg `["array", value]` overload).
+fn example_matches_fixed_arity_overload(
+    def: &SyntaxVariantDef,
+    example: &serde_json::Value,
+) -> bool {
+    let serde_json::Value::Array(elems) = example else {
+        return true;
+    };
+    let nargs = elems.len().saturating_sub(1);
+    let mut any_variadic = false;
+    for ov in &def.syntax.overloads {
+        if ov.parameters.iter().any(|p| p == "...") {
+            any_variadic = true;
+            continue;
+        }
+        let req = ov.parameters.iter().filter(|p| !p.ends_with('?')).count();
+        let opt = ov.parameters.iter().filter(|p| p.ends_with('?')).count();
+        if nargs >= req && nargs <= req + opt {
+            return true;
+        }
+    }
+    any_variadic
 }
 
 fn pregenerate_all_operator_parameter_types(
@@ -99,6 +157,8 @@ fn normalize_expression_union_component_type(component: &str) -> String {
         "ArrayOfColor" => "ColorOrArrayOfColor".to_string(),
         // Avoid infinite `Number` ⇄ `MinusOptions` recursion; stops are validated structurally.
         "ArrayOfNumber" => "serde_json::Value".to_string(),
+        // Interpolate `projection` stops are `ProjectionType` values; box breaks the cycle with `ProjectionType::Expr(...)`.
+        "Projection" => "Box<ProjectionType>".to_string(),
         other => other.to_string(),
     }
 }
@@ -121,14 +181,68 @@ fn expression_union_needs_untagged(types: &[ParameterType]) -> bool {
 }
 
 fn generate_expression_any_of(scope: &mut Scope, types: &[ParameterType]) -> String {
-    let arms: Vec<(String, String)> = types
+    // `interpolate` / `step` stop outputs mix JSON literals (bare numbers) with expression arrays.
+    // The spec encodes the numeric stop output as `expression(number)` which we normally lower to
+    // the [`Number`] syntax enum — that rejects bare JSON numbers, so map that arm to
+    // [`NumberLiteral`] only in unions that also include `projection` stops (the v-shaped output set).
+    let has_projection_stop = types.iter().any(|p| {
+        matches!(
+            p,
+            ParameterType::Reference(r) if r == "projection"
+        )
+    });
+    let number_literal_with_number_expr = types
+        .iter()
+        .any(|p| matches!(p, ParameterType::Literal(Literal::Number)))
+        && types.iter().any(|p| {
+            matches!(
+                p,
+                ParameterType::Expression(e) if matches!(e.as_ref(), MirExpression::Number)
+            )
+        });
+    let mut arms: Vec<(String, String)> = types
         .iter()
         .map(|p| {
             let label = p.to_upper_camel_case();
-            let rust_ty = normalize_expression_union_component_type(&label);
+            let rust_ty = if has_projection_stop
+                && matches!(
+                    p,
+                    ParameterType::Expression(e) if matches!(e.as_ref(), MirExpression::Number)
+                ) {
+                "NumberLiteral".to_string()
+            } else if number_literal_with_number_expr
+                && matches!(
+                    p,
+                    ParameterType::Expression(e) if matches!(e.as_ref(), MirExpression::Number)
+                )
+            {
+                // Needs indirection: `Number` contains this union recursively (`+`, `*`, …).
+                "Box<Number>".to_string()
+            } else {
+                normalize_expression_union_component_type(&label)
+            };
             (label, rust_ty)
         })
         .collect();
+
+    // `interpolate-hcl` / `interpolate-lab` accept CSS color strings (e.g. `"#f00"`) as stop outputs.
+    let mut arm_labels: Vec<&str> = arms.iter().map(|(l, _)| l.as_str()).collect();
+    arm_labels.sort_unstable();
+    arm_labels.dedup();
+    let mut extra_untagged = false;
+    if arm_labels == ["ArrayOfColor", "Color"] {
+        arms.insert(
+            0,
+            ("StringLiteral".to_string(), "StringLiteral".to_string()),
+        );
+        extra_untagged = true;
+    }
+    // `Number`↔`NumberLiteral` and projection↔string stops share one serde shape; without `untagged`
+    // serde expects externally-tagged enums and rejects plain JSON scalars / arrays.
+    if has_projection_stop {
+        extra_untagged = true;
+    }
+
     let any_of_type = format!(
         "{}AsUnion",
         arms.iter()
@@ -141,7 +255,7 @@ fn generate_expression_any_of(scope: &mut Scope, types: &[ParameterType]) -> Str
             .new_enum(&any_of_type)
             .doc("Either of the below variants")
             .vis("pub");
-        if expression_union_needs_untagged(types) {
+        if expression_union_needs_untagged(types) || extra_untagged {
             enu = enu.attr("serde(untagged)");
         }
         enu.derive("serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone")
@@ -178,6 +292,16 @@ fn generate_referenced_multi_overload_options_enums(
     }
 }
 
+/// Variadic `interpolate` / `step` shape: one Rust tuple type `(headers..., Vec<(stop_in, stop_out)>)`.
+///
+/// Stored as a single [`codegen2`] tuple slot — the formatter only prints the first slot when
+/// multiple tuple fields have no attributes.
+#[derive(Debug, Clone)]
+struct InterpolateStyleFields {
+    /// e.g. `(Interpolation, Number, Vec<(NumberLiteral, U)>)`
+    combined_tuple_type: String,
+}
+
 fn generate_syntax_enum_body(
     scope: &mut Scope,
     name: &str,
@@ -187,6 +311,7 @@ fn generate_syntax_enum_body(
     // Variadic variants need `generate_parameter_variant`, which mutates `scope`. `new_enum` also
     // holds a `scope` borrow via its handle, so precompute tuple types before creating the enum.
     let mut variadic_tuple_types: BTreeMap<String, String> = BTreeMap::new();
+    let mut variadic_interpolate_style: BTreeMap<String, InterpolateStyleFields> = BTreeMap::new();
     let mut variadic_row_struct_names: BTreeMap<String, String> = BTreeMap::new();
     for (key, value) in values {
         let syntax = &value.syntax;
@@ -203,6 +328,76 @@ fn generate_syntax_enum_body(
             let overload = &syntax.overloads[0];
             let position_of_variadic_separator = overload.position_of_variadic_separator();
             let variant_name = to_upper_camel_case(key);
+
+            if name == "Any" && key == "match" {
+                let variant_name = to_upper_camel_case(key);
+                let label_ty = generate_parameter_type(
+                    scope,
+                    (name, variant_name.as_str(), "label_i"),
+                    &syntax.parameters,
+                );
+                let output_ty = generate_parameter_type(
+                    scope,
+                    (name, variant_name.as_str(), "output_i"),
+                    &syntax.parameters,
+                );
+                let fallback_ty = generate_parameter_type(
+                    scope,
+                    (name, variant_name.as_str(), "fallback"),
+                    &syntax.parameters,
+                );
+                let lt = box_recursive_types(name, &label_ty);
+                let ot = box_recursive_types(name, &output_ty);
+                let ft = box_recursive_types(name, &fallback_ty);
+                variadic_tuple_types.insert(
+                    key.clone(),
+                    format!("(serde_json::Value, Vec<({lt},{ot})>, {ft})"),
+                );
+                continue;
+            }
+
+            if overload_uses_interpolate_style_variadic(overload) {
+                let sep = position_of_variadic_separator;
+                let header_params = &overload.parameters[0..sep.saturating_sub(2)];
+                let header_rust_types: Vec<String> = header_params
+                    .iter()
+                    .map(|overload_param| {
+                        let part = generate_parameter_type(
+                            scope,
+                            (name, variant_name.as_str(), overload_param.as_str()),
+                            &syntax.parameters,
+                        );
+                        box_recursive_types(name, &part)
+                    })
+                    .collect();
+                let pa = &overload.parameters[sep - 2];
+                let pb = &overload.parameters[sep - 1];
+                let rust_a = generate_parameter_type(
+                    scope,
+                    (name, variant_name.as_str(), pa.as_str()),
+                    &syntax.parameters,
+                );
+                let rust_b = generate_parameter_type(
+                    scope,
+                    (name, variant_name.as_str(), pb.as_str()),
+                    &syntax.parameters,
+                );
+                let pair_a = box_recursive_types(name, &rust_a);
+                let pair_b = box_recursive_types(name, &rust_b);
+                let stops_ty = format!("Vec<({pair_a},{pair_b})>");
+                let combined = if header_rust_types.is_empty() {
+                    stops_ty
+                } else {
+                    format!("({},{})", header_rust_types.join(","), stops_ty)
+                };
+                variadic_interpolate_style.insert(
+                    key.clone(),
+                    InterpolateStyleFields {
+                        combined_tuple_type: combined,
+                    },
+                );
+                continue;
+            }
 
             let prefix = &overload.parameters[0..position_of_variadic_separator];
             let parts: Vec<String> = prefix
@@ -239,7 +434,24 @@ fn generate_syntax_enum_body(
             } else {
                 box_recursive_types(name, &format!("Vec<{tuple_type_names}>"))
             };
-            variadic_tuple_types.insert(key.clone(), tuple);
+            let suffix_params = variadic_non_template_suffix_parameters(overload);
+            let suffix_types: Vec<String> = suffix_params
+                .iter()
+                .map(|overload_param| {
+                    let part = generate_parameter_type(
+                        scope,
+                        (name, variant_name.as_str(), overload_param.as_str()),
+                        &syntax.parameters,
+                    );
+                    box_recursive_types(name, &part)
+                })
+                .collect();
+            let full_tuple = if suffix_types.is_empty() {
+                tuple
+            } else {
+                format!("({},{})", tuple, suffix_types.join(","))
+            };
+            variadic_tuple_types.insert(key.clone(), full_tuple);
         }
     }
 
@@ -265,10 +477,14 @@ fn generate_syntax_enum_body(
             let overload = &syntax.overloads[0];
             if syntax.has_variadic_overload() {
                 let var = enu.new_variant(&var_name).doc(&value.doc);
-                let tuple = variadic_tuple_types
-                    .get(key)
-                    .unwrap_or_else(|| panic!("variadic tuple missing for operator {key}"));
-                var.tuple(tuple);
+                if let Some(shape) = variadic_interpolate_style.get(key) {
+                    var.tuple(shape.combined_tuple_type.as_str());
+                } else {
+                    let tuple = variadic_tuple_types
+                        .get(key)
+                        .unwrap_or_else(|| panic!("variadic tuple missing for operator {key}"));
+                    var.tuple(tuple);
+                }
                 continue;
             }
             let var = enu.new_variant(&var_name).doc(&value.doc);
@@ -322,11 +538,44 @@ fn box_recursive_types(parent_syntax_enum: &str, rust_type: &str) -> String {
     t.to_string()
 }
 
+/// `<` / `<=` / … use `(string,string)` and `(number,number)` overloads. `untagged` +
+/// `SeqAccessDeserializer` breaks when serde probes variants; merge to one `(Value, Value, …)`.
+fn comparison_operands_merge_applies(syntax: &Syntax) -> bool {
+    if syntax.overloads.len() != 2 {
+        return false;
+    }
+    let a = &syntax.overloads[0].parameters;
+    let b = &syntax.overloads[1].parameters;
+    if a.len() != 3 || b.len() != 3 {
+        return false;
+    }
+    if !a[2].ends_with("collator?") || !b[2].ends_with("collator?") {
+        return false;
+    }
+    let a0 = a[0].as_str();
+    let b0 = b[0].as_str();
+    (a0.starts_with("string_") && b0.starts_with("number_"))
+        || (a0.starts_with("number_") && b0.starts_with("string_"))
+}
+
 fn generate_multi_overload(
     scope: &mut Scope,
     (name, var_name, options_name): (&str, &str, &str),
     syntax: &Syntax,
 ) {
+    if comparison_operands_merge_applies(syntax) {
+        scope
+            .new_enum(options_name)
+            .doc(format!(
+                "Options for deserializing the syntax enum variant [`{name}::{var_name}`]"
+            ))
+            .vis("pub")
+            .derive("serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone")
+            .attr(fuzz::CFG_DERIVE_ARBITRARY)
+            .new_variant("Args")
+            .tuple("(serde_json::Value, serde_json::Value, Option<serde_json::Value>)");
+        return;
+    }
     // because scope can only be owned by one owner, we first need to generate all tuples, then can add them
     let mut overloads_tuples = Vec::with_capacity(syntax.overloads.len());
     for overload in &syntax.overloads {
@@ -341,6 +590,12 @@ fn generate_multi_overload(
             let var_name = overload.output_type.to_upper_camel_case();
             let mut tuples = Vec::with_capacity(overload.parameters.len());
             for param in &overload.parameters {
+                // Trailing optional tuple fields + untagged enums + `SeqAccessDeserializer` cannot
+                // reliably rewind; accept JSON for common optional slots.
+                if matches!(param.as_str(), "collator?" | "from_index?") {
+                    tuples.push("Option<serde_json::Value>".to_string());
+                    continue;
+                }
                 let param_name =
                     generate_parameter_type(scope, (name, &var_name, param), &syntax.parameters);
                 tuples.push(box_recursive_types(name, &param_name));
@@ -362,8 +617,19 @@ fn generate_multi_overload(
     for (i, overload) in syntax.overloads.iter().enumerate() {
         let var_name = variant_naming_strat.var_name(overload, i);
         let var = enu.new_variant(&var_name);
-        for t in &overloads_tuples[i] {
-            emit_tuple_slot(var, t);
+        if overload.is_variadic(&syntax.parameters) {
+            for t in &overloads_tuples[i] {
+                emit_tuple_slot(var, t);
+            }
+        } else {
+            for (pi, param_raw) in overload.parameters.iter().enumerate() {
+                let t = &overloads_tuples[i][pi];
+                if param_raw.ends_with('?') {
+                    var.tuple_with_attrs(["#[serde(default)]"], t.as_str());
+                } else {
+                    emit_tuple_slot(var, t);
+                }
+            }
         }
     }
 }
@@ -426,6 +692,17 @@ fn map_template_n_to_1(param: &str) -> Option<String> {
     None
 }
 
+/// Parameters after the `...` separator that are **not** part of the repeating template (e.g.
+/// `fallback` / `expression` on `case` / `let`).
+fn variadic_non_template_suffix_parameters(overload: &Overload) -> Vec<String> {
+    let sep = overload.position_of_variadic_separator();
+    overload.parameters[sep + 1..]
+        .iter()
+        .filter(|p| map_template_n_to_1(p).is_none())
+        .cloned()
+        .collect()
+}
+
 enum OverloadVariantNamingStrategy {
     OutputType,
     NumberOptions(Vec<usize>),
@@ -464,10 +741,9 @@ impl OverloadVariantNamingStrategy {
         }
 
         // case 3: the first parameter is different
-        let mut first_parameters = overloads
+        let ordered_first: Vec<String> = overloads
             .iter()
             .map(|o| o.parameters.first().cloned().unwrap_or_default())
-            // by default, the names are kind of bad, so we replace unstable patterns
             .map(|name| {
                 if name.ends_with('?') {
                     format!("Opt{}", name.replace('?', ""))
@@ -483,12 +759,16 @@ impl OverloadVariantNamingStrategy {
                 }
             })
             .map(to_upper_camel_case)
-            .collect::<Vec<_>>();
-        first_parameters.sort_unstable();
-        let all_first_parameters = first_parameters.len();
-        first_parameters.dedup();
-        if all_first_parameters == first_parameters.len() {
-            return OverloadVariantNamingStrategy::ConstantMapping(first_parameters);
+            .collect();
+        let mut sorted_for_uniq = ordered_first.clone();
+        sorted_for_uniq.sort_unstable();
+        let n = sorted_for_uniq.len();
+        sorted_for_uniq.dedup();
+        if n == sorted_for_uniq.len() {
+            // IMPORTANT: preserve overload order — tuple types are built in the same order as
+            // `overloads`; sorting names alone would pair the wrong arm with each overload
+            // (e.g. `LessOptions::Number` getting `(String, String)`).
+            return OverloadVariantNamingStrategy::ConstantMapping(ordered_first);
         }
 
         panic!("could not determine a good naming strategy for {overloads:?}");
@@ -527,14 +807,30 @@ fn generate_parameter_variant(scope: &mut Scope, param: &ParameterType) -> Strin
     match &param {
         ParameterType::Literal(l) => l.to_upper_camel_case().to_string(),
         ParameterType::LiteralAnyOf(ls) => generate_any_of(scope, ls),
-        ParameterType::Expression(e) => e.to_upper_camel_case().to_string(),
+        ParameterType::Expression(e) => match e.as_ref() {
+            // `any` in the style spec means "expression or JSON literal", not the [`Any`] syntax enum.
+            MirExpression::Any => "serde_json::Value".to_string(),
+            MirExpression::Number => generate_expression_any_of(
+                scope,
+                &[
+                    ParameterType::Literal(Literal::Number),
+                    ParameterType::Expression(Box::new(MirExpression::Number)),
+                ],
+            ),
+            _ => e.to_upper_camel_case().to_string(),
+        },
         ParameterType::ExpressionAnyOf(es) => generate_expression_any_of(scope, es),
         ParameterType::Object(_) => {
             "serde_json::Map<std::string::String, serde_json::Value>".to_string()
         }
         ParameterType::Reference(r) => {
             if r == "T" {
-                "Any".to_string()
+                // Type variable `T` permits literals or arbitrary nested expressions (e.g. `coalesce`
+                // with `image`, `in` with feature properties, …).
+                "serde_json::Value".to_string()
+            } else if r == "projection" {
+                // Projection definition strings / expressions — not the root `{ "type": … }` object (`struct Projection`).
+                "ProjectionType".to_string()
             } else {
                 to_upper_camel_case(r)
             }
@@ -562,6 +858,162 @@ fn generate_any_of(scope: &mut Scope, any_of: &[Literal]) -> String {
     any_of_type
 }
 
+fn overload_uses_interpolate_style_variadic(overload: &Overload) -> bool {
+    let sep = overload.position_of_variadic_separator();
+    if sep < 4 {
+        return false;
+    }
+    let pa = &overload.parameters[sep - 2];
+    let pb = &overload.parameters[sep - 1];
+    pa.contains("stop_input") && pb.contains("stop_output")
+}
+
+/// Precomputed fragment for variadic operators whose overload uses the `step` / `interpolate`
+/// layout: shared prefix once, then `(stop_input, stop_output)` pairs (`…` at index ≥ 4).
+///
+/// Built before `generate_visitor` so `generate_parameter_type` can use `scope` without
+/// conflicting with the visitor impl borrow.
+#[derive(Debug, Clone)]
+struct VariadicSep4Plan {
+    header_lines: Vec<String>,
+    header_bind_names: Vec<String>,
+    pair_bind_a: String,
+    pair_bind_b: String,
+    pair_ty_a: String,
+    pair_ty_b: String,
+    pair_b_optional: bool,
+}
+
+fn precompute_variadic_sep4_plans(
+    scope: &mut Scope,
+    syntax_enum_name: &str,
+    values: &BTreeMap<String, SyntaxVariantDef>,
+) -> BTreeMap<String, VariadicSep4Plan> {
+    let mut out = BTreeMap::new();
+    for (key, syntax_docs) in values {
+        let syntax = &syntax_docs.syntax;
+        if syntax.overloads.len() != 1 || !syntax.has_variadic_overload() {
+            continue;
+        }
+        let overload = &syntax.overloads[0];
+        if !overload_uses_interpolate_style_variadic(overload) {
+            continue;
+        }
+        let sep = overload.position_of_variadic_separator();
+        let variant_name = to_upper_camel_case(key);
+        let fixed_header_len = sep - 2;
+        let mut header_lines = Vec::new();
+        let mut header_bind_names = Vec::new();
+        for param in overload.parameters.iter().take(fixed_header_len) {
+            if param.ends_with('?') {
+                let rust_ty = generate_parameter_type(
+                    scope,
+                    (syntax_enum_name, variant_name.as_str(), param.as_str()),
+                    &syntax.parameters,
+                );
+                let rust_ty = box_recursive_types(syntax_enum_name, &rust_ty);
+                let p = param.strip_suffix('?').expect("checked ends_with ?");
+                header_lines.push(format!("let {p}: {rust_ty} = seq.next_element()?;"));
+                header_bind_names.push(p.to_string());
+            } else if param == "type" {
+                let rust_ty = generate_parameter_type(
+                    scope,
+                    (syntax_enum_name, variant_name.as_str(), param.as_str()),
+                    &syntax.parameters,
+                );
+                let rust_ty = box_recursive_types(syntax_enum_name, &rust_ty);
+                header_lines.push(format!(
+                    "let r#type: {rust_ty} = visit_seq_field(&mut seq, \"type\")?;"
+                ));
+                header_bind_names.push("r#type".to_string());
+            } else {
+                let rust_ty = generate_parameter_type(
+                    scope,
+                    (syntax_enum_name, variant_name.as_str(), param.as_str()),
+                    &syntax.parameters,
+                );
+                let rust_ty = box_recursive_types(syntax_enum_name, &rust_ty);
+                header_lines.push(format!(
+                    "let {param}: {rust_ty} = visit_seq_field(&mut seq, \"{param}\")?;"
+                ));
+                header_bind_names.push(param.to_string());
+            }
+        }
+        let pa = &overload.parameters[sep - 2];
+        let pb = &overload.parameters[sep - 1];
+        let rust_a = generate_parameter_type(
+            scope,
+            (syntax_enum_name, variant_name.as_str(), pa.as_str()),
+            &syntax.parameters,
+        );
+        let rust_b = generate_parameter_type(
+            scope,
+            (syntax_enum_name, variant_name.as_str(), pb.as_str()),
+            &syntax.parameters,
+        );
+        let pair_ty_a = box_recursive_types(syntax_enum_name, &rust_a);
+        let pair_ty_b = box_recursive_types(syntax_enum_name, &rust_b);
+        out.insert(
+            key.clone(),
+            VariadicSep4Plan {
+                header_lines,
+                header_bind_names,
+                pair_bind_a: to_snake_case(pa).replace("_1", "_i"),
+                pair_bind_b: to_snake_case(pb).replace("_1", "_i"),
+                pair_ty_a,
+                pair_ty_b,
+                pair_b_optional: pb.ends_with('?'),
+            },
+        );
+    }
+    out
+}
+
+fn emit_any_match_deserializer_arm(visit_seq: &mut Function, (lt, ot, ft): (&str, &str, &str)) {
+    visit_seq.line("let mut rest: Vec<serde_json::Value> = Vec::new();");
+    visit_seq.line("while let Some(v) = seq.next_element()? { rest.push(v); }");
+    visit_seq.line("if rest.len() < 2 {");
+    visit_seq.line("return Err(serde::de::Error::custom(\"Any::Match: too few arguments\"));");
+    visit_seq.line("}");
+    visit_seq.line("if rest.len() % 2 != 0 {");
+    visit_seq.line("return Err(serde::de::Error::custom(\"Any::Match: expected an even number of arguments after operator (input + label/output pairs + fallback)\"));");
+    visit_seq.line("}");
+    visit_seq.line("let fallback_v = rest.pop().unwrap();");
+    visit_seq.line("let input = rest.remove(0);");
+    visit_seq.line("let mut pairs = Vec::new();");
+    visit_seq.line("for chunk in rest.chunks_exact(2) {");
+    visit_seq.line(format!(
+        "let label_i: {lt} = serde_json::from_value(chunk[0].clone()).map_err(serde::de::Error::custom)?;"
+    ));
+    visit_seq.line(format!(
+        "let output_i: {ot} = serde_json::from_value(chunk[1].clone()).map_err(serde::de::Error::custom)?;"
+    ));
+    visit_seq.line("pairs.push((label_i, output_i));");
+    visit_seq.line("}");
+    visit_seq.line("if pairs.is_empty() {");
+    visit_seq
+        .line("return Err(serde::de::Error::custom(\"Any::Match: missing label/output pairs\"));");
+    visit_seq.line("}");
+    visit_seq.line(format!(
+        "let fallback: {ft} = serde_json::from_value(fallback_v).map_err(serde::de::Error::custom)?;"
+    ));
+    visit_seq.line("Ok(Any::Match((input, pairs, fallback)))");
+}
+
+fn emit_number_minus_deserializer_arm(visit_seq: &mut Function, union_ty: &str) {
+    visit_seq.line("let mut rest: Vec<serde_json::Value> = Vec::new();");
+    visit_seq.line("while let Some(v) = seq.next_element()? { rest.push(v); }");
+    visit_seq.line("match rest.len() {");
+    visit_seq.line(format!(
+        "2 => Ok(Number::Minus(MinusOptions::TwoParams(serde_json::from_value::<{union_ty}>(rest[0].clone()).map_err(serde::de::Error::custom)?, serde_json::from_value::<{union_ty}>(rest[1].clone()).map_err(serde::de::Error::custom)?))),"
+    ));
+    visit_seq.line(format!(
+        "1 => Ok(Number::Minus(MinusOptions::OneParams(serde_json::from_value::<{union_ty}>(rest[0].clone()).map_err(serde::de::Error::custom)?))),"
+    ));
+    visit_seq.line("len => Err(serde::de::Error::custom(format!(\"'-': expected 1 or 2 arguments, got {len}\"))),");
+    visit_seq.line("}");
+}
+
 fn generate_syntax_enum_deserializer(
     scope: &mut Scope,
     name: &str,
@@ -569,6 +1021,46 @@ fn generate_syntax_enum_deserializer(
     example: &serde_json::Value,
     variadic_row_struct_names: &BTreeMap<String, String>,
 ) {
+    let sep4_plans = precompute_variadic_sep4_plans(scope, name, values);
+    let any_match_types = if name == "Any" {
+        values.get("match").map(|def| {
+            let syntax = &def.syntax;
+            let variant_name = "Match";
+            let label_ty = generate_parameter_type(
+                scope,
+                ("Any", variant_name, "label_i"),
+                &syntax.parameters,
+            );
+            let output_ty = generate_parameter_type(
+                scope,
+                ("Any", variant_name, "output_i"),
+                &syntax.parameters,
+            );
+            let fallback_ty = generate_parameter_type(
+                scope,
+                ("Any", variant_name, "fallback"),
+                &syntax.parameters,
+            );
+            (
+                box_recursive_types("Any", &label_ty),
+                box_recursive_types("Any", &output_ty),
+                box_recursive_types("Any", &fallback_ty),
+            )
+        })
+    } else {
+        None
+    };
+    let number_minus_union_ty = if name == "Number" {
+        Some(generate_expression_any_of(
+            scope,
+            &[
+                ParameterType::Literal(Literal::Number),
+                ParameterType::Expression(Box::new(MirExpression::Number)),
+            ],
+        ))
+    } else {
+        None
+    };
     let vis = generate_visitor(scope, name, example);
 
     let visit_seq = vis
@@ -594,12 +1086,23 @@ fn generate_syntax_enum_deserializer(
                 let row_struct = variadic_row_struct_names
                     .get(key.as_str())
                     .map(String::as_str);
-                generate_syntax_enum_deserializer_regular_variadic_variant(
-                    visit_seq,
-                    (name, &variant_name),
-                    overload,
-                    row_struct,
-                )
+                if name == "Any" && key == "match" {
+                    let (lt, ot, ft) = any_match_types
+                        .as_ref()
+                        .expect("Any::Match precomputed types");
+                    emit_any_match_deserializer_arm(
+                        visit_seq,
+                        (lt.as_str(), ot.as_str(), ft.as_str()),
+                    );
+                } else {
+                    generate_syntax_enum_deserializer_regular_variadic_variant(
+                        visit_seq,
+                        (name, &variant_name),
+                        overload,
+                        row_struct,
+                        sep4_plans.get(key.as_str()),
+                    );
+                }
             } else {
                 generate_syntax_enum_deserializer_regular_variant(
                     visit_seq,
@@ -613,10 +1116,17 @@ fn generate_syntax_enum_deserializer(
                     "{name}::{variant_name} needs multiple variadic overloads, i.e. {variant_name}Options implemented"
                 );
             } else {
-                generate_syntax_enum_deserializer_multi_overload_variant(
-                    visit_seq,
-                    (name, &variant_name),
-                );
+                if name == "Number" && key == "-" {
+                    let u = number_minus_union_ty
+                        .as_ref()
+                        .expect("Number minus operand union");
+                    emit_number_minus_deserializer_arm(visit_seq, u.as_str());
+                } else {
+                    generate_syntax_enum_deserializer_multi_overload_variant(
+                        visit_seq,
+                        (name, &variant_name),
+                    );
+                }
             }
         }
         visit_seq.line("},");
@@ -698,9 +1208,45 @@ fn generate_syntax_enum_deserializer_regular_variadic_variant(
     (name, variant_name): (&str, &str),
     overload: &Overload,
     row_struct_name: Option<&str>,
+    sep4_plan: Option<&VariadicSep4Plan>,
 ) {
     let position_of_variadic_separator = overload.position_of_variadic_separator();
     assert_ne!(position_of_variadic_separator, 0);
+
+    if overload_uses_interpolate_style_variadic(overload) {
+        let plan =
+            sep4_plan.expect("interpolate-style variadic must have a precomputed VariadicSep4Plan");
+        for line in &plan.header_lines {
+            visit_seq.line(line.clone());
+        }
+        visit_seq.line("let mut stops = Vec::new();");
+        let bind_a = &plan.pair_bind_a;
+        let bind_b = &plan.pair_bind_b;
+        let ty_a = &plan.pair_ty_a;
+        let ty_b = &plan.pair_ty_b;
+        visit_seq.line(format!(
+            "while let Some({bind_a}) = seq.next_element::<{ty_a}>()? {{"
+        ));
+        if plan.pair_b_optional {
+            visit_seq.line(format!(
+                "let {bind_b}: {ty_b} = seq.next_element()?; // optional param"
+            ));
+        } else {
+            visit_seq.line(format!(
+                "let {bind_b}: {ty_b} = seq.next_element()?.ok_or_else(|| serde::de::Error::custom(\"expected {bind_b} in {name}::{variant_name}\"))?;"
+            ));
+        }
+
+        visit_seq.line(format!("stops.push(({bind_a}, {bind_b}));"));
+        visit_seq.line("}");
+        visit_seq.line("if stops.is_empty() {".to_string());
+        visit_seq.line(format!("return Err(serde::de::Error::custom(\"{name}::{variant_name} requires at least one stop pair\"));"));
+        visit_seq.line("}");
+        let hdr = plan.header_bind_names.join(", ");
+        visit_seq.line(format!("Ok({name}::{variant_name}(({hdr}, stops)))"));
+        return;
+    }
+
     visit_seq.line("let mut inputs = Vec::new();");
     if position_of_variadic_separator == 1 {
         visit_seq.line("while let Some(element) = seq.next_element()? {");
@@ -738,7 +1284,35 @@ fn generate_syntax_enum_deserializer_regular_variadic_variant(
     visit_seq.line("if inputs.is_empty() {".to_string());
     visit_seq.line(format!("return Err(serde::de::Error::custom(\"{name}::{variant_name} requires at least one argument\"));"));
     visit_seq.line("}");
-    visit_seq.line(format!("Ok({name}::{variant_name}(inputs))"));
+    let suffix_params = variadic_non_template_suffix_parameters(overload);
+    let mut suffix_binds: Vec<String> = Vec::new();
+    for pname in &suffix_params {
+        let is_opt = pname.ends_with('?');
+        let lookup = pname.strip_suffix('?').unwrap_or(pname);
+        let bind = if lookup == "type" {
+            "r#type".to_string()
+        } else {
+            lookup.to_string()
+        };
+        if is_opt {
+            visit_seq.line(format!("let {bind} = seq.next_element()?;"));
+        } else if lookup == "type" {
+            visit_seq.line("let r#type = visit_seq_field(&mut seq, \"type\")?;".to_string());
+        } else {
+            visit_seq.line(format!(
+                "let {bind} = visit_seq_field(&mut seq, \"{lookup}\")?;"
+            ));
+        }
+        suffix_binds.push(bind);
+    }
+    if suffix_params.is_empty() {
+        visit_seq.line(format!("Ok({name}::{variant_name}(inputs))"));
+    } else {
+        visit_seq.line(format!(
+            "Ok({name}::{variant_name}((inputs, {})))",
+            suffix_binds.join(", ")
+        ));
+    }
 }
 fn generate_syntax_enum_deserializer_regular_variant(
     visit_seq: &mut Function,

@@ -156,7 +156,12 @@ impl Fields {
 
                 if !multiline {
                     write!(fmt, "(")?;
-                    slots[0].ty.fmt(fmt)?;
+                    for (i, slot) in slots.iter().enumerate() {
+                        if i > 0 {
+                            write!(fmt, ", ")?;
+                        }
+                        slot.ty.fmt(fmt)?;
+                    }
                     write!(fmt, ")")?;
                 } else {
                     write!(fmt, "(")?;

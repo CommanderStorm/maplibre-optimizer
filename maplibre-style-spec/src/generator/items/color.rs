@@ -6,13 +6,39 @@ use crate::generator::fuzz;
 use crate::mir::types::ColorField;
 
 pub fn generate(scope: &mut Scope, name: &str, field: &ColorField) {
-    scope
-        .new_struct(name)
-        .vis("pub")
-        .doc(&field.meta.doc)
-        .derive("serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone")
-        .attr(fuzz::CFG_DERIVE_ARBITRARY)
-        .tuple_field_with_attrs([fuzz::ARB_DYNAMIC_COLOR], "color::DynamicColor");
+    if field.meta.expression.is_some() {
+        let expr_name = format!("{name}Expression");
+        let expr = scope
+            .new_enum(&expr_name)
+            .doc("Nested expression: ramp (`interpolate-hcl`, …) or [`Color`] operators.")
+            .vis("pub")
+            .derive("serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone")
+            .attr(fuzz::CFG_DERIVE_ARBITRARY)
+            .attr("serde(untagged)");
+        expr.new_variant("Color").tuple("Color");
+        expr.new_variant("Ramp").tuple("ColorOrArrayOfColor");
+
+        let enu = scope
+            .new_enum(name)
+            .vis("pub")
+            .doc(&field.meta.doc)
+            .derive("serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone")
+            .attr(fuzz::CFG_DERIVE_ARBITRARY)
+            .attr("serde(untagged)");
+        enu.new_variant("Expr").tuple(&expr_name);
+        // CSS / JSON color literals (`\"#fff\"`, arrays, …) are not always accepted by
+        // `color::DynamicColor`'s serde impl — accept raw JSON here; validation can tighten.
+        enu.new_variant("Literal")
+            .tuple_with_attrs([fuzz::ARB_JSON_VALUE], "serde_json::Value");
+    } else {
+        scope
+            .new_struct(name)
+            .vis("pub")
+            .doc(&field.meta.doc)
+            .derive("serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone")
+            .attr(fuzz::CFG_DERIVE_ARBITRARY)
+            .tuple_field_with_attrs([fuzz::ARB_DYNAMIC_COLOR], "color::DynamicColor");
+    }
 
     if let Some(default) = &field.default {
         let fun = scope
@@ -20,7 +46,9 @@ pub fn generate(scope: &mut Scope, name: &str, field: &ColorField) {
             .impl_trait("Default")
             .new_fn("default")
             .ret("Self");
-        if let Value::String(default) = default {
+        if field.meta.expression.is_some() {
+            fun.line(format!("Self::Literal(serde_json::json!({default}))"));
+        } else if let Value::String(default) = default {
             fun.line(format!("Self(color::parse_color(\"{default}\").expect(\"Invalid color specified as the default value\"))"));
         } else {
             fun.line(format!("let default = serde_json::json!({default});"));

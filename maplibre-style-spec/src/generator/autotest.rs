@@ -26,6 +26,9 @@ pub fn generate_test_from_examples_if_present(
     name: &str,
     examples: Vec<&Value>,
 ) {
+    if examples.is_empty() {
+        return;
+    }
     let fun = scope
         .get_or_new_module("test")
         .new_fn(to_snake_case(format!("test_example_{name}_decodes")))

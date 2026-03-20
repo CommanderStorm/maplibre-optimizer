@@ -5,21 +5,54 @@ use crate::generator::fuzz;
 use crate::mir::types::NumberField;
 
 pub fn generate(scope: &mut Scope, name: &str, field: &NumberField) {
-    scope
-        .new_struct(name)
-        .doc(&field.meta.doc)
-        .vis("pub")
-        .derive("serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone")
-        .attr(fuzz::CFG_DERIVE_ARBITRARY)
-        .tuple_field_with_attrs([fuzz::ARB_JSON_NUMBER], "serde_json::Number");
+    if field.meta.expression.is_some() {
+        // `interpolate` / `step` for numeric properties use the combined ramp enum, not [`Number`].
+        let expr_name = format!("{name}Expression");
+        let expr = scope
+            .new_enum(&expr_name)
+            .doc("Nested expression: ramp (`interpolate` / …) or regular [`Number`] operators.")
+            .vis("pub")
+            .derive("serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone")
+            .attr(fuzz::CFG_DERIVE_ARBITRARY)
+            .attr("serde(untagged)");
+        // Try [`Number`] first so `["+", …]` / `["*", …]` decode without trying the ramp enum
+        // (which only accepts `interpolate`).
+        expr.new_variant("Number").tuple("Number");
+        expr.new_variant("Ramp")
+            .tuple("NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection");
+
+        let enu = scope
+            .new_enum(name)
+            .doc(&field.meta.doc)
+            .vis("pub")
+            .derive("serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone")
+            .attr(fuzz::CFG_DERIVE_ARBITRARY)
+            .attr("serde(untagged)");
+        enu.new_variant("Expr").tuple(&expr_name);
+        enu.new_variant("Literal")
+            .tuple_with_attrs([fuzz::ARB_JSON_NUMBER], "serde_json::Number");
+    } else {
+        scope
+            .new_struct(name)
+            .doc(&field.meta.doc)
+            .vis("pub")
+            .derive("serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone")
+            .attr(fuzz::CFG_DERIVE_ARBITRARY)
+            .tuple_field_with_attrs([fuzz::ARB_JSON_NUMBER], "serde_json::Number");
+    }
     if let Some(default) = &field.default {
         let default_expr = generate_number_default(default);
+        let default_body = if field.meta.expression.is_some() {
+            format!("Self::Literal({default_expr})") // Literal arm remains the numeric default
+        } else {
+            format!("Self({default_expr})")
+        };
         scope
             .new_impl(name)
             .impl_trait("Default")
             .new_fn("default")
             .ret("Self")
-            .line(format!("Self({default_expr})"));
+            .line(default_body);
     }
     generate_test_from_example_if_present(scope, name, field.meta.example.as_ref());
 }

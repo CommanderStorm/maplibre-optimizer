@@ -2,13 +2,13 @@ use std::collections::BTreeSet;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use serde::Deserialize;
+use maplibre_style_spec::validate::parse_and_validate_style;
 use serde_json::Value;
 
 /// Upstream reject-parity harness:
 /// - expected validity comes from `*.output.json` emptiness
-/// - actual validity is whether our current modeled style shape can deserialize.
-/// - this test intentionally lives outside codegen and does not alter CI wiring.
+/// - actual validity is whether `parse_and_validate_style` accepts the document
+///   (decode into the generated `MaplibreStyleSpecification` plus rules in `validate.rs`).
 #[test]
 fn upstream_style_spec_reject_parity() {
     let workspace_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
@@ -49,11 +49,11 @@ fn upstream_style_spec_reject_parity() {
             .unwrap_or_else(|e| panic!("failed to read {}: {e}", output_path.display()));
 
         let expected_valid = expected_validity(&output_json, &output_path);
-        let actual = serde_json::from_str::<ModeledStyleSpec>(&input_json);
+        let actual = parse_and_validate_style(&input_json);
         let actual_valid = actual.is_ok();
 
         if expected_valid != actual_valid {
-            let err = actual.err().map(|e| e.to_string()).unwrap_or_default();
+            let err = actual.err().unwrap_or_default();
             mismatches.push(format!(
                 "{} -> expected={}, actual={}{}",
                 file_name,
@@ -62,7 +62,7 @@ fn upstream_style_spec_reject_parity() {
                 if err.is_empty() {
                     String::new()
                 } else {
-                    format!(", decode_error={err}")
+                    format!(", error={err}")
                 }
             ));
         }
@@ -132,37 +132,4 @@ fn expected_validity(output_json: &str, output_path: &Path) -> bool {
 
 fn validity_word(valid: bool) -> &'static str {
     if valid { "valid" } else { "invalid" }
-}
-
-#[allow(dead_code)]
-#[derive(Debug, Deserialize)]
-#[serde(deny_unknown_fields)]
-struct ModeledStyleSpec {
-    version: u8,
-    sources: std::collections::BTreeMap<std::string::String, Value>,
-    layers: Vec<Value>,
-    #[serde(default)]
-    bearing: Option<Value>,
-    #[serde(default)]
-    center: Option<Value>,
-    #[serde(default)]
-    glyphs: Option<Value>,
-    #[serde(default)]
-    light: Option<Value>,
-    #[serde(default)]
-    metadata: Option<Value>,
-    #[serde(default)]
-    name: Option<Value>,
-    #[serde(default)]
-    pitch: Option<Value>,
-    #[serde(default)]
-    sprite: Option<Value>,
-    #[serde(default)]
-    state: Option<Value>,
-    #[serde(default)]
-    terrain: Option<Value>,
-    #[serde(default)]
-    transition: Option<Value>,
-    #[serde(default)]
-    zoom: Option<Value>,
 }

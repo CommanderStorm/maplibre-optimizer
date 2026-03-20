@@ -4,14 +4,20 @@ use serde_json::{Map, Value};
 
 use crate::spec::MaplibreStyleSpecification;
 
+/// Run the same JSON-tree checks as [`parse_and_validate_style`] without deserializing into
+/// [`MaplibreStyleSpecification`] (avoids dropping root keys not yet modeled in `spec.rs`).
+pub fn validate_style_value(v: &Value) -> Result<(), String> {
+    let obj = v
+        .as_object()
+        .ok_or_else(|| "style: object expected".to_string())?;
+    validate_from_root_object(obj)
+}
+
 /// Deserialize a style JSON string and run validation on the **parsed JSON tree** (before lossy
 /// deserialization drops unknown nested keys), then decode into [`MaplibreStyleSpecification`].
 pub fn parse_and_validate_style(json: &str) -> Result<MaplibreStyleSpecification, String> {
     let v: Value = serde_json::from_str(json).map_err(|e| e.to_string())?;
-    let obj = v
-        .as_object()
-        .ok_or_else(|| "style: object expected".to_string())?;
-    validate_from_root_object(obj)?;
+    validate_style_value(&v)?;
     serde_json::from_value(v).map_err(|e| e.to_string())
 }
 

@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["codegen2", "maplibre-style-spec"]
+members = ["codegen2", "maplibre-style-spec", "maplibre-style-optimizer"]
 
 [workspace.package]
 edition = "2024"

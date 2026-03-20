@@ -250,6 +250,31 @@ impl MirSyntax {
                 }
             }
         }
+        if operator == "match" {
+            for p in parameters.iter_mut() {
+                if p.name == "input" {
+                    // v8 narrows `input` to string|number, but real styles use arbitrary expressions
+                    // (e.g. `["get", "building_type"]`). Model as JSON until we have a richer union.
+                    p.r#type = MirParameterType::Expression(Box::new(MirExpression::Any));
+                }
+            }
+        }
+        if operator == "in" {
+            for p in parameters.iter_mut() {
+                if p.name == "array" {
+                    // Haystack may be a literal array or another expression; `Array` syntax enum is
+                    // too narrow (only `array` / `literal` / … operators).
+                    p.r#type = MirParameterType::Expression(Box::new(MirExpression::Any));
+                }
+            }
+        }
+        if operator == "index-of" {
+            for p in parameters.iter_mut() {
+                if p.name == "array" {
+                    p.r#type = MirParameterType::Expression(Box::new(MirExpression::Any));
+                }
+            }
+        }
     }
 
     /// Lower decoded reference syntax into MIR, applying fixes where the JSON schema is too narrow.

@@ -5,21 +5,39 @@ use crate::generator::fuzz;
 use crate::mir::types::ProjectionDefinitionField;
 
 pub fn generate(scope: &mut Scope, name: &str, field: &ProjectionDefinitionField) {
-    scope
-        .new_struct(name)
-        .vis("pub")
-        .doc(&field.meta.doc)
-        .derive("serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone")
-        .attr(fuzz::CFG_DERIVE_ARBITRARY)
-        .tuple_field("std::string::String");
+    if field.meta.expression.is_some() {
+        let enu = scope
+            .new_enum(name)
+            .vis("pub")
+            .doc(&field.meta.doc)
+            .derive("serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone")
+            .attr(fuzz::CFG_DERIVE_ARBITRARY)
+            .attr("serde(untagged)");
+        enu.new_variant("Expr")
+            .tuple("NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection");
+        enu.new_variant("Literal").tuple("std::string::String");
+    } else {
+        scope
+            .new_struct(name)
+            .vis("pub")
+            .doc(&field.meta.doc)
+            .derive("serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone")
+            .attr(fuzz::CFG_DERIVE_ARBITRARY)
+            .tuple_field("std::string::String");
+    }
 
     let default = &field.default;
+    let default_line = if field.meta.expression.is_some() {
+        format!("Self::Literal(\"{default}\".to_string())")
+    } else {
+        format!("Self(\"{default}\".to_string())")
+    };
     scope
         .new_impl(name)
         .impl_trait("Default")
         .new_fn("default")
         .ret("Self")
-        .line(format!("Self(\"{default}\".to_string())"));
+        .line(default_line);
     generate_test_from_example_if_present(scope, name, field.meta.example.as_ref());
 }
 
