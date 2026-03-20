@@ -93,9 +93,9 @@ mod tests {
         pub struct SpriteUrlAndId {
             id: std::string::String,
             /// URL where the sprite can be loaded from.
-            /// 
+            ///
             /// This is equivalent to the following multiple sprite definition:
-            /// 
+            ///
             /// ```json
             /// {
             ///         "id": "default",

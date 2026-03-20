@@ -126,7 +126,7 @@ Nested correctness is not enforced after decode, so invalid layer paint/layout, 
 
 `ModeledStyleSpec` in the integration test is **not** the shipping model. Some “valid” mismatches are **harness-only** (`extrakeys`, `font-faces`, `projection`) until either:
 
-- the harness deserializes into `MaplibreStyleSpecification`, or  
+- the harness deserializes into `MaplibreStyleSpecification`, or
 - a shared `parse_and_validate_style(json) -> Result<_, _>` API wraps codegen output.
 
 Once `spec.rs` compiles cleanly in the test crate (or is re-exported from `lib.rs`), point the harness at the real type + validation.
