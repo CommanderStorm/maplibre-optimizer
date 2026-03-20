@@ -10,7 +10,6 @@ use std::path::Path;
 use anyhow::Context;
 use maplibre_style_spec::decoder::StyleReference;
 use maplibre_style_spec::mir::IntermediateSpec;
-
 pub use optimize::{OptPasses, optimize_style_json_value};
 
 /// Load MIR from a MapLibre style reference `v8.json` on disk.

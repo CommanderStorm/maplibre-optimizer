@@ -54,9 +54,8 @@ fn optimize_value_recursive(v: &mut Value, passes: &OptPasses) {
 mod tests {
     use std::path::Path;
 
-    use crate::load_intermediate_spec_from_v8_path;
-
     use super::*;
+    use crate::load_intermediate_spec_from_v8_path;
 
     fn sample_mir() -> IntermediateSpec {
         let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("../upstream/src/reference/v8.json");
