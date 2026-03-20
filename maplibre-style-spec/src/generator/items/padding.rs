@@ -12,10 +12,6 @@ pub fn generate(scope: &mut Scope, name: &str, field: &PaddingField) {
         .doc(&field.meta.doc)
         .derive("serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone")
         .attr(fuzz::CFG_DERIVE_ARBITRARY);
-    enu.new_variant("Unwrapped")
-        .annotation("#[deprecated = \"Please see [`Self::One`] instead\"]")
-        .doc("A single value applies to all four sides.\n\nOnly avaliable for backwards compatibility.")
-        .tuple_with_attrs([fuzz::ARB_JSON_NUMBER], "serde_json::Number");
     enu.new_variant("One")
         .doc("A single value applies to all four sides")
         .tuple_with_attrs(
@@ -91,14 +87,6 @@ mod tests {
         #[serde(untagged)]
         #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
         pub enum Foo {
-            /// A single value applies to all four sides.
-            /// 
-            /// Only avaliable for backwards compatibility.
-            #[deprecated = "Please see [`Self::One`] instead"]
-            Unwrapped(
-                #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
-                serde_json::Number,
-            ),
             /// A single value applies to all four sides
             One(
                 #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_box_1_json_number))]

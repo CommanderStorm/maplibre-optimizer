@@ -679,7 +679,7 @@ impl Default for FunctionBase {
 }
 
 /// The color space in which colors interpolated. Interpolating colors in perceptual color spaces like LAB and HCL tend to produce color ramps that look more consistent and produce colors that can be differentiated more easily than those interpolated in RGB space.
-#[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy)]
+#[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy, Default)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum FunctionColorSpace {
     /// Use the HCL color space to interpolate color values, interpolating the Hue, Chroma, and Luminance channels individually.
@@ -690,13 +690,8 @@ pub enum FunctionColorSpace {
     Lab,
     /// Use the RGB color space to interpolate color values
     #[serde(rename = "rgb")]
+    #[default]
     Rgb,
-}
-
-impl Default for FunctionColorSpace {
-    fn default() -> Self {
-        Self::Rgb
-    }
 }
 
 /// A value to serve as a fallback function result when a value isn't otherwise available. It is used in the following circumstances:
@@ -739,7 +734,7 @@ impl Default for FunctionProperty {
 pub struct FunctionStops(Vec<FunctionStop>);
 
 /// The interpolation strategy to use in function evaluation.
-#[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy)]
+#[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy, Default)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum FunctionType {
     /// Return the output value of the stop equal to the function input.
@@ -747,6 +742,7 @@ pub enum FunctionType {
     Categorical,
     /// Generate an output by interpolating between stops just less than and just greater than the function input.
     #[serde(rename = "exponential")]
+    #[default]
     Exponential,
     /// Return the input value as the output value.
     #[serde(rename = "identity")]
@@ -754,12 +750,6 @@ pub enum FunctionType {
     /// Return the output value of the stop just less than the function input.
     #[serde(rename = "interval")]
     Interval,
-}
-
-impl Default for FunctionType {
-    fn default() -> Self {
-        Self::Exponential
-    }
 }
 
 /// FunctionStopValue Values
@@ -899,7 +889,7 @@ pub struct Light {
 }
 
 /// Whether extruded geometries are lit relative to the map or viewport.
-#[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy)]
+#[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy, Default)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum LightAnchor {
     /// The position of the light source is aligned to the rotation of the map.
@@ -907,13 +897,8 @@ pub enum LightAnchor {
     Map,
     /// The position of the light source is aligned to the rotation of the viewport.
     #[serde(rename = "viewport")]
+    #[default]
     Viewport,
-}
-
-impl Default for LightAnchor {
-    fn default() -> Self {
-        Self::Viewport
-    }
 }
 
 /// Color tint for lighting extruded geometries.
@@ -3582,7 +3567,7 @@ impl Default for RasterSourceMinzoom {
 }
 
 /// Influences the y direction of the tile coordinates. The global-mercator (aka Spherical Mercator) profile is assumed.
-#[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy)]
+#[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy, Default)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum RasterSourceScheme {
     /// OSGeo spec scheme.
@@ -3590,13 +3575,8 @@ pub enum RasterSourceScheme {
     Tms,
     /// Slippy map tilenames scheme.
     #[serde(rename = "xyz")]
+    #[default]
     Xyz,
-}
-
-impl Default for RasterSourceScheme {
-    fn default() -> Self {
-        Self::Xyz
-    }
 }
 
 /// The minimum visual size to display tiles for this layer. Only configurable for raster layers.
@@ -3736,7 +3716,7 @@ impl Default for RasterDemSourceBounds {
 }
 
 /// The encoding used by this source. Mapbox Terrain RGB is used by default.
-#[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy)]
+#[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy, Default)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum RasterDemSourceEncoding {
     /// Decodes tiles using the redFactor, blueFactor, greenFactor, baseShift parameters.
@@ -3744,16 +3724,11 @@ pub enum RasterDemSourceEncoding {
     Custom,
     /// Mapbox Terrain RGB tiles. See https://www.mapbox.com/help/access-elevation-data/#mapbox-terrain-rgb for more info.
     #[serde(rename = "mapbox")]
+    #[default]
     Mapbox,
     /// Terrarium format PNG tiles. See https://aws.amazon.com/es/public-datasets/terrain/ for more info.
     #[serde(rename = "terrarium")]
     Terrarium,
-}
-
-impl Default for RasterDemSourceEncoding {
-    fn default() -> Self {
-        Self::Mapbox
-    }
 }
 
 /// Value that will be multiplied by the green channel value when decoding. Only used on custom encodings.
@@ -3917,7 +3892,7 @@ impl Default for VectorSourceBounds {
 }
 
 /// The encoding used by this source. Mapbox Vector Tiles encoding is used by default.
-#[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy)]
+#[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy, Default)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum VectorSourceEncoding {
     /// MapLibre Vector Tiles. See https://github.com/maplibre/maplibre-tile-spec for more info.
@@ -3925,13 +3900,8 @@ pub enum VectorSourceEncoding {
     Mlt,
     /// Mapbox Vector Tiles. See http://github.com/mapbox/vector-tile-spec for more info.
     #[serde(rename = "mvt")]
+    #[default]
     Mvt,
-}
-
-impl Default for VectorSourceEncoding {
-    fn default() -> Self {
-        Self::Mvt
-    }
 }
 
 /// Maximum zoom level for which tiles are available, as in the TileJSON spec. Data from tiles at the maxzoom are used when displaying the map at higher zoom levels.
@@ -3974,7 +3944,7 @@ impl Default for VectorSourceMinzoom {
 pub struct VectorSourcePromoteId(std::string::String);
 
 /// Influences the y direction of the tile coordinates. The global-mercator (aka Spherical Mercator) profile is assumed.
-#[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy)]
+#[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy, Default)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum VectorSourceScheme {
     /// OSGeo spec scheme.
@@ -3982,13 +3952,8 @@ pub enum VectorSourceScheme {
     Tms,
     /// Slippy map tilenames scheme.
     #[serde(rename = "xyz")]
+    #[default]
     Xyz,
-}
-
-impl Default for VectorSourceScheme {
-    fn default() -> Self {
-        Self::Xyz
-    }
 }
 
 /// An array of one or more tile source URLs, as in the TileJSON spec.
@@ -4129,19 +4094,14 @@ pub struct BackgroundLayoutLayer {
 }
 
 /// Whether this layer is displayed.
-#[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy)]
+#[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy, Default)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum BackgroundLayoutLayerVisibility {
     #[serde(rename = "none")]
     None,
     #[serde(rename = "visible")]
+    #[default]
     Visible,
-}
-
-impl Default for BackgroundLayoutLayerVisibility {
-    fn default() -> Self {
-        Self::Visible
-    }
 }
 
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
@@ -4213,19 +4173,14 @@ pub struct CircleLayoutLayerCircleSortKey(
 );
 
 /// Whether this layer is displayed.
-#[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy)]
+#[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy, Default)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum CircleLayoutLayerVisibility {
     #[serde(rename = "none")]
     None,
     #[serde(rename = "visible")]
+    #[default]
     Visible,
-}
-
-impl Default for CircleLayoutLayerVisibility {
-    fn default() -> Self {
-        Self::Visible
-    }
 }
 
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
@@ -4315,35 +4270,25 @@ impl Default for CirclePaintLayerCircleOpacity {
 }
 
 /// Orientation of circle when map is pitched.
-#[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy)]
+#[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy, Default)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum CirclePaintLayerCirclePitchAlignment {
     #[serde(rename = "map")]
     Map,
     #[serde(rename = "viewport")]
+    #[default]
     Viewport,
-}
-
-impl Default for CirclePaintLayerCirclePitchAlignment {
-    fn default() -> Self {
-        Self::Viewport
-    }
 }
 
 /// Controls the scaling behavior of the circle when the map is pitched.
-#[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy)]
+#[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy, Default)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum CirclePaintLayerCirclePitchScale {
     #[serde(rename = "map")]
+    #[default]
     Map,
     #[serde(rename = "viewport")]
     Viewport,
-}
-
-impl Default for CirclePaintLayerCirclePitchScale {
-    fn default() -> Self {
-        Self::Map
-    }
 }
 
 /// Circle radius.
@@ -4431,19 +4376,14 @@ impl Default for CirclePaintLayerCircleTranslate {
 }
 
 /// Controls the frame of reference for `circle-translate`.
-#[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy)]
+#[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy, Default)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum CirclePaintLayerCircleTranslateAnchor {
     #[serde(rename = "map")]
+    #[default]
     Map,
     #[serde(rename = "viewport")]
     Viewport,
-}
-
-impl Default for CirclePaintLayerCircleTranslateAnchor {
-    fn default() -> Self {
-        Self::Map
-    }
 }
 
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
@@ -4454,19 +4394,14 @@ pub struct ColorReliefLayoutLayer {
 }
 
 /// Whether this layer is displayed.
-#[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy)]
+#[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy, Default)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum ColorReliefLayoutLayerVisibility {
     #[serde(rename = "none")]
     None,
     #[serde(rename = "visible")]
+    #[default]
     Visible,
-}
-
-impl Default for ColorReliefLayoutLayerVisibility {
-    fn default() -> Self {
-        Self::Visible
-    }
 }
 
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
@@ -4524,19 +4459,14 @@ pub struct FillLayoutLayerFillSortKey(
 );
 
 /// Whether this layer is displayed.
-#[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy)]
+#[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy, Default)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum FillLayoutLayerVisibility {
     #[serde(rename = "none")]
     None,
     #[serde(rename = "visible")]
+    #[default]
     Visible,
-}
-
-impl Default for FillLayoutLayerVisibility {
-    fn default() -> Self {
-        Self::Visible
-    }
 }
 
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
@@ -4640,19 +4570,14 @@ impl Default for FillPaintLayerFillTranslate {
 }
 
 /// Controls the frame of reference for `fill-translate`.
-#[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy)]
+#[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy, Default)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum FillPaintLayerFillTranslateAnchor {
     #[serde(rename = "map")]
+    #[default]
     Map,
     #[serde(rename = "viewport")]
     Viewport,
-}
-
-impl Default for FillPaintLayerFillTranslateAnchor {
-    fn default() -> Self {
-        Self::Map
-    }
 }
 
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
@@ -4663,19 +4588,14 @@ pub struct FillExtrusionLayoutLayer {
 }
 
 /// Whether this layer is displayed.
-#[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy)]
+#[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy, Default)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum FillExtrusionLayoutLayerVisibility {
     #[serde(rename = "none")]
     None,
     #[serde(rename = "visible")]
+    #[default]
     Visible,
-}
-
-impl Default for FillExtrusionLayoutLayerVisibility {
-    fn default() -> Self {
-        Self::Visible
-    }
 }
 
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
@@ -4799,19 +4719,14 @@ impl Default for FillExtrusionPaintLayerFillExtrusionTranslate {
 }
 
 /// Controls the frame of reference for `fill-extrusion-translate`.
-#[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy)]
+#[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy, Default)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum FillExtrusionPaintLayerFillExtrusionTranslateAnchor {
     #[serde(rename = "map")]
+    #[default]
     Map,
     #[serde(rename = "viewport")]
     Viewport,
-}
-
-impl Default for FillExtrusionPaintLayerFillExtrusionTranslateAnchor {
-    fn default() -> Self {
-        Self::Map
-    }
 }
 
 /// Whether to apply a vertical gradient to the sides of a fill-extrusion layer. If true, sides will be shaded slightly darker farther down.
@@ -4833,19 +4748,14 @@ pub struct HeatmapLayoutLayer {
 }
 
 /// Whether this layer is displayed.
-#[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy)]
+#[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy, Default)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum HeatmapLayoutLayerVisibility {
     #[serde(rename = "none")]
     None,
     #[serde(rename = "visible")]
+    #[default]
     Visible,
-}
-
-impl Default for HeatmapLayoutLayerVisibility {
-    fn default() -> Self {
-        Self::Visible
-    }
 }
 
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
@@ -4977,19 +4887,14 @@ pub struct HillshadeLayoutLayer {
 }
 
 /// Whether this layer is displayed.
-#[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy)]
+#[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy, Default)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum HillshadeLayoutLayerVisibility {
     #[serde(rename = "none")]
     None,
     #[serde(rename = "visible")]
+    #[default]
     Visible,
-}
-
-impl Default for HillshadeLayoutLayerVisibility {
-    fn default() -> Self {
-        Self::Visible
-    }
 }
 
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
@@ -5102,19 +5007,14 @@ impl Default for HillshadePaintLayerHillshadeIlluminationAltitude {
 }
 
 /// Direction of light source when map is rotated.
-#[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy)]
+#[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy, Default)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum HillshadePaintLayerHillshadeIlluminationAnchor {
     #[serde(rename = "map")]
     Map,
     #[serde(rename = "viewport")]
+    #[default]
     Viewport,
-}
-
-impl Default for HillshadePaintLayerHillshadeIlluminationAnchor {
-    fn default() -> Self {
-        Self::Viewport
-    }
 }
 
 /// The direction of the light source(s) used to generate the hillshading with 0 as the top of the viewport if `hillshade-illumination-anchor` is set to `viewport` and due north if `hillshade-illumination-anchor` is set to `map`. Only when `hillshade-method` is set to `multidirectional` can you specify multiple light sources.
@@ -5142,7 +5042,7 @@ impl Default for HillshadePaintLayerHillshadeIlluminationDirection {
 }
 
 /// The hillshade algorithm to use, one of `standard`, `basic`, `combined`, `igor`, or `multidirectional`. ![image](assets/hillshade_methods.png)
-#[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy)]
+#[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy, Default)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum HillshadePaintLayerHillshadeMethod {
     #[serde(rename = "basic")]
@@ -5154,13 +5054,8 @@ pub enum HillshadePaintLayerHillshadeMethod {
     #[serde(rename = "multidirectional")]
     Multidirectional,
     #[serde(rename = "standard")]
+    #[default]
     Standard,
-}
-
-impl Default for HillshadePaintLayerHillshadeMethod {
-    fn default() -> Self {
-        Self::Standard
-    }
 }
 
 /// The shading color of areas that face away from the light source(s). Only when `hillshade-method` is set to `multidirectional` can you specify multiple light sources.
@@ -5211,10 +5106,11 @@ pub struct LineLayoutLayer {
 }
 
 /// The display of line endings.
-#[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy)]
+#[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy, Default)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum LineLayoutLayerLineCap {
     #[serde(rename = "butt")]
+    #[default]
     Butt,
     #[serde(rename = "round")]
     Round,
@@ -5222,28 +5118,17 @@ pub enum LineLayoutLayerLineCap {
     Square,
 }
 
-impl Default for LineLayoutLayerLineCap {
-    fn default() -> Self {
-        Self::Butt
-    }
-}
-
 /// The display of lines when joining.
-#[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy)]
+#[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy, Default)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum LineLayoutLayerLineJoin {
     #[serde(rename = "bevel")]
     Bevel,
     #[serde(rename = "miter")]
+    #[default]
     Miter,
     #[serde(rename = "round")]
     Round,
-}
-
-impl Default for LineLayoutLayerLineJoin {
-    fn default() -> Self {
-        Self::Miter
-    }
 }
 
 /// Used to automatically convert miter joins to bevel joins for sharp angles.
@@ -5289,19 +5174,14 @@ pub struct LineLayoutLayerLineSortKey(
 );
 
 /// Whether this layer is displayed.
-#[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy)]
+#[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy, Default)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum LineLayoutLayerVisibility {
     #[serde(rename = "none")]
     None,
     #[serde(rename = "visible")]
+    #[default]
     Visible,
-}
-
-impl Default for LineLayoutLayerVisibility {
-    fn default() -> Self {
-        Self::Visible
-    }
 }
 
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
@@ -5465,19 +5345,14 @@ impl Default for LinePaintLayerLineTranslate {
 }
 
 /// Controls the frame of reference for `line-translate`.
-#[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy)]
+#[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy, Default)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum LinePaintLayerLineTranslateAnchor {
     #[serde(rename = "map")]
+    #[default]
     Map,
     #[serde(rename = "viewport")]
     Viewport,
-}
-
-impl Default for LinePaintLayerLineTranslateAnchor {
-    fn default() -> Self {
-        Self::Map
-    }
 }
 
 /// Stroke thickness.
@@ -5505,19 +5380,14 @@ pub struct RasterLayoutLayer {
 }
 
 /// Whether this layer is displayed.
-#[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy)]
+#[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy, Default)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum RasterLayoutLayerVisibility {
     #[serde(rename = "none")]
     None,
     #[serde(rename = "visible")]
+    #[default]
     Visible,
-}
-
-impl Default for RasterLayoutLayerVisibility {
-    fn default() -> Self {
-        Self::Visible
-    }
 }
 
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
@@ -5652,19 +5522,14 @@ impl Default for RasterPaintLayerRasterOpacity {
 }
 
 /// The resampling/interpolation method to use for overscaling, also known as texture magnification filter
-#[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy)]
+#[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy, Default)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum RasterPaintLayerRasterResampling {
     #[serde(rename = "linear")]
+    #[default]
     Linear,
     #[serde(rename = "nearest")]
     Nearest,
-}
-
-impl Default for RasterPaintLayerRasterResampling {
-    fn default() -> Self {
-        Self::Linear
-    }
 }
 
 /// Increase or reduce the saturation of the image.
@@ -5849,7 +5714,7 @@ impl Default for SymbolLayoutLayerIconAllowOverlap {
 }
 
 /// Part of the icon placed closest to the anchor.
-#[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy)]
+#[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy, Default)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum SymbolLayoutLayerIconAnchor {
     #[serde(rename = "bottom")]
@@ -5859,6 +5724,7 @@ pub enum SymbolLayoutLayerIconAnchor {
     #[serde(rename = "bottom-right")]
     BottomRight,
     #[serde(rename = "center")]
+    #[default]
     Center,
     #[serde(rename = "left")]
     Left,
@@ -5870,12 +5736,6 @@ pub enum SymbolLayoutLayerIconAnchor {
     TopLeft,
     #[serde(rename = "top-right")]
     TopRight,
-}
-
-impl Default for SymbolLayoutLayerIconAnchor {
-    fn default() -> Self {
-        Self::Center
-    }
 }
 
 /// If true, other symbols can be visible even if they collide with the icon.
@@ -5952,14 +5812,6 @@ pub enum SymbolLayoutLayerIconOverlap {
 #[serde(untagged)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum SymbolLayoutLayerIconPadding {
-    /// A single value applies to all four sides.
-    ///
-    /// Only avaliable for backwards compatibility.
-    #[deprecated = "Please see [`Self::One`] instead"]
-    Unwrapped(
-        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
-        serde_json::Number,
-    ),
     /// A single value applies to all four sides
     One(
         #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_box_1_json_number))]
@@ -5989,21 +5841,16 @@ impl Default for SymbolLayoutLayerIconPadding {
 }
 
 /// Orientation of icon when map is pitched.
-#[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy)]
+#[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy, Default)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum SymbolLayoutLayerIconPitchAlignment {
     #[serde(rename = "auto")]
+    #[default]
     Auto,
     #[serde(rename = "map")]
     Map,
     #[serde(rename = "viewport")]
     Viewport,
-}
-
-impl Default for SymbolLayoutLayerIconPitchAlignment {
-    fn default() -> Self {
-        Self::Auto
-    }
 }
 
 /// Rotates the icon clockwise.
@@ -6024,21 +5871,16 @@ impl Default for SymbolLayoutLayerIconRotate {
 }
 
 /// In combination with `symbol-placement`, determines the rotation behavior of icons.
-#[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy)]
+#[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy, Default)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum SymbolLayoutLayerIconRotationAlignment {
     #[serde(rename = "auto")]
+    #[default]
     Auto,
     #[serde(rename = "map")]
     Map,
     #[serde(rename = "viewport")]
     Viewport,
-}
-
-impl Default for SymbolLayoutLayerIconRotationAlignment {
-    fn default() -> Self {
-        Self::Auto
-    }
 }
 
 /// Scales the original size of the icon by the provided factor. The new pixel size of the image will be the original pixel size multiplied by `icon-size`. 1 is the original size; 3 triples the size of the image.
@@ -6059,7 +5901,7 @@ impl Default for SymbolLayoutLayerIconSize {
 }
 
 /// Scales the icon to fit around the associated text.
-#[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy)]
+#[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy, Default)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum SymbolLayoutLayerIconTextFit {
     #[serde(rename = "both")]
@@ -6067,15 +5909,10 @@ pub enum SymbolLayoutLayerIconTextFit {
     #[serde(rename = "height")]
     Height,
     #[serde(rename = "none")]
+    #[default]
     None,
     #[serde(rename = "width")]
     Width,
-}
-
-impl Default for SymbolLayoutLayerIconTextFit {
-    fn default() -> Self {
-        Self::None
-    }
 }
 
 /// Size of the additional area added to dimensions determined by `icon-text-fit`, in clockwise order: top, right, bottom, left.
@@ -6113,7 +5950,7 @@ impl Default for SymbolLayoutLayerSymbolAvoidEdges {
 }
 
 /// Label placement relative to its geometry.
-#[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy)]
+#[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy, Default)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum SymbolLayoutLayerSymbolPlacement {
     #[serde(rename = "line")]
@@ -6121,13 +5958,8 @@ pub enum SymbolLayoutLayerSymbolPlacement {
     #[serde(rename = "line-center")]
     LineCenter,
     #[serde(rename = "point")]
+    #[default]
     Point,
-}
-
-impl Default for SymbolLayoutLayerSymbolPlacement {
-    fn default() -> Self {
-        Self::Point
-    }
 }
 
 /// Sorts features in ascending order based on this value. Features with lower sort keys are drawn and placed first.  When `icon-allow-overlap` or `text-allow-overlap` is `false`, features with a lower sort key will have priority during placement. When `icon-allow-overlap` or `text-allow-overlap` is set to `true`, features with a higher sort key will overlap over features with a lower sort key.
@@ -6156,21 +5988,16 @@ impl Default for SymbolLayoutLayerSymbolSpacing {
 }
 
 /// Determines whether overlapping symbols in the same layer are rendered in the order that they appear in the data source or by their y-position relative to the viewport. To control the order and prioritization of symbols otherwise, use `symbol-sort-key`.
-#[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy)]
+#[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy, Default)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum SymbolLayoutLayerSymbolZOrder {
     #[serde(rename = "auto")]
+    #[default]
     Auto,
     #[serde(rename = "source")]
     Source,
     #[serde(rename = "viewport-y")]
     ViewportY,
-}
-
-impl Default for SymbolLayoutLayerSymbolZOrder {
-    fn default() -> Self {
-        Self::Auto
-    }
 }
 
 /// If true, the text will be visible even if it collides with other previously drawn symbols.
@@ -6185,7 +6012,7 @@ impl Default for SymbolLayoutLayerTextAllowOverlap {
 }
 
 /// Part of the text placed closest to the anchor.
-#[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy)]
+#[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy, Default)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum SymbolLayoutLayerTextAnchor {
     #[serde(rename = "bottom")]
@@ -6195,6 +6022,7 @@ pub enum SymbolLayoutLayerTextAnchor {
     #[serde(rename = "bottom-right")]
     BottomRight,
     #[serde(rename = "center")]
+    #[default]
     Center,
     #[serde(rename = "left")]
     Left,
@@ -6206,12 +6034,6 @@ pub enum SymbolLayoutLayerTextAnchor {
     TopLeft,
     #[serde(rename = "top-right")]
     TopRight,
-}
-
-impl Default for SymbolLayoutLayerTextAnchor {
-    fn default() -> Self {
-        Self::Center
-    }
 }
 
 /// Value to use for a text label. If a plain `string` is provided, it will be treated as a `formatted` with default/inherited formatting options.
@@ -6251,23 +6073,18 @@ impl Default for SymbolLayoutLayerTextIgnorePlacement {
 }
 
 /// Text justification options.
-#[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy)]
+#[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy, Default)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum SymbolLayoutLayerTextJustify {
     #[serde(rename = "auto")]
     Auto,
     #[serde(rename = "center")]
+    #[default]
     Center,
     #[serde(rename = "left")]
     Left,
     #[serde(rename = "right")]
     Right,
-}
-
-impl Default for SymbolLayoutLayerTextJustify {
-    fn default() -> Self {
-        Self::Center
-    }
 }
 
 /// If true, the text may be flipped vertically to prevent it from being rendered upside-down.
@@ -6409,21 +6226,16 @@ impl Default for SymbolLayoutLayerTextPadding {
 }
 
 /// Orientation of text when map is pitched.
-#[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy)]
+#[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy, Default)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum SymbolLayoutLayerTextPitchAlignment {
     #[serde(rename = "auto")]
+    #[default]
     Auto,
     #[serde(rename = "map")]
     Map,
     #[serde(rename = "viewport")]
     Viewport,
-}
-
-impl Default for SymbolLayoutLayerTextPitchAlignment {
-    fn default() -> Self {
-        Self::Auto
-    }
 }
 
 /// Radial offset of text, in the direction of the symbol's anchor. Useful in combination with `text-variable-anchor`, which defaults to using the two-dimensional `text-offset` if present.
@@ -6461,10 +6273,11 @@ impl Default for SymbolLayoutLayerTextRotate {
 }
 
 /// In combination with `symbol-placement`, determines the rotation behavior of the individual glyphs forming the text.
-#[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy)]
+#[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy, Default)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum SymbolLayoutLayerTextRotationAlignment {
     #[serde(rename = "auto")]
+    #[default]
     Auto,
     #[serde(rename = "map")]
     Map,
@@ -6472,12 +6285,6 @@ pub enum SymbolLayoutLayerTextRotationAlignment {
     Viewport,
     #[serde(rename = "viewport-glyph")]
     ViewportGlyph,
-}
-
-impl Default for SymbolLayoutLayerTextRotationAlignment {
-    fn default() -> Self {
-        Self::Auto
-    }
 }
 
 /// Font size.
@@ -6498,21 +6305,16 @@ impl Default for SymbolLayoutLayerTextSize {
 }
 
 /// Specifies how to capitalize text, similar to the CSS `text-transform` property.
-#[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy)]
+#[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy, Default)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum SymbolLayoutLayerTextTransform {
     #[serde(rename = "lowercase")]
     Lowercase,
     #[serde(rename = "none")]
+    #[default]
     None,
     #[serde(rename = "uppercase")]
     Uppercase,
-}
-
-impl Default for SymbolLayoutLayerTextTransform {
-    fn default() -> Self {
-        Self::None
-    }
 }
 
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy)]
@@ -6580,19 +6382,14 @@ pub enum SymbolLayoutLayerTextWritingModeValue {
 pub struct SymbolLayoutLayerTextWritingMode(Vec<SymbolLayoutLayerTextWritingModeValue>);
 
 /// Whether this layer is displayed.
-#[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy)]
+#[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy, Default)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum SymbolLayoutLayerVisibility {
     #[serde(rename = "none")]
     None,
     #[serde(rename = "visible")]
+    #[default]
     Visible,
-}
-
-impl Default for SymbolLayoutLayerVisibility {
-    fn default() -> Self {
-        Self::Visible
-    }
 }
 
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
@@ -6748,19 +6545,14 @@ impl Default for SymbolPaintLayerIconTranslate {
 }
 
 /// Controls the frame of reference for `icon-translate`.
-#[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy)]
+#[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy, Default)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum SymbolPaintLayerIconTranslateAnchor {
     #[serde(rename = "map")]
+    #[default]
     Map,
     #[serde(rename = "viewport")]
     Viewport,
-}
-
-impl Default for SymbolPaintLayerIconTranslateAnchor {
-    fn default() -> Self {
-        Self::Map
-    }
 }
 
 /// The color with which the text will be drawn.
@@ -6865,17 +6657,12 @@ impl Default for SymbolPaintLayerTextTranslate {
 }
 
 /// Controls the frame of reference for `text-translate`.
-#[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy)]
+#[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy, Default)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum SymbolPaintLayerTextTranslateAnchor {
     #[serde(rename = "map")]
+    #[default]
     Map,
     #[serde(rename = "viewport")]
     Viewport,
-}
-
-impl Default for SymbolPaintLayerTextTranslateAnchor {
-    fn default() -> Self {
-        Self::Map
-    }
 }

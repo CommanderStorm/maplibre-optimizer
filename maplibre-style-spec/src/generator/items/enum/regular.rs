@@ -11,30 +11,26 @@ pub fn generate_regular_enum(
     variants: &RegularEnum,
     default: Option<&serde_json::Value>,
 ) {
-    let enu = scope
+    let default_key = default.map(|d| d.to_string());
+    let default_variant = default_key.as_ref().map(|d| to_upper_camel_case(d));
+    let mut enu = scope
         .new_enum(name)
         .doc(doc)
         .vis("pub")
         .derive("serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy")
         .attr(fuzz::CFG_DERIVE_ARBITRARY);
+    if default_key.is_some() {
+        enu = enu.derive("Default");
+    }
     for (key, value) in &variants.variants {
         let var_name = to_upper_camel_case(key);
         let var = enu.new_variant(&var_name).doc(&value.doc);
         if key != &var_name {
             var.annotation(format!("#[serde(rename=\"{key}\")]"));
         }
-    }
-
-    if let Some(default) = default {
-        scope
-            .new_impl(name)
-            .impl_trait("Default")
-            .new_fn("default")
-            .ret("Self")
-            .line(format!(
-                "Self::{}",
-                to_upper_camel_case(default.to_string())
-            ));
+        if default_variant.as_ref() == Some(&var_name) {
+            var.annotation("#[default]");
+        }
     }
 }
 

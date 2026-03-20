@@ -55,7 +55,7 @@ pub struct ArrayOfNumberLiteral(Vec<NumberLiteral>);
 pub struct MaplibreStyleSpecification;
 
 /// The color space in which colors interpolated. Interpolating colors in perceptual color spaces like LAB and HCL tend to produce color ramps that look more consistent and produce colors that can be differentiated more easily than those interpolated in RGB space.
-#[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy)]
+#[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy, Default)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum ColorSpace {
     /// Use the HCL color space to interpolate color values, interpolating the Hue, Chroma, and Luminance channels individually.
@@ -66,13 +66,8 @@ pub enum ColorSpace {
     Lab,
     /// Use the RGB color space to interpolate color values
     #[serde(rename="rgb")]
+    #[default]
     Rgb,
-}
-
-impl Default for ColorSpace {
-    fn default() -> Self {
-        Self::Rgb
-    }
 }
 
 #[cfg(test)]
