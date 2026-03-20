@@ -25,14 +25,14 @@ export RUST_BACKTRACE := env('RUST_BACKTRACE', if ci_mode == '1' {'1'} else {''}
     {{just_executable()}} --list
 
 # Run integration tests and save its output as the new expected output (ordering is important)
+# `clean-gen` stubs `spec.rs`; `bless-insta` must run `gen` before `cargo insta test` so the
+# workspace compiles with `full` (same issue as the `gen` recipe).
 bless: clean-gen clean-test bless-insta
-    # done this way as otherwise just can optimise the order when this runs
-    {{just_executable()}} gen
 
-# Run integration tests and save its output as the new expected output
-bless-insta *args:  (cargo-install 'cargo-insta')
-    cargo insta test --accept --workspace {{args}}
+# Run integration tests and save their insta snapshots (`--accept`).
+bless-insta *args: (cargo-install 'cargo-insta')
     {{just_executable()}} gen
+    cargo insta test --accept --workspace {{args}}
 
 # Quick compile without building a binary
 check: (cargo-install 'cargo-hack')
