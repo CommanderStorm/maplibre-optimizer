@@ -16,7 +16,6 @@ pub fn preprocess_expression(
 ) -> IntermediateExpressions {
     // not used in the generator or MIR
     let _ = fields.remove("filter_operator");
-    let _ = fields.remove("filter");
     let Some(_) = fields.remove("expression") else {
         // Not present in test fixtures — return empty.
         return IntermediateExpressions {

@@ -1,6 +1,11 @@
 #[allow(unused_imports)]
 use super::*;
 
+/// A filter selects specific features from a layer.
+#[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone, Copy)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+pub struct Filter(bool);
+
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct Function {

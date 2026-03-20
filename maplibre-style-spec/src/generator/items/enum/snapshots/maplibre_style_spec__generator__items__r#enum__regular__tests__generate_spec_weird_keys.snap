@@ -54,24 +54,6 @@ pub struct ArrayOfNumberLiteral(Vec<NumberLiteral>);
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct MaplibreStyleSpecification;
 
-/// The filter operator.
-#[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum FilterOperator {
-    /// `["!=", key, value]` inequality: `feature[key] ≠ value`
-    #[serde(rename="!=")]
-    NotEqual,
-    /// `["==", key, value]` equality: `feature[key] = value`
-    #[serde(rename="==")]
-    EqualEqual,
-    /// `[">", key, value]` greater than: `feature[key] > value`
-    #[serde(rename=">")]
-    Greater,
-    /// `[">=", key, value]` greater than or equal: `feature[key] ≥ value`
-    #[serde(rename=">=")]
-    GreaterEqual,
-}
-
 #[cfg(test)]
 mod test {
     use super::*;

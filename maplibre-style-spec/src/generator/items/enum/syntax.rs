@@ -640,16 +640,21 @@ fn generate_multi_overload(
     syntax: &Syntax,
 ) {
     if comparison_operands_merge_applies(syntax) {
-        scope
+        let enu = scope
             .new_enum(options_name)
             .doc(format!(
                 "Options for deserializing the syntax enum variant [`{name}::{var_name}`]"
             ))
             .vis("pub")
             .derive("serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone")
-            .attr(fuzz::CFG_DERIVE_ARBITRARY)
-            .new_variant("Args")
-            .tuple("(serde_json::Value, serde_json::Value, Option<Collator>)");
+            .attr("serde(untagged)")
+            .attr(fuzz::CFG_DERIVE_ARBITRARY);
+        let args = enu.new_variant("Args");
+        // Build the tuple explicitly so the trailing `collator?` slot gets a serde default.
+        // Without `#[serde(default)]`, serde won't accept the shortened 2-operand form.
+        args.tuple("serde_json::Value");
+        args.tuple("serde_json::Value");
+        args.tuple_with_attrs(["#[serde(default)]"], "Option<Collator>");
         return;
     }
     // because scope can only be owned by one owner, we first need to generate all tuples, then can add them
@@ -1352,7 +1357,9 @@ fn generate_syntax_enum_deserializer_regular_variadic_variant(
             visit_seq.line("while let Some(element) = seq.next_element()? {");
         } else {
             let base_name = to_snake_case(&overload.parameters[0]).replace("_1", "_i");
-            visit_seq.line(format!("while let Some({base_name}) = seq.next_element()? {{"));
+            visit_seq.line(format!(
+                "while let Some({base_name}) = seq.next_element()? {{"
+            ));
             let non_base_parameters = &overload.parameters[1..position_of_variadic_separator]
                 .iter()
                 .map(|p| (to_snake_case(p).replace("_1", "_i"), p.ends_with('?')))
@@ -1374,13 +1381,9 @@ fn generate_syntax_enum_deserializer_regular_variadic_variant(
                 .collect::<Vec<_>>()
                 .join(", ");
             if let Some(row) = row_struct_name {
-                visit_seq.line(format!(
-                    "let element = {row}({base_name},{tuple_inner});"
-                ));
+                visit_seq.line(format!("let element = {row}({base_name},{tuple_inner});"));
             } else {
-                visit_seq.line(format!(
-                    "let element = ({base_name},{tuple_inner});"
-                ));
+                visit_seq.line(format!("let element = ({base_name},{tuple_inner});"));
             }
         }
         visit_seq.line("inputs.push(element);");
@@ -1435,13 +1438,9 @@ fn generate_syntax_enum_deserializer_regular_variadic_variant(
                 .collect::<Vec<_>>()
                 .join(", ");
             if let Some(row) = row_struct_name {
-                visit_seq.line(format!(
-                    "let element = {row}({base_name},{tuple_inner});"
-                ));
+                visit_seq.line(format!("let element = {row}({base_name},{tuple_inner});"));
             } else {
-                visit_seq.line(format!(
-                    "let element = ({base_name},{tuple_inner});"
-                ));
+                visit_seq.line(format!("let element = ({base_name},{tuple_inner});"));
             }
             visit_seq.line("inputs.push(element);");
             visit_seq.line("}");
@@ -1472,7 +1471,10 @@ fn generate_syntax_enum_deserializer_regular_variadic_variant(
         if suffix_len == 0 {
             unreachable!();
         }
-        let idx_expr = format!("inputs_len * {} + {}", position_of_variadic_separator, suffix_i);
+        let idx_expr = format!(
+            "inputs_len * {} + {}",
+            position_of_variadic_separator, suffix_i
+        );
         visit_seq.line(format!(
             "let {bind} = serde_json::from_value(rest[{idx_expr}].clone()).map_err(serde::de::Error::custom)?;"
         ));

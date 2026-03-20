@@ -16,9 +16,10 @@ pub enum StringOrNumberOrArrayOfStringOrArrayOfNumberAsUnion {
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
 #[serde(untagged)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum NumberLiteralOrNumberAsUnion {
+pub enum NumberLiteralOrNumberOrAnyAsUnion {
     NumberLiteral(NumberLiteral),
     Number(Box<Number>),
+    Any(Box<Any>),
 }
 
 /// "Any"
@@ -99,7 +100,7 @@ pub enum Any {
     ///  - [Create and style clusters](https://maplibre.org/maplibre-gl-js/docs/examples/create-and-style-clusters/)
     Step(
         (
-            NumberLiteralOrNumberAsUnion,
+            NumberLiteralOrNumberOrAnyAsUnion,
             serde_json::Value,
             Vec<(NumberLiteral, serde_json::Value)>,
         ),
@@ -157,10 +158,24 @@ impl<'de> serde::de::Visitor<'de> for AnyVisitor {
             }
             "case" => {
                 let mut inputs = Vec::new();
-                while let Some(condition_i) = seq.next_element()? {
-                    let output_i = seq.next_element()?.ok_or_else(|| {
-                        serde::de::Error::custom("expected output_i in Any::Case")
-                    })?;
+                let mut rest: Vec<serde_json::Value> = Vec::new();
+                while let Some(v) = seq.next_element()? {
+                    rest.push(v);
+                }
+                if rest.len() < 2 + 1 {
+                    return Err(serde::de::Error::custom("Any::Case: too few arguments"));
+                }
+                if (rest.len() - 1) % 2 != 0 {
+                    return Err(serde::de::Error::custom(
+                        "Any::Case: malformed template/suffix layout",
+                    ));
+                }
+                let inputs_len = (rest.len() - 1) / 2;
+                for i in 0..inputs_len {
+                    let condition_i = serde_json::from_value(rest[i * 2].clone())
+                        .map_err(serde::de::Error::custom)?;
+                    let output_i = serde_json::from_value(rest[i * 2 + 1].clone())
+                        .map_err(serde::de::Error::custom)?;
                     let element = (condition_i, output_i);
                     inputs.push(element);
                 }
@@ -169,7 +184,8 @@ impl<'de> serde::de::Visitor<'de> for AnyVisitor {
                         "Any::Case requires at least one argument",
                     ));
                 }
-                let fallback = visit_seq_field(&mut seq, "fallback")?;
+                let fallback = serde_json::from_value(rest[inputs_len * 2 + 0].clone())
+                    .map_err(serde::de::Error::custom)?;
                 Ok(Any::Case((inputs, fallback)))
             }
             "coalesce" => {
@@ -200,10 +216,24 @@ impl<'de> serde::de::Visitor<'de> for AnyVisitor {
             "id" => Ok(Any::Id),
             "let" => {
                 let mut inputs = Vec::new();
-                while let Some(var_name_i) = seq.next_element()? {
-                    let var_value_i = seq.next_element()?.ok_or_else(|| {
-                        serde::de::Error::custom("expected var_value_i in Any::Let")
-                    })?;
+                let mut rest: Vec<serde_json::Value> = Vec::new();
+                while let Some(v) = seq.next_element()? {
+                    rest.push(v);
+                }
+                if rest.len() < 2 + 1 {
+                    return Err(serde::de::Error::custom("Any::Let: too few arguments"));
+                }
+                if (rest.len() - 1) % 2 != 0 {
+                    return Err(serde::de::Error::custom(
+                        "Any::Let: malformed template/suffix layout",
+                    ));
+                }
+                let inputs_len = (rest.len() - 1) / 2;
+                for i in 0..inputs_len {
+                    let var_name_i = serde_json::from_value(rest[i * 2].clone())
+                        .map_err(serde::de::Error::custom)?;
+                    let var_value_i = serde_json::from_value(rest[i * 2 + 1].clone())
+                        .map_err(serde::de::Error::custom)?;
                     let element = (var_name_i, var_value_i);
                     inputs.push(element);
                 }
@@ -212,7 +242,8 @@ impl<'de> serde::de::Visitor<'de> for AnyVisitor {
                         "Any::Let requires at least one argument",
                     ));
                 }
-                let expression = visit_seq_field(&mut seq, "expression")?;
+                let expression = serde_json::from_value(rest[inputs_len * 2 + 0].clone())
+                    .map_err(serde::de::Error::custom)?;
                 Ok(Any::Let((inputs, expression)))
             }
             "match" => {
@@ -249,7 +280,7 @@ impl<'de> serde::de::Visitor<'de> for AnyVisitor {
                 Ok(Any::Match((input, pairs, fallback)))
             }
             "step" => {
-                let input: NumberLiteralOrNumberAsUnion = visit_seq_field(&mut seq, "input")?;
+                let input: NumberLiteralOrNumberOrAnyAsUnion = visit_seq_field(&mut seq, "input")?;
                 let output_0: serde_json::Value = visit_seq_field(&mut seq, "output_0")?;
                 let mut stops = Vec::new();
                 while let Some(stop_input_i) = seq.next_element::<NumberLiteral>()? {
@@ -773,30 +804,50 @@ pub enum Boolean {
 
 /// Options for deserializing the syntax enum variant [`Boolean::Less`]
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+#[serde(untagged)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum LessOptions {
-    Args((serde_json::Value, serde_json::Value, Option<Collator>)),
+    Args(
+        serde_json::Value,
+        serde_json::Value,
+        #[serde(default)] Option<Collator>,
+    ),
 }
 
 /// Options for deserializing the syntax enum variant [`Boolean::LessEqual`]
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+#[serde(untagged)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum LessEqualOptions {
-    Args((serde_json::Value, serde_json::Value, Option<Collator>)),
+    Args(
+        serde_json::Value,
+        serde_json::Value,
+        #[serde(default)] Option<Collator>,
+    ),
 }
 
 /// Options for deserializing the syntax enum variant [`Boolean::Greater`]
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+#[serde(untagged)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum GreaterOptions {
-    Args((serde_json::Value, serde_json::Value, Option<Collator>)),
+    Args(
+        serde_json::Value,
+        serde_json::Value,
+        #[serde(default)] Option<Collator>,
+    ),
 }
 
 /// Options for deserializing the syntax enum variant [`Boolean::GreaterEqual`]
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+#[serde(untagged)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum GreaterEqualOptions {
-    Args((serde_json::Value, serde_json::Value, Option<Collator>)),
+    Args(
+        serde_json::Value,
+        serde_json::Value,
+        #[serde(default)] Option<Collator>,
+    ),
 }
 
 /// Options for deserializing the syntax enum variant [`Boolean::In`]
@@ -1151,7 +1202,7 @@ pub enum ColorOrArrayOfColor {
     InterpolateHcl(
         (
             Interpolation,
-            NumberLiteralOrNumberAsUnion,
+            NumberLiteralOrNumberOrAnyAsUnion,
             Vec<(NumberLiteral, StringLiteralOrColorOrArrayOfColorAsUnion)>,
         ),
     ),
@@ -1159,7 +1210,7 @@ pub enum ColorOrArrayOfColor {
     InterpolateLab(
         (
             Interpolation,
-            NumberLiteralOrNumberAsUnion,
+            NumberLiteralOrNumberOrAnyAsUnion,
             Vec<(NumberLiteral, StringLiteralOrColorOrArrayOfColorAsUnion)>,
         ),
     ),
@@ -1204,7 +1255,7 @@ impl<'de> serde::de::Visitor<'de> for ColorOrArrayOfColorVisitor {
             "interpolate-hcl" => {
                 let interpolation_type: Interpolation =
                     visit_seq_field(&mut seq, "interpolation_type")?;
-                let input: NumberLiteralOrNumberAsUnion = visit_seq_field(&mut seq, "input")?;
+                let input: NumberLiteralOrNumberOrAnyAsUnion = visit_seq_field(&mut seq, "input")?;
                 let mut stops = Vec::new();
                 while let Some(stop_input_i) = seq.next_element::<NumberLiteral>()? {
                     let stop_output_i: StringLiteralOrColorOrArrayOfColorAsUnion =
@@ -1229,7 +1280,7 @@ impl<'de> serde::de::Visitor<'de> for ColorOrArrayOfColorVisitor {
             "interpolate-lab" => {
                 let interpolation_type: Interpolation =
                     visit_seq_field(&mut seq, "interpolation_type")?;
-                let input: NumberLiteralOrNumberAsUnion = visit_seq_field(&mut seq, "input")?;
+                let input: NumberLiteralOrNumberOrAnyAsUnion = visit_seq_field(&mut seq, "input")?;
                 let mut stops = Vec::new();
                 while let Some(stop_input_i) = seq.next_element::<NumberLiteral>()? {
                     let stop_output_i: StringLiteralOrColorOrArrayOfColorAsUnion =
@@ -1423,9 +1474,9 @@ pub enum Number {
         serde_json::Value,
     ),
     /// Returns the product of the inputs.
-    Star(Vec<NumberLiteralOrNumberAsUnion>),
+    Star(Vec<NumberLiteralOrNumberOrAnyAsUnion>),
     /// Returns the sum of the inputs.
-    Plus(Vec<NumberLiteralOrNumberAsUnion>),
+    Plus(Vec<NumberLiteralOrNumberOrAnyAsUnion>),
     /// For two inputs, returns the result of subtracting the second input from the first. For a single input, returns the result of subtracting it from 0.
     Minus(MinusOptions),
     /// Returns the result of floating point division of the first input by the second.
@@ -1517,9 +1568,9 @@ pub enum Number {
         serde_json::Value,
     ),
     /// Returns the maximum value of the inputs.
-    Max(Vec<NumberLiteralOrNumberAsUnion>),
+    Max(Vec<NumberLiteralOrNumberOrAnyAsUnion>),
     /// Returns the minimum value of the inputs.
-    Min(Vec<NumberLiteralOrNumberAsUnion>),
+    Min(Vec<NumberLiteralOrNumberOrAnyAsUnion>),
     /// Asserts that the input value is a number. If multiple values are provided, each one is evaluated in order until a number is obtained. If none of the inputs are numbers, the expression is an error.
     Op(Vec<serde_json::Value>),
     /// Returns the mathematical constant pi.
@@ -1555,8 +1606,11 @@ pub enum Number {
 #[serde(untagged)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum MinusOptions {
-    TwoParams(NumberLiteralOrNumberAsUnion, NumberLiteralOrNumberAsUnion),
-    OneParams(NumberLiteralOrNumberAsUnion),
+    TwoParams(
+        NumberLiteralOrNumberOrAnyAsUnion,
+        NumberLiteralOrNumberOrAnyAsUnion,
+    ),
+    OneParams(NumberLiteralOrNumberOrAnyAsUnion),
 }
 
 /// Options for deserializing the syntax enum variant [`Number::IndexOf`]
@@ -1646,14 +1700,20 @@ impl<'de> serde::de::Visitor<'de> for NumberVisitor {
                 }
                 match rest.len() {
                     2 => Ok(Number::Minus(MinusOptions::TwoParams(
-                        serde_json::from_value::<NumberLiteralOrNumberAsUnion>(rest[0].clone())
-                            .map_err(serde::de::Error::custom)?,
-                        serde_json::from_value::<NumberLiteralOrNumberAsUnion>(rest[1].clone())
-                            .map_err(serde::de::Error::custom)?,
+                        serde_json::from_value::<NumberLiteralOrNumberOrAnyAsUnion>(
+                            rest[0].clone(),
+                        )
+                        .map_err(serde::de::Error::custom)?,
+                        serde_json::from_value::<NumberLiteralOrNumberOrAnyAsUnion>(
+                            rest[1].clone(),
+                        )
+                        .map_err(serde::de::Error::custom)?,
                     ))),
                     1 => Ok(Number::Minus(MinusOptions::OneParams(
-                        serde_json::from_value::<NumberLiteralOrNumberAsUnion>(rest[0].clone())
-                            .map_err(serde::de::Error::custom)?,
+                        serde_json::from_value::<NumberLiteralOrNumberOrAnyAsUnion>(
+                            rest[0].clone(),
+                        )
+                        .map_err(serde::de::Error::custom)?,
                     ))),
                     len => Err(serde::de::Error::custom(format!(
                         "'-': expected 1 or 2 arguments, got {len}"
@@ -1870,7 +1930,7 @@ pub enum NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection {
     Interpolate(
         (
             Interpolation,
-            NumberLiteralOrNumberAsUnion,
+            NumberLiteralOrNumberOrAnyAsUnion,
             Vec<(
                 NumberLiteral,
                 NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjectionAsUnion,
@@ -1920,7 +1980,7 @@ impl<'de> serde::de::Visitor<'de>
             "interpolate" => {
                 let interpolation_type: Interpolation =
                     visit_seq_field(&mut seq, "interpolation_type")?;
-                let input: NumberLiteralOrNumberAsUnion = visit_seq_field(&mut seq, "input")?;
+                let input: NumberLiteralOrNumberOrAnyAsUnion = visit_seq_field(&mut seq, "input")?;
                 let mut stops = Vec::new();
                 while let Some(stop_input_i) = seq.next_element::<NumberLiteral>()? {
                     let stop_output_i: NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjectionAsUnion = seq.next_element()?.ok_or_else(|| serde::de::Error::custom("expected stop_output_i in NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection::Interpolate"))?;

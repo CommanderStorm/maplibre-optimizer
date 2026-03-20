@@ -93,15 +93,21 @@ impl<'de> serde::de::Visitor<'de> for AnyVisitor {
         match op.as_str() {
         "let" => {
         let mut inputs = Vec::new();
-        while let Some(var_name_i) = seq.next_element()? {
-        let var_value_i = seq.next_element()?.ok_or_else(|| serde::de::Error::custom("expected var_value_i in Any::Let"))?;
+        let mut rest: Vec<serde_json::Value> = Vec::new();
+        while let Some(v) = seq.next_element()? { rest.push(v); }
+        if rest.len() < 2 + 1 { return Err(serde::de::Error::custom("Any::Let: too few arguments")); }
+        if (rest.len() - 1) % 2 != 0 { return Err(serde::de::Error::custom("Any::Let: malformed template/suffix layout")); }
+        let inputs_len = (rest.len() - 1) / 2;
+        for i in 0..inputs_len {
+        let var_name_i = serde_json::from_value(rest[i * 2].clone()).map_err(serde::de::Error::custom)?;
+        let var_value_i = serde_json::from_value(rest[i * 2 + 1].clone()).map_err(serde::de::Error::custom)?;
         let element = (var_name_i,var_value_i);
         inputs.push(element);
         }
         if inputs.is_empty() {
         return Err(serde::de::Error::custom("Any::Let requires at least one argument"));
         }
-        let expression = visit_seq_field(&mut seq, "expression")?;
+        let expression = serde_json::from_value(rest[inputs_len * 2 + 0].clone()).map_err(serde::de::Error::custom)?;
         Ok(Any::Let((inputs, expression)))
         },
         _ => Err(serde::de::Error::unknown_variant(&op, &["let"]))
