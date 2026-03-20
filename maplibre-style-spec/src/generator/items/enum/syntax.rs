@@ -21,12 +21,60 @@ fn emit_tuple_slot(v: &mut Variant, rust_ty: &str) {
     };
 }
 
+/// `ExprOrLiteral` is the typed replacement for the current `serde_json::Value` escape hatch
+/// in expression operand positions.
+///
+/// It models:
+/// - expression nodes (nested operators), via the generated output-type syntax enums
+/// - literal primitives, via literal newtypes (and primitive `bool`)
+/// - object/array literal containers, via `spec::literals::{JSONObjectLiteral, JSONArrayLiteral}`
+fn ensure_expr_or_literal_type(scope: &mut Scope) {
+    if scope.get_enum_mut("ExprOrLiteral").is_some() {
+        return;
+    }
+
+    // Un-tagged so JSON arrays map to the first matching expression-output enum variant,
+    // and JSON primitives/objects map to the literal variants.
+    let enu = scope
+        .new_enum("ExprOrLiteral")
+        .doc("An expression node or a literal JSON value in expression positions.")
+        .vis("pub")
+        .derive("serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone")
+        .attr(fuzz::CFG_DERIVE_ARBITRARY)
+        .attr("serde(untagged)");
+
+    // Literals first: we want geojson to win when valid (then object-literal fallback works).
+    enu.new_variant("Null");
+    enu.new_variant("Bool").tuple("bool");
+    enu.new_variant("NumberLiteral").tuple("NumberLiteral");
+    enu.new_variant("StringLiteral").tuple("StringLiteral");
+    enu.new_variant("GeoJSONObjectLiteral")
+        .tuple("GeoJSONObjectLiteral");
+    enu.new_variant("JSONObjectLiteral")
+        .tuple("JSONObjectLiteral");
+    enu.new_variant("JSONArrayLiteral")
+        .tuple("JSONArrayLiteral");
+
+    // Expressions (boxed to break recursive type size cycles).
+    enu.new_variant("AnyExpr").tuple("Box<Any>");
+    enu.new_variant("ArrayExpr").tuple("Box<Array>");
+    enu.new_variant("BooleanExpr").tuple("Box<Boolean>");
+    enu.new_variant("CollatorExpr").tuple("Box<Collator>");
+    enu.new_variant("ColorExpr").tuple("Box<Color>");
+    enu.new_variant("FormattedExpr").tuple("Box<Formatted>");
+    enu.new_variant("ImageExpr").tuple("Box<Image>");
+    enu.new_variant("NumberExpr").tuple("Box<Number>");
+    enu.new_variant("ObjectExpr").tuple("Box<Object>");
+    enu.new_variant("StringExpr").tuple("Box<String>");
+}
+
 pub fn generate_syntax_enum(
     scope: &mut Scope,
     name: &str,
     doc: &str,
     values: &BTreeMap<String, SyntaxVariantDef>,
 ) {
+    ensure_expr_or_literal_type(scope);
     pregenerate_all_operator_parameter_types(scope, values);
     // pass 1: populate enum variants
     let variadic_row_struct_names = generate_syntax_enum_body(scope, name, doc, values);
@@ -524,6 +572,46 @@ fn generate_syntax_enum_body(
         }
     }
 
+    // Precompute fixed single-overload parameter tuple types so we don't call back into
+    // `generate_parameter_type(scope, ...)` while the output enum builder (`enu`) holds
+    // a mutable borrow of `scope` (Rust borrow checker).
+    let mut fixed_param_types: BTreeMap<String, Vec<String>> = BTreeMap::new();
+    for (key, value) in values {
+        let syntax = &value.syntax;
+        if syntax.overloads.len() != 1 || syntax.has_variadic_overload() {
+            continue;
+        }
+        let overload = &syntax.overloads[0];
+        let var_name = normalized_syntax_variant_ident(name, key);
+
+        let tuple_types: Vec<String> = overload
+            .parameters
+            .iter()
+            .map(|param| {
+                if name == "Collator" && key == "collator" && param == "options" {
+                    // Collator options are an object schema; represent them as a JSON object map.
+                    "serde_json::Map<std::string::String, serde_json::Value>".to_string()
+                } else if name == "String" && key == "resolved-locale" && param == "collator" {
+                    // `resolved-locale` takes a `collator` expression.
+                    "Collator".to_string()
+                } else if name == "Boolean" && (key == "==" || key == "!=") && param == "collator?"
+                {
+                    // Equality operators inline `collator?` as an optional third argument.
+                    "Option<Collator>".to_string()
+                } else {
+                    let rust_ty = generate_parameter_type(
+                        scope,
+                        (name, &var_name, param.as_str()),
+                        &syntax.parameters,
+                    );
+                    box_recursive_types(name, &rust_ty)
+                }
+            })
+            .collect();
+
+        fixed_param_types.insert(key.clone(), tuple_types);
+    }
+
     let enu = scope
         .new_enum(name)
         .doc(doc)
@@ -557,30 +645,12 @@ fn generate_syntax_enum_body(
                 continue;
             }
             let var = enu.new_variant(&var_name).doc(&value.doc);
-            for p in &overload.parameters {
-                let param = p.clone();
-                // Most single-overload syntax enums model parameters as raw JSON values.
-                // Collator is special: upstream defines `collator` as a typed expression, and
-                // we want its operands/arguments to remain strongly typed.
-                let tuple_identifier = if name == "Collator"
-                    && key == "collator"
-                    && param == "options"
-                {
-                    // Collator options are an object schema; represent them as a JSON object map.
-                    "serde_json::Map<std::string::String, serde_json::Value>".to_string()
-                } else if name == "String" && key == "resolved-locale" && param == "collator" {
-                    // `resolved-locale` takes a `collator` expression, not an opaque JSON value.
-                    "Collator".to_string()
-                } else if name == "Boolean" && (key == "==" || key == "!=") && param == "collator?"
-                {
-                    // Equality operators inline `collator?` as an optional third argument.
-                    "Option<Collator>".to_string()
-                } else if param.strip_suffix('?').is_some() {
-                    "Option<serde_json::Value>".to_string()
-                } else {
-                    "serde_json::Value".to_string()
-                };
-
+            for (param_idx, _p) in overload.parameters.iter().enumerate() {
+                let tuple_identifier = fixed_param_types
+                    .get(key)
+                    .and_then(|v| v.get(param_idx))
+                    .cloned()
+                    .unwrap_or_else(|| "serde_json::Value".to_string());
                 emit_tuple_slot(var, &tuple_identifier);
             }
         } else {
@@ -923,7 +993,7 @@ fn generate_parameter_variant(scope: &mut Scope, param: &ParameterType) -> Strin
         ParameterType::LiteralAnyOf(ls) => generate_any_of(scope, ls),
         ParameterType::Expression(e) => match e.as_ref() {
             // `any` in the style spec means "expression or JSON literal", not the [`Any`] syntax enum.
-            MirExpression::Any => "serde_json::Value".to_string(),
+            MirExpression::Any => "ExprOrLiteral".to_string(),
             MirExpression::Number => generate_expression_any_of(
                 scope,
                 &[
@@ -941,7 +1011,7 @@ fn generate_parameter_variant(scope: &mut Scope, param: &ParameterType) -> Strin
             if r == "T" {
                 // Type variable `T` permits literals or arbitrary nested expressions (e.g. `coalesce`
                 // with `image`, `in` with feature properties, …).
-                "serde_json::Value".to_string()
+                "ExprOrLiteral".to_string()
             } else if r == "projection" {
                 // Projection definition strings / expressions — not the root `{ "type": … }` object (`struct Projection`).
                 "ProjectionType".to_string()

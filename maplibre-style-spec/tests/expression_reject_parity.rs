@@ -21,13 +21,23 @@ use maplibre_style_spec::decoder::StyleReference;
 use maplibre_style_spec::expression_validate::{
     operator_groups_map, validate_expression_with_spec,
 };
-use maplibre_style_spec::mir::IntermediateSpec;
+use maplibre_style_spec::mir::{ExprParamType, ExprType, IntermediateSpec};
+use maplibre_style_spec::spec::ExprOrLiteral;
 use serde::Deserialize;
-use serde_json::Value;
+
+#[derive(Debug, Deserialize)]
+struct PropertySpec {
+    #[serde(rename = "type")]
+    property_type: String,
+    #[serde(default)]
+    value: Option<String>,
+}
 
 #[derive(Debug, Deserialize)]
 struct ExpressionFixture {
-    expression: Value,
+    expression: ExprOrLiteral,
+    #[serde(rename = "propertySpec")]
+    property_spec: Option<PropertySpec>,
     #[serde(default)]
     expected: Option<FixtureExpected>,
 }
@@ -118,8 +128,18 @@ fn upstream_expression_reject_parity() {
         };
 
         let expected_ok = matches!(expected.compiled, FixtureCompiled::Success { .. });
-        let actual_ok =
-            validate_expression_with_spec(&fixture.expression, &op_to_groups, &known_ops).is_ok();
+        let expected_ty = fixture
+            .property_spec
+            .as_ref()
+            .map(expr_type_from_property_spec)
+            .unwrap_or(ExprType::Any);
+        let actual_ok = validate_expression_with_spec(
+            &fixture.expression,
+            &expected_ty,
+            &op_to_groups,
+            &known_ops,
+        )
+        .is_ok();
 
         if expected_ok != actual_ok {
             let rel = path
@@ -127,9 +147,14 @@ fn upstream_expression_reject_parity() {
                 .unwrap_or(path.as_path())
                 .display()
                 .to_string();
-            let err = validate_expression_with_spec(&fixture.expression, &op_to_groups, &known_ops)
-                .err()
-                .unwrap_or_default();
+            let err = validate_expression_with_spec(
+                &fixture.expression,
+                &expected_ty,
+                &op_to_groups,
+                &known_ops,
+            )
+            .err()
+            .unwrap_or_default();
             let reason = if err.is_empty() {
                 String::new()
             } else {
@@ -198,6 +223,58 @@ fn upstream_expression_reject_parity() {
             .collect::<Vec<_>>()
             .join("\n")
     );
+}
+
+fn expr_type_from_property_spec(ps: &PropertySpec) -> ExprType {
+    match ps.property_type.as_str() {
+        "string" => ExprType::String,
+        "number" => ExprType::Number,
+        "boolean" => ExprType::Boolean,
+        "color" => ExprType::Color,
+        "formatted" => ExprType::Formatted,
+        "image" => ExprType::Image,
+        "object" => ExprType::Object,
+        // Generic array: we don't know element type from the property alone.
+        "array" => ExprType::Array {
+            element: ps
+                .value
+                .as_deref()
+                .and_then(|v| match v {
+                    "string" => Some(ExprType::String),
+                    "number" => Some(ExprType::Number),
+                    "boolean" => Some(ExprType::Boolean),
+                    "color" => Some(ExprType::Color),
+                    _ => None,
+                })
+                .map(|inner_ty| Box::new(ExprParamType::Expression(inner_ty))),
+            length: None,
+        },
+        other => {
+            let ty = other.trim();
+            if let Some(inner) = ty.strip_prefix("array<").and_then(|s| s.strip_suffix('>')) {
+                let inner = inner.trim();
+                let inner_ty = match inner {
+                    "string" => ExprType::String,
+                    "number" => ExprType::Number,
+                    "boolean" => ExprType::Boolean,
+                    "color" => ExprType::Color,
+                    _ => {
+                        return ExprType::Array {
+                            element: None,
+                            length: None,
+                        };
+                    }
+                };
+                return ExprType::Array {
+                    element: Some(Box::new(ExprParamType::Expression(inner_ty))),
+                    length: None,
+                };
+            }
+
+            // Fallback: treat unknown property types as unconstrained.
+            ExprType::Any
+        }
+    }
 }
 
 fn collect_test_json(dir: &Path, out: &mut Vec<PathBuf>) {

@@ -1,6 +1,30 @@
 #[allow(unused_imports)]
 use super::*;
 
+/// An expression node or a literal JSON value in expression positions.
+#[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[serde(untagged)]
+pub enum ExprOrLiteral {
+    Null,
+    Bool(bool),
+    NumberLiteral(NumberLiteral),
+    StringLiteral(StringLiteral),
+    GeoJSONObjectLiteral(GeoJSONObjectLiteral),
+    JSONObjectLiteral(JSONObjectLiteral),
+    JSONArrayLiteral(JSONArrayLiteral),
+    AnyExpr(Box<Any>),
+    ArrayExpr(Box<Array>),
+    BooleanExpr(Box<Boolean>),
+    CollatorExpr(Box<Collator>),
+    ColorExpr(Box<Color>),
+    FormattedExpr(Box<Formatted>),
+    ImageExpr(Box<Image>),
+    NumberExpr(Box<Number>),
+    ObjectExpr(Box<Object>),
+    StringExpr(Box<String>),
+}
+
 /// Either of the below variants
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
 #[serde(untagged)]
@@ -29,29 +53,21 @@ pub enum Any {
     /// Gets the value of a cluster property accumulated so far. Can only be used in the `clusterProperties` option of a clustered GeoJSON source.
     Accumulated,
     /// Retrieves an item from an array.
-    At(
-        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
-        serde_json::Value,
-        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
-        serde_json::Value,
-    ),
+    At(NumberLiteralOrNumberOrAnyAsUnion, Array),
     /// Selects the first output whose corresponding test condition evaluates to true, or the fallback value otherwise.
     ///
     ///  - [Create a hover effect](https://maplibre.org/maplibre-gl-js/docs/examples/create-a-hover-effect/)
     ///
     ///  - [Display HTML clusters with custom properties](https://maplibre.org/maplibre-gl-js/docs/examples/display-html-clusters-with-custom-properties/)
-    Case((Vec<(Boolean, serde_json::Value)>, serde_json::Value)),
+    Case((Vec<(Boolean, ExprOrLiteral)>, ExprOrLiteral)),
     /// Evaluates each expression in turn until the first non-null value is obtained, and returns that value.
     ///
     ///  - [Use a fallback image](https://maplibre.org/maplibre-gl-js/docs/examples/use-a-fallback-image/)
-    Coalesce(Vec<serde_json::Value>),
+    Coalesce(Vec<ExprOrLiteral>),
     /// Retrieves a property value from the current feature's state. Returns null if the requested property is not present on the feature's state. A feature's state is not part of the GeoJSON or vector tile data, and must be set programmatically on each feature. When `source.promoteId` is not provided, features are identified by their `id` attribute, which must be an integer or a string that can be cast to an integer. When `source.promoteId` is provided, features are identified by their `promoteId` property, which may be a number, string, or any primitive data type. Note that ["feature-state"] can only be used with paint properties that support data-driven styling.
     ///
     ///  - [Create a hover effect](https://maplibre.org/maplibre-gl-js/docs/examples/create-a-hover-effect/)
-    FeatureState(
-        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
-        serde_json::Value,
-    ),
+    FeatureState(String),
     /// Retrieves a property value from the current feature's properties, or from another object if a second argument is provided. Returns null if the requested property is missing.
     ///
     ///  - [Change the case of labels](https://maplibre.org/maplibre-gl-js/docs/examples/change-case-of-labels/)
@@ -59,23 +75,15 @@ pub enum Any {
     ///  - [Display HTML clusters with custom properties](https://maplibre.org/maplibre-gl-js/docs/examples/display-html-clusters-with-custom-properties/)
     ///
     ///  - [Extrude polygons for 3D indoor mapping](https://maplibre.org/maplibre-gl-js/docs/examples/extrude-polygons-for-3d-indoor-mapping/)
-    Get(
-        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
-        serde_json::Value,
-        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_option_json_value))]
-         Option<serde_json::Value>,
-    ),
+    Get(String, Option<Object>),
     /// Retrieves a property value from global state that can be set with platform-specific APIs. Defaults can be provided using the [`state`](https://maplibre.org/maplibre-style-spec/root/#state) root property. Returns `null` if no value nor default value is set for the retrieved property.
-    GlobalState(
-        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
-        serde_json::Value,
-    ),
+    GlobalState(StringLiteral),
     /// Gets the feature's id, if it has one.
     Id,
     /// Binds expressions to named variables, which can then be referenced in the result expression using `["var", "variable_name"]`.
     ///
     ///  - [Visualize population density](https://maplibre.org/maplibre-gl-js/docs/examples/visualize-population-density/)
-    Let((Vec<(StringLiteral, serde_json::Value)>, serde_json::Value)),
+    Let((Vec<(StringLiteral, ExprOrLiteral)>, ExprOrLiteral)),
     /// Selects the output whose label value matches the input value, or the fallback value if no match is found. The input can be any expression (e.g. `["get", "building_type"]`). Each label must be either:
     ///
     ///  - a single literal value; or
@@ -88,9 +96,9 @@ pub enum Any {
             serde_json::Value,
             Vec<(
                 StringOrNumberOrArrayOfStringOrArrayOfNumberAsUnion,
-                serde_json::Value,
+                ExprOrLiteral,
             )>,
-            serde_json::Value,
+            ExprOrLiteral,
         ),
     ),
     /// Produces discrete, stepped results by evaluating a piecewise-constant function defined by pairs of input and output values ("stops"). The `input` may be any numeric expression (e.g., `["get", "population"]`). Stop inputs must be numeric literals in strictly ascending order.
@@ -101,17 +109,14 @@ pub enum Any {
     Step(
         (
             NumberLiteralOrNumberOrAnyAsUnion,
-            serde_json::Value,
-            Vec<(NumberLiteral, serde_json::Value)>,
+            ExprOrLiteral,
+            Vec<(NumberLiteral, ExprOrLiteral)>,
         ),
     ),
     /// References variable bound using `let`.
     ///
     ///  - [Visualize population density](https://maplibre.org/maplibre-gl-js/docs/examples/visualize-population-density/)
-    Var(
-        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
-        serde_json::Value,
-    ),
+    Var(StringLiteral),
 }
 
 impl<'de> serde::Deserialize<'de> for Any {
@@ -266,7 +271,7 @@ impl<'de> serde::de::Visitor<'de> for AnyVisitor {
                     let label_i: StringOrNumberOrArrayOfStringOrArrayOfNumberAsUnion =
                         serde_json::from_value(chunk[0].clone())
                             .map_err(serde::de::Error::custom)?;
-                    let output_i: serde_json::Value = serde_json::from_value(chunk[1].clone())
+                    let output_i: ExprOrLiteral = serde_json::from_value(chunk[1].clone())
                         .map_err(serde::de::Error::custom)?;
                     pairs.push((label_i, output_i));
                 }
@@ -275,19 +280,18 @@ impl<'de> serde::de::Visitor<'de> for AnyVisitor {
                         "Any::Match: missing label/output pairs",
                     ));
                 }
-                let fallback: serde_json::Value =
+                let fallback: ExprOrLiteral =
                     serde_json::from_value(fallback_v).map_err(serde::de::Error::custom)?;
                 Ok(Any::Match((input, pairs, fallback)))
             }
             "step" => {
                 let input: NumberLiteralOrNumberOrAnyAsUnion = visit_seq_field(&mut seq, "input")?;
-                let output_0: serde_json::Value = visit_seq_field(&mut seq, "output_0")?;
+                let output_0: ExprOrLiteral = visit_seq_field(&mut seq, "output_0")?;
                 let mut stops = Vec::new();
                 while let Some(stop_input_i) = seq.next_element::<NumberLiteral>()? {
-                    let stop_output_i: serde_json::Value =
-                        seq.next_element()?.ok_or_else(|| {
-                            serde::de::Error::custom("expected stop_output_i in Any::Step")
-                        })?;
+                    let stop_output_i: ExprOrLiteral = seq.next_element()?.ok_or_else(|| {
+                        serde::de::Error::custom("expected stop_output_i in Any::Step")
+                    })?;
                     stops.push((stop_input_i, stop_output_i));
                 }
                 if stops.is_empty() {
@@ -490,31 +494,19 @@ mod test {
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum Array {
     /// Asserts that the input is an array (optionally with a specific item type and length). If, when the input expression is evaluated, it is not of the asserted type or length, then this assertion will cause the whole expression to be aborted.
-    Op(
-        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
-        serde_json::Value,
-    ),
+    Op(ExprOrLiteral),
     /// Provides a literal array or object value.
     ///
     ///  - [Display and style rich text labels](https://maplibre.org/maplibre-gl-js/docs/examples/display-and-style-rich-text-labels/)
-    Literal(
-        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
-        serde_json::Value,
-    ),
+    Literal(JSONArrayLiteral),
     /// Returns a subarray from an array or a substring from a string from a specified start index, or between a start index and an end index if set. The return value is inclusive of the start index but not of the end index. In a string, a UTF-16 surrogate pair counts as a single position.
     Slice(
-        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
-        serde_json::Value,
-        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
-        serde_json::Value,
-        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_option_json_value))]
-         Option<serde_json::Value>,
+        Box<Array>,
+        NumberLiteralOrNumberOrAnyAsUnion,
+        Option<NumberLiteralOrNumberOrAnyAsUnion>,
     ),
     /// Returns a four-element array containing the input color's red, green, blue, and alpha components, in that order.
-    ToRgba(
-        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
-        serde_json::Value,
-    ),
+    ToRgba(Color),
 }
 
 impl<'de> serde::Deserialize<'de> for Array {
@@ -593,14 +585,7 @@ pub enum StringOrNumberOrBooleanAsUnion {
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum ArrayLessTypeLengthGreater {
     /// Asserts that the input is an array (optionally with a specific item type and length). If, when the input expression is evaluated, it is not of the asserted type or length, then this assertion will cause the whole expression to be aborted.
-    Array(
-        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
-        serde_json::Value,
-        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
-        serde_json::Value,
-        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
-        serde_json::Value,
-    ),
+    Array(StringOrNumberOrBooleanAsUnion, NumberLiteral, ExprOrLiteral),
 }
 
 impl<'de> serde::Deserialize<'de> for ArrayLessTypeLengthGreater {
@@ -655,12 +640,7 @@ impl<'de> serde::de::Visitor<'de> for ArrayLessTypeLengthGreaterVisitor {
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum ArrayOfType {
     /// Asserts that the input is an array (optionally with a specific item type and length). If, when the input expression is evaluated, it is not of the asserted type or length, then this assertion will cause the whole expression to be aborted.
-    Array(
-        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
-        serde_json::Value,
-        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
-        serde_json::Value,
-    ),
+    Array(StringOrNumberOrBooleanAsUnion, ExprOrLiteral),
 }
 
 impl<'de> serde::Deserialize<'de> for ArrayOfType {
@@ -716,20 +696,11 @@ pub enum Boolean {
     /// Logical negation. Returns `true` if the input is `false`, and `false` if the input is `true`.
     ///
     ///  - [Create and style clusters](https://maplibre.org/maplibre-gl-js/docs/examples/create-and-style-clusters/)
-    Not(
-        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
-        serde_json::Value,
-    ),
+    Not(Box<Boolean>),
     /// Returns `true` if the input values are not equal, `false` otherwise. The comparison is strictly typed: values of different runtime types are always considered unequal. Cases where the types are known to be different at parse time are considered invalid and will produce a parse error. Accepts an optional `collator` argument to control locale-dependent string comparisons.
     ///
     ///  - [Display HTML clusters with custom properties](https://maplibre.org/maplibre-gl-js/docs/examples/display-html-clusters-with-custom-properties/)
-    NotEqual(
-        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
-        serde_json::Value,
-        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
-        serde_json::Value,
-        Option<Collator>,
-    ),
+    NotEqual(ExprOrLiteral, ExprOrLiteral, Option<Collator>),
     /// Returns `true` if the first input is strictly less than the second, `false` otherwise. The arguments are required to be either both strings or both numbers; if during evaluation they are not, expression evaluation produces an error. Cases where this constraint is known not to hold at parse time are considered in valid and will produce a parse error. Accepts an optional `collator` argument to control locale-dependent string comparisons.
     ///
     ///  - [Display HTML clusters with custom properties](https://maplibre.org/maplibre-gl-js/docs/examples/display-html-clusters-with-custom-properties/)
@@ -745,13 +716,7 @@ pub enum Boolean {
     ///  - [Display buildings in 3D](https://maplibre.org/maplibre-gl-js/docs/examples/display-buildings-in-3d/)
     ///
     ///  - [Filter symbols by toggling a list](https://maplibre.org/maplibre-gl-js/docs/examples/filter-symbols-by-toggling-a-list/)
-    EqualEqual(
-        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
-        serde_json::Value,
-        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
-        serde_json::Value,
-        Option<Collator>,
-    ),
+    EqualEqual(ExprOrLiteral, ExprOrLiteral, Option<Collator>),
     /// Returns `true` if the first input is strictly greater than the second, `false` otherwise. The arguments are required to be either both strings or both numbers; if during evaluation they are not, expression evaluation produces an error. Cases where this constraint is known not to hold at parse time are considered in valid and will produce a parse error. Accepts an optional `collator` argument to control locale-dependent string comparisons.
     Greater(GreaterOptions),
     /// Returns `true` if the first input is greater than or equal to the second, `false` otherwise. The arguments are required to be either both strings or both numbers; if during evaluation they are not, expression evaluation produces an error. Cases where this constraint is known not to hold at parse time are considered in valid and will produce a parse error. Accepts an optional `collator` argument to control locale-dependent string comparisons.
@@ -767,39 +732,25 @@ pub enum Boolean {
     /// Asserts that the input value is a boolean. If multiple values are provided, each one is evaluated in order until a boolean is obtained. If none of the inputs are booleans, the expression is an error.
     ///
     ///  - [Create a hover effect](https://maplibre.org/maplibre-gl-js/docs/examples/create-a-hover-effect/)
-    Op(Vec<serde_json::Value>),
+    Op(Vec<ExprOrLiteral>),
     /// Tests for the presence of a property value in the current feature's properties, or from another object if a second argument is provided.
     ///
     ///  - [Create and style clusters](https://maplibre.org/maplibre-gl-js/docs/examples/create-and-style-clusters/)
-    Has(
-        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
-        serde_json::Value,
-        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_option_json_value))]
-         Option<serde_json::Value>,
-    ),
+    Has(String, Option<Object>),
     /// Determines whether an item exists in an array or a substring exists in a string.
     ///
     ///  - [Measure distances](https://maplibre.org/maplibre-gl-js/docs/examples/measure-distances/)
     In(InOptions),
     /// Returns `true` if the input string is expected to render legibly. Returns `false` if the input string contains sections that cannot be rendered without potential loss of meaning (e.g. Indic scripts that require complex text shaping, or right-to-left scripts if the `mapbox-gl-rtl-text` plugin is not in use in MapLibre GL JS).
-    IsSupportedScript(
-        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
-        serde_json::Value,
-    ),
+    IsSupportedScript(String),
     /// Converts the input value to a boolean. The result is `false` when the input is an empty string, 0, `false`, `null`, or `NaN`; otherwise it is `true`.
-    To(
-        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
-        serde_json::Value,
-    ),
+    To(ExprOrLiteral),
     /// Returns `true` if the evaluated feature is fully contained inside a boundary of the input geometry, `false` otherwise. The input value can be a valid GeoJSON of type `Polygon`, `MultiPolygon`, `Feature`, or `FeatureCollection`. Supported features for evaluation:
     ///
     /// - `Point`: Returns `false` if a point is on the boundary or falls outside the boundary.
     ///
     /// - `LineString`: Returns `false` if any part of a line falls outside the boundary, the line intersects the boundary, or a line's endpoint is on the boundary.
-    Within(
-        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
-        serde_json::Value,
-    ),
+    Within(GeoJSONObjectLiteral),
 }
 
 /// Options for deserializing the syntax enum variant [`Boolean::Less`]
@@ -855,12 +806,7 @@ pub enum GreaterEqualOptions {
 #[serde(untagged)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum InOptions {
-    Item(
-        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
-        serde_json::Value,
-        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
-        serde_json::Value,
-    ),
+    Item(ExprOrLiteral, ExprOrLiteral),
     Substring(String, String),
 }
 
@@ -1091,28 +1037,21 @@ impl<'de> serde::de::Visitor<'de> for CollatorVisitor {
 pub enum Color {
     /// Creates a color value from red, green, and blue components, which must range between 0 and 255, and an alpha component of 1. If any component is out of range, the expression is an error.
     Rgb(
-        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
-        serde_json::Value,
-        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
-        serde_json::Value,
-        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
-        serde_json::Value,
+        NumberLiteralOrNumberOrAnyAsUnion,
+        NumberLiteralOrNumberOrAnyAsUnion,
+        NumberLiteralOrNumberOrAnyAsUnion,
     ),
     /// Creates a color value from red, green, blue components, which must range between 0 and 255, and an alpha component which must range between zero and one. If any component is out of range, the expression is an error.
     Rgba(
-        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
-        serde_json::Value,
-        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
-        serde_json::Value,
-        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
-        serde_json::Value,
-        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
-        serde_json::Value,
+        NumberLiteralOrNumberOrAnyAsUnion,
+        NumberLiteralOrNumberOrAnyAsUnion,
+        NumberLiteralOrNumberOrAnyAsUnion,
+        NumberLiteralOrNumberOrAnyAsUnion,
     ),
     /// Converts the input value to a color. If multiple values are provided, each one is evaluated in order until the first successful conversion is obtained. If none of the inputs can be converted, the expression is an error.
     ///
     ///  - [Visualize population density](https://maplibre.org/maplibre-gl-js/docs/examples/visualize-population-density/)
-    To(Vec<serde_json::Value>),
+    To(Vec<ExprOrLiteral>),
 }
 
 impl<'de> serde::Deserialize<'de> for Color {
@@ -1404,10 +1343,7 @@ pub enum Image {
     /// Returns an `image` type for use in `icon-image`, `*-pattern` entries and as a section in the `format` expression. If set, the `image` argument will check that the requested image exists in the style and will return either the resolved image name or `null`, depending on whether or not the image is currently in the style. This validation process is synchronous and requires the image to have been added to the style before requesting it in the `image` argument.
     ///
     ///  - [Use a fallback image](https://maplibre.org/maplibre-gl-js/docs/examples/use-a-fallback-image/)
-    Op(
-        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
-        serde_json::Value,
-    ),
+    Op(String),
 }
 
 impl<'de> serde::Deserialize<'de> for Image {
@@ -1469,10 +1405,8 @@ pub enum ArrayOrStringAsUnion {
 pub enum Number {
     /// Returns the remainder after integer division of the first input by the second.
     Percentage(
-        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
-        serde_json::Value,
-        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
-        serde_json::Value,
+        NumberLiteralOrNumberOrAnyAsUnion,
+        NumberLiteralOrNumberOrAnyAsUnion,
     ),
     /// Returns the product of the inputs.
     Star(Vec<NumberLiteralOrNumberOrAnyAsUnion>),
@@ -1484,120 +1418,68 @@ pub enum Number {
     ///
     ///  - [Visualize population density](https://maplibre.org/maplibre-gl-js/docs/examples/visualize-population-density/)
     Slash(
-        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
-        serde_json::Value,
-        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
-        serde_json::Value,
+        NumberLiteralOrNumberOrAnyAsUnion,
+        NumberLiteralOrNumberOrAnyAsUnion,
     ),
     /// Returns the result of raising the first input to the power specified by the second.
     Power(
-        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
-        serde_json::Value,
-        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
-        serde_json::Value,
+        NumberLiteralOrNumberOrAnyAsUnion,
+        NumberLiteralOrNumberOrAnyAsUnion,
     ),
     /// Returns the absolute value of the input.
-    Absolute(
-        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
-        serde_json::Value,
-    ),
+    Absolute(NumberLiteralOrNumberOrAnyAsUnion),
     /// Returns the arccosine of the input.
-    Arccosine(
-        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
-        serde_json::Value,
-    ),
+    Arccosine(NumberLiteralOrNumberOrAnyAsUnion),
     /// Returns the arcsine of the input.
-    Asin(
-        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
-        serde_json::Value,
-    ),
+    Asin(NumberLiteralOrNumberOrAnyAsUnion),
     /// Returns the arctangent of the input.
-    Atan(
-        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
-        serde_json::Value,
-    ),
+    Atan(NumberLiteralOrNumberOrAnyAsUnion),
     /// Returns the smallest integer that is greater than or equal to the input.
-    Ceil(
-        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
-        serde_json::Value,
-    ),
+    Ceil(NumberLiteralOrNumberOrAnyAsUnion),
     /// Returns the cosine of the input.
-    Cos(
-        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
-        serde_json::Value,
-    ),
+    Cos(NumberLiteralOrNumberOrAnyAsUnion),
     /// Returns the shortest distance in meters between the evaluated feature and the input geometry. The input value can be a valid GeoJSON of type `Point`, `MultiPoint`, `LineString`, `MultiLineString`, `Polygon`, `MultiPolygon`, `Feature`, or `FeatureCollection`. Distance values returned may vary in precision due to loss in precision from encoding geometries, particularly below zoom level 13.
-    Distance(
-        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
-        serde_json::Value,
-    ),
+    Distance(GeoJSONObjectLiteral),
     /// Returns the mathematical constant e.
     E,
     /// Gets the elevation of a pixel (in meters above the vertical datum reference of the `raster-dem` tiles) from a `raster-dem` source. Can only be used in the `color-relief-color` property of a `color-relief` layer.
     Elevation,
     /// Returns the largest integer that is less than or equal to the input.
-    Floor(
-        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
-        serde_json::Value,
-    ),
+    Floor(NumberLiteralOrNumberOrAnyAsUnion),
     /// Gets the kernel density estimation of a pixel in a heatmap layer, which is a relative measure of how many data points are crowded around a particular pixel. Can only be used in the `heatmap-color` property.
     HeatmapDensity,
     /// Returns the first position at which an item can be found in an array or a substring can be found in a string, or `-1` if the input cannot be found. Accepts an optional index from where to begin the search. In a string, a UTF-16 surrogate pair counts as a single position.
     IndexOf(IndexOfOptions),
     /// Gets the length of an array or string. In a string, a UTF-16 surrogate pair counts as a single position.
-    Length(
-        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
-        serde_json::Value,
-    ),
+    Length(ArrayOrStringAsUnion),
     /// Gets the progress along a gradient line. Can only be used in the `line-gradient` property.
     LineProgress,
     /// Returns the natural logarithm of the input.
-    Ln(
-        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
-        serde_json::Value,
-    ),
+    Ln(NumberLiteralOrNumberOrAnyAsUnion),
     /// Returns the mathematical constant ln(2).
     Ln2,
     /// Returns the base-ten logarithm of the input.
-    Log10(
-        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
-        serde_json::Value,
-    ),
+    Log10(NumberLiteralOrNumberOrAnyAsUnion),
     /// Returns the base-two logarithm of the input.
-    Log2(
-        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
-        serde_json::Value,
-    ),
+    Log2(NumberLiteralOrNumberOrAnyAsUnion),
     /// Returns the maximum value of the inputs.
     Max(Vec<NumberLiteralOrNumberOrAnyAsUnion>),
     /// Returns the minimum value of the inputs.
     Min(Vec<NumberLiteralOrNumberOrAnyAsUnion>),
     /// Asserts that the input value is a number. If multiple values are provided, each one is evaluated in order until a number is obtained. If none of the inputs are numbers, the expression is an error.
-    Op(Vec<serde_json::Value>),
+    Op(Vec<ExprOrLiteral>),
     /// Returns the mathematical constant pi.
     Pi,
     /// Rounds the input to the nearest integer. Halfway values are rounded away from zero. For example, `["round", -1.5]` evaluates to -2.
-    Round(
-        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
-        serde_json::Value,
-    ),
+    Round(NumberLiteralOrNumberOrAnyAsUnion),
     /// Returns the sine of the input.
-    Sin(
-        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
-        serde_json::Value,
-    ),
+    Sin(NumberLiteralOrNumberOrAnyAsUnion),
     /// Returns the square root of the input.
-    Sqrt(
-        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
-        serde_json::Value,
-    ),
+    Sqrt(NumberLiteralOrNumberOrAnyAsUnion),
     /// Returns the tangent of the input.
-    Tan(
-        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
-        serde_json::Value,
-    ),
+    Tan(NumberLiteralOrNumberOrAnyAsUnion),
     /// Converts the input value to a number, if possible. If the input is `null` or `false`, the result is 0. If the input is `true`, the result is 1. If the input is a string, it is converted to a number as specified by the ["ToNumber Applied to the String Type" algorithm](https://tc39.github.io/ecma262/#sec-tonumber-applied-to-the-string-type) of the ECMAScript Language Specification. If multiple values are provided, each one is evaluated in order until the first successful conversion is obtained. If none of the inputs can be converted, the expression is an error.
-    To(Vec<serde_json::Value>),
+    To(Vec<ExprOrLiteral>),
     /// Gets the current zoom level.  Note that in style layout and paint properties, ["zoom"] may only appear as the input to a top-level "step" or "interpolate" expression.
     Zoom,
 }
@@ -1620,10 +1502,8 @@ pub enum MinusOptions {
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum IndexOfOptions {
     Item(
-        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
-        serde_json::Value,
-        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
-        serde_json::Value,
+        ExprOrLiteral,
+        ExprOrLiteral,
         #[serde(default)] Option<serde_json::Value>,
     ),
     Substring(String, String, #[serde(default)] Option<serde_json::Value>),
@@ -2012,12 +1892,9 @@ pub enum Object {
     /// Provides a literal array or object value.
     ///
     ///  - [Display and style rich text labels](https://maplibre.org/maplibre-gl-js/docs/examples/display-and-style-rich-text-labels/)
-    Literal(
-        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
-        serde_json::Value,
-    ),
+    Literal(JSONObjectLiteral),
     /// Asserts that the input value is an object. If multiple values are provided, each one is evaluated in order until an object is obtained. If none of the inputs are objects, the expression is an error.
-    Op(Vec<serde_json::Value>),
+    Op(Vec<ExprOrLiteral>),
     /// Gets the feature properties object.  Note that in some cases, it may be more efficient to use ["get", "property_name"] directly.
     Properties,
 }
@@ -2096,57 +1973,41 @@ pub enum String {
     ///  - [Use a fallback image](https://maplibre.org/maplibre-gl-js/docs/examples/fallback-image/)
     ///
     ///  - [Variable label placement](https://maplibre.org/maplibre-gl-js/docs/examples/variable-label-placement/)
-    Concat(Vec<serde_json::Value>),
+    Concat(Vec<ExprOrLiteral>),
     /// Returns the input string converted to lowercase. Follows the Unicode Default Case Conversion algorithm and the locale-insensitive case mappings in the Unicode Character Database.
     ///
     ///  - [Change the case of labels](https://maplibre.org/maplibre-gl-js/docs/examples/change-case-of-labels/)
-    Downcase(
-        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
-        serde_json::Value,
-    ),
+    Downcase(Box<String>),
     /// Returns the feature's simple geometry type: `Point`, `LineString`, or `Polygon`. `MultiPoint`, `MultiLineString`, and `MultiPolygon` are returned as `Point`, `LineString`, and `Polygon`, respectively.
     GeometryType,
     /// Converts the input number into a string representation using the provided format_options.
     ///
     ///  - [Display HTML clusters with custom properties](https://maplibre.org/maplibre-gl-js/docs/examples/display-html-clusters-with-custom-properties/)
     NumberFormat(
-        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
-        serde_json::Value,
-        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
-        serde_json::Value,
+        NumberLiteralOrNumberOrAnyAsUnion,
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_map))]
+        serde_json::Map<std::string::String, serde_json::Value>,
     ),
     /// Returns the IETF language tag of the locale being used by the provided `collator`. This can be used to determine the default system locale, or to determine if a requested locale was successfully loaded.
     ResolvedLocale(Collator),
     /// Returns a subarray from an array or a substring from a string from a specified start index, or between a start index and an end index if set. The return value is inclusive of the start index but not of the end index. In a string, a UTF-16 surrogate pair counts as a single position.
     Slice(
-        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
-        serde_json::Value,
-        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
-        serde_json::Value,
-        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_option_json_value))]
-         Option<serde_json::Value>,
+        Box<String>,
+        NumberLiteralOrNumberOrAnyAsUnion,
+        Option<NumberLiteralOrNumberOrAnyAsUnion>,
     ),
     /// Asserts that the input value is a string. If multiple values are provided, each one is evaluated in order until a string is obtained. If none of the inputs are strings, the expression is an error.
-    Op(Vec<serde_json::Value>),
+    Op(Vec<ExprOrLiteral>),
     /// Converts the input value to a string. If the input is `null`, the result is `""`. If the input is a boolean, the result is `"true"` or `"false"`. If the input is a number, it is converted to a string as specified by the ["NumberToString" algorithm](https://tc39.github.io/ecma262/#sec-tostring-applied-to-the-number-type) of the ECMAScript Language Specification. If the input is a color, it is converted to a string of the form `"rgba(r,g,b,a)"`, where `r`, `g`, and `b` are numerals ranging from 0 to 255, and `a` ranges from 0 to 1. Otherwise, the input is converted to a string in the format specified by the [`JSON.stringify`](https://tc39.github.io/ecma262/#sec-json.stringify) function of the ECMAScript Language Specification.
     ///
     ///  - [Create a time slider](https://maplibre.org/maplibre-gl-js/docs/examples/create-a-time-slider/)
-    To(
-        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
-        serde_json::Value,
-    ),
+    To(ExprOrLiteral),
     /// Returns a string describing the type of the given value.
-    Typeof(
-        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
-        serde_json::Value,
-    ),
+    Typeof(ExprOrLiteral),
     /// Returns the input string converted to uppercase. Follows the Unicode Default Case Conversion algorithm and the locale-insensitive case mappings in the Unicode Character Database.
     ///
     ///  - [Change the case of labels](https://maplibre.org/maplibre-gl-js/docs/examples/change-case-of-labels/)
-    Upcase(
-        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
-        serde_json::Value,
-    ),
+    Upcase(Box<String>),
 }
 
 impl<'de> serde::Deserialize<'de> for String {

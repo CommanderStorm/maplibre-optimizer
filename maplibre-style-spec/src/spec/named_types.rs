@@ -173,26 +173,38 @@ pub enum GeometryType {
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct Interpolation(InterpolationName);
 
+/// An expression node or a literal JSON value in expression positions.
+#[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[serde(untagged)]
+pub enum ExprOrLiteral {
+    Null,
+    Bool(bool),
+    NumberLiteral(NumberLiteral),
+    StringLiteral(StringLiteral),
+    GeoJSONObjectLiteral(GeoJSONObjectLiteral),
+    JSONObjectLiteral(JSONObjectLiteral),
+    JSONArrayLiteral(JSONArrayLiteral),
+    AnyExpr(Box<Any>),
+    ArrayExpr(Box<Array>),
+    BooleanExpr(Box<Boolean>),
+    CollatorExpr(Box<Collator>),
+    ColorExpr(Box<Color>),
+    FormattedExpr(Box<Formatted>),
+    ImageExpr(Box<Image>),
+    NumberExpr(Box<Number>),
+    ObjectExpr(Box<Object>),
+    StringExpr(Box<String>),
+}
+
 /// First element in an interpolation array. May be followed by a number of arguments.
 #[derive(serde::Serialize, PartialEq, Debug, Clone)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum InterpolationName {
     /// Interpolates using the cubic bézier curve defined by the given control points.
-    CubicBezier(
-        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
-        serde_json::Value,
-        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
-        serde_json::Value,
-        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
-        serde_json::Value,
-        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
-        serde_json::Value,
-    ),
+    CubicBezier(NumberLiteral, NumberLiteral, NumberLiteral, NumberLiteral),
     /// Interpolates exponentially between the stops just less than and just greater than the input.
-    Exponential(
-        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
-        serde_json::Value,
-    ),
+    Exponential(NumberLiteral),
     /// Interpolates linearly between the pair of stops just less than and just greater than the input
     Linear,
 }
