@@ -7,8 +7,6 @@ mod root;
 mod sources;
 pub mod types;
 
-pub use root::IntermediateRootPrimitives;
-
 use std::collections::BTreeMap;
 
 pub use expressions::{
@@ -17,6 +15,7 @@ pub use expressions::{
     ResolvedParam,
 };
 pub use layers::{IntermediateLayerField, IntermediateLayerType, IntermediateLayers};
+pub use root::IntermediateRootPrimitives;
 /// Alias kept for existing imports (`generator`, tests).
 pub type Layers = IntermediateLayers;
 pub use sources::{IntermediateSources as Sources, SourceTypeDef};

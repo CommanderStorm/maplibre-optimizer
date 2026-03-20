@@ -59,7 +59,7 @@ pub struct MaplibreStyleSpecification;
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum Any {
     /// Binds expressions to named variables.
-    Let(Vec<(StringLiteral,Box<Any>)>),
+    Let((Vec<(StringLiteral,serde_json::Value)>,serde_json::Value)),
 }
 
 impl<'de> serde::Deserialize<'de> for Any {
@@ -101,7 +101,8 @@ impl<'de> serde::de::Visitor<'de> for AnyVisitor {
         if inputs.is_empty() {
         return Err(serde::de::Error::custom("Any::Let requires at least one argument"));
         }
-        Ok(Any::Let(inputs))
+        let expression = visit_seq_field(&mut seq, "expression")?;
+        Ok(Any::Let((inputs, expression)))
         },
         _ => Err(serde::de::Error::unknown_variant(&op, &["let"]))
         }
