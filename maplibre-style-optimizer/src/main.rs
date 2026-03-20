@@ -25,9 +25,9 @@ struct Cli {
     #[arg(long)]
     reference: Option<PathBuf>,
 
-    /// Fold `["any", expr]` to `expr`.
+    /// Simplify unary boolean ops: `["any"|"all", e]` → `e`, `["!",["!",e]]` → `e`.
     #[arg(long)]
-    fold_unary_any: bool,
+    simplify_unary: bool,
 
     /// Run JSON-tree validation after optimization (`maplibre_style_spec::validate`).
     #[arg(long)]
@@ -47,7 +47,9 @@ fn main() -> anyhow::Result<()> {
     let reference_path = cli.reference.unwrap_or_else(default_reference_path);
 
     let mir = load_intermediate_spec_from_v8_path(&reference_path)?;
-    ensure_expression_operator(&mir, "any")?;
+    for op in ["any", "all", "!"] {
+        ensure_expression_operator(&mir, op)?;
+    }
 
     let json_text =
         fs::read_to_string(&cli.input).with_context(|| cli.input.display().to_string())?;
@@ -55,7 +57,7 @@ fn main() -> anyhow::Result<()> {
         .with_context(|| format!("parse style JSON {}", cli.input.display()))?;
 
     let passes = OptPasses {
-        fold_unary_any: cli.fold_unary_any,
+        simplify_unary: cli.simplify_unary,
     };
     optimize_style_json_value(&mut value, &mir, &passes);
 
