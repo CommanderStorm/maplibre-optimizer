@@ -53,6 +53,95 @@ pub fn generate_spec_scope(spec: &IntermediateSpec) -> String {
     scope.to_string()
 }
 
+/// Generate the Maplibre Style Specification types split into per-domain modules.
+///
+/// This returns an *outer* [`codegen2::Scope`] containing one child module per domain
+/// (`literals`, `root`, `named_types`, `expressions`, `sources`, `layers`).
+/// Each domain module contains its own `#[cfg(test)] mod test { ... }` for the
+/// generated `test_example_*_decodes` checks.
+pub fn generate_spec_modules(spec: &IntermediateSpec) -> Scope {
+    let mut outer = Scope::new();
+
+    let domains = [
+        "literals",
+        "root",
+        "named_types",
+        "expressions",
+        "sources",
+        "layers",
+    ];
+
+    // Pre-create modules so we can unconditionally finalize the `test` submodule later.
+    for d in domains {
+        outer.get_or_new_module(d);
+    }
+
+    {
+        let literals_scope = outer.get_or_new_module("literals").scope();
+        generate_literals(literals_scope);
+        literals_scope
+            .get_or_new_module("test")
+            .attr("cfg(test)")
+            .attr("allow(unused_imports)")
+            .import("super", "*");
+    }
+
+    {
+        let root_scope = outer.get_or_new_module("root").scope();
+        generate_root_struct(root_scope, spec);
+        root_scope
+            .get_or_new_module("test")
+            .attr("cfg(test)")
+            .attr("allow(unused_imports)")
+            .import("super", "*");
+    }
+
+    {
+        let named_types_scope = outer.get_or_new_module("named_types").scope();
+        for (key, named_type) in &spec.named_types {
+            let name = to_upper_camel_case(key);
+            generate_named_type(named_types_scope, &name, named_type);
+        }
+        named_types_scope
+            .get_or_new_module("test")
+            .attr("cfg(test)")
+            .attr("allow(unused_imports)")
+            .import("super", "*");
+    }
+
+    {
+        let expressions_scope = outer.get_or_new_module("expressions").scope();
+        generate_expression_types(expressions_scope, &spec.expressions);
+        expressions_scope
+            .get_or_new_module("test")
+            .attr("cfg(test)")
+            .attr("allow(unused_imports)")
+            .import("super", "*");
+    }
+
+    {
+        let sources_scope = outer.get_or_new_module("sources").scope();
+        generate_source_types(sources_scope, &spec.sources);
+        sources_scope
+            .get_or_new_module("test")
+            .attr("cfg(test)")
+            .attr("allow(unused_imports)")
+            .import("super", "*");
+    }
+
+    {
+        let layers_scope = outer.get_or_new_module("layers").scope();
+        generate_layer_types(layers_scope, &spec.layers);
+        layers_scope
+            .get_or_new_module("test")
+            .attr("cfg(test)")
+            .attr("allow(unused_imports)")
+            .import("super", "*");
+    }
+
+    outer
+}
+
 // ── Root struct ───────────────────────────────────────────────────────────────
 
 fn generate_root_struct(scope: &mut Scope, spec: &IntermediateSpec) {

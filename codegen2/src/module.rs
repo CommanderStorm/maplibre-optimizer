@@ -214,4 +214,12 @@ impl Module {
         write!(fmt, "mod {}", self.name)?;
         fmt.block(|fmt| self.scope.fmt(fmt))
     }
+
+    /// Render only this module's *contents* (no `mod <name> { ... }` wrapper).
+    ///
+    /// This is useful when you want to write the module to `src/<name>.rs` as a Rust
+    /// submodule file, where the wrapper is provided by `src/mod.rs`.
+    pub fn body_to_string(&self) -> String {
+        self.scope.to_string()
+    }
 }

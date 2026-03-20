@@ -164,6 +164,16 @@ impl Scope {
         self
     }
 
+    /// Iterate over named child modules stored directly in this scope.
+    ///
+    /// Returned item tuple is `(module_name, module_ref)`.
+    pub fn modules(&self) -> impl Iterator<Item = (&str, &Module)> + '_ {
+        self.items.iter().filter_map(|item| match item {
+            Item::Module(m) => Some((m.name.as_str(), m)),
+            _ => None,
+        })
+    }
+
     /// Returns a mutable reference to a [`Struct`] if it is existing in this scope.
     pub fn get_struct_mut<Q: ?Sized>(&mut self, name: &Q) -> Option<&mut Struct>
     where

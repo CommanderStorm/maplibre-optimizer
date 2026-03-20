@@ -2,7 +2,7 @@ use std::fs;
 use std::path::PathBuf;
 
 use maplibre_style_spec::decoder::StyleReference;
-use maplibre_style_spec::generator::generate_spec_scope;
+use maplibre_style_spec::generator::generate_spec_modules;
 use maplibre_style_spec::mir::IntermediateSpec;
 
 fn main() {
@@ -12,18 +12,54 @@ fn main() {
         serde_json::from_str(json_content).expect("Failed to parse v8.json into StyleReference");
 
     let spec = IntermediateSpec::from(reference);
-    let generated_code = generate_spec_scope(&spec);
-    let code_bytes_cnt = generated_code.len();
-    let code_lines_cnt = generated_code.lines().count();
+    let generated_scope = generate_spec_modules(&spec);
 
-    let output_path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("src/spec.rs");
-    println!("Generating spec code to {output_path:?}");
-    if let Err(e) = fs::write(&output_path, &generated_code) {
-        panic!(
-            "Failed to write {output_path:?} with {code_bytes_cnt}B on {code_lines_cnt} lines code because {e:?}"
-        );
+    let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    let spec_rs = manifest_dir.join("src/spec.rs");
+    let spec_dir = manifest_dir.join("src/spec");
+    fs::create_dir_all(&spec_dir).expect("failed to create src/spec directory");
+
+    // Avoid module resolution ambiguity (`src/spec.rs` vs `src/spec/mod.rs`).
+    let _ = fs::remove_file(&spec_rs);
+
+    let domains = [
+        "literals",
+        "root",
+        "named_types",
+        "expressions",
+        "sources",
+        "layers",
+    ];
+
+    let mod_rs_content = domains
+        .iter()
+        .map(|d| format!("pub mod {d};"))
+        .collect::<Vec<_>>()
+        .join("\n")
+        + "\n\n"
+        + &domains
+            .iter()
+            .map(|d| format!("pub use {d}::*;"))
+            .collect::<Vec<_>>()
+            .join("\n");
+
+    let mod_rs_path = spec_dir.join("mod.rs");
+    println!("Generating spec mod at {mod_rs_path:?}");
+    fs::write(&mod_rs_path, mod_rs_content).expect("failed to write spec/mod.rs");
+
+    let mut code_bytes_cnt = 0usize;
+    let mut code_lines_cnt = 0usize;
+    for (domain_name, module) in generated_scope.modules() {
+        let body = module.body_to_string();
+        let content = format!("#[allow(unused_imports)]\nuse super::*;\n\n{body}\n");
+        let out_path = spec_dir.join(format!("{domain_name}.rs"));
+        println!("Generating spec module {domain_name} at {out_path:?}");
+        code_bytes_cnt += content.len();
+        code_lines_cnt += content.lines().count();
+        fs::write(&out_path, content)
+            .unwrap_or_else(|e| panic!("failed to write {out_path:?} because {e:?}"));
     }
 
-    println!("Successfully generated spec code to {output_path:?}");
+    println!("Successfully generated split spec into {spec_dir:?}");
     println!("Generated {code_bytes_cnt}B on {code_lines_cnt} lines code");
 }

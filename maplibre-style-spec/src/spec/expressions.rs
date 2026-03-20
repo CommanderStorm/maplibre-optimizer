@@ -1,0 +1,2231 @@
+#[allow(unused_imports)]
+use super::*;
+
+/// Either of the below variants
+#[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+#[serde(untagged)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+pub enum StringOrNumberOrArrayOfStringOrArrayOfNumberAsUnion {
+    String(StringLiteral),
+    Number(NumberLiteral),
+    ArrayOfString(ArrayOfStringLiteral),
+    ArrayOfNumber(ArrayOfNumberLiteral),
+}
+
+/// Either of the below variants
+#[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+#[serde(untagged)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+pub enum NumberLiteralOrNumberAsUnion {
+    NumberLiteral(NumberLiteral),
+    Number(Box<Number>),
+}
+
+/// "Any"
+#[derive(serde::Serialize, PartialEq, Debug, Clone)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+pub enum Any {
+    /// Gets the value of a cluster property accumulated so far. Can only be used in the `clusterProperties` option of a clustered GeoJSON source.
+    Accumulated,
+    /// Retrieves an item from an array.
+    At(
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
+        serde_json::Value,
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
+        serde_json::Value,
+    ),
+    /// Selects the first output whose corresponding test condition evaluates to true, or the fallback value otherwise.
+    ///
+    ///  - [Create a hover effect](https://maplibre.org/maplibre-gl-js/docs/examples/create-a-hover-effect/)
+    ///
+    ///  - [Display HTML clusters with custom properties](https://maplibre.org/maplibre-gl-js/docs/examples/display-html-clusters-with-custom-properties/)
+    Case((Vec<(Boolean, serde_json::Value)>, serde_json::Value)),
+    /// Evaluates each expression in turn until the first non-null value is obtained, and returns that value.
+    ///
+    ///  - [Use a fallback image](https://maplibre.org/maplibre-gl-js/docs/examples/use-a-fallback-image/)
+    Coalesce(Vec<serde_json::Value>),
+    /// Retrieves a property value from the current feature's state. Returns null if the requested property is not present on the feature's state. A feature's state is not part of the GeoJSON or vector tile data, and must be set programmatically on each feature. When `source.promoteId` is not provided, features are identified by their `id` attribute, which must be an integer or a string that can be cast to an integer. When `source.promoteId` is provided, features are identified by their `promoteId` property, which may be a number, string, or any primitive data type. Note that ["feature-state"] can only be used with paint properties that support data-driven styling.
+    ///
+    ///  - [Create a hover effect](https://maplibre.org/maplibre-gl-js/docs/examples/create-a-hover-effect/)
+    FeatureState(
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
+        serde_json::Value,
+    ),
+    /// Retrieves a property value from the current feature's properties, or from another object if a second argument is provided. Returns null if the requested property is missing.
+    ///
+    ///  - [Change the case of labels](https://maplibre.org/maplibre-gl-js/docs/examples/change-case-of-labels/)
+    ///
+    ///  - [Display HTML clusters with custom properties](https://maplibre.org/maplibre-gl-js/docs/examples/display-html-clusters-with-custom-properties/)
+    ///
+    ///  - [Extrude polygons for 3D indoor mapping](https://maplibre.org/maplibre-gl-js/docs/examples/extrude-polygons-for-3d-indoor-mapping/)
+    Get(
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
+        serde_json::Value,
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_option_json_value))]
+         Option<serde_json::Value>,
+    ),
+    /// Retrieves a property value from global state that can be set with platform-specific APIs. Defaults can be provided using the [`state`](https://maplibre.org/maplibre-style-spec/root/#state) root property. Returns `null` if no value nor default value is set for the retrieved property.
+    GlobalState(
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
+        serde_json::Value,
+    ),
+    /// Gets the feature's id, if it has one.
+    Id,
+    /// Binds expressions to named variables, which can then be referenced in the result expression using `["var", "variable_name"]`.
+    ///
+    ///  - [Visualize population density](https://maplibre.org/maplibre-gl-js/docs/examples/visualize-population-density/)
+    Let((Vec<(StringLiteral, serde_json::Value)>, serde_json::Value)),
+    /// Selects the output whose label value matches the input value, or the fallback value if no match is found. The input can be any expression (e.g. `["get", "building_type"]`). Each label must be either:
+    ///
+    ///  - a single literal value; or
+    ///
+    ///  - an array of literal values, whose values must be all strings or all numbers (e.g. `[100, 101]` or `["c", "b"]`). The input matches if any of the values in the array matches, similar to the `"in"` operator.
+    ///
+    /// Each label must be unique. If the input type does not match the type of the labels, the result will be the fallback value.
+    Match(
+        (
+            serde_json::Value,
+            Vec<(
+                StringOrNumberOrArrayOfStringOrArrayOfNumberAsUnion,
+                serde_json::Value,
+            )>,
+            serde_json::Value,
+        ),
+    ),
+    /// Produces discrete, stepped results by evaluating a piecewise-constant function defined by pairs of input and output values ("stops"). The `input` may be any numeric expression (e.g., `["get", "population"]`). Stop inputs must be numeric literals in strictly ascending order.
+    ///
+    /// Returns the output value of the stop just less than the input, or the first output if the input is less than the first stop.
+    ///
+    ///  - [Create and style clusters](https://maplibre.org/maplibre-gl-js/docs/examples/create-and-style-clusters/)
+    Step(
+        (
+            NumberLiteralOrNumberAsUnion,
+            serde_json::Value,
+            Vec<(NumberLiteral, serde_json::Value)>,
+        ),
+    ),
+    /// References variable bound using `let`.
+    ///
+    ///  - [Visualize population density](https://maplibre.org/maplibre-gl-js/docs/examples/visualize-population-density/)
+    Var(
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
+        serde_json::Value,
+    ),
+}
+
+impl<'de> serde::Deserialize<'de> for Any {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        deserializer.deserialize_seq(AnyVisitor)
+    }
+}
+
+/// Visitor for deserializing the syntax enum [`Any`]
+struct AnyVisitor;
+
+impl<'de> serde::de::Visitor<'de> for AnyVisitor {
+    type Value = Any;
+
+    fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+        formatter.write_str("an Any expression (example: [\"accumulated\"])")
+    }
+
+    fn visit_seq<A: serde::de::SeqAccess<'de>>(self, mut seq: A) -> Result<Self::Value, A::Error> {
+        /// Reads the next element from the sequence or reports a missing field error.
+        #[allow(dead_code)]
+        fn visit_seq_field<'de, A, T>(seq: &mut A, name: &'static str) -> Result<T, A::Error>
+        where
+            A: serde::de::SeqAccess<'de>,
+            T: serde::Deserialize<'de>,
+        {
+            seq.next_element()?
+                .ok_or_else(|| serde::de::Error::missing_field(name))
+        }
+
+        // First element: operator string
+        let op: std::string::String = seq
+            .next_element()?
+            .ok_or_else(|| serde::de::Error::custom("missing operator"))?;
+        match op.as_str() {
+            "accumulated" => Ok(Any::Accumulated),
+            "at" => {
+                let index = visit_seq_field(&mut seq, "index")?;
+                let array = visit_seq_field(&mut seq, "array")?;
+                Ok(Any::At(index, array))
+            }
+            "case" => {
+                let mut inputs = Vec::new();
+                while let Some(condition_i) = seq.next_element()? {
+                    let output_i = seq.next_element()?.ok_or_else(|| {
+                        serde::de::Error::custom("expected output_i in Any::Case")
+                    })?;
+                    let element = (condition_i, output_i);
+                    inputs.push(element);
+                }
+                if inputs.is_empty() {
+                    return Err(serde::de::Error::custom(
+                        "Any::Case requires at least one argument",
+                    ));
+                }
+                let fallback = visit_seq_field(&mut seq, "fallback")?;
+                Ok(Any::Case((inputs, fallback)))
+            }
+            "coalesce" => {
+                let mut inputs = Vec::new();
+                while let Some(element) = seq.next_element()? {
+                    inputs.push(element);
+                }
+                if inputs.is_empty() {
+                    return Err(serde::de::Error::custom(
+                        "Any::Coalesce requires at least one argument",
+                    ));
+                }
+                Ok(Any::Coalesce(inputs))
+            }
+            "feature-state" => {
+                let property_name = visit_seq_field(&mut seq, "property_name")?;
+                Ok(Any::FeatureState(property_name))
+            }
+            "get" => {
+                let property_name = visit_seq_field(&mut seq, "property_name")?;
+                let object = seq.next_element()?;
+                Ok(Any::Get(property_name, object))
+            }
+            "global-state" => {
+                let property_name = visit_seq_field(&mut seq, "property_name")?;
+                Ok(Any::GlobalState(property_name))
+            }
+            "id" => Ok(Any::Id),
+            "let" => {
+                let mut inputs = Vec::new();
+                while let Some(var_name_i) = seq.next_element()? {
+                    let var_value_i = seq.next_element()?.ok_or_else(|| {
+                        serde::de::Error::custom("expected var_value_i in Any::Let")
+                    })?;
+                    let element = (var_name_i, var_value_i);
+                    inputs.push(element);
+                }
+                if inputs.is_empty() {
+                    return Err(serde::de::Error::custom(
+                        "Any::Let requires at least one argument",
+                    ));
+                }
+                let expression = visit_seq_field(&mut seq, "expression")?;
+                Ok(Any::Let((inputs, expression)))
+            }
+            "match" => {
+                let mut rest: Vec<serde_json::Value> = Vec::new();
+                while let Some(v) = seq.next_element()? {
+                    rest.push(v);
+                }
+                if rest.len() < 2 {
+                    return Err(serde::de::Error::custom("Any::Match: too few arguments"));
+                }
+                if !rest.len().is_multiple_of(2) {
+                    return Err(serde::de::Error::custom(
+                        "Any::Match: expected an even number of arguments after operator (input + label/output pairs + fallback)",
+                    ));
+                }
+                let fallback_v = rest.pop().unwrap();
+                let input = rest.remove(0);
+                let mut pairs = Vec::new();
+                for chunk in rest.chunks_exact(2) {
+                    let label_i: StringOrNumberOrArrayOfStringOrArrayOfNumberAsUnion =
+                        serde_json::from_value(chunk[0].clone())
+                            .map_err(serde::de::Error::custom)?;
+                    let output_i: serde_json::Value = serde_json::from_value(chunk[1].clone())
+                        .map_err(serde::de::Error::custom)?;
+                    pairs.push((label_i, output_i));
+                }
+                if pairs.is_empty() {
+                    return Err(serde::de::Error::custom(
+                        "Any::Match: missing label/output pairs",
+                    ));
+                }
+                let fallback: serde_json::Value =
+                    serde_json::from_value(fallback_v).map_err(serde::de::Error::custom)?;
+                Ok(Any::Match((input, pairs, fallback)))
+            }
+            "step" => {
+                let input: NumberLiteralOrNumberAsUnion = visit_seq_field(&mut seq, "input")?;
+                let output_0: serde_json::Value = visit_seq_field(&mut seq, "output_0")?;
+                let mut stops = Vec::new();
+                while let Some(stop_input_i) = seq.next_element::<NumberLiteral>()? {
+                    let stop_output_i: serde_json::Value =
+                        seq.next_element()?.ok_or_else(|| {
+                            serde::de::Error::custom("expected stop_output_i in Any::Step")
+                        })?;
+                    stops.push((stop_input_i, stop_output_i));
+                }
+                if stops.is_empty() {
+                    return Err(serde::de::Error::custom(
+                        "Any::Step requires at least one stop pair",
+                    ));
+                }
+                Ok(Any::Step((input, output_0, stops)))
+            }
+            "var" => {
+                let var_name = visit_seq_field(&mut seq, "var_name")?;
+                Ok(Any::Var(var_name))
+            }
+            _ => Err(serde::de::Error::unknown_variant(
+                &op,
+                &[
+                    "accumulated",
+                    "at",
+                    "case",
+                    "coalesce",
+                    "feature-state",
+                    "get",
+                    "global-state",
+                    "id",
+                    "let",
+                    "match",
+                    "step",
+                    "var",
+                ],
+            )),
+        }
+    }
+}
+
+#[cfg(test)]
+#[allow(unused_imports)]
+mod test {
+    use super::*;
+
+    #[rstest::rstest]
+    #[case::t_accumulated(serde_json::json!(["accumulated"]))]
+    #[case::t_at(serde_json::json!(["at",1,["literal",["a","b","c"]]]))]
+    #[case::t_case(serde_json::json!(["case",["boolean",["feature-state","hover"],false],1,0.5]))]
+    #[case::t_coalesce(serde_json::json!(["coalesce",["image",["concat",["get","icon"],"_15"]],["image","marker_15"]]))]
+    #[case::t_feature_state(serde_json::json!(["feature-state","hover"]))]
+    #[case::t_get(serde_json::json!(["get","someProperty"]))]
+    #[case::t_global_state(serde_json::json!(["global-state","someProperty"]))]
+    #[case::t_id(serde_json::json!(["id"]))]
+    #[case::t_let(serde_json::json!(["let","someNumber",500,["interpolate",["linear"],["var","someNumber"],274,"#edf8e9",1551,"#006d2c"]]))]
+    #[case::t_match(serde_json::json!(["match",["get","building_type"],"residential","#f00","commercial","#0f0","#000"]))]
+    #[case::t_step(serde_json::json!(["step",["get","point_count"],20,100,30,750,40]))]
+    #[case::t_var(serde_json::json!(["var","density"]))]
+    fn test_example_any_decodes(#[case] example: serde_json::Value) {
+        let _ = serde_json::from_value::<Any>(example).expect("example should decode");
+    }
+
+    #[rstest::rstest]
+    #[case::t_literal(serde_json::json!(["literal",["DIN Offc Pro Italic","Arial Unicode MS Regular"]]))]
+    #[case::t_slice(serde_json::json!(["slice",["get","name"],0,3]))]
+    #[case::t_to_rgba(serde_json::json!(["to-rgba","#ff0000"]))]
+    fn test_example_array_decodes(#[case] example: serde_json::Value) {
+        let _ = serde_json::from_value::<Array>(example).expect("example should decode");
+    }
+
+    #[rstest::rstest]
+    #[case::t_array(serde_json::json!(["array","string",3,["literal",["a","b","c"]]]))]
+    fn test_example_array_less_type_length_greater_decodes(#[case] example: serde_json::Value) {
+        let _ = serde_json::from_value::<ArrayLessTypeLengthGreater>(example)
+            .expect("example should decode");
+    }
+
+    #[rstest::rstest]
+    #[case::t_not(serde_json::json!(["!",["has","point_count"]]))]
+    #[case::t_not_equal(serde_json::json!(["!=","cluster",true]))]
+    #[case::t_less(serde_json::json!(["<",["get","mag"],2]))]
+    #[case::t_less_equal(serde_json::json!(["<=",["get","mag"],6]))]
+    #[case::t_equal_equal(serde_json::json!(["==","$type","Polygon"]))]
+    #[case::t_greater(serde_json::json!([">",["get","mag"],2]))]
+    #[case::t_greater_equal(serde_json::json!([">=",["get","mag"],6]))]
+    #[case::t_all(serde_json::json!(["all",[">=",["get","mag"],4],["<",["get","mag"],5]]))]
+    #[case::t_any(serde_json::json!(["any",[">=",["get","mag"],4],["<",["get","mag"],5]]))]
+    #[case::t_boolean(serde_json::json!(["boolean",["feature-state","hover"],false]))]
+    #[case::t_has(serde_json::json!(["has","someProperty"]))]
+    #[case::t_in(serde_json::json!(["in","$type","Point"]))]
+    #[case::t_is_supported_script(serde_json::json!(["is-supported-script","दिल्ली"]))]
+    #[case::t_to_boolean(serde_json::json!(["to-boolean","someProperty"]))]
+    #[case::t_within(serde_json::json!(["within",{"coordinates":[[[0,0],[0,5],[5,5],[5,0],[0,0]]],"type":"Polygon"}]))]
+    fn test_example_boolean_decodes(#[case] example: serde_json::Value) {
+        let _ = serde_json::from_value::<Boolean>(example).expect("example should decode");
+    }
+
+    #[rstest::rstest]
+    #[case::t_collator(serde_json::json!(["collator",{"case-sensitive":true,"diacritic-sensitive":true,"locale":"fr"}]))]
+    fn test_example_collator_decodes(#[case] example: serde_json::Value) {
+        let _ = serde_json::from_value::<Collator>(example).expect("example should decode");
+    }
+
+    #[rstest::rstest]
+    #[case::t_rgb(serde_json::json!(["rgb",255,0,0]))]
+    #[case::t_rgba(serde_json::json!(["rgba",255,0,0,1]))]
+    #[case::t_to_color(serde_json::json!(["to-color","#edf8e9"]))]
+    fn test_example_color_decodes(#[case] example: serde_json::Value) {
+        let _ = serde_json::from_value::<Color>(example).expect("example should decode");
+    }
+
+    #[rstest::rstest]
+    #[case::t_interpolate_hcl(serde_json::json!(["interpolate-hcl",["linear"],["zoom"],15,"#f00",15.05,"#00f"]))]
+    #[case::t_interpolate_lab(serde_json::json!(["interpolate-lab",["linear"],["zoom"],15,"#f00",15.05,"#00f"]))]
+    fn test_example_color_or_array_of_color_decodes(#[case] example: serde_json::Value) {
+        let _ =
+            serde_json::from_value::<ColorOrArrayOfColor>(example).expect("example should decode");
+    }
+
+    #[rstest::rstest]
+    #[case::t_format(serde_json::json!(["format",["upcase",["get","FacilityName"]],{"font-scale":0.8},"\n\n",{},["downcase",["get","Comments"]],{"font-scale":0.6,"vertical-align":"center"}]))]
+    fn test_example_formatted_decodes(#[case] example: serde_json::Value) {
+        let _ = serde_json::from_value::<Formatted>(example).expect("example should decode");
+    }
+
+    #[rstest::rstest]
+    #[case::t_image(serde_json::json!(["image","marker_15"]))]
+    fn test_example_image_decodes(#[case] example: serde_json::Value) {
+        let _ = serde_json::from_value::<Image>(example).expect("example should decode");
+    }
+
+    #[rstest::rstest]
+    #[case::t_percentage(serde_json::json!(["%",10,3]))]
+    #[case::t_star(serde_json::json!(["*",2,3]))]
+    #[case::t_plus(serde_json::json!(["+",2,3]))]
+    #[case::t_minus(serde_json::json!(["-",10]))]
+    #[case::t_slash(serde_json::json!(["/",["get","population"],["get","sq-km"]]))]
+    #[case::t_power(serde_json::json!(["^",2,3]))]
+    #[case::t_absolute(serde_json::json!(["abs",-1.5]))]
+    #[case::t_arccosine(serde_json::json!(["acos",1]))]
+    #[case::t_asin(serde_json::json!(["asin",1]))]
+    #[case::t_atan(serde_json::json!(["atan",1]))]
+    #[case::t_ceil(serde_json::json!(["ceil",1.5]))]
+    #[case::t_cos(serde_json::json!(["cos",1]))]
+    #[case::t_distance(serde_json::json!(["distance",{"coordinates":[0,0],"type":"Point"}]))]
+    #[case::t_e(serde_json::json!(["e"]))]
+    #[case::t_elevation(serde_json::json!(["elevation"]))]
+    #[case::t_floor(serde_json::json!(["floor",1.5]))]
+    #[case::t_heatmap_density(serde_json::json!(["heatmap-density"]))]
+    #[case::t_index_of(serde_json::json!(["index-of","foo",["baz","bar","hello","foo","world"]]))]
+    #[case::t_length(serde_json::json!(["length",["get","myArray"]]))]
+    #[case::t_line_progress(serde_json::json!(["line-progress"]))]
+    #[case::t_ln(serde_json::json!(["ln",8]))]
+    #[case::t_ln2(serde_json::json!(["ln2"]))]
+    #[case::t_log10(serde_json::json!(["log10",8]))]
+    #[case::t_log2(serde_json::json!(["log2",8]))]
+    #[case::t_max(serde_json::json!(["max",1,2]))]
+    #[case::t_min(serde_json::json!(["min",1,2]))]
+    #[case::t_number(serde_json::json!(["number",["get","population"]]))]
+    #[case::t_pi(serde_json::json!(["pi"]))]
+    #[case::t_round(serde_json::json!(["round",1.5]))]
+    #[case::t_sin(serde_json::json!(["sin",1]))]
+    #[case::t_sqrt(serde_json::json!(["sqrt",9]))]
+    #[case::t_tan(serde_json::json!(["tan",1]))]
+    #[case::t_to_number(serde_json::json!(["to-number","someProperty"]))]
+    fn test_example_number_decodes(#[case] example: serde_json::Value) {
+        let _ = serde_json::from_value::<Number>(example).expect("example should decode");
+    }
+
+    #[rstest::rstest]
+    #[case::t_interpolate(serde_json::json!(["interpolate",["linear"],["zoom"],15,0,15.05,["get","height"]]))]
+    fn test_example_number_or_array_of_number_or_color_or_array_of_color_or_projection_decodes(
+        #[case] example: serde_json::Value,
+    ) {
+        let _ = serde_json::from_value::<NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection>(
+            example,
+        )
+        .expect("example should decode");
+    }
+
+    #[rstest::rstest]
+    #[case::t_literal(serde_json::json!(["literal",["DIN Offc Pro Italic","Arial Unicode MS Regular"]]))]
+    #[case::t_object(serde_json::json!(["object",["get","some-property"]]))]
+    #[case::t_properties(serde_json::json!(["properties"]))]
+    fn test_example_object_decodes(#[case] example: serde_json::Value) {
+        let _ = serde_json::from_value::<Object>(example).expect("example should decode");
+    }
+
+    #[rstest::rstest]
+    #[case::t_concat(serde_json::json!(["concat","square-rgb-",["get","color"]]))]
+    #[case::t_downcase(serde_json::json!(["downcase",["get","name"]]))]
+    #[case::t_number_format(serde_json::json!(["number-format",["get","mag"],{"max-fraction-digits":1,"min-fraction-digits":1}]))]
+    #[case::t_resolved_locale(serde_json::json!(["resolved-locale",["collator",{"case-sensitive":true,"diacritic-sensitive":false,"locale":"de"}]]))]
+    #[case::t_slice(serde_json::json!(["slice",["get","name"],0,3]))]
+    #[case::t_string(serde_json::json!(["string",["get","name"]]))]
+    #[case::t_to_string(serde_json::json!(["to-string",["get","mag"]]))]
+    #[case::t_typeof(serde_json::json!(["typeof",["get","name"]]))]
+    #[case::t_upcase(serde_json::json!(["upcase",["get","name"]]))]
+    fn test_example_string_decodes(#[case] example: serde_json::Value) {
+        let _ = serde_json::from_value::<String>(example).expect("example should decode");
+    }
+}
+
+/// "Array"
+#[derive(serde::Serialize, PartialEq, Debug, Clone)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+pub enum Array {
+    /// Asserts that the input is an array (optionally with a specific item type and length). If, when the input expression is evaluated, it is not of the asserted type or length, then this assertion will cause the whole expression to be aborted.
+    Op(
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
+        serde_json::Value,
+    ),
+    /// Provides a literal array or object value.
+    ///
+    ///  - [Display and style rich text labels](https://maplibre.org/maplibre-gl-js/docs/examples/display-and-style-rich-text-labels/)
+    Literal(
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
+        serde_json::Value,
+    ),
+    /// Returns a subarray from an array or a substring from a string from a specified start index, or between a start index and an end index if set. The return value is inclusive of the start index but not of the end index. In a string, a UTF-16 surrogate pair counts as a single position.
+    Slice(
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
+        serde_json::Value,
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
+        serde_json::Value,
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_option_json_value))]
+         Option<serde_json::Value>,
+    ),
+    /// Returns a four-element array containing the input color's red, green, blue, and alpha components, in that order.
+    ToRgba(
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
+        serde_json::Value,
+    ),
+}
+
+impl<'de> serde::Deserialize<'de> for Array {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        deserializer.deserialize_seq(ArrayVisitor)
+    }
+}
+
+/// Visitor for deserializing the syntax enum [`Array`]
+struct ArrayVisitor;
+
+impl<'de> serde::de::Visitor<'de> for ArrayVisitor {
+    type Value = Array;
+
+    fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+        formatter.write_str("an Array expression (example: [\"literal\",[\"DIN Offc Pro Italic\",\"Arial Unicode MS Regular\"]])")
+    }
+
+    fn visit_seq<A: serde::de::SeqAccess<'de>>(self, mut seq: A) -> Result<Self::Value, A::Error> {
+        /// Reads the next element from the sequence or reports a missing field error.
+        #[allow(dead_code)]
+        fn visit_seq_field<'de, A, T>(seq: &mut A, name: &'static str) -> Result<T, A::Error>
+        where
+            A: serde::de::SeqAccess<'de>,
+            T: serde::Deserialize<'de>,
+        {
+            seq.next_element()?
+                .ok_or_else(|| serde::de::Error::missing_field(name))
+        }
+
+        // First element: operator string
+        let op: std::string::String = seq
+            .next_element()?
+            .ok_or_else(|| serde::de::Error::custom("missing operator"))?;
+        match op.as_str() {
+            "array" => {
+                let value = visit_seq_field(&mut seq, "value")?;
+                Ok(Array::Op(value))
+            }
+            "literal" => {
+                let json_array = visit_seq_field(&mut seq, "json_array")?;
+                Ok(Array::Literal(json_array))
+            }
+            "slice" => {
+                let array = visit_seq_field(&mut seq, "array")?;
+                let start_index = visit_seq_field(&mut seq, "start_index")?;
+                let end_index = seq.next_element()?;
+                Ok(Array::Slice(array, start_index, end_index))
+            }
+            "to-rgba" => {
+                let color = visit_seq_field(&mut seq, "color")?;
+                Ok(Array::ToRgba(color))
+            }
+            _ => Err(serde::de::Error::unknown_variant(
+                &op,
+                &["array", "literal", "slice", "to-rgba"],
+            )),
+        }
+    }
+}
+
+/// Either of the below variants
+#[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+pub enum StringOrNumberOrBooleanAsUnion {
+    String(String),
+    Number(Number),
+    Boolean(Boolean),
+}
+
+/// "ArrayLessTypeLengthGreater"
+#[derive(serde::Serialize, PartialEq, Debug, Clone)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+pub enum ArrayLessTypeLengthGreater {
+    /// Asserts that the input is an array (optionally with a specific item type and length). If, when the input expression is evaluated, it is not of the asserted type or length, then this assertion will cause the whole expression to be aborted.
+    Array(
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
+        serde_json::Value,
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
+        serde_json::Value,
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
+        serde_json::Value,
+    ),
+}
+
+impl<'de> serde::Deserialize<'de> for ArrayLessTypeLengthGreater {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        deserializer.deserialize_seq(ArrayLessTypeLengthGreaterVisitor)
+    }
+}
+
+/// Visitor for deserializing the syntax enum [`ArrayLessTypeLengthGreater`]
+struct ArrayLessTypeLengthGreaterVisitor;
+
+impl<'de> serde::de::Visitor<'de> for ArrayLessTypeLengthGreaterVisitor {
+    type Value = ArrayLessTypeLengthGreater;
+
+    fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+        formatter.write_str("an ArrayLessTypeLengthGreater expression (example: [\"array\",\"string\",3,[\"literal\",[\"a\",\"b\",\"c\"]]])")
+    }
+
+    fn visit_seq<A: serde::de::SeqAccess<'de>>(self, mut seq: A) -> Result<Self::Value, A::Error> {
+        /// Reads the next element from the sequence or reports a missing field error.
+        #[allow(dead_code)]
+        fn visit_seq_field<'de, A, T>(seq: &mut A, name: &'static str) -> Result<T, A::Error>
+        where
+            A: serde::de::SeqAccess<'de>,
+            T: serde::Deserialize<'de>,
+        {
+            seq.next_element()?
+                .ok_or_else(|| serde::de::Error::missing_field(name))
+        }
+
+        // First element: operator string
+        let op: std::string::String = seq
+            .next_element()?
+            .ok_or_else(|| serde::de::Error::custom("missing operator"))?;
+        match op.as_str() {
+            "array" => {
+                let r#type = visit_seq_field(&mut seq, "type")?;
+                let length = visit_seq_field(&mut seq, "length")?;
+                let value = visit_seq_field(&mut seq, "value")?;
+                Ok(ArrayLessTypeLengthGreater::Array(r#type, length, value))
+            }
+            _ => Err(serde::de::Error::unknown_variant(&op, &["array"])),
+        }
+    }
+}
+
+/// "ArrayOfType"
+#[derive(serde::Serialize, PartialEq, Debug, Clone)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+pub enum ArrayOfType {
+    /// Asserts that the input is an array (optionally with a specific item type and length). If, when the input expression is evaluated, it is not of the asserted type or length, then this assertion will cause the whole expression to be aborted.
+    Array(
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
+        serde_json::Value,
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
+        serde_json::Value,
+    ),
+}
+
+impl<'de> serde::Deserialize<'de> for ArrayOfType {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        deserializer.deserialize_seq(ArrayOfTypeVisitor)
+    }
+}
+
+/// Visitor for deserializing the syntax enum [`ArrayOfType`]
+struct ArrayOfTypeVisitor;
+
+impl<'de> serde::de::Visitor<'de> for ArrayOfTypeVisitor {
+    type Value = ArrayOfType;
+
+    fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+        formatter.write_str("an ArrayOfType expression (example: [\"array\",\"string\",3,[\"literal\",[\"a\",\"b\",\"c\"]]])")
+    }
+
+    fn visit_seq<A: serde::de::SeqAccess<'de>>(self, mut seq: A) -> Result<Self::Value, A::Error> {
+        /// Reads the next element from the sequence or reports a missing field error.
+        #[allow(dead_code)]
+        fn visit_seq_field<'de, A, T>(seq: &mut A, name: &'static str) -> Result<T, A::Error>
+        where
+            A: serde::de::SeqAccess<'de>,
+            T: serde::Deserialize<'de>,
+        {
+            seq.next_element()?
+                .ok_or_else(|| serde::de::Error::missing_field(name))
+        }
+
+        // First element: operator string
+        let op: std::string::String = seq
+            .next_element()?
+            .ok_or_else(|| serde::de::Error::custom("missing operator"))?;
+        match op.as_str() {
+            "array" => {
+                let r#type = visit_seq_field(&mut seq, "type")?;
+                let value = visit_seq_field(&mut seq, "value")?;
+                Ok(ArrayOfType::Array(r#type, value))
+            }
+            _ => Err(serde::de::Error::unknown_variant(&op, &["array"])),
+        }
+    }
+}
+
+/// "Boolean"
+#[derive(serde::Serialize, PartialEq, Debug, Clone)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+pub enum Boolean {
+    /// Logical negation. Returns `true` if the input is `false`, and `false` if the input is `true`.
+    ///
+    ///  - [Create and style clusters](https://maplibre.org/maplibre-gl-js/docs/examples/create-and-style-clusters/)
+    Not(
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
+        serde_json::Value,
+    ),
+    /// Returns `true` if the input values are not equal, `false` otherwise. The comparison is strictly typed: values of different runtime types are always considered unequal. Cases where the types are known to be different at parse time are considered invalid and will produce a parse error. Accepts an optional `collator` argument to control locale-dependent string comparisons.
+    ///
+    ///  - [Display HTML clusters with custom properties](https://maplibre.org/maplibre-gl-js/docs/examples/display-html-clusters-with-custom-properties/)
+    NotEqual(
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
+        serde_json::Value,
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
+        serde_json::Value,
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_option_json_value))]
+         Option<serde_json::Value>,
+    ),
+    /// Returns `true` if the first input is strictly less than the second, `false` otherwise. The arguments are required to be either both strings or both numbers; if during evaluation they are not, expression evaluation produces an error. Cases where this constraint is known not to hold at parse time are considered in valid and will produce a parse error. Accepts an optional `collator` argument to control locale-dependent string comparisons.
+    ///
+    ///  - [Display HTML clusters with custom properties](https://maplibre.org/maplibre-gl-js/docs/examples/display-html-clusters-with-custom-properties/)
+    Less(LessOptions),
+    /// Returns `true` if the first input is less than or equal to the second, `false` otherwise. The arguments are required to be either both strings or both numbers; if during evaluation they are not, expression evaluation produces an error. Cases where this constraint is known not to hold at parse time are considered in valid and will produce a parse error. Accepts an optional `collator` argument to control locale-dependent string comparisons.
+    LessEqual(LessEqualOptions),
+    /// Returns `true` if the input values are equal, `false` otherwise. The comparison is strictly typed: values of different runtime types are always considered unequal. Cases where the types are known to be different at parse time are considered invalid and will produce a parse error. Accepts an optional `collator` argument to control locale-dependent string comparisons.
+    ///
+    ///  - [Add multiple geometries from one GeoJSON source](https://maplibre.org/maplibre-gl-js/docs/examples/multiple-geometries/)
+    ///
+    ///  - [Create a time slider](https://maplibre.org/maplibre-gl-js/docs/examples/timeline-animation/)
+    ///
+    ///  - [Display buildings in 3D](https://maplibre.org/maplibre-gl-js/docs/examples/display-buildings-in-3d/)
+    ///
+    ///  - [Filter symbols by toggling a list](https://maplibre.org/maplibre-gl-js/docs/examples/filter-symbols-by-toggling-a-list/)
+    EqualEqual(
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
+        serde_json::Value,
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
+        serde_json::Value,
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_option_json_value))]
+         Option<serde_json::Value>,
+    ),
+    /// Returns `true` if the first input is strictly greater than the second, `false` otherwise. The arguments are required to be either both strings or both numbers; if during evaluation they are not, expression evaluation produces an error. Cases where this constraint is known not to hold at parse time are considered in valid and will produce a parse error. Accepts an optional `collator` argument to control locale-dependent string comparisons.
+    Greater(GreaterOptions),
+    /// Returns `true` if the first input is greater than or equal to the second, `false` otherwise. The arguments are required to be either both strings or both numbers; if during evaluation they are not, expression evaluation produces an error. Cases where this constraint is known not to hold at parse time are considered in valid and will produce a parse error. Accepts an optional `collator` argument to control locale-dependent string comparisons.
+    ///
+    ///  - [Display HTML clusters with custom properties](https://maplibre.org/maplibre-gl-js/docs/examples/display-html-clusters-with-custom-properties/)
+    GreaterEqual(GreaterEqualOptions),
+    /// Returns `true` if all the inputs are `true`, `false` otherwise. The inputs are evaluated in order, and evaluation is short-circuiting: once an input expression evaluates to `false`, the result is `false` and no further input expressions are evaluated.
+    ///
+    ///  - [Display HTML clusters with custom properties](https://maplibre.org/maplibre-gl-js/docs/examples/display-html-clusters-with-custom-properties/)
+    All(Vec<Boolean>),
+    /// Returns `true` if any of the inputs are `true`, `false` otherwise. The inputs are evaluated in order, and evaluation is short-circuiting: once an input expression evaluates to `true`, the result is `true` and no further input expressions are evaluated.
+    Any(Vec<Boolean>),
+    /// Asserts that the input value is a boolean. If multiple values are provided, each one is evaluated in order until a boolean is obtained. If none of the inputs are booleans, the expression is an error.
+    ///
+    ///  - [Create a hover effect](https://maplibre.org/maplibre-gl-js/docs/examples/create-a-hover-effect/)
+    Op(Vec<serde_json::Value>),
+    /// Tests for the presence of a property value in the current feature's properties, or from another object if a second argument is provided.
+    ///
+    ///  - [Create and style clusters](https://maplibre.org/maplibre-gl-js/docs/examples/create-and-style-clusters/)
+    Has(
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
+        serde_json::Value,
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_option_json_value))]
+         Option<serde_json::Value>,
+    ),
+    /// Determines whether an item exists in an array or a substring exists in a string.
+    ///
+    ///  - [Measure distances](https://maplibre.org/maplibre-gl-js/docs/examples/measure-distances/)
+    In(InOptions),
+    /// Returns `true` if the input string is expected to render legibly. Returns `false` if the input string contains sections that cannot be rendered without potential loss of meaning (e.g. Indic scripts that require complex text shaping, or right-to-left scripts if the `mapbox-gl-rtl-text` plugin is not in use in MapLibre GL JS).
+    IsSupportedScript(
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
+        serde_json::Value,
+    ),
+    /// Converts the input value to a boolean. The result is `false` when the input is an empty string, 0, `false`, `null`, or `NaN`; otherwise it is `true`.
+    To(
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
+        serde_json::Value,
+    ),
+    /// Returns `true` if the evaluated feature is fully contained inside a boundary of the input geometry, `false` otherwise. The input value can be a valid GeoJSON of type `Polygon`, `MultiPolygon`, `Feature`, or `FeatureCollection`. Supported features for evaluation:
+    ///
+    /// - `Point`: Returns `false` if a point is on the boundary or falls outside the boundary.
+    ///
+    /// - `LineString`: Returns `false` if any part of a line falls outside the boundary, the line intersects the boundary, or a line's endpoint is on the boundary.
+    Within(
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
+        serde_json::Value,
+    ),
+}
+
+/// Options for deserializing the syntax enum variant [`Boolean::Less`]
+#[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+pub enum LessOptions {
+    Args(
+        (
+            serde_json::Value,
+            serde_json::Value,
+            Option<serde_json::Value>,
+        ),
+    ),
+}
+
+/// Options for deserializing the syntax enum variant [`Boolean::LessEqual`]
+#[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+pub enum LessEqualOptions {
+    Args(
+        (
+            serde_json::Value,
+            serde_json::Value,
+            Option<serde_json::Value>,
+        ),
+    ),
+}
+
+/// Options for deserializing the syntax enum variant [`Boolean::Greater`]
+#[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+pub enum GreaterOptions {
+    Args(
+        (
+            serde_json::Value,
+            serde_json::Value,
+            Option<serde_json::Value>,
+        ),
+    ),
+}
+
+/// Options for deserializing the syntax enum variant [`Boolean::GreaterEqual`]
+#[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+pub enum GreaterEqualOptions {
+    Args(
+        (
+            serde_json::Value,
+            serde_json::Value,
+            Option<serde_json::Value>,
+        ),
+    ),
+}
+
+/// Options for deserializing the syntax enum variant [`Boolean::In`]
+#[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+#[serde(untagged)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+pub enum InOptions {
+    Item(
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
+        serde_json::Value,
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
+        serde_json::Value,
+    ),
+    Substring(String, String),
+}
+
+impl<'de> serde::Deserialize<'de> for Boolean {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        deserializer.deserialize_seq(BooleanVisitor)
+    }
+}
+
+/// Visitor for deserializing the syntax enum [`Boolean`]
+struct BooleanVisitor;
+
+impl<'de> serde::de::Visitor<'de> for BooleanVisitor {
+    type Value = Boolean;
+
+    fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+        formatter.write_str("an Boolean expression (example: [\"!\",[\"has\",\"point_count\"]])")
+    }
+
+    fn visit_seq<A: serde::de::SeqAccess<'de>>(self, mut seq: A) -> Result<Self::Value, A::Error> {
+        /// Reads the next element from the sequence or reports a missing field error.
+        #[allow(dead_code)]
+        fn visit_seq_field<'de, A, T>(seq: &mut A, name: &'static str) -> Result<T, A::Error>
+        where
+            A: serde::de::SeqAccess<'de>,
+            T: serde::Deserialize<'de>,
+        {
+            seq.next_element()?
+                .ok_or_else(|| serde::de::Error::missing_field(name))
+        }
+
+        // First element: operator string
+        let op: std::string::String = seq
+            .next_element()?
+            .ok_or_else(|| serde::de::Error::custom("missing operator"))?;
+        match op.as_str() {
+            "!" => {
+                let input = visit_seq_field(&mut seq, "input")?;
+                Ok(Boolean::Not(input))
+            }
+            "!=" => {
+                let input_1 = visit_seq_field(&mut seq, "input_1")?;
+                let input_2 = visit_seq_field(&mut seq, "input_2")?;
+                let collator = seq.next_element()?;
+                Ok(Boolean::NotEqual(input_1, input_2, collator))
+            }
+            "<" => {
+                // Delegate the remainder of the sequence to LessOptions deserialization
+                let remainder_of_sequence = serde::de::value::SeqAccessDeserializer::new(seq);
+                let options =
+                    <LessOptions as serde::Deserialize>::deserialize(remainder_of_sequence)?;
+                Ok(Boolean::Less(options))
+            }
+            "<=" => {
+                // Delegate the remainder of the sequence to LessEqualOptions deserialization
+                let remainder_of_sequence = serde::de::value::SeqAccessDeserializer::new(seq);
+                let options =
+                    <LessEqualOptions as serde::Deserialize>::deserialize(remainder_of_sequence)?;
+                Ok(Boolean::LessEqual(options))
+            }
+            "==" => {
+                let input_1 = visit_seq_field(&mut seq, "input_1")?;
+                let input_2 = visit_seq_field(&mut seq, "input_2")?;
+                let collator = seq.next_element()?;
+                Ok(Boolean::EqualEqual(input_1, input_2, collator))
+            }
+            ">" => {
+                // Delegate the remainder of the sequence to GreaterOptions deserialization
+                let remainder_of_sequence = serde::de::value::SeqAccessDeserializer::new(seq);
+                let options =
+                    <GreaterOptions as serde::Deserialize>::deserialize(remainder_of_sequence)?;
+                Ok(Boolean::Greater(options))
+            }
+            ">=" => {
+                // Delegate the remainder of the sequence to GreaterEqualOptions deserialization
+                let remainder_of_sequence = serde::de::value::SeqAccessDeserializer::new(seq);
+                let options = <GreaterEqualOptions as serde::Deserialize>::deserialize(
+                    remainder_of_sequence,
+                )?;
+                Ok(Boolean::GreaterEqual(options))
+            }
+            "all" => {
+                let mut inputs = Vec::new();
+                while let Some(element) = seq.next_element()? {
+                    inputs.push(element);
+                }
+                if inputs.is_empty() {
+                    return Err(serde::de::Error::custom(
+                        "Boolean::All requires at least one argument",
+                    ));
+                }
+                Ok(Boolean::All(inputs))
+            }
+            "any" => {
+                let mut inputs = Vec::new();
+                while let Some(element) = seq.next_element()? {
+                    inputs.push(element);
+                }
+                if inputs.is_empty() {
+                    return Err(serde::de::Error::custom(
+                        "Boolean::Any requires at least one argument",
+                    ));
+                }
+                Ok(Boolean::Any(inputs))
+            }
+            "boolean" => {
+                let mut inputs = Vec::new();
+                while let Some(element) = seq.next_element()? {
+                    inputs.push(element);
+                }
+                if inputs.is_empty() {
+                    return Err(serde::de::Error::custom(
+                        "Boolean::Op requires at least one argument",
+                    ));
+                }
+                Ok(Boolean::Op(inputs))
+            }
+            "has" => {
+                let property_name = visit_seq_field(&mut seq, "property_name")?;
+                let object = seq.next_element()?;
+                Ok(Boolean::Has(property_name, object))
+            }
+            "in" => {
+                // Delegate the remainder of the sequence to InOptions deserialization
+                let remainder_of_sequence = serde::de::value::SeqAccessDeserializer::new(seq);
+                let options =
+                    <InOptions as serde::Deserialize>::deserialize(remainder_of_sequence)?;
+                Ok(Boolean::In(options))
+            }
+            "is-supported-script" => {
+                let input = visit_seq_field(&mut seq, "input")?;
+                Ok(Boolean::IsSupportedScript(input))
+            }
+            "to-boolean" => {
+                let value = visit_seq_field(&mut seq, "value")?;
+                Ok(Boolean::To(value))
+            }
+            "within" => {
+                let geojson = visit_seq_field(&mut seq, "geojson")?;
+                Ok(Boolean::Within(geojson))
+            }
+            _ => Err(serde::de::Error::unknown_variant(
+                &op,
+                &[
+                    "!",
+                    "!=",
+                    "<",
+                    "<=",
+                    "==",
+                    ">",
+                    ">=",
+                    "all",
+                    "any",
+                    "boolean",
+                    "has",
+                    "in",
+                    "is-supported-script",
+                    "to-boolean",
+                    "within",
+                ],
+            )),
+        }
+    }
+}
+
+/// "Collator"
+#[derive(serde::Serialize, PartialEq, Debug, Clone)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+pub enum Collator {
+    /// Returns a `collator` for use in locale-dependent comparison operations. Use `resolved-locale` to test the results of locale fallback behavior.
+    Op(
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
+        serde_json::Value,
+    ),
+}
+
+impl<'de> serde::Deserialize<'de> for Collator {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        deserializer.deserialize_seq(CollatorVisitor)
+    }
+}
+
+/// Visitor for deserializing the syntax enum [`Collator`]
+struct CollatorVisitor;
+
+impl<'de> serde::de::Visitor<'de> for CollatorVisitor {
+    type Value = Collator;
+
+    fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+        formatter.write_str("an Collator expression (example: [\"collator\",{\"case-sensitive\":true,\"diacritic-sensitive\":true,\"locale\":\"fr\"}])")
+    }
+
+    fn visit_seq<A: serde::de::SeqAccess<'de>>(self, mut seq: A) -> Result<Self::Value, A::Error> {
+        /// Reads the next element from the sequence or reports a missing field error.
+        #[allow(dead_code)]
+        fn visit_seq_field<'de, A, T>(seq: &mut A, name: &'static str) -> Result<T, A::Error>
+        where
+            A: serde::de::SeqAccess<'de>,
+            T: serde::Deserialize<'de>,
+        {
+            seq.next_element()?
+                .ok_or_else(|| serde::de::Error::missing_field(name))
+        }
+
+        // First element: operator string
+        let op: std::string::String = seq
+            .next_element()?
+            .ok_or_else(|| serde::de::Error::custom("missing operator"))?;
+        match op.as_str() {
+            "collator" => {
+                let options = visit_seq_field(&mut seq, "options")?;
+                Ok(Collator::Op(options))
+            }
+            _ => Err(serde::de::Error::unknown_variant(&op, &["collator"])),
+        }
+    }
+}
+
+/// "Color"
+#[derive(serde::Serialize, PartialEq, Debug, Clone)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+pub enum Color {
+    /// Creates a color value from red, green, and blue components, which must range between 0 and 255, and an alpha component of 1. If any component is out of range, the expression is an error.
+    Rgb(
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
+        serde_json::Value,
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
+        serde_json::Value,
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
+        serde_json::Value,
+    ),
+    /// Creates a color value from red, green, blue components, which must range between 0 and 255, and an alpha component which must range between zero and one. If any component is out of range, the expression is an error.
+    Rgba(
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
+        serde_json::Value,
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
+        serde_json::Value,
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
+        serde_json::Value,
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
+        serde_json::Value,
+    ),
+    /// Converts the input value to a color. If multiple values are provided, each one is evaluated in order until the first successful conversion is obtained. If none of the inputs can be converted, the expression is an error.
+    ///
+    ///  - [Visualize population density](https://maplibre.org/maplibre-gl-js/docs/examples/visualize-population-density/)
+    To(Vec<serde_json::Value>),
+}
+
+impl<'de> serde::Deserialize<'de> for Color {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        deserializer.deserialize_seq(ColorVisitor)
+    }
+}
+
+/// Visitor for deserializing the syntax enum [`Color`]
+struct ColorVisitor;
+
+impl<'de> serde::de::Visitor<'de> for ColorVisitor {
+    type Value = Color;
+
+    fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+        formatter.write_str("an Color expression (example: [\"rgb\",255,0,0])")
+    }
+
+    fn visit_seq<A: serde::de::SeqAccess<'de>>(self, mut seq: A) -> Result<Self::Value, A::Error> {
+        /// Reads the next element from the sequence or reports a missing field error.
+        #[allow(dead_code)]
+        fn visit_seq_field<'de, A, T>(seq: &mut A, name: &'static str) -> Result<T, A::Error>
+        where
+            A: serde::de::SeqAccess<'de>,
+            T: serde::Deserialize<'de>,
+        {
+            seq.next_element()?
+                .ok_or_else(|| serde::de::Error::missing_field(name))
+        }
+
+        // First element: operator string
+        let op: std::string::String = seq
+            .next_element()?
+            .ok_or_else(|| serde::de::Error::custom("missing operator"))?;
+        match op.as_str() {
+            "rgb" => {
+                let red = visit_seq_field(&mut seq, "red")?;
+                let green = visit_seq_field(&mut seq, "green")?;
+                let blue = visit_seq_field(&mut seq, "blue")?;
+                Ok(Color::Rgb(red, green, blue))
+            }
+            "rgba" => {
+                let red = visit_seq_field(&mut seq, "red")?;
+                let green = visit_seq_field(&mut seq, "green")?;
+                let blue = visit_seq_field(&mut seq, "blue")?;
+                let alpha = visit_seq_field(&mut seq, "alpha")?;
+                Ok(Color::Rgba(red, green, blue, alpha))
+            }
+            "to-color" => {
+                let mut inputs = Vec::new();
+                while let Some(element) = seq.next_element()? {
+                    inputs.push(element);
+                }
+                if inputs.is_empty() {
+                    return Err(serde::de::Error::custom(
+                        "Color::To requires at least one argument",
+                    ));
+                }
+                Ok(Color::To(inputs))
+            }
+            _ => Err(serde::de::Error::unknown_variant(
+                &op,
+                &["rgb", "rgba", "to-color"],
+            )),
+        }
+    }
+}
+
+/// Either of the below variants
+#[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+#[serde(untagged)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+pub enum StringLiteralOrColorOrArrayOfColorAsUnion {
+    StringLiteral(StringLiteral),
+    Color(Color),
+    ArrayOfColor(ColorOrArrayOfColor),
+}
+
+/// "ColorOrArrayOfColor"
+#[derive(serde::Serialize, PartialEq, Debug, Clone)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+pub enum ColorOrArrayOfColor {
+    /// Produces continuous, smooth results by interpolating between pairs of input and output values ("stops"). Works like `interpolate`, but the output type must be `color` or `array<color>`, and the interpolation is performed in the Hue-Chroma-Luminance color space.
+    InterpolateHcl(
+        (
+            Interpolation,
+            NumberLiteralOrNumberAsUnion,
+            Vec<(NumberLiteral, StringLiteralOrColorOrArrayOfColorAsUnion)>,
+        ),
+    ),
+    /// Produces continuous, smooth results by interpolating between pairs of input and output values ("stops"). Works like `interpolate`, but the output type must be `color` or `array<color>`, and the interpolation is performed in the CIELAB color space.
+    InterpolateLab(
+        (
+            Interpolation,
+            NumberLiteralOrNumberAsUnion,
+            Vec<(NumberLiteral, StringLiteralOrColorOrArrayOfColorAsUnion)>,
+        ),
+    ),
+}
+
+impl<'de> serde::Deserialize<'de> for ColorOrArrayOfColor {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        deserializer.deserialize_seq(ColorOrArrayOfColorVisitor)
+    }
+}
+
+/// Visitor for deserializing the syntax enum [`ColorOrArrayOfColor`]
+struct ColorOrArrayOfColorVisitor;
+
+impl<'de> serde::de::Visitor<'de> for ColorOrArrayOfColorVisitor {
+    type Value = ColorOrArrayOfColor;
+
+    fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+        formatter.write_str("an ColorOrArrayOfColor expression (example: [\"interpolate-hcl\",[\"linear\"],[\"zoom\"],15,\"#f00\",15.05,\"#00f\"])")
+    }
+
+    fn visit_seq<A: serde::de::SeqAccess<'de>>(self, mut seq: A) -> Result<Self::Value, A::Error> {
+        /// Reads the next element from the sequence or reports a missing field error.
+        #[allow(dead_code)]
+        fn visit_seq_field<'de, A, T>(seq: &mut A, name: &'static str) -> Result<T, A::Error>
+        where
+            A: serde::de::SeqAccess<'de>,
+            T: serde::Deserialize<'de>,
+        {
+            seq.next_element()?
+                .ok_or_else(|| serde::de::Error::missing_field(name))
+        }
+
+        // First element: operator string
+        let op: std::string::String = seq
+            .next_element()?
+            .ok_or_else(|| serde::de::Error::custom("missing operator"))?;
+        match op.as_str() {
+            "interpolate-hcl" => {
+                let interpolation_type: Interpolation =
+                    visit_seq_field(&mut seq, "interpolation_type")?;
+                let input: NumberLiteralOrNumberAsUnion = visit_seq_field(&mut seq, "input")?;
+                let mut stops = Vec::new();
+                while let Some(stop_input_i) = seq.next_element::<NumberLiteral>()? {
+                    let stop_output_i: StringLiteralOrColorOrArrayOfColorAsUnion =
+                        seq.next_element()?.ok_or_else(|| {
+                            serde::de::Error::custom(
+                                "expected stop_output_i in ColorOrArrayOfColor::InterpolateHcl",
+                            )
+                        })?;
+                    stops.push((stop_input_i, stop_output_i));
+                }
+                if stops.is_empty() {
+                    return Err(serde::de::Error::custom(
+                        "ColorOrArrayOfColor::InterpolateHcl requires at least one stop pair",
+                    ));
+                }
+                Ok(ColorOrArrayOfColor::InterpolateHcl((
+                    interpolation_type,
+                    input,
+                    stops,
+                )))
+            }
+            "interpolate-lab" => {
+                let interpolation_type: Interpolation =
+                    visit_seq_field(&mut seq, "interpolation_type")?;
+                let input: NumberLiteralOrNumberAsUnion = visit_seq_field(&mut seq, "input")?;
+                let mut stops = Vec::new();
+                while let Some(stop_input_i) = seq.next_element::<NumberLiteral>()? {
+                    let stop_output_i: StringLiteralOrColorOrArrayOfColorAsUnion =
+                        seq.next_element()?.ok_or_else(|| {
+                            serde::de::Error::custom(
+                                "expected stop_output_i in ColorOrArrayOfColor::InterpolateLab",
+                            )
+                        })?;
+                    stops.push((stop_input_i, stop_output_i));
+                }
+                if stops.is_empty() {
+                    return Err(serde::de::Error::custom(
+                        "ColorOrArrayOfColor::InterpolateLab requires at least one stop pair",
+                    ));
+                }
+                Ok(ColorOrArrayOfColor::InterpolateLab((
+                    interpolation_type,
+                    input,
+                    stops,
+                )))
+            }
+            _ => Err(serde::de::Error::unknown_variant(
+                &op,
+                &["interpolate-hcl", "interpolate-lab"],
+            )),
+        }
+    }
+}
+
+/// Either of the below variants
+#[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+#[serde(untagged)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+pub enum StringLiteralOrStringOrImageAsUnion {
+    StringLiteral(StringLiteral),
+    String(String),
+    Image(Image),
+}
+
+/// Tuple row for variadic (content, optional style object) pairs.
+#[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+pub struct FormattedFormatVariadicRow(
+    StringLiteralOrStringOrImageAsUnion,
+    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_option_json_map))]
+    Option<serde_json::Map<std::string::String, serde_json::Value>>,
+);
+
+/// "Formatted"
+#[derive(serde::Serialize, PartialEq, Debug, Clone)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+pub enum Formatted {
+    /// Returns a `formatted` string for displaying mixed-format text in the `text-field` property. The input may contain a string literal or expression, including an [`'image'`](#image) expression. Strings may be followed by a style override object.
+    ///
+    ///  - [Change the case of labels](https://maplibre.org/maplibre-gl-js/docs/examples/change-case-of-labels/)
+    ///
+    ///  - [Display and style rich text labels](https://maplibre.org/maplibre-gl-js/docs/examples/display-and-style-rich-text-labels/)
+    Format(Vec<FormattedFormatVariadicRow>),
+}
+
+impl<'de> serde::Deserialize<'de> for Formatted {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        deserializer.deserialize_seq(FormattedVisitor)
+    }
+}
+
+/// Visitor for deserializing the syntax enum [`Formatted`]
+struct FormattedVisitor;
+
+impl<'de> serde::de::Visitor<'de> for FormattedVisitor {
+    type Value = Formatted;
+
+    fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+        formatter.write_str("an Formatted expression (example: [\"format\",[\"upcase\",[\"get\",\"FacilityName\"]],{\"font-scale\":0.8},\"\\n\\n\",{},[\"downcase\",[\"get\",\"Comments\"]],{\"font-scale\":0.6,\"vertical-align\":\"center\"}])")
+    }
+
+    fn visit_seq<A: serde::de::SeqAccess<'de>>(self, mut seq: A) -> Result<Self::Value, A::Error> {
+        /// Reads the next element from the sequence or reports a missing field error.
+        #[allow(dead_code)]
+        fn visit_seq_field<'de, A, T>(seq: &mut A, name: &'static str) -> Result<T, A::Error>
+        where
+            A: serde::de::SeqAccess<'de>,
+            T: serde::Deserialize<'de>,
+        {
+            seq.next_element()?
+                .ok_or_else(|| serde::de::Error::missing_field(name))
+        }
+
+        // First element: operator string
+        let op: std::string::String = seq
+            .next_element()?
+            .ok_or_else(|| serde::de::Error::custom("missing operator"))?;
+        match op.as_str() {
+            "format" => {
+                let mut inputs = Vec::new();
+                while let Some(input_i) = seq.next_element()? {
+                    let style_overrides_i = seq.next_element()?; // optional param
+                    let element = FormattedFormatVariadicRow(input_i, style_overrides_i);
+                    inputs.push(element);
+                }
+                if inputs.is_empty() {
+                    return Err(serde::de::Error::custom(
+                        "Formatted::Format requires at least one argument",
+                    ));
+                }
+                Ok(Formatted::Format(inputs))
+            }
+            _ => Err(serde::de::Error::unknown_variant(&op, &["format"])),
+        }
+    }
+}
+
+/// "Image"
+#[derive(serde::Serialize, PartialEq, Debug, Clone)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+pub enum Image {
+    /// Returns an `image` type for use in `icon-image`, `*-pattern` entries and as a section in the `format` expression. If set, the `image` argument will check that the requested image exists in the style and will return either the resolved image name or `null`, depending on whether or not the image is currently in the style. This validation process is synchronous and requires the image to have been added to the style before requesting it in the `image` argument.
+    ///
+    ///  - [Use a fallback image](https://maplibre.org/maplibre-gl-js/docs/examples/use-a-fallback-image/)
+    Op(
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
+        serde_json::Value,
+    ),
+}
+
+impl<'de> serde::Deserialize<'de> for Image {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        deserializer.deserialize_seq(ImageVisitor)
+    }
+}
+
+/// Visitor for deserializing the syntax enum [`Image`]
+struct ImageVisitor;
+
+impl<'de> serde::de::Visitor<'de> for ImageVisitor {
+    type Value = Image;
+
+    fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+        formatter.write_str("an Image expression (example: [\"image\",\"marker_15\"])")
+    }
+
+    fn visit_seq<A: serde::de::SeqAccess<'de>>(self, mut seq: A) -> Result<Self::Value, A::Error> {
+        /// Reads the next element from the sequence or reports a missing field error.
+        #[allow(dead_code)]
+        fn visit_seq_field<'de, A, T>(seq: &mut A, name: &'static str) -> Result<T, A::Error>
+        where
+            A: serde::de::SeqAccess<'de>,
+            T: serde::Deserialize<'de>,
+        {
+            seq.next_element()?
+                .ok_or_else(|| serde::de::Error::missing_field(name))
+        }
+
+        // First element: operator string
+        let op: std::string::String = seq
+            .next_element()?
+            .ok_or_else(|| serde::de::Error::custom("missing operator"))?;
+        match op.as_str() {
+            "image" => {
+                let image_name = visit_seq_field(&mut seq, "image_name")?;
+                Ok(Image::Op(image_name))
+            }
+            _ => Err(serde::de::Error::unknown_variant(&op, &["image"])),
+        }
+    }
+}
+
+/// Either of the below variants
+#[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+pub enum ArrayOrStringAsUnion {
+    Array(Array),
+    String(String),
+}
+
+/// "Number"
+#[derive(serde::Serialize, PartialEq, Debug, Clone)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+pub enum Number {
+    /// Returns the remainder after integer division of the first input by the second.
+    Percentage(
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
+        serde_json::Value,
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
+        serde_json::Value,
+    ),
+    /// Returns the product of the inputs.
+    Star(Vec<NumberLiteralOrNumberAsUnion>),
+    /// Returns the sum of the inputs.
+    Plus(Vec<NumberLiteralOrNumberAsUnion>),
+    /// For two inputs, returns the result of subtracting the second input from the first. For a single input, returns the result of subtracting it from 0.
+    Minus(MinusOptions),
+    /// Returns the result of floating point division of the first input by the second.
+    ///
+    ///  - [Visualize population density](https://maplibre.org/maplibre-gl-js/docs/examples/visualize-population-density/)
+    Slash(
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
+        serde_json::Value,
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
+        serde_json::Value,
+    ),
+    /// Returns the result of raising the first input to the power specified by the second.
+    Power(
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
+        serde_json::Value,
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
+        serde_json::Value,
+    ),
+    /// Returns the absolute value of the input.
+    Absolute(
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
+        serde_json::Value,
+    ),
+    /// Returns the arccosine of the input.
+    Arccosine(
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
+        serde_json::Value,
+    ),
+    /// Returns the arcsine of the input.
+    Asin(
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
+        serde_json::Value,
+    ),
+    /// Returns the arctangent of the input.
+    Atan(
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
+        serde_json::Value,
+    ),
+    /// Returns the smallest integer that is greater than or equal to the input.
+    Ceil(
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
+        serde_json::Value,
+    ),
+    /// Returns the cosine of the input.
+    Cos(
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
+        serde_json::Value,
+    ),
+    /// Returns the shortest distance in meters between the evaluated feature and the input geometry. The input value can be a valid GeoJSON of type `Point`, `MultiPoint`, `LineString`, `MultiLineString`, `Polygon`, `MultiPolygon`, `Feature`, or `FeatureCollection`. Distance values returned may vary in precision due to loss in precision from encoding geometries, particularly below zoom level 13.
+    Distance(
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
+        serde_json::Value,
+    ),
+    /// Returns the mathematical constant e.
+    E,
+    /// Gets the elevation of a pixel (in meters above the vertical datum reference of the `raster-dem` tiles) from a `raster-dem` source. Can only be used in the `color-relief-color` property of a `color-relief` layer.
+    Elevation,
+    /// Returns the largest integer that is less than or equal to the input.
+    Floor(
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
+        serde_json::Value,
+    ),
+    /// Gets the kernel density estimation of a pixel in a heatmap layer, which is a relative measure of how many data points are crowded around a particular pixel. Can only be used in the `heatmap-color` property.
+    HeatmapDensity,
+    /// Returns the first position at which an item can be found in an array or a substring can be found in a string, or `-1` if the input cannot be found. Accepts an optional index from where to begin the search. In a string, a UTF-16 surrogate pair counts as a single position.
+    IndexOf(IndexOfOptions),
+    /// Gets the length of an array or string. In a string, a UTF-16 surrogate pair counts as a single position.
+    Length(
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
+        serde_json::Value,
+    ),
+    /// Gets the progress along a gradient line. Can only be used in the `line-gradient` property.
+    LineProgress,
+    /// Returns the natural logarithm of the input.
+    Ln(
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
+        serde_json::Value,
+    ),
+    /// Returns the mathematical constant ln(2).
+    Ln2,
+    /// Returns the base-ten logarithm of the input.
+    Log10(
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
+        serde_json::Value,
+    ),
+    /// Returns the base-two logarithm of the input.
+    Log2(
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
+        serde_json::Value,
+    ),
+    /// Returns the maximum value of the inputs.
+    Max(Vec<NumberLiteralOrNumberAsUnion>),
+    /// Returns the minimum value of the inputs.
+    Min(Vec<NumberLiteralOrNumberAsUnion>),
+    /// Asserts that the input value is a number. If multiple values are provided, each one is evaluated in order until a number is obtained. If none of the inputs are numbers, the expression is an error.
+    Op(Vec<serde_json::Value>),
+    /// Returns the mathematical constant pi.
+    Pi,
+    /// Rounds the input to the nearest integer. Halfway values are rounded away from zero. For example, `["round", -1.5]` evaluates to -2.
+    Round(
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
+        serde_json::Value,
+    ),
+    /// Returns the sine of the input.
+    Sin(
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
+        serde_json::Value,
+    ),
+    /// Returns the square root of the input.
+    Sqrt(
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
+        serde_json::Value,
+    ),
+    /// Returns the tangent of the input.
+    Tan(
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
+        serde_json::Value,
+    ),
+    /// Converts the input value to a number, if possible. If the input is `null` or `false`, the result is 0. If the input is `true`, the result is 1. If the input is a string, it is converted to a number as specified by the ["ToNumber Applied to the String Type" algorithm](https://tc39.github.io/ecma262/#sec-tonumber-applied-to-the-string-type) of the ECMAScript Language Specification. If multiple values are provided, each one is evaluated in order until the first successful conversion is obtained. If none of the inputs can be converted, the expression is an error.
+    To(Vec<serde_json::Value>),
+    /// Gets the current zoom level.  Note that in style layout and paint properties, ["zoom"] may only appear as the input to a top-level "step" or "interpolate" expression.
+    Zoom,
+}
+
+/// Options for deserializing the syntax enum variant [`Number::Minus`]
+#[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+#[serde(untagged)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+pub enum MinusOptions {
+    TwoParams(NumberLiteralOrNumberAsUnion, NumberLiteralOrNumberAsUnion),
+    OneParams(NumberLiteralOrNumberAsUnion),
+}
+
+/// Options for deserializing the syntax enum variant [`Number::IndexOf`]
+#[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+#[serde(untagged)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+pub enum IndexOfOptions {
+    Item(
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
+        serde_json::Value,
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
+        serde_json::Value,
+        #[serde(default)] Option<serde_json::Value>,
+    ),
+    Substring(String, String, #[serde(default)] Option<serde_json::Value>),
+}
+
+impl<'de> serde::Deserialize<'de> for Number {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        deserializer.deserialize_seq(NumberVisitor)
+    }
+}
+
+/// Visitor for deserializing the syntax enum [`Number`]
+struct NumberVisitor;
+
+impl<'de> serde::de::Visitor<'de> for NumberVisitor {
+    type Value = Number;
+
+    fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+        formatter.write_str("an Number expression (example: [\"%\",10,3])")
+    }
+
+    fn visit_seq<A: serde::de::SeqAccess<'de>>(self, mut seq: A) -> Result<Self::Value, A::Error> {
+        /// Reads the next element from the sequence or reports a missing field error.
+        #[allow(dead_code)]
+        fn visit_seq_field<'de, A, T>(seq: &mut A, name: &'static str) -> Result<T, A::Error>
+        where
+            A: serde::de::SeqAccess<'de>,
+            T: serde::Deserialize<'de>,
+        {
+            seq.next_element()?
+                .ok_or_else(|| serde::de::Error::missing_field(name))
+        }
+
+        // First element: operator string
+        let op: std::string::String = seq
+            .next_element()?
+            .ok_or_else(|| serde::de::Error::custom("missing operator"))?;
+        match op.as_str() {
+            "%" => {
+                let input_1 = visit_seq_field(&mut seq, "input_1")?;
+                let input_2 = visit_seq_field(&mut seq, "input_2")?;
+                Ok(Number::Percentage(input_1, input_2))
+            }
+            "*" => {
+                let mut inputs = Vec::new();
+                while let Some(element) = seq.next_element()? {
+                    inputs.push(element);
+                }
+                if inputs.is_empty() {
+                    return Err(serde::de::Error::custom(
+                        "Number::Star requires at least one argument",
+                    ));
+                }
+                Ok(Number::Star(inputs))
+            }
+            "+" => {
+                let mut inputs = Vec::new();
+                while let Some(element) = seq.next_element()? {
+                    inputs.push(element);
+                }
+                if inputs.is_empty() {
+                    return Err(serde::de::Error::custom(
+                        "Number::Plus requires at least one argument",
+                    ));
+                }
+                Ok(Number::Plus(inputs))
+            }
+            "-" => {
+                let mut rest: Vec<serde_json::Value> = Vec::new();
+                while let Some(v) = seq.next_element()? {
+                    rest.push(v);
+                }
+                match rest.len() {
+                    2 => Ok(Number::Minus(MinusOptions::TwoParams(
+                        serde_json::from_value::<NumberLiteralOrNumberAsUnion>(rest[0].clone())
+                            .map_err(serde::de::Error::custom)?,
+                        serde_json::from_value::<NumberLiteralOrNumberAsUnion>(rest[1].clone())
+                            .map_err(serde::de::Error::custom)?,
+                    ))),
+                    1 => Ok(Number::Minus(MinusOptions::OneParams(
+                        serde_json::from_value::<NumberLiteralOrNumberAsUnion>(rest[0].clone())
+                            .map_err(serde::de::Error::custom)?,
+                    ))),
+                    len => Err(serde::de::Error::custom(format!(
+                        "'-': expected 1 or 2 arguments, got {len}"
+                    ))),
+                }
+            }
+            "/" => {
+                let input_1 = visit_seq_field(&mut seq, "input_1")?;
+                let input_2 = visit_seq_field(&mut seq, "input_2")?;
+                Ok(Number::Slash(input_1, input_2))
+            }
+            "^" => {
+                let input_1 = visit_seq_field(&mut seq, "input_1")?;
+                let input_2 = visit_seq_field(&mut seq, "input_2")?;
+                Ok(Number::Power(input_1, input_2))
+            }
+            "abs" => {
+                let input = visit_seq_field(&mut seq, "input")?;
+                Ok(Number::Absolute(input))
+            }
+            "acos" => {
+                let input = visit_seq_field(&mut seq, "input")?;
+                Ok(Number::Arccosine(input))
+            }
+            "asin" => {
+                let input = visit_seq_field(&mut seq, "input")?;
+                Ok(Number::Asin(input))
+            }
+            "atan" => {
+                let input = visit_seq_field(&mut seq, "input")?;
+                Ok(Number::Atan(input))
+            }
+            "ceil" => {
+                let input = visit_seq_field(&mut seq, "input")?;
+                Ok(Number::Ceil(input))
+            }
+            "cos" => {
+                let input = visit_seq_field(&mut seq, "input")?;
+                Ok(Number::Cos(input))
+            }
+            "distance" => {
+                let geojson = visit_seq_field(&mut seq, "geojson")?;
+                Ok(Number::Distance(geojson))
+            }
+            "e" => Ok(Number::E),
+            "elevation" => Ok(Number::Elevation),
+            "floor" => {
+                let input = visit_seq_field(&mut seq, "input")?;
+                Ok(Number::Floor(input))
+            }
+            "heatmap-density" => Ok(Number::HeatmapDensity),
+            "index-of" => {
+                // Delegate the remainder of the sequence to IndexOfOptions deserialization
+                let remainder_of_sequence = serde::de::value::SeqAccessDeserializer::new(seq);
+                let options =
+                    <IndexOfOptions as serde::Deserialize>::deserialize(remainder_of_sequence)?;
+                Ok(Number::IndexOf(options))
+            }
+            "length" => {
+                let array_or_string = visit_seq_field(&mut seq, "array_or_string")?;
+                Ok(Number::Length(array_or_string))
+            }
+            "line-progress" => Ok(Number::LineProgress),
+            "ln" => {
+                let input = visit_seq_field(&mut seq, "input")?;
+                Ok(Number::Ln(input))
+            }
+            "ln2" => Ok(Number::Ln2),
+            "log10" => {
+                let input = visit_seq_field(&mut seq, "input")?;
+                Ok(Number::Log10(input))
+            }
+            "log2" => {
+                let input = visit_seq_field(&mut seq, "input")?;
+                Ok(Number::Log2(input))
+            }
+            "max" => {
+                let mut inputs = Vec::new();
+                while let Some(element) = seq.next_element()? {
+                    inputs.push(element);
+                }
+                if inputs.is_empty() {
+                    return Err(serde::de::Error::custom(
+                        "Number::Max requires at least one argument",
+                    ));
+                }
+                Ok(Number::Max(inputs))
+            }
+            "min" => {
+                let mut inputs = Vec::new();
+                while let Some(element) = seq.next_element()? {
+                    inputs.push(element);
+                }
+                if inputs.is_empty() {
+                    return Err(serde::de::Error::custom(
+                        "Number::Min requires at least one argument",
+                    ));
+                }
+                Ok(Number::Min(inputs))
+            }
+            "number" => {
+                let mut inputs = Vec::new();
+                while let Some(element) = seq.next_element()? {
+                    inputs.push(element);
+                }
+                if inputs.is_empty() {
+                    return Err(serde::de::Error::custom(
+                        "Number::Op requires at least one argument",
+                    ));
+                }
+                Ok(Number::Op(inputs))
+            }
+            "pi" => Ok(Number::Pi),
+            "round" => {
+                let input = visit_seq_field(&mut seq, "input")?;
+                Ok(Number::Round(input))
+            }
+            "sin" => {
+                let input = visit_seq_field(&mut seq, "input")?;
+                Ok(Number::Sin(input))
+            }
+            "sqrt" => {
+                let input = visit_seq_field(&mut seq, "input")?;
+                Ok(Number::Sqrt(input))
+            }
+            "tan" => {
+                let input = visit_seq_field(&mut seq, "input")?;
+                Ok(Number::Tan(input))
+            }
+            "to-number" => {
+                let mut inputs = Vec::new();
+                while let Some(element) = seq.next_element()? {
+                    inputs.push(element);
+                }
+                if inputs.is_empty() {
+                    return Err(serde::de::Error::custom(
+                        "Number::To requires at least one argument",
+                    ));
+                }
+                Ok(Number::To(inputs))
+            }
+            "zoom" => Ok(Number::Zoom),
+            _ => Err(serde::de::Error::unknown_variant(
+                &op,
+                &[
+                    "%",
+                    "*",
+                    "+",
+                    "-",
+                    "/",
+                    "^",
+                    "abs",
+                    "acos",
+                    "asin",
+                    "atan",
+                    "ceil",
+                    "cos",
+                    "distance",
+                    "e",
+                    "elevation",
+                    "floor",
+                    "heatmap-density",
+                    "index-of",
+                    "length",
+                    "line-progress",
+                    "ln",
+                    "ln2",
+                    "log10",
+                    "log2",
+                    "max",
+                    "min",
+                    "number",
+                    "pi",
+                    "round",
+                    "sin",
+                    "sqrt",
+                    "tan",
+                    "to-number",
+                    "zoom",
+                ],
+            )),
+        }
+    }
+}
+
+/// Either of the below variants
+#[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+#[serde(untagged)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+pub enum NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjectionAsUnion {
+    Number(NumberLiteral),
+    ArrayOfNumber(
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
+        serde_json::Value,
+    ),
+    Color(Color),
+    ArrayOfColor(ColorOrArrayOfColor),
+    Projection(Box<ProjectionType>),
+}
+
+/// "NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection"
+#[derive(serde::Serialize, PartialEq, Debug, Clone)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+pub enum NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection {
+    /// Produces continuous, smooth results by interpolating between pairs of input and output values ("stops"). The `input` may be any numeric expression (e.g., `["get", "population"]`). Stop inputs must be numeric literals in strictly ascending order. The output type must be `number`, `array<number>`, `color`, `array<color>`, or `projection`.
+    ///
+    ///  - [Animate map camera around a point](https://maplibre.org/maplibre-gl-js/docs/examples/animate-camera-around-point/)
+    ///
+    ///  - [Change building color based on zoom level](https://maplibre.org/maplibre-gl-js/docs/examples/change-building-color-based-on-zoom-level/)
+    ///
+    ///  - [Create a heatmap layer](https://maplibre.org/maplibre-gl-js/docs/examples/heatmap-layer/)
+    ///
+    ///  - [Visualize population density](https://maplibre.org/maplibre-gl-js/docs/examples/visualize-population-density/)
+    Interpolate(
+        (
+            Interpolation,
+            NumberLiteralOrNumberAsUnion,
+            Vec<(
+                NumberLiteral,
+                NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjectionAsUnion,
+            )>,
+        ),
+    ),
+}
+
+impl<'de> serde::Deserialize<'de> for NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        deserializer.deserialize_seq(NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjectionVisitor)
+    }
+}
+
+/// Visitor for deserializing the syntax enum [`NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection`]
+struct NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjectionVisitor;
+
+impl<'de> serde::de::Visitor<'de>
+    for NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjectionVisitor
+{
+    type Value = NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection;
+
+    fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+        formatter.write_str("an NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection expression (example: [\"interpolate\",[\"linear\"],[\"zoom\"],15,0,15.05,[\"get\",\"height\"]])")
+    }
+
+    fn visit_seq<A: serde::de::SeqAccess<'de>>(self, mut seq: A) -> Result<Self::Value, A::Error> {
+        /// Reads the next element from the sequence or reports a missing field error.
+        #[allow(dead_code)]
+        fn visit_seq_field<'de, A, T>(seq: &mut A, name: &'static str) -> Result<T, A::Error>
+        where
+            A: serde::de::SeqAccess<'de>,
+            T: serde::Deserialize<'de>,
+        {
+            seq.next_element()?
+                .ok_or_else(|| serde::de::Error::missing_field(name))
+        }
+
+        // First element: operator string
+        let op: std::string::String = seq
+            .next_element()?
+            .ok_or_else(|| serde::de::Error::custom("missing operator"))?;
+        match op.as_str() {
+            "interpolate" => {
+                let interpolation_type: Interpolation =
+                    visit_seq_field(&mut seq, "interpolation_type")?;
+                let input: NumberLiteralOrNumberAsUnion = visit_seq_field(&mut seq, "input")?;
+                let mut stops = Vec::new();
+                while let Some(stop_input_i) = seq.next_element::<NumberLiteral>()? {
+                    let stop_output_i: NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjectionAsUnion = seq.next_element()?.ok_or_else(|| serde::de::Error::custom("expected stop_output_i in NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection::Interpolate"))?;
+                    stops.push((stop_input_i, stop_output_i));
+                }
+                if stops.is_empty() {
+                    return Err(serde::de::Error::custom(
+                        "NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection::Interpolate requires at least one stop pair",
+                    ));
+                }
+                Ok(
+                    NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection::Interpolate((
+                        interpolation_type,
+                        input,
+                        stops,
+                    )),
+                )
+            }
+            _ => Err(serde::de::Error::unknown_variant(&op, &["interpolate"])),
+        }
+    }
+}
+
+/// "Object"
+#[derive(serde::Serialize, PartialEq, Debug, Clone)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+pub enum Object {
+    /// Provides a literal array or object value.
+    ///
+    ///  - [Display and style rich text labels](https://maplibre.org/maplibre-gl-js/docs/examples/display-and-style-rich-text-labels/)
+    Literal(
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
+        serde_json::Value,
+    ),
+    /// Asserts that the input value is an object. If multiple values are provided, each one is evaluated in order until an object is obtained. If none of the inputs are objects, the expression is an error.
+    Op(Vec<serde_json::Value>),
+    /// Gets the feature properties object.  Note that in some cases, it may be more efficient to use ["get", "property_name"] directly.
+    Properties,
+}
+
+impl<'de> serde::Deserialize<'de> for Object {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        deserializer.deserialize_seq(ObjectVisitor)
+    }
+}
+
+/// Visitor for deserializing the syntax enum [`Object`]
+struct ObjectVisitor;
+
+impl<'de> serde::de::Visitor<'de> for ObjectVisitor {
+    type Value = Object;
+
+    fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+        formatter.write_str("an Object expression (example: [\"literal\",[\"DIN Offc Pro Italic\",\"Arial Unicode MS Regular\"]])")
+    }
+
+    fn visit_seq<A: serde::de::SeqAccess<'de>>(self, mut seq: A) -> Result<Self::Value, A::Error> {
+        /// Reads the next element from the sequence or reports a missing field error.
+        #[allow(dead_code)]
+        fn visit_seq_field<'de, A, T>(seq: &mut A, name: &'static str) -> Result<T, A::Error>
+        where
+            A: serde::de::SeqAccess<'de>,
+            T: serde::Deserialize<'de>,
+        {
+            seq.next_element()?
+                .ok_or_else(|| serde::de::Error::missing_field(name))
+        }
+
+        // First element: operator string
+        let op: std::string::String = seq
+            .next_element()?
+            .ok_or_else(|| serde::de::Error::custom("missing operator"))?;
+        match op.as_str() {
+            "literal" => {
+                let json_object = visit_seq_field(&mut seq, "json_object")?;
+                Ok(Object::Literal(json_object))
+            }
+            "object" => {
+                let mut inputs = Vec::new();
+                while let Some(element) = seq.next_element()? {
+                    inputs.push(element);
+                }
+                if inputs.is_empty() {
+                    return Err(serde::de::Error::custom(
+                        "Object::Op requires at least one argument",
+                    ));
+                }
+                Ok(Object::Op(inputs))
+            }
+            "properties" => Ok(Object::Properties),
+            _ => Err(serde::de::Error::unknown_variant(
+                &op,
+                &["literal", "object", "properties"],
+            )),
+        }
+    }
+}
+
+/// "String"
+#[derive(serde::Serialize, PartialEq, Debug, Clone)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+pub enum String {
+    /// Returns a `string` consisting of the concatenation of the inputs. Each input is converted to a string as if by `to-string`.
+    ///
+    ///  - [Add a generated icon to the map](https://maplibre.org/maplibre-gl-js/docs/examples/add-a-generated-icon-to-the-map/)
+    ///
+    ///  - [Create a time slider](https://maplibre.org/maplibre-gl-js/docs/examples/create-a-time-slider/)
+    ///
+    ///  - [Use a fallback image](https://maplibre.org/maplibre-gl-js/docs/examples/fallback-image/)
+    ///
+    ///  - [Variable label placement](https://maplibre.org/maplibre-gl-js/docs/examples/variable-label-placement/)
+    Concat(Vec<serde_json::Value>),
+    /// Returns the input string converted to lowercase. Follows the Unicode Default Case Conversion algorithm and the locale-insensitive case mappings in the Unicode Character Database.
+    ///
+    ///  - [Change the case of labels](https://maplibre.org/maplibre-gl-js/docs/examples/change-case-of-labels/)
+    Downcase(
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
+        serde_json::Value,
+    ),
+    /// Returns the feature's simple geometry type: `Point`, `LineString`, or `Polygon`. `MultiPoint`, `MultiLineString`, and `MultiPolygon` are returned as `Point`, `LineString`, and `Polygon`, respectively.
+    GeometryType,
+    /// Converts the input number into a string representation using the provided format_options.
+    ///
+    ///  - [Display HTML clusters with custom properties](https://maplibre.org/maplibre-gl-js/docs/examples/display-html-clusters-with-custom-properties/)
+    NumberFormat(
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
+        serde_json::Value,
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
+        serde_json::Value,
+    ),
+    /// Returns the IETF language tag of the locale being used by the provided `collator`. This can be used to determine the default system locale, or to determine if a requested locale was successfully loaded.
+    ResolvedLocale(
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
+        serde_json::Value,
+    ),
+    /// Returns a subarray from an array or a substring from a string from a specified start index, or between a start index and an end index if set. The return value is inclusive of the start index but not of the end index. In a string, a UTF-16 surrogate pair counts as a single position.
+    Slice(
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
+        serde_json::Value,
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
+        serde_json::Value,
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_option_json_value))]
+         Option<serde_json::Value>,
+    ),
+    /// Asserts that the input value is a string. If multiple values are provided, each one is evaluated in order until a string is obtained. If none of the inputs are strings, the expression is an error.
+    Op(Vec<serde_json::Value>),
+    /// Converts the input value to a string. If the input is `null`, the result is `""`. If the input is a boolean, the result is `"true"` or `"false"`. If the input is a number, it is converted to a string as specified by the ["NumberToString" algorithm](https://tc39.github.io/ecma262/#sec-tostring-applied-to-the-number-type) of the ECMAScript Language Specification. If the input is a color, it is converted to a string of the form `"rgba(r,g,b,a)"`, where `r`, `g`, and `b` are numerals ranging from 0 to 255, and `a` ranges from 0 to 1. Otherwise, the input is converted to a string in the format specified by the [`JSON.stringify`](https://tc39.github.io/ecma262/#sec-json.stringify) function of the ECMAScript Language Specification.
+    ///
+    ///  - [Create a time slider](https://maplibre.org/maplibre-gl-js/docs/examples/create-a-time-slider/)
+    To(
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
+        serde_json::Value,
+    ),
+    /// Returns a string describing the type of the given value.
+    Typeof(
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
+        serde_json::Value,
+    ),
+    /// Returns the input string converted to uppercase. Follows the Unicode Default Case Conversion algorithm and the locale-insensitive case mappings in the Unicode Character Database.
+    ///
+    ///  - [Change the case of labels](https://maplibre.org/maplibre-gl-js/docs/examples/change-case-of-labels/)
+    Upcase(
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
+        serde_json::Value,
+    ),
+}
+
+impl<'de> serde::Deserialize<'de> for String {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        deserializer.deserialize_seq(StringVisitor)
+    }
+}
+
+/// Visitor for deserializing the syntax enum [`String`]
+struct StringVisitor;
+
+impl<'de> serde::de::Visitor<'de> for StringVisitor {
+    type Value = String;
+
+    fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+        formatter.write_str(
+            "an String expression (example: [\"concat\",\"square-rgb-\",[\"get\",\"color\"]])",
+        )
+    }
+
+    fn visit_seq<A: serde::de::SeqAccess<'de>>(self, mut seq: A) -> Result<Self::Value, A::Error> {
+        /// Reads the next element from the sequence or reports a missing field error.
+        #[allow(dead_code)]
+        fn visit_seq_field<'de, A, T>(seq: &mut A, name: &'static str) -> Result<T, A::Error>
+        where
+            A: serde::de::SeqAccess<'de>,
+            T: serde::Deserialize<'de>,
+        {
+            seq.next_element()?
+                .ok_or_else(|| serde::de::Error::missing_field(name))
+        }
+
+        // First element: operator string
+        let op: std::string::String = seq
+            .next_element()?
+            .ok_or_else(|| serde::de::Error::custom("missing operator"))?;
+        match op.as_str() {
+            "concat" => {
+                let mut inputs = Vec::new();
+                while let Some(element) = seq.next_element()? {
+                    inputs.push(element);
+                }
+                if inputs.is_empty() {
+                    return Err(serde::de::Error::custom(
+                        "String::Concat requires at least one argument",
+                    ));
+                }
+                Ok(String::Concat(inputs))
+            }
+            "downcase" => {
+                let input = visit_seq_field(&mut seq, "input")?;
+                Ok(String::Downcase(input))
+            }
+            "geometry-type" => Ok(String::GeometryType),
+            "number-format" => {
+                let input = visit_seq_field(&mut seq, "input")?;
+                let format_options = visit_seq_field(&mut seq, "format_options")?;
+                Ok(String::NumberFormat(input, format_options))
+            }
+            "resolved-locale" => {
+                let collator = visit_seq_field(&mut seq, "collator")?;
+                Ok(String::ResolvedLocale(collator))
+            }
+            "slice" => {
+                let string = visit_seq_field(&mut seq, "string")?;
+                let start_index = visit_seq_field(&mut seq, "start_index")?;
+                let end_index = seq.next_element()?;
+                Ok(String::Slice(string, start_index, end_index))
+            }
+            "string" => {
+                let mut inputs = Vec::new();
+                while let Some(element) = seq.next_element()? {
+                    inputs.push(element);
+                }
+                if inputs.is_empty() {
+                    return Err(serde::de::Error::custom(
+                        "String::Op requires at least one argument",
+                    ));
+                }
+                Ok(String::Op(inputs))
+            }
+            "to-string" => {
+                let value = visit_seq_field(&mut seq, "value")?;
+                Ok(String::To(value))
+            }
+            "typeof" => {
+                let value = visit_seq_field(&mut seq, "value")?;
+                Ok(String::Typeof(value))
+            }
+            "upcase" => {
+                let input = visit_seq_field(&mut seq, "input")?;
+                Ok(String::Upcase(input))
+            }
+            _ => Err(serde::de::Error::unknown_variant(
+                &op,
+                &[
+                    "concat",
+                    "downcase",
+                    "geometry-type",
+                    "number-format",
+                    "resolved-locale",
+                    "slice",
+                    "string",
+                    "to-string",
+                    "typeof",
+                    "upcase",
+                ],
+            )),
+        }
+    }
+}
