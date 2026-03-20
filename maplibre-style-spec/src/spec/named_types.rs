@@ -1,56 +1,6 @@
 #[allow(unused_imports)]
 use super::*;
 
-/// A filter selects specific features from a layer.
-#[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone, Copy)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub struct Filter(bool);
-
-/// The filter operator.
-#[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum FilterOperator {
-    /// `["!=", key, value]` inequality: `feature[key] ≠ value`
-    #[serde(rename = "!=")]
-    NotEqual,
-    /// `["!has", key]` `feature[key]` does not exist
-    #[serde(rename = "!has")]
-    NotHas,
-    /// `["!in", key, v0, ..., vn]` set exclusion: `feature[key] ∉ {v0, ..., vn}`
-    #[serde(rename = "!in")]
-    NotIn,
-    /// `["<", key, value]` less than: `feature[key] < value`
-    #[serde(rename = "<")]
-    Less,
-    /// `["<=", key, value]` less than or equal: `feature[key] ≤ value`
-    #[serde(rename = "<=")]
-    LessEqual,
-    /// `["==", key, value]` equality: `feature[key] = value`
-    #[serde(rename = "==")]
-    EqualEqual,
-    /// `[">", key, value]` greater than: `feature[key] > value`
-    #[serde(rename = ">")]
-    Greater,
-    /// `[">=", key, value]` greater than or equal: `feature[key] ≥ value`
-    #[serde(rename = ">=")]
-    GreaterEqual,
-    /// `["all", f0, ..., fn]` logical `AND`: `f0 ∧ ... ∧ fn`
-    #[serde(rename = "all")]
-    All,
-    /// `["any", f0, ..., fn]` logical `OR`: `f0 ∨ ... ∨ fn`
-    #[serde(rename = "any")]
-    Any,
-    /// `["has", key]` `feature[key]` exists
-    #[serde(rename = "has")]
-    Has,
-    /// `["in", key, v0, ..., vn]` set inclusion: `feature[key] ∈ {v0, ..., vn}`
-    #[serde(rename = "in")]
-    In,
-    /// `["none", f0, ..., fn]` logical `NOR`: `¬f0 ∧ ... ∧ ¬fn`
-    #[serde(rename = "none")]
-    None,
-}
-
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct Function {

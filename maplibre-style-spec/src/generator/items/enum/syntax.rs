@@ -1335,46 +1335,126 @@ fn generate_syntax_enum_deserializer_regular_variadic_variant(
         return;
     }
 
+    // Regular variadic syntax: (template params)* + (suffix params...)
+    //
+    // The old implementation consumed `seq` until end-of-sequence, which fails for
+    // operators whose overloads have suffix parameters (e.g. `case` / `let`), causing
+    // the suffix to be deserialized as another template element.
+    //
+    // Fix: buffer the remainder into `rest`, split into fixed-size template chunks, then
+    // deserialize suffix params from the tail.
+    let suffix_params = variadic_non_template_suffix_parameters(overload);
+    let suffix_len = suffix_params.len();
     visit_seq.line("let mut inputs = Vec::new();");
-    if position_of_variadic_separator == 1 {
-        visit_seq.line("while let Some(element) = seq.next_element()? {");
-    } else {
-        let base_name = to_snake_case(&overload.parameters[0]).replace("_1", "_i");
-        visit_seq.line(format!(
-            "while let Some({base_name}) = seq.next_element()? {{"
-        ));
-        let non_base_parameters = &overload.parameters[1..position_of_variadic_separator]
-            .iter()
-            .map(|p| (to_snake_case(p).replace("_1", "_i"), p.ends_with('?')))
-            .collect::<Vec<_>>();
-        for (param_name, is_optional) in non_base_parameters {
-            if *is_optional {
+    if suffix_params.is_empty() {
+        // No suffix: safe to stream with `while let Some(...)`.
+        if position_of_variadic_separator == 1 {
+            visit_seq.line("while let Some(element) = seq.next_element()? {");
+        } else {
+            let base_name = to_snake_case(&overload.parameters[0]).replace("_1", "_i");
+            visit_seq.line(format!("while let Some({base_name}) = seq.next_element()? {{"));
+            let non_base_parameters = &overload.parameters[1..position_of_variadic_separator]
+                .iter()
+                .map(|p| (to_snake_case(p).replace("_1", "_i"), p.ends_with('?')))
+                .collect::<Vec<_>>();
+            for (param_name, is_optional) in non_base_parameters {
+                if *is_optional {
+                    visit_seq.line(format!(
+                        "let {param_name} = seq.next_element()?; // optional param"
+                    ));
+                } else {
+                    visit_seq.line(format!(
+                        "let {param_name} = seq.next_element()?.ok_or_else(|| serde::de::Error::custom(\"expected {param_name} in {name}::{variant_name}\"))?;"
+                    ));
+                }
+            }
+            let tuple_inner = non_base_parameters
+                .iter()
+                .map(|(p, _)| p.as_str())
+                .collect::<Vec<_>>()
+                .join(", ");
+            if let Some(row) = row_struct_name {
                 visit_seq.line(format!(
-                    "let {param_name} = seq.next_element()?; // optional param"
+                    "let element = {row}({base_name},{tuple_inner});"
                 ));
             } else {
-                visit_seq.line(format!("let {param_name} = seq.next_element()?.ok_or_else(|| serde::de::Error::custom(\"expected {param_name} in {name}::{variant_name}\"))?;"));
+                visit_seq.line(format!(
+                    "let element = ({base_name},{tuple_inner});"
+                ));
             }
         }
-        let tuple_inner = non_base_parameters
-            .iter()
-            .map(|(p, _)| p.as_str())
-            .collect::<Vec<_>>()
-            .join(", ");
-        if let Some(row) = row_struct_name {
-            visit_seq.line(format!("let element = {row}({base_name},{tuple_inner});"));
+        visit_seq.line("inputs.push(element);");
+        visit_seq.line("}");
+    } else {
+        // Buffer remainder and split into: template chunks + suffix.
+        let template_len = position_of_variadic_separator;
+        visit_seq.line("let mut rest: Vec<serde_json::Value> = Vec::new();");
+        visit_seq.line("while let Some(v) = seq.next_element()? { rest.push(v); }");
+        visit_seq.line(format!(
+            "if rest.len() < {template_len} + {suffix_len} {{ return Err(serde::de::Error::custom(\"{name}::{variant_name}: too few arguments\")); }}"
+        ));
+        visit_seq.line(format!(
+            "if (rest.len() - {suffix_len}) % {template_len} != 0 {{ return Err(serde::de::Error::custom(\"{name}::{variant_name}: malformed template/suffix layout\")); }}"
+        ));
+        visit_seq.line(format!(
+            "let inputs_len = (rest.len() - {suffix_len}) / {template_len};"
+        ));
+        if position_of_variadic_separator == 1 {
+            visit_seq.line("for i in 0..inputs_len {");
+            visit_seq.line(format!(
+                "let element = serde_json::from_value(rest[i].clone()).map_err(serde::de::Error::custom)?;"
+            ));
+            visit_seq.line("inputs.push(element);");
+            visit_seq.line("}");
         } else {
-            visit_seq.line(format!("let element = ({base_name},{tuple_inner});"));
+            let base_name = to_snake_case(&overload.parameters[0]).replace("_1", "_i");
+            let non_base_parameters = &overload.parameters[1..position_of_variadic_separator]
+                .iter()
+                .map(|p| (to_snake_case(p).replace("_1", "_i"), p.ends_with('?')))
+                .collect::<Vec<_>>();
+            // Parse each template chunk into (base, non_base...) element.
+            visit_seq.line("for i in 0..inputs_len {");
+            visit_seq.line(format!(
+                "let {base_name} = serde_json::from_value(rest[i * {template_len}].clone()).map_err(serde::de::Error::custom)?;"
+            ));
+            for (offset, (param_name, is_optional)) in non_base_parameters.iter().enumerate() {
+                let idx_expr = format!("i * {template_len} + {}", offset + 1);
+                if *is_optional {
+                    visit_seq.line(format!(
+                        "let {param_name} = serde_json::from_value(rest[{idx_expr}].clone()).map_err(serde::de::Error::custom)?; // optional param"
+                    ));
+                } else {
+                    visit_seq.line(format!(
+                        "let {param_name} = serde_json::from_value(rest[{idx_expr}].clone()).map_err(serde::de::Error::custom)?;"
+                    ));
+                }
+            }
+            let tuple_inner = non_base_parameters
+                .iter()
+                .map(|(p, _)| p.as_str())
+                .collect::<Vec<_>>()
+                .join(", ");
+            if let Some(row) = row_struct_name {
+                visit_seq.line(format!(
+                    "let element = {row}({base_name},{tuple_inner});"
+                ));
+            } else {
+                visit_seq.line(format!(
+                    "let element = ({base_name},{tuple_inner});"
+                ));
+            }
+            visit_seq.line("inputs.push(element);");
+            visit_seq.line("}");
         }
     }
-    visit_seq.line("inputs.push(element);");
-    visit_seq.line("}");
     visit_seq.line("if inputs.is_empty() {".to_string());
-    visit_seq.line(format!("return Err(serde::de::Error::custom(\"{name}::{variant_name} requires at least one argument\"));"));
+    visit_seq.line(format!(
+        "return Err(serde::de::Error::custom(\"{name}::{variant_name} requires at least one argument\"));"
+    ));
     visit_seq.line("}");
-    let suffix_params = variadic_non_template_suffix_parameters(overload);
+
     let mut suffix_binds: Vec<String> = Vec::new();
-    for pname in &suffix_params {
+    for (suffix_i, pname) in suffix_params.iter().enumerate() {
         let is_opt = pname.ends_with('?');
         let lookup = pname.strip_suffix('?').unwrap_or(pname);
         let bind = if lookup == "type" {
@@ -1382,20 +1462,29 @@ fn generate_syntax_enum_deserializer_regular_variadic_variant(
         } else {
             lookup.to_string()
         };
-        if is_opt {
-            visit_seq.line(format!("let {bind} = seq.next_element()?;"));
-        } else if lookup == "type" {
-            visit_seq.line("let r#type = visit_seq_field(&mut seq, \"type\")?;".to_string());
-        } else {
-            visit_seq.line(format!(
-                "let {bind} = visit_seq_field(&mut seq, \"{lookup}\")?;"
-            ));
+        if suffix_params.is_empty() {
+            // Unreachable (guarded above), but keep Rust happy.
+            let _ = suffix_i;
         }
+
+        // Suffix parsing always comes from `rest` in the split-path; in the streaming
+        // path (empty suffix) we never enter this block.
+        if suffix_len == 0 {
+            unreachable!();
+        }
+        let idx_expr = format!("inputs_len * {} + {}", position_of_variadic_separator, suffix_i);
+        visit_seq.line(format!(
+            "let {bind} = serde_json::from_value(rest[{idx_expr}].clone()).map_err(serde::de::Error::custom)?;"
+        ));
+        let _ = is_opt; // Option-ness is inferred from the target type.
         suffix_binds.push(bind);
     }
+
     if suffix_params.is_empty() {
+        // No suffix: variant wraps only `inputs`.
         visit_seq.line(format!("Ok({name}::{variant_name}(inputs))"));
     } else {
+        // Suffix: wraps `inputs` plus the deserialized suffix values.
         visit_seq.line(format!(
             "Ok({name}::{variant_name}((inputs, {})))",
             suffix_binds.join(", ")
