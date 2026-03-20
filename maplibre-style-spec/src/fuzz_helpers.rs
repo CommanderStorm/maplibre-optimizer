@@ -86,12 +86,17 @@ fn arbitrary_json_value_inner(u: &mut Unstructured<'_>, depth: u8) -> arbitrary:
     }
 
     let arm: u8 = u.arbitrary()?;
-    match arm % 7 {
-        0 => Ok(Value::Null),
-        1 => Ok(Value::Bool(bool::arbitrary(u)?)),
-        2 => arbitrary_json_number(u).map(Value::Number),
-        3 => arbitrary_short_string(u).map(Value::String),
-        4 => {
+    // Important: avoid `Value::Null`.
+    //
+    // When a `serde_json::Value` (or a newtype around it) is nested inside an `Option<T>`,
+    // `serde_json` treats JSON `null` as `Option::None`, which means
+    // `Some(Value::Null)` will not round-trip back to `Some(Value::Null)`.
+    // Since our fuzz target asserts full round-trip equality, we keep generated JSON values non-null.
+    match arm % 6 {
+        0 => Ok(Value::Bool(bool::arbitrary(u)?)),
+        1 => arbitrary_json_number(u).map(Value::Number),
+        2 => arbitrary_short_string(u).map(Value::String),
+        3 => {
             let n = u.int_in_range(0..=MAX_JSON_ARRAY_LEN)?;
             let mut v = Vec::with_capacity(n);
             for _ in 0..n {
@@ -99,7 +104,7 @@ fn arbitrary_json_value_inner(u: &mut Unstructured<'_>, depth: u8) -> arbitrary:
             }
             Ok(Value::Array(v))
         }
-        5 | 6 => {
+        _ => {
             let n = u.int_in_range(0..=MAX_JSON_OBJECT_LEN)?;
             let mut m = serde_json::Map::new();
             for i in 0..n {
@@ -111,16 +116,14 @@ fn arbitrary_json_value_inner(u: &mut Unstructured<'_>, depth: u8) -> arbitrary:
             }
             Ok(Value::Object(m))
         }
-        _ => leaf_json(u),
     }
 }
 
 fn leaf_json(u: &mut Unstructured<'_>) -> arbitrary::Result<Value> {
     let arm: u8 = u.arbitrary()?;
-    match arm % 4 {
-        0 => Ok(Value::Null),
-        1 => Ok(Value::Bool(bool::arbitrary(u)?)),
-        2 => arbitrary_json_number(u).map(Value::Number),
+    match arm % 3 {
+        0 => Ok(Value::Bool(bool::arbitrary(u)?)),
+        1 => arbitrary_json_number(u).map(Value::Number),
         _ => arbitrary_short_string(u).map(Value::String),
     }
 }

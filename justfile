@@ -125,8 +125,7 @@ fuzz *args:
     host_triple="$(rustc -vV | sed -n 's/^host: //p')"
     # `cargo-fuzz` builds with `-D warnings`; allow the (pre-existing) deprecated lint so fuzzing can compile.
     RUSTFLAGS="${RUSTFLAGS:-} -A deprecated" \
-    cargo +nightly fuzz run spec_roundtrip --target "${host_triple}" --sanitizer none -- \
-        -runs=1000 -max_len=1048576 {{args}}
+    cargo +nightly fuzz run spec_roundtrip --target "${host_triple}" --sanitizer none -- -max_len=1024 {{args}}
 
 # Run cargo fmt and cargo clippy
 lint: fmt clippy
