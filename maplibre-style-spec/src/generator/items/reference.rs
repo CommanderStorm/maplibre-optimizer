@@ -2,6 +2,7 @@ use codegen2::Scope;
 
 use crate::generator::autotest::generate_test_from_example_if_present;
 use crate::generator::formatter::to_upper_camel_case;
+use crate::generator::fuzz;
 use crate::mir::types::ReferenceField;
 
 pub fn generate(scope: &mut Scope, name: &str, field: &ReferenceField) {
@@ -17,6 +18,7 @@ pub fn generate(scope: &mut Scope, name: &str, field: &ReferenceField) {
         .vis("pub")
         .doc(&field.meta.doc)
         .derive("serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone")
+        .attr(fuzz::CFG_DERIVE_ARBITRARY)
         .tuple_field(rust_inner);
 
     generate_test_from_example_if_present(scope, name, field.meta.example.as_ref());
@@ -38,9 +40,10 @@ mod tests {
                 target: "sky".to_string(),
             },
         );
-        insta::assert_snapshot!(scope.to_string(), @r"
+        insta::assert_snapshot!(scope.to_string(), @r#"
         #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+        #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
         pub struct Foo(Sky);
-        ")
+        "#)
     }
 }

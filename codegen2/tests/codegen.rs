@@ -118,6 +118,24 @@ fn empty_struct() {
 }
 
 #[test]
+fn tuple_struct_with_slot_attributes() {
+    let mut scope = Scope::new();
+
+    scope
+        .new_struct("Lit")
+        .derive("Debug")
+        .tuple_field_with_attrs(["#[serde(transparent)]"], "i32");
+
+    insta::assert_snapshot!(scope.to_string(), @r"
+    #[derive(Debug)]
+    struct Lit(
+        #[serde(transparent)]
+        i32,
+    );
+    ");
+}
+
+#[test]
 fn two_structs() {
     let mut scope = Scope::new();
 

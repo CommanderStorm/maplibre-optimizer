@@ -52,6 +52,7 @@ pub use associated_type::*;
 pub use block::*;
 pub use r#enum::*;
 pub use field::*;
+pub use fields::TupleField;
 pub use formatter::*;
 pub use function::*;
 pub use r#impl::*;

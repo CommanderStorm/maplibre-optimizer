@@ -1,6 +1,7 @@
 use codegen2::Scope;
 
 use crate::generator::autotest::generate_test_from_example_if_present;
+use crate::generator::fuzz;
 use crate::mir::types::BooleanField;
 
 pub fn generate(scope: &mut Scope, name: &str, field: &BooleanField) {
@@ -9,6 +10,7 @@ pub fn generate(scope: &mut Scope, name: &str, field: &BooleanField) {
         .vis("pub")
         .doc(&field.meta.doc)
         .derive("serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone, Copy")
+        .attr(fuzz::CFG_DERIVE_ARBITRARY)
         .tuple_field("bool");
 
     if let Some(default) = &field.default {
@@ -38,9 +40,10 @@ mod tests {
                 default: None,
             },
         );
-        insta::assert_snapshot!(scope.to_string(), @r"
+        insta::assert_snapshot!(scope.to_string(), @r#"
         #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone, Copy)]
+        #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
         pub struct Foo(bool);
-        ")
+        "#)
     }
 }

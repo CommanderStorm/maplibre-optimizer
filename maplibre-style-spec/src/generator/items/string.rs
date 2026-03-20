@@ -1,6 +1,7 @@
 use codegen2::Scope;
 
 use crate::generator::autotest::generate_test_from_example_if_present;
+use crate::generator::fuzz;
 use crate::mir::types::StringField;
 
 pub fn generate(scope: &mut Scope, name: &str, field: &StringField) {
@@ -9,6 +10,7 @@ pub fn generate(scope: &mut Scope, name: &str, field: &StringField) {
         .vis("pub")
         .doc(&field.meta.doc)
         .derive("serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone")
+        .attr(fuzz::CFG_DERIVE_ARBITRARY)
         .tuple_field("std::string::String");
 
     if let Some(default) = &field.default {
@@ -38,9 +40,10 @@ mod tests {
                 default: None,
             },
         );
-        insta::assert_snapshot!(scope.to_string(), @r"
+        insta::assert_snapshot!(scope.to_string(), @r#"
         #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+        #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
         pub struct Foo(std::string::String);
-        ")
+        "#)
     }
 }

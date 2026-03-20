@@ -4,11 +4,46 @@ use crate::field::Field;
 use crate::formatter::Formatter;
 use crate::r#type::Type;
 
+/// One slot in a tuple struct or tuple enum variant, optionally with outer attributes.
+#[derive(Debug, Clone)]
+pub struct TupleField {
+    /// Lines like `#[serde(rename = "x")]` (without surrounding `#[]` wrapper per line — use full attribute text).
+    pub annotations: Vec<String>,
+    /// Field type.
+    pub ty: Type,
+}
+
+impl TupleField {
+    /// Tuple slot with no attributes.
+    pub fn new<T>(ty: T) -> Self
+    where
+        T: Into<Type>,
+    {
+        Self {
+            annotations: Vec::new(),
+            ty: ty.into(),
+        }
+    }
+
+    /// Tuple slot with attribute lines (each string is a full attribute, e.g. `#[cfg_attr(...)]`).
+    pub fn with_annotations<I, S, T>(annotations: I, ty: T) -> Self
+    where
+        I: IntoIterator<Item = S>,
+        S: ToString,
+        T: Into<Type>,
+    {
+        Self {
+            annotations: annotations.into_iter().map(|s| s.to_string()).collect(),
+            ty: ty.into(),
+        }
+    }
+}
+
 /// Defines a set of fields.
 #[derive(Debug, Clone)]
 pub enum Fields {
     Empty,
-    Tuple(Vec<Type>),
+    Tuple(Vec<TupleField>),
     Named(Vec<Field>),
 }
 
@@ -53,21 +88,37 @@ impl Fields {
         }
     }
 
+    /// Append a tuple slot with no attributes.
     pub fn tuple<T>(&mut self, ty: T) -> &mut Self
     where
         T: Into<Type>,
     {
+        self.tuple_field(TupleField::new(ty))
+    }
+
+    /// Append a tuple slot, optionally with attribute lines on that slot.
+    pub fn tuple_field(&mut self, slot: TupleField) -> &mut Self {
         match *self {
             Fields::Empty => {
-                *self = Fields::Tuple(vec![ty.into()]);
+                *self = Fields::Tuple(vec![slot]);
             }
             Fields::Tuple(ref mut fields) => {
-                fields.push(ty.into());
+                fields.push(slot);
             }
             _ => panic!("field list is tuple"),
         }
 
         self
+    }
+
+    /// Append a tuple slot with attributes before the type.
+    pub fn tuple_with_attrs<I, S, T>(&mut self, annotations: I, ty: T) -> &mut Self
+    where
+        I: IntoIterator<Item = S>,
+        S: ToString,
+        T: Into<Type>,
+    {
+        self.tuple_field(TupleField::with_annotations(annotations, ty))
     }
 
     pub fn fmt(&self, fmt: &mut Formatter<'_>) -> fmt::Result {
@@ -98,19 +149,33 @@ impl Fields {
                     Ok(())
                 })?;
             }
-            Fields::Tuple(ref tys) => {
-                assert!(!tys.is_empty());
+            Fields::Tuple(ref slots) => {
+                assert!(!slots.is_empty());
 
-                write!(fmt, "(")?;
+                let multiline = slots.iter().any(|s| !s.annotations.is_empty());
 
-                for (i, ty) in tys.iter().enumerate() {
-                    if i != 0 {
-                        write!(fmt, ", ")?;
-                    }
-                    ty.fmt(fmt)?;
+                if !multiline {
+                    write!(fmt, "(")?;
+                    slots[0].ty.fmt(fmt)?;
+                    write!(fmt, ")")?;
+                } else {
+                    write!(fmt, "(")?;
+                    writeln!(fmt)?;
+                    fmt.indent(|fmt| {
+                        for (i, slot) in slots.iter().enumerate() {
+                            if i > 0 {
+                                writeln!(fmt, ",")?;
+                            }
+                            for ann in &slot.annotations {
+                                writeln!(fmt, "{}", ann)?;
+                            }
+                            slot.ty.fmt(fmt)?;
+                        }
+                        writeln!(fmt, ",")?;
+                        Ok(())
+                    })?;
+                    write!(fmt, ")")?;
                 }
-
-                write!(fmt, ")")?;
             }
             Fields::Empty => {}
         }

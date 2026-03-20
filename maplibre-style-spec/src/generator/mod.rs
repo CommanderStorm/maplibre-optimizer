@@ -17,6 +17,7 @@ use crate::mir::{
 
 mod autotest;
 pub mod formatter;
+pub(crate) mod fuzz;
 mod items;
 mod literals;
 
@@ -59,7 +60,8 @@ fn generate_root_struct(scope: &mut Scope, spec: &IntermediateSpec) {
         .new_struct("MaplibreStyleSpecification")
         .doc("This is a Maplibre Style Specification")
         .vis("pub")
-        .derive("serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone");
+        .derive("serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone")
+        .attr(fuzz::CFG_DERIVE_ARBITRARY);
 
     for (key, field) in &spec.root.0 {
         let meta = field.meta();
@@ -106,6 +108,7 @@ fn generate_struct_from_fields(scope: &mut Scope, name: &str, fields: &[MirField
             .new_struct(name)
             .vis("pub")
             .derive("serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone")
+            .attr(fuzz::CFG_DERIVE_ARBITRARY)
             .tuple_field(format!(
                 "std::collections::BTreeMap<std::string::String,{inner_name}>"
             ));
@@ -116,7 +119,8 @@ fn generate_struct_from_fields(scope: &mut Scope, name: &str, fields: &[MirField
     let s = scope
         .new_struct(name)
         .vis("pub")
-        .derive("serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone");
+        .derive("serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone")
+        .attr(fuzz::CFG_DERIVE_ARBITRARY);
 
     for field in fields {
         let meta = field.meta();
@@ -153,7 +157,8 @@ fn generate_oneof(scope: &mut Scope, name: &str, one_of: &IntermediateOneOf) {
     let enu = scope
         .new_enum(name)
         .vis("pub")
-        .derive("serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone");
+        .derive("serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone")
+        .attr(fuzz::CFG_DERIVE_ARBITRARY);
 
     if let Some(tag) = &one_of.tag {
         enu.attr(format!("serde(tag=\"{tag}\")"));

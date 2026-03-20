@@ -130,6 +130,23 @@ impl Struct {
         self
     }
 
+    /// Add a tuple field with outer attributes on that slot (e.g. `#[arbitrary(with = ...)]`).
+    pub fn tuple_field_with_attrs<I, S, T>(&mut self, annotations: I, ty: T) -> &mut Self
+    where
+        I: IntoIterator<Item = S>,
+        S: ToString,
+        T: Into<Type>,
+    {
+        self.fields.tuple_with_attrs(annotations, ty);
+        self
+    }
+
+    /// Push a prebuilt tuple slot (type + optional attributes).
+    pub fn push_tuple_field(&mut self, slot: crate::fields::TupleField) -> &mut Self {
+        self.fields.tuple_field(slot);
+        self
+    }
+
     /// Formats the struct using the given formatter.
     pub fn fmt(&self, fmt: &mut Formatter<'_>) -> fmt::Result {
         self.type_def.fmt_head("struct", &[], fmt)?;

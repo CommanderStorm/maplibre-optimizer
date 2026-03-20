@@ -1,6 +1,7 @@
 use codegen2::Scope;
 
 use crate::generator::autotest::generate_test_from_example_if_present;
+use crate::generator::fuzz;
 use crate::mir::types::PaddingField;
 
 pub fn generate(scope: &mut Scope, name: &str, field: &PaddingField) {
@@ -9,23 +10,36 @@ pub fn generate(scope: &mut Scope, name: &str, field: &PaddingField) {
         .vis("pub")
         .attr("serde(untagged)")
         .doc(&field.meta.doc)
-        .derive("serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone");
+        .derive("serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone")
+        .attr(fuzz::CFG_DERIVE_ARBITRARY);
     enu.new_variant("Unwrapped")
         .annotation("#[deprecated = \"Please see [`Self::One`] instead\"]")
         .doc("A single value applies to all four sides.\n\nOnly avaliable for backwards compatibility.")
-        .tuple("serde_json::Number");
+        .tuple_with_attrs([fuzz::ARB_JSON_NUMBER], "serde_json::Number");
     enu.new_variant("One")
         .doc("A single value applies to all four sides")
-        .tuple("Box<[serde_json::Number; 1]>");
+        .tuple_with_attrs(
+            [fuzz::ARB_BOX_1_JSON_NUMBER],
+            "Box<[serde_json::Number; 1]>",
+        );
     enu.new_variant("Two")
         .doc("two values apply to `[top/bottom, left/right]`")
-        .tuple("Box<[serde_json::Number; 2]>");
+        .tuple_with_attrs(
+            [fuzz::ARB_BOX_2_JSON_NUMBER],
+            "Box<[serde_json::Number; 2]>",
+        );
     enu.new_variant("Three")
         .doc("three values apply to `[top, left/right, bottom]`")
-        .tuple("Box<[serde_json::Number; 3]>");
+        .tuple_with_attrs(
+            [fuzz::ARB_BOX_3_JSON_NUMBER],
+            "Box<[serde_json::Number; 3]>",
+        );
     enu.new_variant("Four")
         .doc("four values apply to `[top, right, bottom, left]`")
-        .tuple("Box<[serde_json::Number; 4]>");
+        .tuple_with_attrs(
+            [fuzz::ARB_BOX_4_JSON_NUMBER],
+            "Box<[serde_json::Number; 4]>",
+        );
 
     let mut items = String::from("Box::new([");
     let mut needs_separator = false;
@@ -75,20 +89,36 @@ mod tests {
         insta::assert_snapshot!(scope.to_string(), @r#"
         #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
         #[serde(untagged)]
+        #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
         pub enum Foo {
             /// A single value applies to all four sides.
             /// 
             /// Only avaliable for backwards compatibility.
             #[deprecated = "Please see [`Self::One`] instead"]
-            Unwrapped(serde_json::Number),
+            Unwrapped(
+                #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
+                serde_json::Number,
+            ),
             /// A single value applies to all four sides
-            One(Box<[serde_json::Number; 1]>),
+            One(
+                #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_box_1_json_number))]
+                Box<[serde_json::Number; 1]>,
+            ),
             /// two values apply to `[top/bottom, left/right]`
-            Two(Box<[serde_json::Number; 2]>),
+            Two(
+                #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_box_2_json_number))]
+                Box<[serde_json::Number; 2]>,
+            ),
             /// three values apply to `[top, left/right, bottom]`
-            Three(Box<[serde_json::Number; 3]>),
+            Three(
+                #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_box_3_json_number))]
+                Box<[serde_json::Number; 3]>,
+            ),
             /// four values apply to `[top, right, bottom, left]`
-            Four(Box<[serde_json::Number; 4]>),
+            Four(
+                #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_box_4_json_number))]
+                Box<[serde_json::Number; 4]>,
+            ),
         }
 
         impl Default for Foo {

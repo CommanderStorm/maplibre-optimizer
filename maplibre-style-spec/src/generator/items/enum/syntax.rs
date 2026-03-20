@@ -1,14 +1,25 @@
 use std::collections::BTreeMap;
 
-use codegen2::{Function, Impl, Scope};
+use codegen2::{Function, Impl, Scope, Variant};
 use serde_json::Value;
 
 use crate::generator::autotest::generate_test_from_examples_if_present;
 use crate::generator::formatter::{to_snake_case, to_upper_camel_case};
+use crate::generator::fuzz;
 use crate::mir::types::{
     MirExpression, MirLiteral as Literal, MirOverload as Overload, MirParameter as Parameter,
     MirParameterType as ParameterType, MirSyntax as Syntax, SyntaxVariantDef,
 };
+
+fn emit_tuple_slot(v: &mut Variant, rust_ty: &str) {
+    match rust_ty {
+        "serde_json::Value" => v.tuple_with_attrs([fuzz::ARB_JSON_VALUE], rust_ty),
+        "Option<serde_json::Value>" => v.tuple_with_attrs([fuzz::ARB_OPTION_JSON_VALUE], rust_ty),
+        fuzz::JSON_MAP_TY => v.tuple_with_attrs([fuzz::ARB_JSON_MAP], rust_ty),
+        fuzz::OPTION_JSON_MAP_TY => v.tuple_with_attrs([fuzz::ARB_OPTION_JSON_MAP], rust_ty),
+        _ => v.tuple(rust_ty),
+    };
+}
 
 pub fn generate_syntax_enum(
     scope: &mut Scope,
@@ -18,14 +29,14 @@ pub fn generate_syntax_enum(
 ) {
     pregenerate_all_operator_parameter_types(scope, values);
     // pass 1: populate enum variants
-    generate_syntax_enum_body(scope, name, doc, values);
+    let variadic_row_struct_names = generate_syntax_enum_body(scope, name, doc, values);
     // pass 2: generate the previously referenced enum variants for overloaded variants
     generate_referenced_multi_overload_options_enums(scope, name, values);
     let examples = values
         .values()
         .filter_map(|e| e.example.as_ref())
         .collect::<Vec<_>>();
-    generate_syntax_enum_deserializer(scope, name, values, examples[0]);
+    generate_syntax_enum_deserializer(scope, name, values, examples[0], &variadic_row_struct_names);
 
     generate_test_from_examples_if_present(scope, name, examples);
 }
@@ -133,9 +144,10 @@ fn generate_expression_any_of(scope: &mut Scope, types: &[ParameterType]) -> Str
         if expression_union_needs_untagged(types) {
             enu = enu.attr("serde(untagged)");
         }
-        enu.derive("serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone");
+        enu.derive("serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone")
+            .attr(fuzz::CFG_DERIVE_ARBITRARY);
         for (variant, rust_ty) in &arms {
-            enu.new_variant(variant).tuple(rust_ty);
+            emit_tuple_slot(enu.new_variant(variant), rust_ty.as_str());
         }
     }
     any_of_type
@@ -171,10 +183,11 @@ fn generate_syntax_enum_body(
     name: &str,
     doc: &str,
     values: &BTreeMap<String, SyntaxVariantDef>,
-) {
+) -> BTreeMap<String, String> {
     // Variadic variants need `generate_parameter_variant`, which mutates `scope`. `new_enum` also
     // holds a `scope` borrow via its handle, so precompute tuple types before creating the enum.
     let mut variadic_tuple_types: BTreeMap<String, String> = BTreeMap::new();
+    let mut variadic_row_struct_names: BTreeMap<String, String> = BTreeMap::new();
     for (key, value) in values {
         let syntax = &value.syntax;
         let name_and_possibly_group = if let Some(group) = &value.group {
@@ -204,7 +217,24 @@ fn generate_syntax_enum_body(
                 })
                 .collect();
             let tuple_type_names = parts.join(",");
-            let tuple = if parts.len() > 1 {
+            let tuple = if parts.len() == 2
+                && parts[1].contains("serde_json::Map")
+                && parts[1].contains("Option<")
+            {
+                let row_name = format!("{name}{variant_name}VariadicRow");
+                if scope.get_struct_mut(&row_name).is_none() {
+                    scope
+                        .new_struct(&row_name)
+                        .vis("pub")
+                        .doc("Tuple row for variadic (content, optional style object) pairs.")
+                        .derive("serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone")
+                        .attr(fuzz::CFG_DERIVE_ARBITRARY)
+                        .tuple_field(&parts[0])
+                        .tuple_field_with_attrs([fuzz::ARB_OPTION_JSON_MAP], &parts[1]);
+                }
+                variadic_row_struct_names.insert(key.clone(), row_name.clone());
+                format!("Vec<{row_name}>")
+            } else if parts.len() > 1 {
                 box_recursive_types(name, &format!("Vec<({tuple_type_names})>"))
             } else {
                 box_recursive_types(name, &format!("Vec<{tuple_type_names}>"))
@@ -217,7 +247,8 @@ fn generate_syntax_enum_body(
         .new_enum(name)
         .doc(doc)
         .vis("pub")
-        .derive("serde::Serialize, PartialEq, Debug, Clone");
+        .derive("serde::Serialize, PartialEq, Debug, Clone")
+        .attr(fuzz::CFG_DERIVE_ARBITRARY);
     for (key, value) in values {
         let var_name = to_upper_camel_case(key);
         let syntax = &value.syntax;
@@ -249,7 +280,7 @@ fn generate_syntax_enum_body(
                     "serde_json::Value".to_string()
                 };
 
-                var.tuple(tuple_identifier);
+                emit_tuple_slot(var, &tuple_identifier);
             }
         } else {
             let options_name = format!("{var_name}Options");
@@ -257,6 +288,7 @@ fn generate_syntax_enum_body(
             var.tuple(&options_name);
         }
     }
+    variadic_row_struct_names
 }
 
 /// Breaks `E`-recursive shapes like `Number::Minus`/`Number::Star` without infinite-sized types.
@@ -324,13 +356,14 @@ fn generate_multi_overload(
         ))
         .vis("pub")
         .derive("serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone")
-        .attr("serde(untagged)");
+        .attr("serde(untagged)")
+        .attr(fuzz::CFG_DERIVE_ARBITRARY);
     let variant_naming_strat = OverloadVariantNamingStrategy::detect(&syntax.overloads);
     for (i, overload) in syntax.overloads.iter().enumerate() {
         let var_name = variant_naming_strat.var_name(overload, i);
         let var = enu.new_variant(&var_name);
         for t in &overloads_tuples[i] {
-            var.tuple(t);
+            emit_tuple_slot(var, t);
         }
     }
 }
@@ -520,7 +553,8 @@ fn generate_any_of(scope: &mut Scope, any_of: &[Literal]) -> String {
             .new_enum(&any_of_type)
             .doc("Either of the below variants")
             .vis("pub")
-            .derive("serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone");
+            .derive("serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone")
+            .attr(fuzz::CFG_DERIVE_ARBITRARY);
         for t in ts {
             enu.new_variant(t).tuple(t);
         }
@@ -533,6 +567,7 @@ fn generate_syntax_enum_deserializer(
     name: &str,
     values: &BTreeMap<String, SyntaxVariantDef>,
     example: &serde_json::Value,
+    variadic_row_struct_names: &BTreeMap<String, String>,
 ) {
     let vis = generate_visitor(scope, name, example);
 
@@ -556,10 +591,14 @@ fn generate_syntax_enum_deserializer(
             && let Some(overload) = syntax.overloads.first()
         {
             if syntax.has_variadic_overload() {
+                let row_struct = variadic_row_struct_names
+                    .get(key.as_str())
+                    .map(String::as_str);
                 generate_syntax_enum_deserializer_regular_variadic_variant(
                     visit_seq,
                     (name, &variant_name),
                     overload,
+                    row_struct,
                 )
             } else {
                 generate_syntax_enum_deserializer_regular_variant(
@@ -658,6 +697,7 @@ fn generate_syntax_enum_deserializer_regular_variadic_variant(
     visit_seq: &mut Function,
     (name, variant_name): (&str, &str),
     overload: &Overload,
+    row_struct_name: Option<&str>,
 ) {
     let position_of_variadic_separator = overload.position_of_variadic_separator();
     assert_ne!(position_of_variadic_separator, 0);
@@ -682,14 +722,16 @@ fn generate_syntax_enum_deserializer_regular_variadic_variant(
                 visit_seq.line(format!("let {param_name} = seq.next_element()?.ok_or_else(|| serde::de::Error::custom(\"expected {param_name} in {name}::{variant_name}\"))?;"));
             }
         }
-        visit_seq.line(format!(
-            "let element = ({base_name},{});",
-            non_base_parameters
-                .iter()
-                .map(|(p, _)| p.as_str())
-                .collect::<Vec<_>>()
-                .join(", ")
-        ));
+        let tuple_inner = non_base_parameters
+            .iter()
+            .map(|(p, _)| p.as_str())
+            .collect::<Vec<_>>()
+            .join(", ");
+        if let Some(row) = row_struct_name {
+            visit_seq.line(format!("let element = {row}({base_name},{tuple_inner});"));
+        } else {
+            visit_seq.line(format!("let element = ({base_name},{tuple_inner});"));
+        }
     }
     visit_seq.line("inputs.push(element);");
     visit_seq.line("}");

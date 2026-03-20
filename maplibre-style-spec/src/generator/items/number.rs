@@ -1,6 +1,7 @@
 use codegen2::Scope;
 
 use crate::generator::autotest::generate_test_from_example_if_present;
+use crate::generator::fuzz;
 use crate::mir::types::NumberField;
 
 pub fn generate(scope: &mut Scope, name: &str, field: &NumberField) {
@@ -9,7 +10,8 @@ pub fn generate(scope: &mut Scope, name: &str, field: &NumberField) {
         .doc(&field.meta.doc)
         .vis("pub")
         .derive("serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone")
-        .tuple_field("serde_json::Number");
+        .attr(fuzz::CFG_DERIVE_ARBITRARY)
+        .tuple_field_with_attrs([fuzz::ARB_JSON_NUMBER], "serde_json::Number");
     if let Some(default) = &field.default {
         let default_expr = generate_number_default(default);
         scope
@@ -54,10 +56,14 @@ mod tests {
                 period: None,
             },
         );
-        insta::assert_snapshot!(scope.to_string(), @r"
+        insta::assert_snapshot!(scope.to_string(), @r#"
         #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-        pub struct Foo(serde_json::Number);
-        ")
+        #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+        pub struct Foo(
+            #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
+            serde_json::Number,
+        );
+        "#)
     }
 
     #[test]
@@ -79,11 +85,15 @@ mod tests {
                 period: Some(360.0),
             },
         );
-        insta::assert_snapshot!(scope.to_string(), @r"
+        insta::assert_snapshot!(scope.to_string(), @r#"
         /// Range: 360..=1 every 360
         #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-        pub struct Foo(serde_json::Number);
-        ")
+        #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+        pub struct Foo(
+            #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
+            serde_json::Number,
+        );
+        "#)
     }
 
     #[test]
@@ -102,7 +112,11 @@ mod tests {
         );
         insta::assert_snapshot!(scope.to_string(), @r#"
         #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-        pub struct Foo(serde_json::Number);
+        #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+        pub struct Foo(
+            #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
+            serde_json::Number,
+        );
 
         impl Default for Foo {
             fn default() -> Self {

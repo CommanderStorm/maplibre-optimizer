@@ -3,6 +3,7 @@ use serde_json::Value;
 
 use crate::generator::autotest::generate_test_from_example_if_present;
 use crate::generator::formatter::to_upper_camel_case;
+use crate::generator::fuzz;
 use crate::generator::items::number::generate_number_default;
 use crate::mir::types::{ArrayElement, ArrayField, RegularEnum};
 
@@ -18,12 +19,42 @@ pub fn generate(scope: &mut Scope, name: &str, field: &ArrayField) {
         format!("Vec<{rust_element_type}>")
     };
 
-    scope
+    let st = scope
         .new_struct(name)
         .vis("pub")
         .doc(&field.meta.doc)
         .derive("serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone")
-        .tuple_field(field_type);
+        .attr(fuzz::CFG_DERIVE_ARBITRARY);
+
+    match (&field.element, field.length) {
+        (ArrayElement::Star, _) => {
+            st.tuple_field_with_attrs([fuzz::ARB_VEC_JSON_VALUE], field_type);
+        }
+        (ArrayElement::Number { .. }, None) => {
+            st.tuple_field_with_attrs([fuzz::ARB_VEC_JSON_NUMBER], field_type);
+        }
+        (ArrayElement::Number { .. }, Some(1)) => {
+            st.tuple_field_with_attrs([fuzz::ARB_BOX_1_JSON_NUMBER], field_type);
+        }
+        (ArrayElement::Number { .. }, Some(2)) => {
+            st.tuple_field_with_attrs([fuzz::ARB_BOX_2_JSON_NUMBER], field_type);
+        }
+        (ArrayElement::Number { .. }, Some(3)) => {
+            st.tuple_field_with_attrs([fuzz::ARB_BOX_3_JSON_NUMBER], field_type);
+        }
+        (ArrayElement::Number { .. }, Some(4)) => {
+            st.tuple_field_with_attrs([fuzz::ARB_BOX_4_JSON_NUMBER], field_type);
+        }
+        (ArrayElement::Number { .. }, Some(_)) => {
+            st.tuple_field(field_type);
+        }
+        (ArrayElement::Color, None) => {
+            st.tuple_field_with_attrs([fuzz::ARB_VEC_DYNAMIC_COLOR], field_type);
+        }
+        _ => {
+            st.tuple_field(field_type);
+        }
+    }
 
     if let Some(default) = &field.default {
         let mut default_expr = String::new();
@@ -87,9 +118,21 @@ fn generate_array_element(scope: &mut Scope, name: &str, element: &ArrayElement)
                 .doc(format!("{name} Values"))
                 .attr("serde(untagged)")
                 .derive("serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone")
+                .attr(fuzz::CFG_DERIVE_ARBITRARY)
                 .vis("pub");
             for (variant_name, variant_type) in variant_types {
-                enu.new_variant(variant_name).tuple(variant_type);
+                let v = enu.new_variant(variant_name);
+                match variant_type.as_str() {
+                    "serde_json::Number" => {
+                        v.tuple_with_attrs([fuzz::ARB_JSON_NUMBER], variant_type);
+                    }
+                    "color::DynamicColor" => {
+                        v.tuple_with_attrs([fuzz::ARB_DYNAMIC_COLOR], variant_type);
+                    }
+                    _ => {
+                        v.tuple(variant_type);
+                    }
+                }
             }
             name.to_string()
         }
@@ -111,11 +154,13 @@ fn generate_font_faces(scope: &mut Scope) {
         .new_struct("FontWithRange")
         .vis("pub")
         .doc("Font file URL and the unicode-range at which it can be used")
-        .derive("serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone");
+        .derive("serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone")
+        .attr(fuzz::CFG_DERIVE_ARBITRARY);
     font_with_range
         .new_field("url", "url::Url")
         .vis("pub")
-        .doc("URL the font can retrieved under");
+        .doc("URL the font can retrieved under")
+        .annotation(fuzz::ARB_URL);
     font_with_range
         .new_field("unicode_range", "Vec<std::string::String>")
         .vis("pub")
@@ -128,10 +173,11 @@ fn generate_font_faces(scope: &mut Scope) {
         .new_enum("FontFace")
         .vis("pub")
         .attr("serde(untagged)")
-        .derive("serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone");
+        .derive("serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone")
+        .attr(fuzz::CFG_DERIVE_ARBITRARY);
     enu.new_variant("Url")
         .doc("A single global font file URL")
-        .tuple("url::Url");
+        .tuple_with_attrs([fuzz::ARB_URL], "url::Url");
     enu.new_variant("FontRange")
         .doc("Load different fonts depending on the unicode range")
         .tuple("Vec<FontWithRange>");
@@ -193,10 +239,14 @@ mod tests {
                 length: None,
             },
         );
-        insta::assert_snapshot!(scope.to_string(), @r"
+        insta::assert_snapshot!(scope.to_string(), @r#"
         #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-        pub struct Foo(Vec<serde_json::Value>);
-        ")
+        #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+        pub struct Foo(
+            #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_vec_json_value))]
+            Vec<serde_json::Value>,
+        );
+        "#)
     }
 
     #[test]
@@ -234,39 +284,63 @@ mod tests {
         insta::assert_snapshot!(crate::generator::generate_spec_scope(&spec), @r#"
         /// JSON number in an expression position
         #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-        pub struct NumberLiteral(serde_json::Number);
+        #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+        pub struct NumberLiteral(
+            #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
+            serde_json::Number,
+        );
 
         /// JSON string in an expression position
         #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+        #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
         pub struct StringLiteral(std::string::String);
 
         /// GeoJSON object literal
         #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-        pub struct GeoJSONObjectLiteral(geojson::GeoJson);
+        #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+        pub struct GeoJSONObjectLiteral(
+            #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_geojson))]
+            geojson::GeoJson,
+        );
 
         /// JSON object literal
         #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-        pub struct JSONObjectLiteral(serde_json::Value);
+        #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+        pub struct JSONObjectLiteral(
+            #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
+            serde_json::Value,
+        );
 
         /// JSON array literal
         #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-        pub struct JSONArrayLiteral(Vec<serde_json::Value>);
+        #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+        pub struct JSONArrayLiteral(
+            #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_vec_json_value))]
+            Vec<serde_json::Value>,
+        );
 
         /// Array whose elements are string literals (e.g. match labels)
         #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+        #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
         pub struct ArrayOfStringLiteral(Vec<StringLiteral>);
 
         /// Array whose elements are number literals (e.g. match labels)
         #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+        #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
         pub struct ArrayOfNumberLiteral(Vec<NumberLiteral>);
 
         /// This is a Maplibre Style Specification
         #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+        #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
         pub struct MaplibreStyleSpecification;
 
         /// Position of the light source relative to lit (extruded) geometries, in [r radial coordinate, a azimuthal angle, p polar angle] where r indicates the distance from the center of the base of an object to its light, a indicates the position of the light relative to 0° (0° when `light.anchor` is set to `viewport` corresponds to the top of the viewport, or 0° when `light.anchor` is set to `map` corresponds to due north, and degrees proceed clockwise), and p indicates the height of the light (from 0°, directly above, to 180°, directly below).
         #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-        pub struct Position(Box<[serde_json::Number; 3]>);
+        #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+        pub struct Position(
+            #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_box_3_json_number))]
+            Box<[serde_json::Number; 3]>,
+        );
 
         impl Default for Position {
             fn default() -> Self {
@@ -315,38 +389,59 @@ mod tests {
         insta::assert_snapshot!(crate::generator::generate_spec_scope(&spec), @r##"
         /// JSON number in an expression position
         #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-        pub struct NumberLiteral(serde_json::Number);
+        #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+        pub struct NumberLiteral(
+            #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
+            serde_json::Number,
+        );
 
         /// JSON string in an expression position
         #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+        #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
         pub struct StringLiteral(std::string::String);
 
         /// GeoJSON object literal
         #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-        pub struct GeoJSONObjectLiteral(geojson::GeoJson);
+        #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+        pub struct GeoJSONObjectLiteral(
+            #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_geojson))]
+            geojson::GeoJson,
+        );
 
         /// JSON object literal
         #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-        pub struct JSONObjectLiteral(serde_json::Value);
+        #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+        pub struct JSONObjectLiteral(
+            #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
+            serde_json::Value,
+        );
 
         /// JSON array literal
         #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-        pub struct JSONArrayLiteral(Vec<serde_json::Value>);
+        #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+        pub struct JSONArrayLiteral(
+            #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_vec_json_value))]
+            Vec<serde_json::Value>,
+        );
 
         /// Array whose elements are string literals (e.g. match labels)
         #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+        #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
         pub struct ArrayOfStringLiteral(Vec<StringLiteral>);
 
         /// Array whose elements are number literals (e.g. match labels)
         #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+        #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
         pub struct ArrayOfNumberLiteral(Vec<NumberLiteral>);
 
         /// This is a Maplibre Style Specification
         #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+        #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
         pub struct MaplibreStyleSpecification;
 
         /// A style's `layers` property lists all the layers available in that style.
         #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+        #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
         pub struct Layers(Vec<Layer>);
 
         #[cfg(test)]
@@ -379,40 +474,61 @@ mod tests {
         insta::assert_snapshot!(crate::generator::generate_spec_scope(&spec), @r#"
         /// JSON number in an expression position
         #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-        pub struct NumberLiteral(serde_json::Number);
+        #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+        pub struct NumberLiteral(
+            #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
+            serde_json::Number,
+        );
 
         /// JSON string in an expression position
         #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+        #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
         pub struct StringLiteral(std::string::String);
 
         /// GeoJSON object literal
         #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-        pub struct GeoJSONObjectLiteral(geojson::GeoJson);
+        #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+        pub struct GeoJSONObjectLiteral(
+            #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_geojson))]
+            geojson::GeoJson,
+        );
 
         /// JSON object literal
         #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-        pub struct JSONObjectLiteral(serde_json::Value);
+        #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+        pub struct JSONObjectLiteral(
+            #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
+            serde_json::Value,
+        );
 
         /// JSON array literal
         #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-        pub struct JSONArrayLiteral(Vec<serde_json::Value>);
+        #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+        pub struct JSONArrayLiteral(
+            #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_vec_json_value))]
+            Vec<serde_json::Value>,
+        );
 
         /// Array whose elements are string literals (e.g. match labels)
         #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+        #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
         pub struct ArrayOfStringLiteral(Vec<StringLiteral>);
 
         /// Array whose elements are number literals (e.g. match labels)
         #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+        #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
         pub struct ArrayOfNumberLiteral(Vec<NumberLiteral>);
 
         /// This is a Maplibre Style Specification
         #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+        #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
         pub struct MaplibreStyleSpecification;
 
         /// An interpolation defines how to transition between items. The first element of an interpolation array is a string naming the interpolation operator, e.g. `"linear"` or `"exponential"`. Elements that follow (if any) are the _arguments_ to the interpolation.
         ///
         /// Range: 1..
         #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+        #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
         pub struct Interpolation(InterpolationName);
 
         #[cfg(test)]

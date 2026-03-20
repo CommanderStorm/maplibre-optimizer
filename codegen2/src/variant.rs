@@ -70,6 +70,17 @@ impl Variant {
         self
     }
 
+    /// Tuple variant field with outer attributes on that slot.
+    pub fn tuple_with_attrs<I, S, T>(&mut self, annotations: I, ty: T) -> &mut Self
+    where
+        I: IntoIterator<Item = S>,
+        S: ToString,
+        T: Into<Type>,
+    {
+        self.fields.tuple_with_attrs(annotations, ty);
+        self
+    }
+
     /// Set the variant documentation.
     pub fn doc(&mut self, documentation: impl ToString) -> &mut Self {
         self.documentation = documentation.to_string();

@@ -7,12 +7,15 @@ edition = "2024"
 default = ["full"]
 # Disable for `cargo run --no-default-features --bin generate_spec` when `spec.rs` is out of date.
 full = []
+# Enables `arbitrary::Arbitrary` on generated `spec` types and fuzz helpers (for cargo-fuzz).
+fuzz = ["dep:arbitrary"]
 
 [[bin]]
 name = "generate_spec"
 path = "src/bin/generate_spec.rs"
 
 [dependencies]
+arbitrary = { workspace = true, optional = true }
 codegen2.workspace = true
 color = { workspace = true, features = ["serde"] }
 serde.workspace = true

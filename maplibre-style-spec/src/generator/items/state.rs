@@ -1,6 +1,7 @@
 use codegen2::Scope;
 
 use crate::generator::autotest::generate_test_from_example_if_present;
+use crate::generator::fuzz;
 use crate::mir::types::StateField;
 
 pub fn generate(scope: &mut Scope, name: &str, field: &StateField) {
@@ -9,7 +10,8 @@ pub fn generate(scope: &mut Scope, name: &str, field: &StateField) {
         .vis("pub")
         .doc(&field.meta.doc)
         .derive("serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone")
-        .tuple_field("serde_json::Value");
+        .attr(fuzz::CFG_DERIVE_ARBITRARY)
+        .tuple_field_with_attrs([fuzz::ARB_JSON_VALUE], "serde_json::Value");
 
     let default = &field.default;
     scope
@@ -37,15 +39,19 @@ mod tests {
                 default: serde_json::json!(null),
             },
         );
-        insta::assert_snapshot!(scope.to_string(), @r"
+        insta::assert_snapshot!(scope.to_string(), @r#"
         #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-        pub struct Foo(serde_json::Value);
+        #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+        pub struct Foo(
+            #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
+            serde_json::Value,
+        );
 
         impl Default for Foo {
             fn default() -> Self {
                 Self(serde_json::json!(null))
             }
         }
-        ")
+        "#)
     }
 }

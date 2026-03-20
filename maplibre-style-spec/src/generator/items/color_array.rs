@@ -1,6 +1,7 @@
 use codegen2::Scope;
 
 use crate::generator::autotest::generate_test_from_example_if_present;
+use crate::generator::fuzz;
 use crate::mir::types::ColorArrayField;
 
 pub fn generate(scope: &mut Scope, name: &str, field: &ColorArrayField) {
@@ -9,12 +10,13 @@ pub fn generate(scope: &mut Scope, name: &str, field: &ColorArrayField) {
         .vis("pub")
         .attr("serde(untagged)")
         .doc(&field.meta.doc)
-        .derive("serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone");
+        .derive("serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone")
+        .attr(fuzz::CFG_DERIVE_ARBITRARY);
     enu.new_variant("One")
-        .tuple("color::DynamicColor")
+        .tuple_with_attrs([fuzz::ARB_DYNAMIC_COLOR], "color::DynamicColor")
         .doc("A color");
     enu.new_variant("Multiple")
-        .tuple("Vec<color::DynamicColor>")
+        .tuple_with_attrs([fuzz::ARB_VEC_DYNAMIC_COLOR], "Vec<color::DynamicColor>")
         .doc("A set of colors");
 
     if let Some(default) = &field.default {
@@ -44,15 +46,22 @@ mod tests {
                 default: None,
             },
         );
-        insta::assert_snapshot!(scope.to_string(), @r"
+        insta::assert_snapshot!(scope.to_string(), @r#"
         #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
         #[serde(untagged)]
+        #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
         pub enum Foo {
             /// A color
-            One(color::DynamicColor),
+            One(
+                #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_dynamic_color))]
+                color::DynamicColor,
+            ),
             /// A set of colors
-            Multiple(Vec<color::DynamicColor>),
+            Multiple(
+                #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_vec_dynamic_color))]
+                Vec<color::DynamicColor>,
+            ),
         }
-        ")
+        "#)
     }
 }

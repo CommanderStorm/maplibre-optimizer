@@ -1,6 +1,7 @@
 use codegen2::Scope;
 
 use crate::generator::formatter::to_upper_camel_case;
+use crate::generator::fuzz;
 use crate::mir::types::RegularEnum;
 
 pub fn generate_regular_enum(
@@ -14,7 +15,8 @@ pub fn generate_regular_enum(
         .new_enum(name)
         .doc(doc)
         .vis("pub")
-        .derive("serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy");
+        .derive("serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy")
+        .attr(fuzz::CFG_DERIVE_ARBITRARY);
     for (key, value) in &variants.variants {
         let var_name = to_upper_camel_case(key);
         let var = enu.new_variant(&var_name).doc(&value.doc);

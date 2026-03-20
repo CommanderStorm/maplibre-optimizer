@@ -1,6 +1,7 @@
 use codegen2::Scope;
 
 use crate::generator::formatter::to_upper_camel_case;
+use crate::generator::fuzz;
 use crate::mir::types::VersionEnum;
 
 pub fn generate_version(scope: &mut Scope, name: &str, doc: &str, versions: &VersionEnum) {
@@ -13,7 +14,8 @@ pub fn generate_version(scope: &mut Scope, name: &str, doc: &str, versions: &Ver
         .repr("u8")
         .derive(
             "serde_repr::Serialize_repr, serde_repr::Deserialize_repr, PartialEq, Eq, Debug, Clone, Copy",
-        );
+        )
+        .attr(fuzz::CFG_DERIVE_ARBITRARY);
     for v in &versions.versions {
         enu.new_variant(to_upper_camel_case(v.to_string()))
             .discriminant(v.to_string());

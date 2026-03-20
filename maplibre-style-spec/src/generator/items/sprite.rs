@@ -1,6 +1,7 @@
 use codegen2::Scope;
 
 use crate::generator::autotest::generate_test_from_example_if_present;
+use crate::generator::fuzz;
 use crate::mir::types::FieldMeta;
 
 const SPRITE_URL_AND_ID_DOCS: &str = r#"Defining Id and Url for a sprite allows you to load multiple sprites at once.
@@ -38,12 +39,17 @@ pub fn generate(scope: &mut Scope, name: &str, meta: &FieldMeta) {
         .new_struct("SpriteUrlAndId")
         .vis("pub")
         .derive("serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone")
+        .attr(fuzz::CFG_DERIVE_ARBITRARY)
         .doc(SPRITE_URL_AND_ID_DOCS);
     sprite_url_and_id
         .field("id", "std::string::String")
         .doc("Identifier of a sprite");
-    sprite_url_and_id.field("url", "url::Url").doc(
-        r#"URL where the sprite can be loaded from.
+    sprite_url_and_id
+        .new_field("url", "url::Url")
+        .vis("pub")
+        .annotation(fuzz::ARB_URL)
+        .doc(
+            r#"URL where the sprite can be loaded from.
 
 This is equivalent to the following multiple sprite definition:
 
@@ -53,17 +59,18 @@ This is equivalent to the following multiple sprite definition:
         "url": "https://example2.com/anotherurl"
 }
 ```"#,
-    );
+        );
 
     let enu = scope
         .new_enum(name)
         .vis("pub")
         .doc(&meta.doc)
-        .derive("serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone");
+        .derive("serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone")
+        .attr(fuzz::CFG_DERIVE_ARBITRARY);
 
     enu.new_variant("Url")
         .doc("URL where the sprite can be loaded from")
-        .tuple("url::Url");
+        .tuple_with_attrs([fuzz::ARB_URL], "url::Url");
     enu.new_variant("Multiple")
         .doc("Array of `{ id: ..., url: ... }` pairs to load multiple sprites")
         .tuple("Vec<SpriteUrlAndId>");
@@ -80,26 +87,33 @@ mod tests {
         let mut scope = Scope::new();
         generate(&mut scope, "Foo", &FieldMeta::default());
         insta::assert_snapshot!(scope.to_string(), @r#"
-        /// URL where the sprite can be loaded from.
-        ///
-        /// This is equivalent to the following multiple sprite definition:
-        ///
-        /// ```json
-        /// {
-        ///         "id": "default",
-        ///         "url": "https://example2.com/anotherurl"
-        /// }
-        /// ```
+        /// Identifier of a sprite
         #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+        #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
         pub struct SpriteUrlAndId {
             id: std::string::String,
-            url: url::Url,
+            /// URL where the sprite can be loaded from.
+            /// 
+            /// This is equivalent to the following multiple sprite definition:
+            /// 
+            /// ```json
+            /// {
+            ///         "id": "default",
+            ///         "url": "https://example2.com/anotherurl"
+            /// }
+            /// ```
+            #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_url))]
+            pub url: url::Url,
         }
 
         #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+        #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
         pub enum Foo {
             /// URL where the sprite can be loaded from
-            Url(url::Url),
+            Url(
+                #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_url))]
+                url::Url,
+            ),
             /// Array of `{ id: ..., url: ... }` pairs to load multiple sprites
             Multiple(Vec<SpriteUrlAndId>),
         }

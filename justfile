@@ -117,6 +117,17 @@ gen: clean-gen
     {{ just_executable() }} fmt
     rustfmt maplibre-style-spec/src/spec.rs
 
+# Run the serde round-trip fuzz target
+[working-directory: 'maplibre-style-spec/fuzz']
+fuzz *args:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    host_triple="$(rustc -vV | sed -n 's/^host: //p')"
+    # `cargo-fuzz` builds with `-D warnings`; allow the (pre-existing) deprecated lint so fuzzing can compile.
+    RUSTFLAGS="${RUSTFLAGS:-} -A deprecated" \
+    cargo +nightly fuzz run spec_roundtrip --target "${host_triple}" --sanitizer none -- \
+        -runs=1000 -max_len=1048576 {{args}}
+
 # Run cargo fmt and cargo clippy
 lint: fmt clippy
 

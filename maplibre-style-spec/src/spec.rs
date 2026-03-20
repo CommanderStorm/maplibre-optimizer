@@ -1,33 +1,53 @@
 /// JSON number in an expression position
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-pub struct NumberLiteral(serde_json::Number);
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+pub struct NumberLiteral(
+    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
+    serde_json::Number,
+);
 
 /// JSON string in an expression position
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct StringLiteral(std::string::String);
 
 /// GeoJSON object literal
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-pub struct GeoJSONObjectLiteral(geojson::GeoJson);
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+pub struct GeoJSONObjectLiteral(
+    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_geojson))]
+    geojson::GeoJson,
+);
 
 /// JSON object literal
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-pub struct JSONObjectLiteral(serde_json::Value);
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+pub struct JSONObjectLiteral(
+    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
+    serde_json::Value,
+);
 
 /// JSON array literal
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-pub struct JSONArrayLiteral(Vec<serde_json::Value>);
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+pub struct JSONArrayLiteral(
+    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_vec_json_value))]
+    Vec<serde_json::Value>,
+);
 
 /// Array whose elements are string literals (e.g. match labels)
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct ArrayOfStringLiteral(Vec<StringLiteral>);
 
 /// Array whose elements are number literals (e.g. match labels)
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct ArrayOfNumberLiteral(Vec<NumberLiteral>);
 
 /// This is a Maplibre Style Specification
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct MaplibreStyleSpecification {
     /// Default bearing, in degrees. The bearing is the compass direction that is "up"; for example, a bearing of 90° orients the map so that east is up. This value will be used only if the map has not been positioned by other means (e.g. map options or user interaction).
     ///
@@ -81,7 +101,11 @@ pub struct MaplibreStyleSpecification {
 ///
 /// Range: every 360
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-pub struct RootBearing(serde_json::Number);
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+pub struct RootBearing(
+    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
+    serde_json::Number,
+);
 
 impl Default for RootBearing {
     fn default() -> Self {
@@ -389,16 +413,26 @@ mod test {
 
 /// Default map center in longitude and latitude.  The style center will be used only if the map has not been positioned by other means (e.g. map options or user interaction).
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-pub struct RootCenter(Box<[serde_json::Number; 2]>);
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+pub struct RootCenter(
+    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_box_2_json_number))]
+     Box<[serde_json::Number; 2]>,
+);
 
 /// Default map center altitude in meters above sea level. The style center altitude defines the altitude where the camera is looking at and will be used only if the map has not been positioned by other means (e.g. map options or user interaction).
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-pub struct RootCenterAltitude(serde_json::Number);
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+pub struct RootCenterAltitude(
+    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
+    serde_json::Number,
+);
 
 /// Font file URL and the unicode-range at which it can be used
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct FontWithRange {
     /// URL the font can retrieved under
+    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_url))]
     pub url: url::Url,
     /// Unicode range(s) where this font applies (CSS `unicode-range` semantics)
     #[serde(rename = "unicode-range")]
@@ -409,9 +443,13 @@ pub struct FontWithRange {
 
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone)]
 #[serde(untagged)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum FontFace {
     /// A single global font file URL
-    Url(url::Url),
+    Url(
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_url))]
+        url::Url,
+    ),
     /// Load different fonts depending on the unicode range
     FontRange(Vec<FontWithRange>),
 }
@@ -424,23 +462,34 @@ pub enum FontFace {
 ///
 /// <h2>Supported Fonts</h2>What type of fonts are supported is implementation-defined. Unsupported fonts are ignored.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct RootFontFaces(std::collections::BTreeMap<std::string::String, FontFace>);
 
 /// The global light source.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct RootLight(Light);
 
 /// Arbitrary properties useful to track with the stylesheet, but do not influence rendering. Properties should be prefixed to avoid collisions, like 'maplibre:'.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-pub struct RootMetadata(serde_json::Value);
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+pub struct RootMetadata(
+    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
+    serde_json::Value,
+);
 
 /// A human-readable name for the style.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct RootName(std::string::String);
 
 /// Default pitch, in degrees. Zero is perpendicular to the surface, for a look straight down at the map, while a greater value like 60 looks ahead towards the horizon. The style pitch will be used only if the map has not been positioned by other means (e.g. map options or user interaction).
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-pub struct RootPitch(serde_json::Number);
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+pub struct RootPitch(
+    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
+    serde_json::Number,
+);
 
 impl Default for RootPitch {
     fn default() -> Self {
@@ -453,11 +502,16 @@ impl Default for RootPitch {
 
 /// The projection configuration
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct RootProjection(Projection);
 
 /// Default roll, in degrees. The roll angle is measured counterclockwise about the camera boresight. The style roll will be used only if the map has not been positioned by other means (e.g. map options or user interaction).
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-pub struct RootRoll(serde_json::Number);
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+pub struct RootRoll(
+    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
+    serde_json::Number,
+);
 
 impl Default for RootRoll {
     fn default() -> Self {
@@ -470,17 +524,23 @@ impl Default for RootRoll {
 
 /// The map's sky configuration. **Note:** this definition is still experimental and is under development in maplibre-gl-js.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct RootSky(Sky);
 
 /// Sources state which data the map should display. Specify the type of source with the `type` property. Adding a source isn't enough to make data appear on the map because sources don't contain styling details like color or width. Layers refer to a source and give it a visual representation. This makes it possible to style the same source in different ways, like differentiating between types of roads in a highways layer.
 ///
 /// Tiled sources (vector and raster) must specify their details according to the [TileJSON specification](https://github.com/mapbox/tilejson-spec).
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct RootSources(std::collections::BTreeMap<std::string::String, Source>);
 
 /// An object used to define default values when using the [`global-state`](https://maplibre.org/maplibre-style-spec/expressions/#global-state) expression.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-pub struct RootState(serde_json::Value);
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+pub struct RootState(
+    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
+    serde_json::Value,
+);
 
 impl Default for RootState {
     fn default() -> Self {
@@ -490,10 +550,12 @@ impl Default for RootState {
 
 /// The terrain configuration.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct RootTerrain(Terrain);
 
 /// A global transition definition to use as a default across properties, to be used for timing transitions between one value and the next when no property-specific transition is set. Collision-based symbol fading is controlled independently of the style's `transition` property.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct RootTransition(Transition);
 
 /// Style specification version number. Must be 8.
@@ -501,20 +563,27 @@ pub struct RootTransition(Transition);
     serde_repr::Serialize_repr, serde_repr::Deserialize_repr, PartialEq, Eq, Debug, Clone, Copy,
 )]
 #[repr(u8)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum RootVersion {
     Eight = 8,
 }
 
 /// Default zoom level.  The style zoom will be used only if the map has not been positioned by other means (e.g. map options or user interaction).
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-pub struct RootZoom(serde_json::Number);
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+pub struct RootZoom(
+    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
+    serde_json::Number,
+);
 
 /// A filter selects specific features from a layer.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone, Copy)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct Filter(bool);
 
 /// The filter operator.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum FilterOperator {
     /// `["!=", key, value]` inequality: `feature[key] ≠ value`
     #[serde(rename = "!=")]
@@ -558,6 +627,7 @@ pub enum FilterOperator {
 }
 
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct Function {
     /// The exponential base of the interpolation curve. It controls the rate at which the result increases. Higher values make the result increase more towards the high end of the range. With `1` the stops are interpolated linearly.
     ///
@@ -593,7 +663,11 @@ pub struct Function {
 ///
 /// Range: 0..
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-pub struct FunctionBase(serde_json::Number);
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+pub struct FunctionBase(
+    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
+    serde_json::Number,
+);
 
 impl Default for FunctionBase {
     fn default() -> Self {
@@ -606,6 +680,7 @@ impl Default for FunctionBase {
 
 /// The color space in which colors interpolated. Interpolating colors in perceptual color spaces like LAB and HCL tend to produce color ramps that look more consistent and produce colors that can be differentiated more easily than those interpolated in RGB space.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum FunctionColorSpace {
     /// Use the HCL color space to interpolate color values, interpolating the Hue, Chroma, and Luminance channels individually.
     #[serde(rename = "hcl")]
@@ -636,14 +711,20 @@ impl Default for FunctionColorSpace {
 ///
 /// If no default is provided, the style property's default is used in these circumstances.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-pub struct FunctionDefault(serde_json::Value);
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+pub struct FunctionDefault(
+    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
+    serde_json::Value,
+);
 
 /// An expression.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct FunctionExpression(Any);
 
 /// The name of a feature property to use as the function input.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct FunctionProperty(std::string::String);
 
 impl Default for FunctionProperty {
@@ -654,10 +735,12 @@ impl Default for FunctionProperty {
 
 /// An array of stops.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct FunctionStops(Vec<FunctionStop>);
 
 /// The interpolation strategy to use in function evaluation.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum FunctionType {
     /// Return the output value of the stop equal to the function input.
     #[serde(rename = "categorical")]
@@ -682,19 +765,28 @@ impl Default for FunctionType {
 /// FunctionStopValue Values
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
 #[serde(untagged)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum FunctionStopValue {
-    Zero(serde_json::Number),
-    One(color::DynamicColor),
+    Zero(
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
+        serde_json::Number,
+    ),
+    One(
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_dynamic_color))]
+         color::DynamicColor,
+    ),
 }
 
 /// Zoom level and value pair.
 ///
 /// Range: 0..=24
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct FunctionStop(Box<[FunctionStopValue; 2]>);
 
 /// The geometry type for the filter to select.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum GeometryType {
     /// Filter to line geometries.
     LineString,
@@ -708,20 +800,29 @@ pub enum GeometryType {
 ///
 /// Range: 1..
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct Interpolation(InterpolationName);
 
 /// First element in an interpolation array. May be followed by a number of arguments.
 #[derive(serde::Serialize, PartialEq, Debug, Clone)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum InterpolationName {
     /// Interpolates using the cubic bézier curve defined by the given control points.
     CubicBezier(
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
         serde_json::Value,
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
         serde_json::Value,
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
         serde_json::Value,
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
         serde_json::Value,
     ),
     /// Interpolates exponentially between the stops just less than and just greater than the input.
-    Exponential(serde_json::Value),
+    Exponential(
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
+        serde_json::Value,
+    ),
     /// Interpolates linearly between the pair of stops just less than and just greater than the input
     Linear,
 }
@@ -783,6 +884,7 @@ impl<'de> serde::de::Visitor<'de> for InterpolationNameVisitor {
 }
 
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct Light {
     /// Whether extruded geometries are lit relative to the map or viewport.
     pub anchor: Option<LightAnchor>,
@@ -798,6 +900,7 @@ pub struct Light {
 
 /// Whether extruded geometries are lit relative to the map or viewport.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum LightAnchor {
     /// The position of the light source is aligned to the rotation of the map.
     #[serde(rename = "map")]
@@ -815,7 +918,11 @@ impl Default for LightAnchor {
 
 /// Color tint for lighting extruded geometries.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-pub struct LightColor(color::DynamicColor);
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+pub struct LightColor(
+    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_dynamic_color))]
+    color::DynamicColor,
+);
 
 impl Default for LightColor {
     fn default() -> Self {
@@ -827,7 +934,11 @@ impl Default for LightColor {
 ///
 /// Range: 0..=1
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-pub struct LightIntensity(serde_json::Number);
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+pub struct LightIntensity(
+    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
+    serde_json::Number,
+);
 
 impl Default for LightIntensity {
     fn default() -> Self {
@@ -840,7 +951,11 @@ impl Default for LightIntensity {
 
 /// Position of the light source relative to lit (extruded) geometries, in [r radial coordinate, a azimuthal angle, p polar angle] where r indicates the distance from the center of the base of an object to its light, a indicates the position of the light relative to 0° (0° when `light.anchor` is set to `viewport` corresponds to the top of the viewport, or 0° when `light.anchor` is set to `map` corresponds to due north, and degrees proceed clockwise), and p indicates the height of the light (from 0°, directly above, to 180°, directly below).
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-pub struct LightPosition(Box<[serde_json::Number; 3]>);
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+pub struct LightPosition(
+    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_box_3_json_number))]
+     Box<[serde_json::Number; 3]>,
+);
 
 impl Default for LightPosition {
     fn default() -> Self {
@@ -856,6 +971,7 @@ impl Default for LightPosition {
 }
 
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct Projection {
     /// The projection definition type. Can be specified as a string, a transition state, or an expression.
     #[serde(rename = "type")]
@@ -864,6 +980,7 @@ pub struct Projection {
 
 /// The projection definition type. Can be specified as a string, a transition state, or an expression.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct ProjectionType(std::string::String);
 
 impl Default for ProjectionType {
@@ -873,6 +990,7 @@ impl Default for ProjectionType {
 }
 
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct PromoteId {
     /// A name of a feature property to use as ID for feature state.
     #[serde(flatten)]
@@ -881,12 +999,15 @@ pub struct PromoteId {
 
 /// A name of a feature property to use as ID for feature state.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct PromoteIdStar(std::string::String);
 
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct PropertyType;
 
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct Sky {
     /// How to blend the atmosphere. Where 1 is visible atmosphere and 0 is hidden. It is best to interpolate this expression when using globe projection.
     ///
@@ -923,7 +1044,11 @@ pub struct Sky {
 ///
 /// Range: 0..=1
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-pub struct SkyAtmosphereBlend(serde_json::Number);
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+pub struct SkyAtmosphereBlend(
+    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
+    serde_json::Number,
+);
 
 impl Default for SkyAtmosphereBlend {
     fn default() -> Self {
@@ -936,7 +1061,11 @@ impl Default for SkyAtmosphereBlend {
 
 /// The base color for the fog. Requires 3D terrain.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-pub struct SkyFogColor(color::DynamicColor);
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+pub struct SkyFogColor(
+    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_dynamic_color))]
+    color::DynamicColor,
+);
 
 impl Default for SkyFogColor {
     fn default() -> Self {
@@ -948,7 +1077,11 @@ impl Default for SkyFogColor {
 ///
 /// Range: 0..=1
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-pub struct SkyFogGroundBlend(serde_json::Number);
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+pub struct SkyFogGroundBlend(
+    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
+    serde_json::Number,
+);
 
 impl Default for SkyFogGroundBlend {
     fn default() -> Self {
@@ -961,7 +1094,11 @@ impl Default for SkyFogGroundBlend {
 
 /// The base color at the horizon.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-pub struct SkyHorizonColor(color::DynamicColor);
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+pub struct SkyHorizonColor(
+    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_dynamic_color))]
+    color::DynamicColor,
+);
 
 impl Default for SkyHorizonColor {
     fn default() -> Self {
@@ -973,7 +1110,11 @@ impl Default for SkyHorizonColor {
 ///
 /// Range: 0..=1
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-pub struct SkyHorizonFogBlend(serde_json::Number);
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+pub struct SkyHorizonFogBlend(
+    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
+    serde_json::Number,
+);
 
 impl Default for SkyHorizonFogBlend {
     fn default() -> Self {
@@ -986,7 +1127,11 @@ impl Default for SkyHorizonFogBlend {
 
 /// The base color for the sky.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-pub struct SkySkyColor(color::DynamicColor);
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+pub struct SkySkyColor(
+    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_dynamic_color))]
+    color::DynamicColor,
+);
 
 impl Default for SkySkyColor {
     fn default() -> Self {
@@ -998,7 +1143,11 @@ impl Default for SkySkyColor {
 ///
 /// Range: 0..=1
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-pub struct SkySkyHorizonBlend(serde_json::Number);
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+pub struct SkySkyHorizonBlend(
+    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
+    serde_json::Number,
+);
 
 impl Default for SkySkyHorizonBlend {
     fn default() -> Self {
@@ -1010,6 +1159,7 @@ impl Default for SkySkyHorizonBlend {
 }
 
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct Terrain {
     /// The exaggeration of the terrain - how high it will look.
     ///
@@ -1023,7 +1173,11 @@ pub struct Terrain {
 ///
 /// Range: 0..
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-pub struct TerrainExaggeration(serde_json::Number);
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+pub struct TerrainExaggeration(
+    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
+    serde_json::Number,
+);
 
 impl Default for TerrainExaggeration {
     fn default() -> Self {
@@ -1036,9 +1190,11 @@ impl Default for TerrainExaggeration {
 
 /// The source for the terrain data.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct TerrainSource(std::string::String);
 
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct Transition {
     /// Length of time before a transition begins.
     ///
@@ -1054,7 +1210,11 @@ pub struct Transition {
 ///
 /// Range: 0..
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-pub struct TransitionDelay(serde_json::Number);
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+pub struct TransitionDelay(
+    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
+    serde_json::Number,
+);
 
 impl Default for TransitionDelay {
     fn default() -> Self {
@@ -1069,7 +1229,11 @@ impl Default for TransitionDelay {
 ///
 /// Range: 0..
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-pub struct TransitionDuration(serde_json::Number);
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+pub struct TransitionDuration(
+    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
+    serde_json::Number,
+);
 
 impl Default for TransitionDuration {
     fn default() -> Self {
@@ -1082,6 +1246,7 @@ impl Default for TransitionDuration {
 
 /// Either of the below variants
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum StringOrNumberAsUnion {
     String(String),
     Number(Number),
@@ -1090,6 +1255,7 @@ pub enum StringOrNumberAsUnion {
 /// Either of the below variants
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
 #[serde(untagged)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum StringLiteralOrNumberLiteralOrArrayOfStringLiteralOrArrayOfNumberLiteralAsUnion {
     StringLiteral(StringLiteral),
     NumberLiteral(NumberLiteral),
@@ -1099,11 +1265,17 @@ pub enum StringLiteralOrNumberLiteralOrArrayOfStringLiteralOrArrayOfNumberLitera
 
 /// "Any"
 #[derive(serde::Serialize, PartialEq, Debug, Clone)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum Any {
     /// Gets the value of a cluster property accumulated so far. Can only be used in the `clusterProperties` option of a clustered GeoJSON source.
     Accumulated,
     /// Retrieves an item from an array.
-    At(serde_json::Value, serde_json::Value),
+    At(
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
+        serde_json::Value,
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
+        serde_json::Value,
+    ),
     /// Selects the first output whose corresponding test condition evaluates to true, or the fallback value otherwise.
     ///
     ///  - [Create a hover effect](https://maplibre.org/maplibre-gl-js/docs/examples/create-a-hover-effect/)
@@ -1117,7 +1289,10 @@ pub enum Any {
     /// Retrieves a property value from the current feature's state. Returns null if the requested property is not present on the feature's state. A feature's state is not part of the GeoJSON or vector tile data, and must be set programmatically on each feature. When `source.promoteId` is not provided, features are identified by their `id` attribute, which must be an integer or a string that can be cast to an integer. When `source.promoteId` is provided, features are identified by their `promoteId` property, which may be a number, string, or any primitive data type. Note that ["feature-state"] can only be used with paint properties that support data-driven styling.
     ///
     ///  - [Create a hover effect](https://maplibre.org/maplibre-gl-js/docs/examples/create-a-hover-effect/)
-    FeatureState(serde_json::Value),
+    FeatureState(
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
+        serde_json::Value,
+    ),
     /// Retrieves a property value from the current feature's properties, or from another object if a second argument is provided. Returns null if the requested property is missing.
     ///
     ///  - [Change the case of labels](https://maplibre.org/maplibre-gl-js/docs/examples/change-case-of-labels/)
@@ -1125,9 +1300,17 @@ pub enum Any {
     ///  - [Display HTML clusters with custom properties](https://maplibre.org/maplibre-gl-js/docs/examples/display-html-clusters-with-custom-properties/)
     ///
     ///  - [Extrude polygons for 3D indoor mapping](https://maplibre.org/maplibre-gl-js/docs/examples/extrude-polygons-for-3d-indoor-mapping/)
-    Get(serde_json::Value, Option<serde_json::Value>),
+    Get(
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
+        serde_json::Value,
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_option_json_value))]
+         Option<serde_json::Value>,
+    ),
     /// Retrieves a property value from global state that can be set with platform-specific APIs. Defaults can be provided using the [`state`](https://maplibre.org/maplibre-style-spec/root/#state) root property. Returns `null` if no value nor default value is set for the retrieved property.
-    GlobalState(serde_json::Value),
+    GlobalState(
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
+        serde_json::Value,
+    ),
     /// Gets the feature's id, if it has one.
     Id,
     /// Binds expressions to named variables, which can then be referenced in the result expression using `["var", "variable_name"]`.
@@ -1157,7 +1340,10 @@ pub enum Any {
     /// References variable bound using `let`.
     ///
     ///  - [Visualize population density](https://maplibre.org/maplibre-gl-js/docs/examples/visualize-population-density/)
-    Var(serde_json::Value),
+    Var(
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
+        serde_json::Value,
+    ),
 }
 
 impl<'de> serde::Deserialize<'de> for Any {
@@ -1328,21 +1514,34 @@ impl<'de> serde::de::Visitor<'de> for AnyVisitor {
 
 /// "Array"
 #[derive(serde::Serialize, PartialEq, Debug, Clone)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum Array {
     /// Asserts that the input is an array (optionally with a specific item type and length). If, when the input expression is evaluated, it is not of the asserted type or length, then this assertion will cause the whole expression to be aborted.
-    Array(serde_json::Value),
+    Array(
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
+        serde_json::Value,
+    ),
     /// Provides a literal array or object value.
     ///
     ///  - [Display and style rich text labels](https://maplibre.org/maplibre-gl-js/docs/examples/display-and-style-rich-text-labels/)
-    Literal(serde_json::Value),
+    Literal(
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
+        serde_json::Value,
+    ),
     /// Returns a subarray from an array or a substring from a string from a specified start index, or between a start index and an end index if set. The return value is inclusive of the start index but not of the end index. In a string, a UTF-16 surrogate pair counts as a single position.
     Slice(
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
         serde_json::Value,
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
         serde_json::Value,
-        Option<serde_json::Value>,
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_option_json_value))]
+         Option<serde_json::Value>,
     ),
     /// Returns a four-element array containing the input color's red, green, blue, and alpha components, in that order.
-    ToRgba(serde_json::Value),
+    ToRgba(
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
+        serde_json::Value,
+    ),
 }
 
 impl<'de> serde::Deserialize<'de> for Array {
@@ -1409,6 +1608,7 @@ impl<'de> serde::de::Visitor<'de> for ArrayVisitor {
 
 /// Either of the below variants
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum StringOrNumberOrBooleanAsUnion {
     String(String),
     Number(Number),
@@ -1417,9 +1617,17 @@ pub enum StringOrNumberOrBooleanAsUnion {
 
 /// "ArrayLessTypeLengthGreater"
 #[derive(serde::Serialize, PartialEq, Debug, Clone)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum ArrayLessTypeLengthGreater {
     /// Asserts that the input is an array (optionally with a specific item type and length). If, when the input expression is evaluated, it is not of the asserted type or length, then this assertion will cause the whole expression to be aborted.
-    Array(serde_json::Value, serde_json::Value, serde_json::Value),
+    Array(
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
+        serde_json::Value,
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
+        serde_json::Value,
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
+        serde_json::Value,
+    ),
 }
 
 impl<'de> serde::Deserialize<'de> for ArrayLessTypeLengthGreater {
@@ -1471,9 +1679,15 @@ impl<'de> serde::de::Visitor<'de> for ArrayLessTypeLengthGreaterVisitor {
 
 /// "ArrayOfType"
 #[derive(serde::Serialize, PartialEq, Debug, Clone)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum ArrayOfType {
     /// Asserts that the input is an array (optionally with a specific item type and length). If, when the input expression is evaluated, it is not of the asserted type or length, then this assertion will cause the whole expression to be aborted.
-    Array(serde_json::Value, serde_json::Value),
+    Array(
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
+        serde_json::Value,
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
+        serde_json::Value,
+    ),
 }
 
 impl<'de> serde::Deserialize<'de> for ArrayOfType {
@@ -1524,18 +1738,25 @@ impl<'de> serde::de::Visitor<'de> for ArrayOfTypeVisitor {
 
 /// "Boolean"
 #[derive(serde::Serialize, PartialEq, Debug, Clone)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum Boolean {
     /// Logical negation. Returns `true` if the input is `false`, and `false` if the input is `true`.
     ///
     ///  - [Create and style clusters](https://maplibre.org/maplibre-gl-js/docs/examples/create-and-style-clusters/)
-    Not(serde_json::Value),
+    Not(
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
+        serde_json::Value,
+    ),
     /// Returns `true` if the input values are not equal, `false` otherwise. The comparison is strictly typed: values of different runtime types are always considered unequal. Cases where the types are known to be different at parse time are considered invalid and will produce a parse error. Accepts an optional `collator` argument to control locale-dependent string comparisons.
     ///
     ///  - [Display HTML clusters with custom properties](https://maplibre.org/maplibre-gl-js/docs/examples/display-html-clusters-with-custom-properties/)
     NotEqual(
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
         serde_json::Value,
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
         serde_json::Value,
-        Option<serde_json::Value>,
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_option_json_value))]
+         Option<serde_json::Value>,
     ),
     /// Returns `true` if the first input is strictly less than the second, `false` otherwise. The arguments are required to be either both strings or both numbers; if during evaluation they are not, expression evaluation produces an error. Cases where this constraint is known not to hold at parse time are considered in valid and will produce a parse error. Accepts an optional `collator` argument to control locale-dependent string comparisons.
     ///
@@ -1553,9 +1774,12 @@ pub enum Boolean {
     ///
     ///  - [Filter symbols by toggling a list](https://maplibre.org/maplibre-gl-js/docs/examples/filter-symbols-by-toggling-a-list/)
     EqualEqual(
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
         serde_json::Value,
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
         serde_json::Value,
-        Option<serde_json::Value>,
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_option_json_value))]
+         Option<serde_json::Value>,
     ),
     /// Returns `true` if the first input is strictly greater than the second, `false` otherwise. The arguments are required to be either both strings or both numbers; if during evaluation they are not, expression evaluation produces an error. Cases where this constraint is known not to hold at parse time are considered in valid and will produce a parse error. Accepts an optional `collator` argument to control locale-dependent string comparisons.
     Greater(GreaterOptions),
@@ -1576,61 +1800,80 @@ pub enum Boolean {
     /// Tests for the presence of a property value in the current feature's properties, or from another object if a second argument is provided.
     ///
     ///  - [Create and style clusters](https://maplibre.org/maplibre-gl-js/docs/examples/create-and-style-clusters/)
-    Has(serde_json::Value, Option<serde_json::Value>),
+    Has(
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
+        serde_json::Value,
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_option_json_value))]
+         Option<serde_json::Value>,
+    ),
     /// Determines whether an item exists in an array or a substring exists in a string.
     ///
     ///  - [Measure distances](https://maplibre.org/maplibre-gl-js/docs/examples/measure-distances/)
     In(InOptions),
     /// Returns `true` if the input string is expected to render legibly. Returns `false` if the input string contains sections that cannot be rendered without potential loss of meaning (e.g. Indic scripts that require complex text shaping, or right-to-left scripts if the `mapbox-gl-rtl-text` plugin is not in use in MapLibre GL JS).
-    IsSupportedScript(serde_json::Value),
+    IsSupportedScript(
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
+        serde_json::Value,
+    ),
     /// Converts the input value to a boolean. The result is `false` when the input is an empty string, 0, `false`, `null`, or `NaN`; otherwise it is `true`.
-    ToBoolean(serde_json::Value),
+    ToBoolean(
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
+        serde_json::Value,
+    ),
     /// Returns `true` if the evaluated feature is fully contained inside a boundary of the input geometry, `false` otherwise. The input value can be a valid GeoJSON of type `Polygon`, `MultiPolygon`, `Feature`, or `FeatureCollection`. Supported features for evaluation:
     ///
     /// - `Point`: Returns `false` if a point is on the boundary or falls outside the boundary.
     ///
     /// - `LineString`: Returns `false` if any part of a line falls outside the boundary, the line intersects the boundary, or a line's endpoint is on the boundary.
-    Within(serde_json::Value),
+    Within(
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
+        serde_json::Value,
+    ),
 }
 
 /// Options for deserializing the syntax enum variant [`Boolean::Less`]
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
 #[serde(untagged)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum LessOptions {
-    Number(String, String, Option<Collator>),
-    String(Number, Number, Option<Collator>),
+    Number(String),
+    String(Number),
 }
 
 /// Options for deserializing the syntax enum variant [`Boolean::LessEqual`]
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
 #[serde(untagged)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum LessEqualOptions {
-    Number(String, String, Option<Collator>),
-    String(Number, Number, Option<Collator>),
+    Number(String),
+    String(Number),
 }
 
 /// Options for deserializing the syntax enum variant [`Boolean::Greater`]
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
 #[serde(untagged)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum GreaterOptions {
-    Number(String, String, Option<Collator>),
-    String(Number, Number, Option<Collator>),
+    Number(String),
+    String(Number),
 }
 
 /// Options for deserializing the syntax enum variant [`Boolean::GreaterEqual`]
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
 #[serde(untagged)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum GreaterEqualOptions {
-    Number(String, String, Option<Collator>),
-    String(Number, Number, Option<Collator>),
+    Number(String),
+    String(Number),
 }
 
 /// Options for deserializing the syntax enum variant [`Boolean::In`]
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
 #[serde(untagged)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum InOptions {
-    Item(Any, Array),
-    Substring(String, String),
+    Item(Any),
+    Substring(String),
 }
 
 impl<'de> serde::Deserialize<'de> for Boolean {
@@ -1800,9 +2043,13 @@ impl<'de> serde::de::Visitor<'de> for BooleanVisitor {
 
 /// "Collator"
 #[derive(serde::Serialize, PartialEq, Debug, Clone)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum Collator {
     /// Returns a `collator` for use in locale-dependent comparison operations. Use `resolved-locale` to test the results of locale fallback behavior.
-    Collator(serde_json::Value),
+    Collator(
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
+        serde_json::Value,
+    ),
 }
 
 impl<'de> serde::Deserialize<'de> for Collator {
@@ -1852,14 +2099,26 @@ impl<'de> serde::de::Visitor<'de> for CollatorVisitor {
 
 /// "Color"
 #[derive(serde::Serialize, PartialEq, Debug, Clone)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum Color {
     /// Creates a color value from red, green, and blue components, which must range between 0 and 255, and an alpha component of 1. If any component is out of range, the expression is an error.
-    Rgb(serde_json::Value, serde_json::Value, serde_json::Value),
+    Rgb(
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
+        serde_json::Value,
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
+        serde_json::Value,
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
+        serde_json::Value,
+    ),
     /// Creates a color value from red, green, blue components, which must range between 0 and 255, and an alpha component which must range between zero and one. If any component is out of range, the expression is an error.
     Rgba(
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
         serde_json::Value,
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
         serde_json::Value,
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
         serde_json::Value,
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
         serde_json::Value,
     ),
     /// Converts the input value to a color. If multiple values are provided, each one is evaluated in order until the first successful conversion is obtained. If none of the inputs can be converted, the expression is an error.
@@ -1939,6 +2198,7 @@ impl<'de> serde::de::Visitor<'de> for ColorVisitor {
 
 /// Either of the below variants
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum ColorOrArrayOfColorAsUnion {
     Color(Color),
     ArrayOfColor(ColorOrArrayOfColor),
@@ -1946,6 +2206,7 @@ pub enum ColorOrArrayOfColorAsUnion {
 
 /// "ColorOrArrayOfColor"
 #[derive(serde::Serialize, PartialEq, Debug, Clone)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum ColorOrArrayOfColor {
     /// Produces continuous, smooth results by interpolating between pairs of input and output values ("stops"). Works like `interpolate`, but the output type must be `color` or `array<color>`, and the interpolation is performed in the Hue-Chroma-Luminance color space.
     InterpolateHcl(
@@ -2070,26 +2331,32 @@ impl<'de> serde::de::Visitor<'de> for ColorOrArrayOfColorVisitor {
 /// Either of the below variants
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
 #[serde(untagged)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum StringLiteralOrStringOrImageAsUnion {
     StringLiteral(StringLiteral),
     String(String),
     Image(Image),
 }
 
+/// Tuple row for variadic (content, optional style object) pairs.
+#[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+pub struct FormattedFormatVariadicRow(
+    StringLiteralOrStringOrImageAsUnion,
+    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_option_json_map))]
+    Option<serde_json::Map<std::string::String, serde_json::Value>>,
+);
+
 /// "Formatted"
 #[derive(serde::Serialize, PartialEq, Debug, Clone)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum Formatted {
     /// Returns a `formatted` string for displaying mixed-format text in the `text-field` property. The input may contain a string literal or expression, including an [`'image'`](#image) expression. Strings may be followed by a style override object.
     ///
     ///  - [Change the case of labels](https://maplibre.org/maplibre-gl-js/docs/examples/change-case-of-labels/)
     ///
     ///  - [Display and style rich text labels](https://maplibre.org/maplibre-gl-js/docs/examples/display-and-style-rich-text-labels/)
-    Format(
-        Vec<(
-            StringLiteralOrStringOrImageAsUnion,
-            Option<serde_json::Map<std::string::String, serde_json::Value>>,
-        )>,
-    ),
+    Format(Vec<FormattedFormatVariadicRow>),
 }
 
 impl<'de> serde::Deserialize<'de> for Formatted {
@@ -2132,7 +2399,7 @@ impl<'de> serde::de::Visitor<'de> for FormattedVisitor {
                 let mut inputs = Vec::new();
                 while let Some(input_i) = seq.next_element()? {
                     let style_overrides_i = seq.next_element()?; // optional param
-                    let element = (input_i, style_overrides_i);
+                    let element = FormattedFormatVariadicRow(input_i, style_overrides_i);
                     inputs.push(element);
                 }
                 if inputs.is_empty() {
@@ -2149,11 +2416,15 @@ impl<'de> serde::de::Visitor<'de> for FormattedVisitor {
 
 /// "Image"
 #[derive(serde::Serialize, PartialEq, Debug, Clone)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum Image {
     /// Returns an `image` type for use in `icon-image`, `*-pattern` entries and as a section in the `format` expression. If set, the `image` argument will check that the requested image exists in the style and will return either the resolved image name or `null`, depending on whether or not the image is currently in the style. This validation process is synchronous and requires the image to have been added to the style before requesting it in the `image` argument.
     ///
     ///  - [Use a fallback image](https://maplibre.org/maplibre-gl-js/docs/examples/use-a-fallback-image/)
-    Image(serde_json::Value),
+    Image(
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
+        serde_json::Value,
+    ),
 }
 
 impl<'de> serde::Deserialize<'de> for Image {
@@ -2203,6 +2474,7 @@ impl<'de> serde::de::Visitor<'de> for ImageVisitor {
 
 /// Either of the below variants
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum ArrayOrStringAsUnion {
     Array(Array),
     String(String),
@@ -2210,9 +2482,15 @@ pub enum ArrayOrStringAsUnion {
 
 /// "Number"
 #[derive(serde::Serialize, PartialEq, Debug, Clone)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum Number {
     /// Returns the remainder after integer division of the first input by the second.
-    Percentage(serde_json::Value, serde_json::Value),
+    Percentage(
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
+        serde_json::Value,
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
+        serde_json::Value,
+    ),
     /// Returns the product of the inputs.
     Star(Vec<Box<Number>>),
     /// Returns the sum of the inputs.
@@ -2222,45 +2500,91 @@ pub enum Number {
     /// Returns the result of floating point division of the first input by the second.
     ///
     ///  - [Visualize population density](https://maplibre.org/maplibre-gl-js/docs/examples/visualize-population-density/)
-    Slash(serde_json::Value, serde_json::Value),
+    Slash(
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
+        serde_json::Value,
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
+        serde_json::Value,
+    ),
     /// Returns the result of raising the first input to the power specified by the second.
-    Power(serde_json::Value, serde_json::Value),
+    Power(
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
+        serde_json::Value,
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
+        serde_json::Value,
+    ),
     /// Returns the absolute value of the input.
-    Absolute(serde_json::Value),
+    Absolute(
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
+        serde_json::Value,
+    ),
     /// Returns the arccosine of the input.
-    Arccosine(serde_json::Value),
+    Arccosine(
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
+        serde_json::Value,
+    ),
     /// Returns the arcsine of the input.
-    Asin(serde_json::Value),
+    Asin(
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
+        serde_json::Value,
+    ),
     /// Returns the arctangent of the input.
-    Atan(serde_json::Value),
+    Atan(
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
+        serde_json::Value,
+    ),
     /// Returns the smallest integer that is greater than or equal to the input.
-    Ceil(serde_json::Value),
+    Ceil(
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
+        serde_json::Value,
+    ),
     /// Returns the cosine of the input.
-    Cos(serde_json::Value),
+    Cos(
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
+        serde_json::Value,
+    ),
     /// Returns the shortest distance in meters between the evaluated feature and the input geometry. The input value can be a valid GeoJSON of type `Point`, `MultiPoint`, `LineString`, `MultiLineString`, `Polygon`, `MultiPolygon`, `Feature`, or `FeatureCollection`. Distance values returned may vary in precision due to loss in precision from encoding geometries, particularly below zoom level 13.
-    Distance(serde_json::Value),
+    Distance(
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
+        serde_json::Value,
+    ),
     /// Returns the mathematical constant e.
     E,
     /// Gets the elevation of a pixel (in meters above the vertical datum reference of the `raster-dem` tiles) from a `raster-dem` source. Can only be used in the `color-relief-color` property of a `color-relief` layer.
     Elevation,
     /// Returns the largest integer that is less than or equal to the input.
-    Floor(serde_json::Value),
+    Floor(
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
+        serde_json::Value,
+    ),
     /// Gets the kernel density estimation of a pixel in a heatmap layer, which is a relative measure of how many data points are crowded around a particular pixel. Can only be used in the `heatmap-color` property.
     HeatmapDensity,
     /// Returns the first position at which an item can be found in an array or a substring can be found in a string, or `-1` if the input cannot be found. Accepts an optional index from where to begin the search. In a string, a UTF-16 surrogate pair counts as a single position.
     IndexOf(IndexOfOptions),
     /// Gets the length of an array or string. In a string, a UTF-16 surrogate pair counts as a single position.
-    Length(serde_json::Value),
+    Length(
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
+        serde_json::Value,
+    ),
     /// Gets the progress along a gradient line. Can only be used in the `line-gradient` property.
     LineProgress,
     /// Returns the natural logarithm of the input.
-    Ln(serde_json::Value),
+    Ln(
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
+        serde_json::Value,
+    ),
     /// Returns the mathematical constant ln(2).
     Ln2,
     /// Returns the base-ten logarithm of the input.
-    Log10(serde_json::Value),
+    Log10(
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
+        serde_json::Value,
+    ),
     /// Returns the base-two logarithm of the input.
-    Log2(serde_json::Value),
+    Log2(
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
+        serde_json::Value,
+    ),
     /// Returns the maximum value of the inputs.
     Max(Vec<Box<Number>>),
     /// Returns the minimum value of the inputs.
@@ -2270,13 +2594,25 @@ pub enum Number {
     /// Returns the mathematical constant pi.
     Pi,
     /// Rounds the input to the nearest integer. Halfway values are rounded away from zero. For example, `["round", -1.5]` evaluates to -2.
-    Round(serde_json::Value),
+    Round(
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
+        serde_json::Value,
+    ),
     /// Returns the sine of the input.
-    Sin(serde_json::Value),
+    Sin(
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
+        serde_json::Value,
+    ),
     /// Returns the square root of the input.
-    Sqrt(serde_json::Value),
+    Sqrt(
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
+        serde_json::Value,
+    ),
     /// Returns the tangent of the input.
-    Tan(serde_json::Value),
+    Tan(
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
+        serde_json::Value,
+    ),
     /// Converts the input value to a number, if possible. If the input is `null` or `false`, the result is 0. If the input is `true`, the result is 1. If the input is a string, it is converted to a number as specified by the ["ToNumber Applied to the String Type" algorithm](https://tc39.github.io/ecma262/#sec-tonumber-applied-to-the-string-type) of the ECMAScript Language Specification. If multiple values are provided, each one is evaluated in order until the first successful conversion is obtained. If none of the inputs can be converted, the expression is an error.
     ToNumber(Vec<Box<Any>>),
     /// Gets the current zoom level.  Note that in style layout and paint properties, ["zoom"] may only appear as the input to a top-level "step" or "interpolate" expression.
@@ -2286,17 +2622,19 @@ pub enum Number {
 /// Options for deserializing the syntax enum variant [`Number::Minus`]
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
 #[serde(untagged)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum MinusOptions {
-    TwoParams(Box<Number>, Box<Number>),
+    TwoParams(Box<Number>),
     OneParams(Box<Number>),
 }
 
 /// Options for deserializing the syntax enum variant [`Number::IndexOf`]
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
 #[serde(untagged)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum IndexOfOptions {
-    Item(Box<Any>, Array, Option<Box<Number>>),
-    Substring(String, String, Option<Box<Number>>),
+    Item(Box<Any>),
+    Substring(String),
 }
 
 impl<'de> serde::Deserialize<'de> for Number {
@@ -2552,9 +2890,13 @@ impl<'de> serde::de::Visitor<'de> for NumberVisitor {
 
 /// Either of the below variants
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjectionAsUnion {
     Number(Number),
-    ArrayOfNumber(serde_json::Value),
+    ArrayOfNumber(
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
+        serde_json::Value,
+    ),
     Color(Color),
     ArrayOfColor(ColorOrArrayOfColor),
     Projection(Projection),
@@ -2562,6 +2904,7 @@ pub enum NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjectionAsUnion {
 
 /// "NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection"
 #[derive(serde::Serialize, PartialEq, Debug, Clone)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection {
     /// Produces continuous, smooth results by interpolating between pairs of input and output values ("stops"). The `input` may be any numeric expression (e.g., `["get", "population"]`). Stop inputs must be numeric literals in strictly ascending order. The output type must be `number`, `array<number>`, `color`, `array<color>`, or `projection`.
     ///
@@ -2643,11 +2986,15 @@ impl<'de> serde::de::Visitor<'de>
 
 /// "Object"
 #[derive(serde::Serialize, PartialEq, Debug, Clone)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum Object {
     /// Provides a literal array or object value.
     ///
     ///  - [Display and style rich text labels](https://maplibre.org/maplibre-gl-js/docs/examples/display-and-style-rich-text-labels/)
-    Literal(serde_json::Value),
+    Literal(
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
+        serde_json::Value,
+    ),
     /// Asserts that the input value is an object. If multiple values are provided, each one is evaluated in order until an object is obtained. If none of the inputs are objects, the expression is an error.
     Object(Vec<Any>),
     /// Gets the feature properties object.  Note that in some cases, it may be more efficient to use ["get", "property_name"] directly.
@@ -2717,6 +3064,7 @@ impl<'de> serde::de::Visitor<'de> for ObjectVisitor {
 
 /// "String"
 #[derive(serde::Serialize, PartialEq, Debug, Clone)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum String {
     /// Returns a `string` consisting of the concatenation of the inputs. Each input is converted to a string as if by `to-string`.
     ///
@@ -2731,33 +3079,56 @@ pub enum String {
     /// Returns the input string converted to lowercase. Follows the Unicode Default Case Conversion algorithm and the locale-insensitive case mappings in the Unicode Character Database.
     ///
     ///  - [Change the case of labels](https://maplibre.org/maplibre-gl-js/docs/examples/change-case-of-labels/)
-    Downcase(serde_json::Value),
+    Downcase(
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
+        serde_json::Value,
+    ),
     /// Returns the feature's simple geometry type: `Point`, `LineString`, or `Polygon`. `MultiPoint`, `MultiLineString`, and `MultiPolygon` are returned as `Point`, `LineString`, and `Polygon`, respectively.
     GeometryType,
     /// Converts the input number into a string representation using the provided format_options.
     ///
     ///  - [Display HTML clusters with custom properties](https://maplibre.org/maplibre-gl-js/docs/examples/display-html-clusters-with-custom-properties/)
-    NumberFormat(serde_json::Value, serde_json::Value),
+    NumberFormat(
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
+        serde_json::Value,
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
+        serde_json::Value,
+    ),
     /// Returns the IETF language tag of the locale being used by the provided `collator`. This can be used to determine the default system locale, or to determine if a requested locale was successfully loaded.
-    ResolvedLocale(serde_json::Value),
+    ResolvedLocale(
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
+        serde_json::Value,
+    ),
     /// Returns a subarray from an array or a substring from a string from a specified start index, or between a start index and an end index if set. The return value is inclusive of the start index but not of the end index. In a string, a UTF-16 surrogate pair counts as a single position.
     Slice(
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
         serde_json::Value,
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
         serde_json::Value,
-        Option<serde_json::Value>,
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_option_json_value))]
+         Option<serde_json::Value>,
     ),
     /// Asserts that the input value is a string. If multiple values are provided, each one is evaluated in order until a string is obtained. If none of the inputs are strings, the expression is an error.
     String(Vec<Any>),
     /// Converts the input value to a string. If the input is `null`, the result is `""`. If the input is a boolean, the result is `"true"` or `"false"`. If the input is a number, it is converted to a string as specified by the ["NumberToString" algorithm](https://tc39.github.io/ecma262/#sec-tostring-applied-to-the-number-type) of the ECMAScript Language Specification. If the input is a color, it is converted to a string of the form `"rgba(r,g,b,a)"`, where `r`, `g`, and `b` are numerals ranging from 0 to 255, and `a` ranges from 0 to 1. Otherwise, the input is converted to a string in the format specified by the [`JSON.stringify`](https://tc39.github.io/ecma262/#sec-json.stringify) function of the ECMAScript Language Specification.
     ///
     ///  - [Create a time slider](https://maplibre.org/maplibre-gl-js/docs/examples/create-a-time-slider/)
-    ToString(serde_json::Value),
+    ToString(
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
+        serde_json::Value,
+    ),
     /// Returns a string describing the type of the given value.
-    Typeof(serde_json::Value),
+    Typeof(
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
+        serde_json::Value,
+    ),
     /// Returns the input string converted to uppercase. Follows the Unicode Default Case Conversion algorithm and the locale-insensitive case mappings in the Unicode Character Database.
     ///
     ///  - [Change the case of labels](https://maplibre.org/maplibre-gl-js/docs/examples/change-case-of-labels/)
-    Upcase(serde_json::Value),
+    Upcase(
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
+        serde_json::Value,
+    ),
 }
 
 impl<'de> serde::Deserialize<'de> for String {
@@ -2874,6 +3245,7 @@ impl<'de> serde::de::Visitor<'de> for StringVisitor {
 }
 
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct GeojsonSource {
     /// Contains an attribution to be displayed when the map is shown to a user.
     pub attribution: Option<GeojsonSourceAttribution>,
@@ -2932,13 +3304,18 @@ pub struct GeojsonSource {
 
 /// Contains an attribution to be displayed when the map is shown to a user.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct GeojsonSourceAttribution(std::string::String);
 
 /// Size of the tile buffer on each side. A value of 0 produces no buffer. A value of 512 produces a buffer as wide as the tile itself. Larger values produce fewer rendering artifacts near tile edges and slower performance.
 ///
 /// Range: 0..=512
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-pub struct GeojsonSourceBuffer(serde_json::Number);
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+pub struct GeojsonSourceBuffer(
+    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
+    serde_json::Number,
+);
 
 impl Default for GeojsonSourceBuffer {
     fn default() -> Self {
@@ -2959,6 +3336,7 @@ impl Default for GeojsonSourceBuffer {
 ///
 ///  * `point_count_abbreviated` An abbreviated point count
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone, Copy)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct GeojsonSourceCluster(bool);
 
 impl Default for GeojsonSourceCluster {
@@ -2969,11 +3347,19 @@ impl Default for GeojsonSourceCluster {
 
 /// Max zoom on which to cluster points if clustering is enabled. Defaults to one zoom less than maxzoom (so that last zoom features are not clustered). Clusters are re-evaluated at integer zoom levels so setting clusterMaxZoom to 14 means the clusters will be displayed until z15.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-pub struct GeojsonSourceClusterMaxZoom(serde_json::Number);
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+pub struct GeojsonSourceClusterMaxZoom(
+    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
+    serde_json::Number,
+);
 
 /// Minimum number of points necessary to form a cluster if clustering is enabled. Defaults to `2`.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-pub struct GeojsonSourceClusterMinPoints(serde_json::Number);
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+pub struct GeojsonSourceClusterMinPoints(
+    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
+    serde_json::Number,
+);
 
 /// An object defining custom properties on the generated clusters if clustering is enabled, aggregating values from clustered points. Has the form `{"property_name": [operator, map_expression]}`. `operator` is any expression function that accepts at least 2 operands (e.g. `"+"` or `"max"`) — it accumulates the property value from clusters/points the cluster contains; `map_expression` produces the value of a single point.
 ///
@@ -2983,13 +3369,21 @@ pub struct GeojsonSourceClusterMinPoints(serde_json::Number);
 ///
 /// `{"sum": [["+", ["accumulated"], ["get", "sum"]], ["get", "scalerank"]]}`
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-pub struct GeojsonSourceClusterProperties(serde_json::Value);
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+pub struct GeojsonSourceClusterProperties(
+    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
+    serde_json::Value,
+);
 
 /// Radius of each cluster if clustering is enabled. A value of 512 indicates a radius equal to the width of a tile.
 ///
 /// Range: 0..
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-pub struct GeojsonSourceClusterRadius(serde_json::Number);
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+pub struct GeojsonSourceClusterRadius(
+    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
+    serde_json::Number,
+);
 
 impl Default for GeojsonSourceClusterRadius {
     fn default() -> Self {
@@ -3002,14 +3396,20 @@ impl Default for GeojsonSourceClusterRadius {
 
 /// A URL to a GeoJSON file, or inline GeoJSON.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-pub struct GeojsonSourceData(serde_json::Value);
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+pub struct GeojsonSourceData(
+    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
+    serde_json::Value,
+);
 
 /// An expression for filtering features prior to processing them for rendering.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct GeojsonSourceFilter(Filter);
 
 /// Whether to generate ids for the geojson features. When enabled, the `feature.id` property will be auto assigned based on its index in the `features` array, over-writing any previous values.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone, Copy)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct GeojsonSourceGenerateId(bool);
 
 impl Default for GeojsonSourceGenerateId {
@@ -3020,6 +3420,7 @@ impl Default for GeojsonSourceGenerateId {
 
 /// Whether to calculate line distance metrics. This is required for line layers that specify `line-gradient` values.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone, Copy)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct GeojsonSourceLineMetrics(bool);
 
 impl Default for GeojsonSourceLineMetrics {
@@ -3030,7 +3431,11 @@ impl Default for GeojsonSourceLineMetrics {
 
 /// Maximum zoom level at which to create vector tiles (higher means greater detail at high zoom levels).
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-pub struct GeojsonSourceMaxzoom(serde_json::Number);
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+pub struct GeojsonSourceMaxzoom(
+    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
+    serde_json::Number,
+);
 
 impl Default for GeojsonSourceMaxzoom {
     fn default() -> Self {
@@ -3043,11 +3448,16 @@ impl Default for GeojsonSourceMaxzoom {
 
 /// A property to use as a feature id (for feature state). Either a property name, or an object of the form `{<sourceLayer>: <propertyName>}`.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct GeojsonSourcePromoteId(std::string::String);
 
 /// Douglas-Peucker simplification tolerance (higher means simpler geometries and faster performance).
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-pub struct GeojsonSourceTolerance(serde_json::Number);
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+pub struct GeojsonSourceTolerance(
+    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
+    serde_json::Number,
+);
 
 impl Default for GeojsonSourceTolerance {
     fn default() -> Self {
@@ -3059,6 +3469,7 @@ impl Default for GeojsonSourceTolerance {
 }
 
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct ImageSource {
     /// Corners of image specified in longitude, latitude pairs.
     pub coordinates: ImageSourceCoordinates,
@@ -3068,17 +3479,24 @@ pub struct ImageSource {
 
 /// A single longitude, latitude pair.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-pub struct ImageSourceCoordinatesValue(Box<[serde_json::Number; 2]>);
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+pub struct ImageSourceCoordinatesValue(
+    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_box_2_json_number))]
+     Box<[serde_json::Number; 2]>,
+);
 
 /// Corners of image specified in longitude, latitude pairs.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct ImageSourceCoordinates(Box<[ImageSourceCoordinatesValue; 4]>);
 
 /// URL that points to an image.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct ImageSourceUrl(std::string::String);
 
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct RasterSource {
     /// Contains an attribution to be displayed when the map is shown to a user.
     pub attribution: Option<RasterSourceAttribution>,
@@ -3103,11 +3521,16 @@ pub struct RasterSource {
 
 /// Contains an attribution to be displayed when the map is shown to a user.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct RasterSourceAttribution(std::string::String);
 
 /// An array containing the longitude and latitude of the southwest and northeast corners of the source's bounding box in the following order: `[sw.lng, sw.lat, ne.lng, ne.lat]`. When this property is included in a source, no tiles outside of the given bounds are requested by MapLibre.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-pub struct RasterSourceBounds(Box<[serde_json::Number; 4]>);
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+pub struct RasterSourceBounds(
+    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_box_4_json_number))]
+     Box<[serde_json::Number; 4]>,
+);
 
 impl Default for RasterSourceBounds {
     fn default() -> Self {
@@ -3126,7 +3549,11 @@ impl Default for RasterSourceBounds {
 
 /// Maximum zoom level for which tiles are available, as in the TileJSON spec. Data from tiles at the maxzoom are used when displaying the map at higher zoom levels.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-pub struct RasterSourceMaxzoom(serde_json::Number);
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+pub struct RasterSourceMaxzoom(
+    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
+    serde_json::Number,
+);
 
 impl Default for RasterSourceMaxzoom {
     fn default() -> Self {
@@ -3139,7 +3566,11 @@ impl Default for RasterSourceMaxzoom {
 
 /// Minimum zoom level for which tiles are available, as in the TileJSON spec.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-pub struct RasterSourceMinzoom(serde_json::Number);
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+pub struct RasterSourceMinzoom(
+    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
+    serde_json::Number,
+);
 
 impl Default for RasterSourceMinzoom {
     fn default() -> Self {
@@ -3152,6 +3583,7 @@ impl Default for RasterSourceMinzoom {
 
 /// Influences the y direction of the tile coordinates. The global-mercator (aka Spherical Mercator) profile is assumed.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum RasterSourceScheme {
     /// OSGeo spec scheme.
     #[serde(rename = "tms")]
@@ -3169,7 +3601,11 @@ impl Default for RasterSourceScheme {
 
 /// The minimum visual size to display tiles for this layer. Only configurable for raster layers.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-pub struct RasterSourceTileSize(serde_json::Number);
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+pub struct RasterSourceTileSize(
+    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
+    serde_json::Number,
+);
 
 impl Default for RasterSourceTileSize {
     fn default() -> Self {
@@ -3182,14 +3618,17 @@ impl Default for RasterSourceTileSize {
 
 /// An array of one or more tile source URLs, as in the TileJSON spec.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct RasterSourceTiles(Vec<std::string::String>);
 
 /// A URL to a TileJSON resource. Supported protocols are `http:` and `https:`.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct RasterSourceUrl(std::string::String);
 
 /// A setting to determine whether a source's tiles are cached locally.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone, Copy)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct RasterSourceVolatile(bool);
 
 impl Default for RasterSourceVolatile {
@@ -3199,6 +3638,7 @@ impl Default for RasterSourceVolatile {
 }
 
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct RasterDemSource {
     /// Contains an attribution to be displayed when the map is shown to a user.
     pub attribution: Option<RasterDemSourceAttribution>,
@@ -3235,11 +3675,16 @@ pub struct RasterDemSource {
 
 /// Contains an attribution to be displayed when the map is shown to a user.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct RasterDemSourceAttribution(std::string::String);
 
 /// Value that will be added to the encoding mix when decoding. Only used on custom encodings.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-pub struct RasterDemSourceBaseShift(serde_json::Number);
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+pub struct RasterDemSourceBaseShift(
+    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
+    serde_json::Number,
+);
 
 impl Default for RasterDemSourceBaseShift {
     fn default() -> Self {
@@ -3252,7 +3697,11 @@ impl Default for RasterDemSourceBaseShift {
 
 /// Value that will be multiplied by the blue channel value when decoding. Only used on custom encodings.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-pub struct RasterDemSourceBlueFactor(serde_json::Number);
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+pub struct RasterDemSourceBlueFactor(
+    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
+    serde_json::Number,
+);
 
 impl Default for RasterDemSourceBlueFactor {
     fn default() -> Self {
@@ -3265,7 +3714,11 @@ impl Default for RasterDemSourceBlueFactor {
 
 /// An array containing the longitude and latitude of the southwest and northeast corners of the source's bounding box in the following order: `[sw.lng, sw.lat, ne.lng, ne.lat]`. When this property is included in a source, no tiles outside of the given bounds are requested by MapLibre.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-pub struct RasterDemSourceBounds(Box<[serde_json::Number; 4]>);
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+pub struct RasterDemSourceBounds(
+    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_box_4_json_number))]
+     Box<[serde_json::Number; 4]>,
+);
 
 impl Default for RasterDemSourceBounds {
     fn default() -> Self {
@@ -3284,6 +3737,7 @@ impl Default for RasterDemSourceBounds {
 
 /// The encoding used by this source. Mapbox Terrain RGB is used by default.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum RasterDemSourceEncoding {
     /// Decodes tiles using the redFactor, blueFactor, greenFactor, baseShift parameters.
     #[serde(rename = "custom")]
@@ -3304,7 +3758,11 @@ impl Default for RasterDemSourceEncoding {
 
 /// Value that will be multiplied by the green channel value when decoding. Only used on custom encodings.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-pub struct RasterDemSourceGreenFactor(serde_json::Number);
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+pub struct RasterDemSourceGreenFactor(
+    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
+    serde_json::Number,
+);
 
 impl Default for RasterDemSourceGreenFactor {
     fn default() -> Self {
@@ -3317,7 +3775,11 @@ impl Default for RasterDemSourceGreenFactor {
 
 /// Maximum zoom level for which tiles are available, as in the TileJSON spec. Data from tiles at the maxzoom are used when displaying the map at higher zoom levels.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-pub struct RasterDemSourceMaxzoom(serde_json::Number);
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+pub struct RasterDemSourceMaxzoom(
+    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
+    serde_json::Number,
+);
 
 impl Default for RasterDemSourceMaxzoom {
     fn default() -> Self {
@@ -3330,7 +3792,11 @@ impl Default for RasterDemSourceMaxzoom {
 
 /// Minimum zoom level for which tiles are available, as in the TileJSON spec.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-pub struct RasterDemSourceMinzoom(serde_json::Number);
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+pub struct RasterDemSourceMinzoom(
+    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
+    serde_json::Number,
+);
 
 impl Default for RasterDemSourceMinzoom {
     fn default() -> Self {
@@ -3343,7 +3809,11 @@ impl Default for RasterDemSourceMinzoom {
 
 /// Value that will be multiplied by the red channel value when decoding. Only used on custom encodings.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-pub struct RasterDemSourceRedFactor(serde_json::Number);
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+pub struct RasterDemSourceRedFactor(
+    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
+    serde_json::Number,
+);
 
 impl Default for RasterDemSourceRedFactor {
     fn default() -> Self {
@@ -3356,7 +3826,11 @@ impl Default for RasterDemSourceRedFactor {
 
 /// The minimum visual size to display tiles for this layer. Only configurable for raster layers.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-pub struct RasterDemSourceTileSize(serde_json::Number);
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+pub struct RasterDemSourceTileSize(
+    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
+    serde_json::Number,
+);
 
 impl Default for RasterDemSourceTileSize {
     fn default() -> Self {
@@ -3369,14 +3843,17 @@ impl Default for RasterDemSourceTileSize {
 
 /// An array of one or more tile source URLs, as in the TileJSON spec.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct RasterDemSourceTiles(Vec<std::string::String>);
 
 /// A URL to a TileJSON resource. Supported protocols are `http:` and `https:`.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct RasterDemSourceUrl(std::string::String);
 
 /// A setting to determine whether a source's tiles are cached locally.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone, Copy)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct RasterDemSourceVolatile(bool);
 
 impl Default for RasterDemSourceVolatile {
@@ -3386,6 +3863,7 @@ impl Default for RasterDemSourceVolatile {
 }
 
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct VectorSource {
     /// Contains an attribution to be displayed when the map is shown to a user.
     pub attribution: Option<VectorSourceAttribution>,
@@ -3412,11 +3890,16 @@ pub struct VectorSource {
 
 /// Contains an attribution to be displayed when the map is shown to a user.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct VectorSourceAttribution(std::string::String);
 
 /// An array containing the longitude and latitude of the southwest and northeast corners of the source's bounding box in the following order: `[sw.lng, sw.lat, ne.lng, ne.lat]`. When this property is included in a source, no tiles outside of the given bounds are requested by MapLibre.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-pub struct VectorSourceBounds(Box<[serde_json::Number; 4]>);
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+pub struct VectorSourceBounds(
+    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_box_4_json_number))]
+     Box<[serde_json::Number; 4]>,
+);
 
 impl Default for VectorSourceBounds {
     fn default() -> Self {
@@ -3435,6 +3918,7 @@ impl Default for VectorSourceBounds {
 
 /// The encoding used by this source. Mapbox Vector Tiles encoding is used by default.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum VectorSourceEncoding {
     /// MapLibre Vector Tiles. See https://github.com/maplibre/maplibre-tile-spec for more info.
     #[serde(rename = "mlt")]
@@ -3452,7 +3936,11 @@ impl Default for VectorSourceEncoding {
 
 /// Maximum zoom level for which tiles are available, as in the TileJSON spec. Data from tiles at the maxzoom are used when displaying the map at higher zoom levels.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-pub struct VectorSourceMaxzoom(serde_json::Number);
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+pub struct VectorSourceMaxzoom(
+    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
+    serde_json::Number,
+);
 
 impl Default for VectorSourceMaxzoom {
     fn default() -> Self {
@@ -3465,7 +3953,11 @@ impl Default for VectorSourceMaxzoom {
 
 /// Minimum zoom level for which tiles are available, as in the TileJSON spec.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-pub struct VectorSourceMinzoom(serde_json::Number);
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+pub struct VectorSourceMinzoom(
+    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
+    serde_json::Number,
+);
 
 impl Default for VectorSourceMinzoom {
     fn default() -> Self {
@@ -3478,10 +3970,12 @@ impl Default for VectorSourceMinzoom {
 
 /// A property to use as a feature id (for feature state). Either a property name, or an object of the form `{<sourceLayer>: <propertyName>}`. If specified as a string for a vector tile source, the same property is used across all its source layers.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct VectorSourcePromoteId(std::string::String);
 
 /// Influences the y direction of the tile coordinates. The global-mercator (aka Spherical Mercator) profile is assumed.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum VectorSourceScheme {
     /// OSGeo spec scheme.
     #[serde(rename = "tms")]
@@ -3499,14 +3993,17 @@ impl Default for VectorSourceScheme {
 
 /// An array of one or more tile source URLs, as in the TileJSON spec.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct VectorSourceTiles(Vec<std::string::String>);
 
 /// A URL to a TileJSON resource. Supported protocols are `http:` and `https:`.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct VectorSourceUrl(std::string::String);
 
 /// A setting to determine whether a source's tiles are cached locally.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone, Copy)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct VectorSourceVolatile(bool);
 
 impl Default for VectorSourceVolatile {
@@ -3516,6 +4013,7 @@ impl Default for VectorSourceVolatile {
 }
 
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct VideoSource {
     /// Corners of video specified in longitude, latitude pairs.
     pub coordinates: VideoSourceCoordinates,
@@ -3525,17 +4023,24 @@ pub struct VideoSource {
 
 /// A single longitude, latitude pair.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-pub struct VideoSourceCoordinatesValue(Box<[serde_json::Number; 2]>);
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+pub struct VideoSourceCoordinatesValue(
+    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_box_2_json_number))]
+     Box<[serde_json::Number; 2]>,
+);
 
 /// Corners of video specified in longitude, latitude pairs.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct VideoSourceCoordinates(Box<[VideoSourceCoordinatesValue; 4]>);
 
 /// URLs to video content in order of preferred format.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct VideoSourceUrls(Vec<std::string::String>);
 
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 #[serde(tag = "type")]
 pub enum Source {
     #[serde(rename = "geojson")]
@@ -3553,6 +4058,7 @@ pub enum Source {
 }
 
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct Layer {
     /// A expression specifying conditions on source features. Only features that match the filter are displayed. Zoom expressions in filters are only evaluated at integer zoom levels. The `feature-state` expression is not supported in filter expressions.
     pub filter: Option<LayerFilter>,
@@ -3573,33 +4079,50 @@ pub struct Layer {
 
 /// A expression specifying conditions on source features. Only features that match the filter are displayed. Zoom expressions in filters are only evaluated at integer zoom levels. The `feature-state` expression is not supported in filter expressions.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct LayerFilter(std::string::String);
 
 /// Unique layer name.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct LayerId(std::string::String);
 
 /// The maximum zoom level for the layer. At zoom levels equal to or greater than the maxzoom, the layer will be hidden.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-pub struct LayerMaxzoom(serde_json::Number);
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+pub struct LayerMaxzoom(
+    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
+    serde_json::Number,
+);
 
 /// Arbitrary properties useful to track with the layer, but do not influence rendering. Properties should be prefixed to avoid collisions, like 'maplibre:'.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-pub struct LayerMetadata(serde_json::Value);
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+pub struct LayerMetadata(
+    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
+    serde_json::Value,
+);
 
 /// The minimum zoom level for the layer. At zoom levels less than the minzoom, the layer will be hidden.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-pub struct LayerMinzoom(serde_json::Number);
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+pub struct LayerMinzoom(
+    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
+    serde_json::Number,
+);
 
 /// Name of a source description to be used for this layer. Required for all layer types except `background`.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct LayerSource(std::string::String);
 
 /// Layer to use from a vector tile source. Required for vector tile sources; prohibited for all other source types, including GeoJSON sources.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct LayerSourceLayer(std::string::String);
 
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct BackgroundLayoutLayer {
     /// Whether this layer is displayed.
     pub visibility: Option<BackgroundLayoutLayerVisibility>,
@@ -3607,6 +4130,7 @@ pub struct BackgroundLayoutLayer {
 
 /// Whether this layer is displayed.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum BackgroundLayoutLayerVisibility {
     #[serde(rename = "none")]
     None,
@@ -3621,6 +4145,7 @@ impl Default for BackgroundLayoutLayerVisibility {
 }
 
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct BackgroundPaintLayer {
     /// The color with which the background will be drawn.
     #[serde(rename = "background-color")]
@@ -3635,7 +4160,11 @@ pub struct BackgroundPaintLayer {
 
 /// The color with which the background will be drawn.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-pub struct BackgroundPaintLayerBackgroundColor(color::DynamicColor);
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+pub struct BackgroundPaintLayerBackgroundColor(
+    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_dynamic_color))]
+    color::DynamicColor,
+);
 
 impl Default for BackgroundPaintLayerBackgroundColor {
     fn default() -> Self {
@@ -3645,7 +4174,11 @@ impl Default for BackgroundPaintLayerBackgroundColor {
 
 /// The opacity at which the background will be drawn.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-pub struct BackgroundPaintLayerBackgroundOpacity(serde_json::Number);
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+pub struct BackgroundPaintLayerBackgroundOpacity(
+    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
+    serde_json::Number,
+);
 
 impl Default for BackgroundPaintLayerBackgroundOpacity {
     fn default() -> Self {
@@ -3658,9 +4191,11 @@ impl Default for BackgroundPaintLayerBackgroundOpacity {
 
 /// Name of image in sprite to use for drawing an image background. For seamless patterns, image width and height must be a factor of two (2, 4, 8, ..., 512). Note that zoom-dependent expressions will be evaluated only at integer zoom levels.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct BackgroundPaintLayerBackgroundPattern(std::string::String);
 
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct CircleLayoutLayer {
     /// Sorts features in ascending order based on this value. Features with a higher sort key will appear above features with a lower sort key.
     #[serde(rename = "circle-sort-key")]
@@ -3671,10 +4206,15 @@ pub struct CircleLayoutLayer {
 
 /// Sorts features in ascending order based on this value. Features with a higher sort key will appear above features with a lower sort key.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-pub struct CircleLayoutLayerCircleSortKey(serde_json::Number);
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+pub struct CircleLayoutLayerCircleSortKey(
+    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
+    serde_json::Number,
+);
 
 /// Whether this layer is displayed.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum CircleLayoutLayerVisibility {
     #[serde(rename = "none")]
     None,
@@ -3689,6 +4229,7 @@ impl Default for CircleLayoutLayerVisibility {
 }
 
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct CirclePaintLayer {
     /// Amount to blur the circle. 1 blurs the circle such that only the centerpoint is full opacity.
     #[serde(rename = "circle-blur")]
@@ -3727,7 +4268,11 @@ pub struct CirclePaintLayer {
 
 /// Amount to blur the circle. 1 blurs the circle such that only the centerpoint is full opacity.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-pub struct CirclePaintLayerCircleBlur(serde_json::Number);
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+pub struct CirclePaintLayerCircleBlur(
+    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
+    serde_json::Number,
+);
 
 impl Default for CirclePaintLayerCircleBlur {
     fn default() -> Self {
@@ -3740,7 +4285,11 @@ impl Default for CirclePaintLayerCircleBlur {
 
 /// The fill color of the circle.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-pub struct CirclePaintLayerCircleColor(color::DynamicColor);
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+pub struct CirclePaintLayerCircleColor(
+    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_dynamic_color))]
+    color::DynamicColor,
+);
 
 impl Default for CirclePaintLayerCircleColor {
     fn default() -> Self {
@@ -3750,7 +4299,11 @@ impl Default for CirclePaintLayerCircleColor {
 
 /// The opacity at which the circle will be drawn.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-pub struct CirclePaintLayerCircleOpacity(serde_json::Number);
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+pub struct CirclePaintLayerCircleOpacity(
+    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
+    serde_json::Number,
+);
 
 impl Default for CirclePaintLayerCircleOpacity {
     fn default() -> Self {
@@ -3763,6 +4316,7 @@ impl Default for CirclePaintLayerCircleOpacity {
 
 /// Orientation of circle when map is pitched.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum CirclePaintLayerCirclePitchAlignment {
     #[serde(rename = "map")]
     Map,
@@ -3778,6 +4332,7 @@ impl Default for CirclePaintLayerCirclePitchAlignment {
 
 /// Controls the scaling behavior of the circle when the map is pitched.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum CirclePaintLayerCirclePitchScale {
     #[serde(rename = "map")]
     Map,
@@ -3793,7 +4348,11 @@ impl Default for CirclePaintLayerCirclePitchScale {
 
 /// Circle radius.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-pub struct CirclePaintLayerCircleRadius(serde_json::Number);
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+pub struct CirclePaintLayerCircleRadius(
+    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
+    serde_json::Number,
+);
 
 impl Default for CirclePaintLayerCircleRadius {
     fn default() -> Self {
@@ -3806,7 +4365,11 @@ impl Default for CirclePaintLayerCircleRadius {
 
 /// The stroke color of the circle.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-pub struct CirclePaintLayerCircleStrokeColor(color::DynamicColor);
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+pub struct CirclePaintLayerCircleStrokeColor(
+    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_dynamic_color))]
+    color::DynamicColor,
+);
 
 impl Default for CirclePaintLayerCircleStrokeColor {
     fn default() -> Self {
@@ -3816,7 +4379,11 @@ impl Default for CirclePaintLayerCircleStrokeColor {
 
 /// The opacity of the circle's stroke.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-pub struct CirclePaintLayerCircleStrokeOpacity(serde_json::Number);
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+pub struct CirclePaintLayerCircleStrokeOpacity(
+    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
+    serde_json::Number,
+);
 
 impl Default for CirclePaintLayerCircleStrokeOpacity {
     fn default() -> Self {
@@ -3829,7 +4396,11 @@ impl Default for CirclePaintLayerCircleStrokeOpacity {
 
 /// The width of the circle's stroke. Strokes are placed outside of the `circle-radius`.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-pub struct CirclePaintLayerCircleStrokeWidth(serde_json::Number);
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+pub struct CirclePaintLayerCircleStrokeWidth(
+    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
+    serde_json::Number,
+);
 
 impl Default for CirclePaintLayerCircleStrokeWidth {
     fn default() -> Self {
@@ -3842,7 +4413,11 @@ impl Default for CirclePaintLayerCircleStrokeWidth {
 
 /// The geometry's offset. Values are [x, y] where negatives indicate left and up, respectively.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-pub struct CirclePaintLayerCircleTranslate(Box<[serde_json::Number; 2]>);
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+pub struct CirclePaintLayerCircleTranslate(
+    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_box_2_json_number))]
+     Box<[serde_json::Number; 2]>,
+);
 
 impl Default for CirclePaintLayerCircleTranslate {
     fn default() -> Self {
@@ -3857,6 +4432,7 @@ impl Default for CirclePaintLayerCircleTranslate {
 
 /// Controls the frame of reference for `circle-translate`.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum CirclePaintLayerCircleTranslateAnchor {
     #[serde(rename = "map")]
     Map,
@@ -3871,6 +4447,7 @@ impl Default for CirclePaintLayerCircleTranslateAnchor {
 }
 
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct ColorReliefLayoutLayer {
     /// Whether this layer is displayed.
     pub visibility: Option<ColorReliefLayoutLayerVisibility>,
@@ -3878,6 +4455,7 @@ pub struct ColorReliefLayoutLayer {
 
 /// Whether this layer is displayed.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum ColorReliefLayoutLayerVisibility {
     #[serde(rename = "none")]
     None,
@@ -3892,6 +4470,7 @@ impl Default for ColorReliefLayoutLayerVisibility {
 }
 
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct ColorReliefPaintLayer {
     /// Defines the color of each pixel based on its elevation. Should be an expression that uses `["elevation"]` as input.
     #[serde(rename = "color-relief-color")]
@@ -3903,11 +4482,19 @@ pub struct ColorReliefPaintLayer {
 
 /// Defines the color of each pixel based on its elevation. Should be an expression that uses `["elevation"]` as input.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-pub struct ColorReliefPaintLayerColorReliefColor(color::DynamicColor);
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+pub struct ColorReliefPaintLayerColorReliefColor(
+    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_dynamic_color))]
+    color::DynamicColor,
+);
 
 /// The opacity at which the color-relief will be drawn.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-pub struct ColorReliefPaintLayerColorReliefOpacity(serde_json::Number);
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+pub struct ColorReliefPaintLayerColorReliefOpacity(
+    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
+    serde_json::Number,
+);
 
 impl Default for ColorReliefPaintLayerColorReliefOpacity {
     fn default() -> Self {
@@ -3919,6 +4506,7 @@ impl Default for ColorReliefPaintLayerColorReliefOpacity {
 }
 
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct FillLayoutLayer {
     /// Sorts features in ascending order based on this value. Features with a higher sort key will appear above features with a lower sort key.
     #[serde(rename = "fill-sort-key")]
@@ -3929,10 +4517,15 @@ pub struct FillLayoutLayer {
 
 /// Sorts features in ascending order based on this value. Features with a higher sort key will appear above features with a lower sort key.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-pub struct FillLayoutLayerFillSortKey(serde_json::Number);
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+pub struct FillLayoutLayerFillSortKey(
+    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
+    serde_json::Number,
+);
 
 /// Whether this layer is displayed.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum FillLayoutLayerVisibility {
     #[serde(rename = "none")]
     None,
@@ -3947,6 +4540,7 @@ impl Default for FillLayoutLayerVisibility {
 }
 
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct FillPaintLayer {
     /// Whether or not the fill should be antialiased.
     #[serde(rename = "fill-antialias")]
@@ -3973,6 +4567,7 @@ pub struct FillPaintLayer {
 
 /// Whether or not the fill should be antialiased.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone, Copy)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct FillPaintLayerFillAntialias(bool);
 
 impl Default for FillPaintLayerFillAntialias {
@@ -3983,7 +4578,11 @@ impl Default for FillPaintLayerFillAntialias {
 
 /// The color of the filled part of this layer. This color can be specified as `rgba` with an alpha component and the color's opacity will not affect the opacity of the 1px stroke, if it is used.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-pub struct FillPaintLayerFillColor(color::DynamicColor);
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+pub struct FillPaintLayerFillColor(
+    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_dynamic_color))]
+    color::DynamicColor,
+);
 
 impl Default for FillPaintLayerFillColor {
     fn default() -> Self {
@@ -3993,7 +4592,11 @@ impl Default for FillPaintLayerFillColor {
 
 /// The opacity of the entire fill layer. In contrast to the `fill-color`, this value will also affect the 1px stroke around the fill, if the stroke is used.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-pub struct FillPaintLayerFillOpacity(serde_json::Number);
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+pub struct FillPaintLayerFillOpacity(
+    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
+    serde_json::Number,
+);
 
 impl Default for FillPaintLayerFillOpacity {
     fn default() -> Self {
@@ -4006,15 +4609,24 @@ impl Default for FillPaintLayerFillOpacity {
 
 /// The outline color of the fill. Matches the value of `fill-color` if unspecified.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-pub struct FillPaintLayerFillOutlineColor(color::DynamicColor);
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+pub struct FillPaintLayerFillOutlineColor(
+    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_dynamic_color))]
+    color::DynamicColor,
+);
 
 /// Name of image in sprite to use for drawing image fills. For seamless patterns, image width and height must be a factor of two (2, 4, 8, ..., 512). Note that zoom-dependent expressions will be evaluated only at integer zoom levels.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct FillPaintLayerFillPattern(std::string::String);
 
 /// The geometry's offset. Values are [x, y] where negatives indicate left and up, respectively.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-pub struct FillPaintLayerFillTranslate(Box<[serde_json::Number; 2]>);
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+pub struct FillPaintLayerFillTranslate(
+    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_box_2_json_number))]
+     Box<[serde_json::Number; 2]>,
+);
 
 impl Default for FillPaintLayerFillTranslate {
     fn default() -> Self {
@@ -4029,6 +4641,7 @@ impl Default for FillPaintLayerFillTranslate {
 
 /// Controls the frame of reference for `fill-translate`.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum FillPaintLayerFillTranslateAnchor {
     #[serde(rename = "map")]
     Map,
@@ -4043,6 +4656,7 @@ impl Default for FillPaintLayerFillTranslateAnchor {
 }
 
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct FillExtrusionLayoutLayer {
     /// Whether this layer is displayed.
     pub visibility: Option<FillExtrusionLayoutLayerVisibility>,
@@ -4050,6 +4664,7 @@ pub struct FillExtrusionLayoutLayer {
 
 /// Whether this layer is displayed.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum FillExtrusionLayoutLayerVisibility {
     #[serde(rename = "none")]
     None,
@@ -4064,6 +4679,7 @@ impl Default for FillExtrusionLayoutLayerVisibility {
 }
 
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct FillExtrusionPaintLayer {
     /// The height with which to extrude the base of this layer. Must be less than or equal to `fill-extrusion-height`.
     #[serde(rename = "fill-extrusion-base")]
@@ -4095,7 +4711,11 @@ pub struct FillExtrusionPaintLayer {
 
 /// The height with which to extrude the base of this layer. Must be less than or equal to `fill-extrusion-height`.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-pub struct FillExtrusionPaintLayerFillExtrusionBase(serde_json::Number);
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+pub struct FillExtrusionPaintLayerFillExtrusionBase(
+    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
+    serde_json::Number,
+);
 
 impl Default for FillExtrusionPaintLayerFillExtrusionBase {
     fn default() -> Self {
@@ -4108,7 +4728,11 @@ impl Default for FillExtrusionPaintLayerFillExtrusionBase {
 
 /// The base color of the extruded fill. The extrusion's surfaces will be shaded differently based on this color in combination with the root `light` settings. If this color is specified as `rgba` with an alpha component, the alpha component will be ignored; use `fill-extrusion-opacity` to set layer opacity.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-pub struct FillExtrusionPaintLayerFillExtrusionColor(color::DynamicColor);
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+pub struct FillExtrusionPaintLayerFillExtrusionColor(
+    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_dynamic_color))]
+    color::DynamicColor,
+);
 
 impl Default for FillExtrusionPaintLayerFillExtrusionColor {
     fn default() -> Self {
@@ -4118,7 +4742,11 @@ impl Default for FillExtrusionPaintLayerFillExtrusionColor {
 
 /// The height with which to extrude this layer.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-pub struct FillExtrusionPaintLayerFillExtrusionHeight(serde_json::Number);
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+pub struct FillExtrusionPaintLayerFillExtrusionHeight(
+    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
+    serde_json::Number,
+);
 
 impl Default for FillExtrusionPaintLayerFillExtrusionHeight {
     fn default() -> Self {
@@ -4131,7 +4759,11 @@ impl Default for FillExtrusionPaintLayerFillExtrusionHeight {
 
 /// The opacity of the entire fill extrusion layer. This is rendered on a per-layer, not per-feature, basis, and data-driven styling is not available.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-pub struct FillExtrusionPaintLayerFillExtrusionOpacity(serde_json::Number);
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+pub struct FillExtrusionPaintLayerFillExtrusionOpacity(
+    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
+    serde_json::Number,
+);
 
 impl Default for FillExtrusionPaintLayerFillExtrusionOpacity {
     fn default() -> Self {
@@ -4144,11 +4776,16 @@ impl Default for FillExtrusionPaintLayerFillExtrusionOpacity {
 
 /// Name of image in sprite to use for drawing images on extruded fills. For seamless patterns, image width and height must be a factor of two (2, 4, 8, ..., 512). Note that zoom-dependent expressions will be evaluated only at integer zoom levels.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct FillExtrusionPaintLayerFillExtrusionPattern(std::string::String);
 
 /// The geometry's offset. Values are [x, y] where negatives indicate left and up (on the flat plane), respectively.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-pub struct FillExtrusionPaintLayerFillExtrusionTranslate(Box<[serde_json::Number; 2]>);
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+pub struct FillExtrusionPaintLayerFillExtrusionTranslate(
+    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_box_2_json_number))]
+     Box<[serde_json::Number; 2]>,
+);
 
 impl Default for FillExtrusionPaintLayerFillExtrusionTranslate {
     fn default() -> Self {
@@ -4163,6 +4800,7 @@ impl Default for FillExtrusionPaintLayerFillExtrusionTranslate {
 
 /// Controls the frame of reference for `fill-extrusion-translate`.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum FillExtrusionPaintLayerFillExtrusionTranslateAnchor {
     #[serde(rename = "map")]
     Map,
@@ -4178,6 +4816,7 @@ impl Default for FillExtrusionPaintLayerFillExtrusionTranslateAnchor {
 
 /// Whether to apply a vertical gradient to the sides of a fill-extrusion layer. If true, sides will be shaded slightly darker farther down.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone, Copy)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct FillExtrusionPaintLayerFillExtrusionVerticalGradient(bool);
 
 impl Default for FillExtrusionPaintLayerFillExtrusionVerticalGradient {
@@ -4187,6 +4826,7 @@ impl Default for FillExtrusionPaintLayerFillExtrusionVerticalGradient {
 }
 
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct HeatmapLayoutLayer {
     /// Whether this layer is displayed.
     pub visibility: Option<HeatmapLayoutLayerVisibility>,
@@ -4194,6 +4834,7 @@ pub struct HeatmapLayoutLayer {
 
 /// Whether this layer is displayed.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum HeatmapLayoutLayerVisibility {
     #[serde(rename = "none")]
     None,
@@ -4208,6 +4849,7 @@ impl Default for HeatmapLayoutLayerVisibility {
 }
 
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct HeatmapPaintLayer {
     /// Defines the color of each pixel based on its density value in a heatmap.  Should be an expression that uses `["heatmap-density"]` as input.
     #[serde(rename = "heatmap-color")]
@@ -4228,7 +4870,11 @@ pub struct HeatmapPaintLayer {
 
 /// Defines the color of each pixel based on its density value in a heatmap.  Should be an expression that uses `["heatmap-density"]` as input.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-pub struct HeatmapPaintLayerHeatmapColor(color::DynamicColor);
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+pub struct HeatmapPaintLayerHeatmapColor(
+    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_dynamic_color))]
+    color::DynamicColor,
+);
 
 impl Default for HeatmapPaintLayerHeatmapColor {
     fn default() -> Self {
@@ -4257,7 +4903,11 @@ impl Default for HeatmapPaintLayerHeatmapColor {
 
 /// Similar to `heatmap-weight` but controls the intensity of the heatmap globally. Primarily used for adjusting the heatmap based on zoom level.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-pub struct HeatmapPaintLayerHeatmapIntensity(serde_json::Number);
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+pub struct HeatmapPaintLayerHeatmapIntensity(
+    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
+    serde_json::Number,
+);
 
 impl Default for HeatmapPaintLayerHeatmapIntensity {
     fn default() -> Self {
@@ -4270,7 +4920,11 @@ impl Default for HeatmapPaintLayerHeatmapIntensity {
 
 /// The global opacity at which the heatmap layer will be drawn.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-pub struct HeatmapPaintLayerHeatmapOpacity(serde_json::Number);
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+pub struct HeatmapPaintLayerHeatmapOpacity(
+    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
+    serde_json::Number,
+);
 
 impl Default for HeatmapPaintLayerHeatmapOpacity {
     fn default() -> Self {
@@ -4283,7 +4937,11 @@ impl Default for HeatmapPaintLayerHeatmapOpacity {
 
 /// Radius of influence of one heatmap point in pixels. Increasing the value makes the heatmap smoother, but less detailed.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-pub struct HeatmapPaintLayerHeatmapRadius(serde_json::Number);
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+pub struct HeatmapPaintLayerHeatmapRadius(
+    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
+    serde_json::Number,
+);
 
 impl Default for HeatmapPaintLayerHeatmapRadius {
     fn default() -> Self {
@@ -4296,7 +4954,11 @@ impl Default for HeatmapPaintLayerHeatmapRadius {
 
 /// A measure of how much an individual point contributes to the heatmap. A value of 10 would be equivalent to having 10 points of weight 1 in the same spot. Especially useful when combined with clustering.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-pub struct HeatmapPaintLayerHeatmapWeight(serde_json::Number);
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+pub struct HeatmapPaintLayerHeatmapWeight(
+    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
+    serde_json::Number,
+);
 
 impl Default for HeatmapPaintLayerHeatmapWeight {
     fn default() -> Self {
@@ -4308,6 +4970,7 @@ impl Default for HeatmapPaintLayerHeatmapWeight {
 }
 
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct HillshadeLayoutLayer {
     /// Whether this layer is displayed.
     pub visibility: Option<HillshadeLayoutLayerVisibility>,
@@ -4315,6 +4978,7 @@ pub struct HillshadeLayoutLayer {
 
 /// Whether this layer is displayed.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum HillshadeLayoutLayerVisibility {
     #[serde(rename = "none")]
     None,
@@ -4329,6 +4993,7 @@ impl Default for HillshadeLayoutLayerVisibility {
 }
 
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct HillshadePaintLayer {
     /// The shading color used to accentuate rugged terrain like sharp cliffs and gorges.
     #[serde(rename = "hillshade-accent-color")]
@@ -4358,7 +5023,11 @@ pub struct HillshadePaintLayer {
 
 /// The shading color used to accentuate rugged terrain like sharp cliffs and gorges.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-pub struct HillshadePaintLayerHillshadeAccentColor(color::DynamicColor);
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+pub struct HillshadePaintLayerHillshadeAccentColor(
+    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_dynamic_color))]
+    color::DynamicColor,
+);
 
 impl Default for HillshadePaintLayerHillshadeAccentColor {
     fn default() -> Self {
@@ -4368,7 +5037,11 @@ impl Default for HillshadePaintLayerHillshadeAccentColor {
 
 /// Intensity of the hillshade
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-pub struct HillshadePaintLayerHillshadeExaggeration(serde_json::Number);
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+pub struct HillshadePaintLayerHillshadeExaggeration(
+    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
+    serde_json::Number,
+);
 
 impl Default for HillshadePaintLayerHillshadeExaggeration {
     fn default() -> Self {
@@ -4382,11 +5055,18 @@ impl Default for HillshadePaintLayerHillshadeExaggeration {
 /// The shading color of areas that faces towards the light source(s). Only when `hillshade-method` is set to `multidirectional` can you specify multiple light sources.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
 #[serde(untagged)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum HillshadePaintLayerHillshadeHighlightColor {
     /// A color
-    One(color::DynamicColor),
+    One(
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_dynamic_color))]
+         color::DynamicColor,
+    ),
     /// A set of colors
-    Multiple(Vec<color::DynamicColor>),
+    Multiple(
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_vec_dynamic_color))]
+         Vec<color::DynamicColor>,
+    ),
 }
 
 impl Default for HillshadePaintLayerHillshadeHighlightColor {
@@ -4400,9 +5080,16 @@ impl Default for HillshadePaintLayerHillshadeHighlightColor {
 /// The altitude of the light source(s) used to generate the hillshading with 0 as sunset and 90 as noon. Only when `hillshade-method` is set to `multidirectional` can you specify multiple light sources.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
 #[serde(untagged)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum HillshadePaintLayerHillshadeIlluminationAltitude {
-    One(serde_json::Number),
-    Many(Vec<serde_json::Number>),
+    One(
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
+        serde_json::Number,
+    ),
+    Many(
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_vec_json_number))]
+         Vec<serde_json::Number>,
+    ),
 }
 
 impl Default for HillshadePaintLayerHillshadeIlluminationAltitude {
@@ -4416,6 +5103,7 @@ impl Default for HillshadePaintLayerHillshadeIlluminationAltitude {
 
 /// Direction of light source when map is rotated.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum HillshadePaintLayerHillshadeIlluminationAnchor {
     #[serde(rename = "map")]
     Map,
@@ -4432,9 +5120,16 @@ impl Default for HillshadePaintLayerHillshadeIlluminationAnchor {
 /// The direction of the light source(s) used to generate the hillshading with 0 as the top of the viewport if `hillshade-illumination-anchor` is set to `viewport` and due north if `hillshade-illumination-anchor` is set to `map`. Only when `hillshade-method` is set to `multidirectional` can you specify multiple light sources.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
 #[serde(untagged)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum HillshadePaintLayerHillshadeIlluminationDirection {
-    One(serde_json::Number),
-    Many(Vec<serde_json::Number>),
+    One(
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
+        serde_json::Number,
+    ),
+    Many(
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_vec_json_number))]
+         Vec<serde_json::Number>,
+    ),
 }
 
 impl Default for HillshadePaintLayerHillshadeIlluminationDirection {
@@ -4448,6 +5143,7 @@ impl Default for HillshadePaintLayerHillshadeIlluminationDirection {
 
 /// The hillshade algorithm to use, one of `standard`, `basic`, `combined`, `igor`, or `multidirectional`. ![image](assets/hillshade_methods.png)
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum HillshadePaintLayerHillshadeMethod {
     #[serde(rename = "basic")]
     Basic,
@@ -4470,11 +5166,18 @@ impl Default for HillshadePaintLayerHillshadeMethod {
 /// The shading color of areas that face away from the light source(s). Only when `hillshade-method` is set to `multidirectional` can you specify multiple light sources.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
 #[serde(untagged)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum HillshadePaintLayerHillshadeShadowColor {
     /// A color
-    One(color::DynamicColor),
+    One(
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_dynamic_color))]
+         color::DynamicColor,
+    ),
     /// A set of colors
-    Multiple(Vec<color::DynamicColor>),
+    Multiple(
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_vec_dynamic_color))]
+         Vec<color::DynamicColor>,
+    ),
 }
 
 impl Default for HillshadePaintLayerHillshadeShadowColor {
@@ -4486,6 +5189,7 @@ impl Default for HillshadePaintLayerHillshadeShadowColor {
 }
 
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct LineLayoutLayer {
     /// The display of line endings.
     #[serde(rename = "line-cap")]
@@ -4508,6 +5212,7 @@ pub struct LineLayoutLayer {
 
 /// The display of line endings.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum LineLayoutLayerLineCap {
     #[serde(rename = "butt")]
     Butt,
@@ -4525,6 +5230,7 @@ impl Default for LineLayoutLayerLineCap {
 
 /// The display of lines when joining.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum LineLayoutLayerLineJoin {
     #[serde(rename = "bevel")]
     Bevel,
@@ -4542,7 +5248,11 @@ impl Default for LineLayoutLayerLineJoin {
 
 /// Used to automatically convert miter joins to bevel joins for sharp angles.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-pub struct LineLayoutLayerLineMiterLimit(serde_json::Number);
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+pub struct LineLayoutLayerLineMiterLimit(
+    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
+    serde_json::Number,
+);
 
 impl Default for LineLayoutLayerLineMiterLimit {
     fn default() -> Self {
@@ -4555,7 +5265,11 @@ impl Default for LineLayoutLayerLineMiterLimit {
 
 /// Used to automatically convert round joins to miter joins for shallow angles.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-pub struct LineLayoutLayerLineRoundLimit(serde_json::Number);
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+pub struct LineLayoutLayerLineRoundLimit(
+    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
+    serde_json::Number,
+);
 
 impl Default for LineLayoutLayerLineRoundLimit {
     fn default() -> Self {
@@ -4568,10 +5282,15 @@ impl Default for LineLayoutLayerLineRoundLimit {
 
 /// Sorts features in ascending order based on this value. Features with a higher sort key will appear above features with a lower sort key.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-pub struct LineLayoutLayerLineSortKey(serde_json::Number);
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+pub struct LineLayoutLayerLineSortKey(
+    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
+    serde_json::Number,
+);
 
 /// Whether this layer is displayed.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum LineLayoutLayerVisibility {
     #[serde(rename = "none")]
     None,
@@ -4586,6 +5305,7 @@ impl Default for LineLayoutLayerVisibility {
 }
 
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct LinePaintLayer {
     /// Blur applied to the line, in pixels.
     #[serde(rename = "line-blur")]
@@ -4624,7 +5344,11 @@ pub struct LinePaintLayer {
 
 /// Blur applied to the line, in pixels.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-pub struct LinePaintLayerLineBlur(serde_json::Number);
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+pub struct LinePaintLayerLineBlur(
+    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
+    serde_json::Number,
+);
 
 impl Default for LinePaintLayerLineBlur {
     fn default() -> Self {
@@ -4637,7 +5361,11 @@ impl Default for LinePaintLayerLineBlur {
 
 /// The color with which the line will be drawn.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-pub struct LinePaintLayerLineColor(color::DynamicColor);
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+pub struct LinePaintLayerLineColor(
+    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_dynamic_color))]
+    color::DynamicColor,
+);
 
 impl Default for LinePaintLayerLineColor {
     fn default() -> Self {
@@ -4647,11 +5375,19 @@ impl Default for LinePaintLayerLineColor {
 
 /// Specifies the lengths of the alternating dashes and gaps that form the dash pattern. The lengths are later scaled by the line width. To convert a dash length to pixels, multiply the length by the current line width. GeoJSON sources with `lineMetrics: true` specified won't render dashed lines to the expected scale. Zoom-dependent expressions will be evaluated only at integer zoom levels. The only way to create an array value is using `["literal", [...]]`; arrays cannot be read from or derived from feature properties.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-pub struct LinePaintLayerLineDasharray(Vec<serde_json::Number>);
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+pub struct LinePaintLayerLineDasharray(
+    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_vec_json_number))]
+    Vec<serde_json::Number>,
+);
 
 /// Draws a line casing outside of a line's actual path. Value indicates the width of the inner gap.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-pub struct LinePaintLayerLineGapWidth(serde_json::Number);
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+pub struct LinePaintLayerLineGapWidth(
+    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
+    serde_json::Number,
+);
 
 impl Default for LinePaintLayerLineGapWidth {
     fn default() -> Self {
@@ -4664,11 +5400,19 @@ impl Default for LinePaintLayerLineGapWidth {
 
 /// Defines a gradient with which to color a line feature. Can only be used with GeoJSON sources that specify `"lineMetrics": true`.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-pub struct LinePaintLayerLineGradient(color::DynamicColor);
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+pub struct LinePaintLayerLineGradient(
+    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_dynamic_color))]
+    color::DynamicColor,
+);
 
 /// The line's offset. For linear features, a positive value offsets the line to the right, relative to the direction of the line, and a negative value to the left. For polygon features, a positive value results in an inset, and a negative value results in an outset.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-pub struct LinePaintLayerLineOffset(serde_json::Number);
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+pub struct LinePaintLayerLineOffset(
+    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
+    serde_json::Number,
+);
 
 impl Default for LinePaintLayerLineOffset {
     fn default() -> Self {
@@ -4681,7 +5425,11 @@ impl Default for LinePaintLayerLineOffset {
 
 /// The opacity at which the line will be drawn.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-pub struct LinePaintLayerLineOpacity(serde_json::Number);
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+pub struct LinePaintLayerLineOpacity(
+    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
+    serde_json::Number,
+);
 
 impl Default for LinePaintLayerLineOpacity {
     fn default() -> Self {
@@ -4694,11 +5442,16 @@ impl Default for LinePaintLayerLineOpacity {
 
 /// Name of image in sprite to use for drawing image lines. For seamless patterns, image width must be a factor of two (2, 4, 8, ..., 512). Note that zoom-dependent expressions will be evaluated only at integer zoom levels.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct LinePaintLayerLinePattern(std::string::String);
 
 /// The geometry's offset. Values are [x, y] where negatives indicate left and up, respectively.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-pub struct LinePaintLayerLineTranslate(Box<[serde_json::Number; 2]>);
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+pub struct LinePaintLayerLineTranslate(
+    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_box_2_json_number))]
+     Box<[serde_json::Number; 2]>,
+);
 
 impl Default for LinePaintLayerLineTranslate {
     fn default() -> Self {
@@ -4713,6 +5466,7 @@ impl Default for LinePaintLayerLineTranslate {
 
 /// Controls the frame of reference for `line-translate`.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum LinePaintLayerLineTranslateAnchor {
     #[serde(rename = "map")]
     Map,
@@ -4728,7 +5482,11 @@ impl Default for LinePaintLayerLineTranslateAnchor {
 
 /// Stroke thickness.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-pub struct LinePaintLayerLineWidth(serde_json::Number);
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+pub struct LinePaintLayerLineWidth(
+    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
+    serde_json::Number,
+);
 
 impl Default for LinePaintLayerLineWidth {
     fn default() -> Self {
@@ -4740,6 +5498,7 @@ impl Default for LinePaintLayerLineWidth {
 }
 
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct RasterLayoutLayer {
     /// Whether this layer is displayed.
     pub visibility: Option<RasterLayoutLayerVisibility>,
@@ -4747,6 +5506,7 @@ pub struct RasterLayoutLayer {
 
 /// Whether this layer is displayed.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum RasterLayoutLayerVisibility {
     #[serde(rename = "none")]
     None,
@@ -4761,6 +5521,7 @@ impl Default for RasterLayoutLayerVisibility {
 }
 
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct RasterPaintLayer {
     /// Increase or reduce the brightness of the image. The value is the maximum brightness.
     #[serde(rename = "raster-brightness-max")]
@@ -4790,7 +5551,11 @@ pub struct RasterPaintLayer {
 
 /// Increase or reduce the brightness of the image. The value is the maximum brightness.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-pub struct RasterPaintLayerRasterBrightnessMax(serde_json::Number);
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+pub struct RasterPaintLayerRasterBrightnessMax(
+    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
+    serde_json::Number,
+);
 
 impl Default for RasterPaintLayerRasterBrightnessMax {
     fn default() -> Self {
@@ -4803,7 +5568,11 @@ impl Default for RasterPaintLayerRasterBrightnessMax {
 
 /// Increase or reduce the brightness of the image. The value is the minimum brightness.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-pub struct RasterPaintLayerRasterBrightnessMin(serde_json::Number);
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+pub struct RasterPaintLayerRasterBrightnessMin(
+    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
+    serde_json::Number,
+);
 
 impl Default for RasterPaintLayerRasterBrightnessMin {
     fn default() -> Self {
@@ -4816,7 +5585,11 @@ impl Default for RasterPaintLayerRasterBrightnessMin {
 
 /// Increase or reduce the contrast of the image.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-pub struct RasterPaintLayerRasterContrast(serde_json::Number);
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+pub struct RasterPaintLayerRasterContrast(
+    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
+    serde_json::Number,
+);
 
 impl Default for RasterPaintLayerRasterContrast {
     fn default() -> Self {
@@ -4829,7 +5602,11 @@ impl Default for RasterPaintLayerRasterContrast {
 
 /// Fade duration when a new tile is added, or when a video is started or its coordinates are updated.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-pub struct RasterPaintLayerRasterFadeDuration(serde_json::Number);
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+pub struct RasterPaintLayerRasterFadeDuration(
+    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
+    serde_json::Number,
+);
 
 impl Default for RasterPaintLayerRasterFadeDuration {
     fn default() -> Self {
@@ -4842,7 +5619,11 @@ impl Default for RasterPaintLayerRasterFadeDuration {
 
 /// Rotates hues around the color wheel.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-pub struct RasterPaintLayerRasterHueRotate(serde_json::Number);
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+pub struct RasterPaintLayerRasterHueRotate(
+    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
+    serde_json::Number,
+);
 
 impl Default for RasterPaintLayerRasterHueRotate {
     fn default() -> Self {
@@ -4855,7 +5636,11 @@ impl Default for RasterPaintLayerRasterHueRotate {
 
 /// The opacity at which the image will be drawn.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-pub struct RasterPaintLayerRasterOpacity(serde_json::Number);
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+pub struct RasterPaintLayerRasterOpacity(
+    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
+    serde_json::Number,
+);
 
 impl Default for RasterPaintLayerRasterOpacity {
     fn default() -> Self {
@@ -4868,6 +5653,7 @@ impl Default for RasterPaintLayerRasterOpacity {
 
 /// The resampling/interpolation method to use for overscaling, also known as texture magnification filter
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum RasterPaintLayerRasterResampling {
     #[serde(rename = "linear")]
     Linear,
@@ -4883,7 +5669,11 @@ impl Default for RasterPaintLayerRasterResampling {
 
 /// Increase or reduce the saturation of the image.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-pub struct RasterPaintLayerRasterSaturation(serde_json::Number);
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+pub struct RasterPaintLayerRasterSaturation(
+    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
+    serde_json::Number,
+);
 
 impl Default for RasterPaintLayerRasterSaturation {
     fn default() -> Self {
@@ -4895,6 +5685,7 @@ impl Default for RasterPaintLayerRasterSaturation {
 }
 
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct SymbolLayoutLayer {
     /// If true, the icon will be visible even if it collides with other previously drawn symbols.
     #[serde(rename = "icon-allow-overlap")]
@@ -5048,6 +5839,7 @@ pub struct SymbolLayoutLayer {
 
 /// If true, the icon will be visible even if it collides with other previously drawn symbols.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone, Copy)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct SymbolLayoutLayerIconAllowOverlap(bool);
 
 impl Default for SymbolLayoutLayerIconAllowOverlap {
@@ -5058,6 +5850,7 @@ impl Default for SymbolLayoutLayerIconAllowOverlap {
 
 /// Part of the icon placed closest to the anchor.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum SymbolLayoutLayerIconAnchor {
     #[serde(rename = "bottom")]
     Bottom,
@@ -5087,6 +5880,7 @@ impl Default for SymbolLayoutLayerIconAnchor {
 
 /// If true, other symbols can be visible even if they collide with the icon.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone, Copy)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct SymbolLayoutLayerIconIgnorePlacement(bool);
 
 impl Default for SymbolLayoutLayerIconIgnorePlacement {
@@ -5097,10 +5891,12 @@ impl Default for SymbolLayoutLayerIconIgnorePlacement {
 
 /// Name of image in sprite to use for drawing an image background.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct SymbolLayoutLayerIconImage(std::string::String);
 
 /// If true, the icon may be flipped to prevent it from being rendered upside-down.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone, Copy)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct SymbolLayoutLayerIconKeepUpright(bool);
 
 impl Default for SymbolLayoutLayerIconKeepUpright {
@@ -5111,7 +5907,11 @@ impl Default for SymbolLayoutLayerIconKeepUpright {
 
 /// Offset distance of icon from its anchor. Positive values indicate right and down, while negative values indicate left and up. Each component is multiplied by the value of `icon-size` to obtain the final offset in pixels. When combined with `icon-rotate` the offset will be as if the rotated direction was up.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-pub struct SymbolLayoutLayerIconOffset(Box<[serde_json::Number; 2]>);
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+pub struct SymbolLayoutLayerIconOffset(
+    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_box_2_json_number))]
+     Box<[serde_json::Number; 2]>,
+);
 
 impl Default for SymbolLayoutLayerIconOffset {
     fn default() -> Self {
@@ -5126,6 +5926,7 @@ impl Default for SymbolLayoutLayerIconOffset {
 
 /// If true, text will display without their corresponding icons when the icon collides with other symbols and the text does not.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone, Copy)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct SymbolLayoutLayerIconOptional(bool);
 
 impl Default for SymbolLayoutLayerIconOptional {
@@ -5136,6 +5937,7 @@ impl Default for SymbolLayoutLayerIconOptional {
 
 /// Allows for control over whether to show an icon when it overlaps other symbols on the map. If `icon-overlap` is not set, `icon-allow-overlap` is used instead.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum SymbolLayoutLayerIconOverlap {
     #[serde(rename = "always")]
     Always,
@@ -5148,20 +5950,36 @@ pub enum SymbolLayoutLayerIconOverlap {
 /// Size of additional area round the icon bounding box used for detecting symbol collisions.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
 #[serde(untagged)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum SymbolLayoutLayerIconPadding {
     /// A single value applies to all four sides.
     ///
     /// Only avaliable for backwards compatibility.
     #[deprecated = "Please see [`Self::One`] instead"]
-    Unwrapped(serde_json::Number),
+    Unwrapped(
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
+        serde_json::Number,
+    ),
     /// A single value applies to all four sides
-    One(Box<[serde_json::Number; 1]>),
+    One(
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_box_1_json_number))]
+         Box<[serde_json::Number; 1]>,
+    ),
     /// two values apply to `[top/bottom, left/right]`
-    Two(Box<[serde_json::Number; 2]>),
+    Two(
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_box_2_json_number))]
+         Box<[serde_json::Number; 2]>,
+    ),
     /// three values apply to `[top, left/right, bottom]`
-    Three(Box<[serde_json::Number; 3]>),
+    Three(
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_box_3_json_number))]
+         Box<[serde_json::Number; 3]>,
+    ),
     /// four values apply to `[top, right, bottom, left]`
-    Four(Box<[serde_json::Number; 4]>),
+    Four(
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_box_4_json_number))]
+         Box<[serde_json::Number; 4]>,
+    ),
 }
 
 impl Default for SymbolLayoutLayerIconPadding {
@@ -5172,6 +5990,7 @@ impl Default for SymbolLayoutLayerIconPadding {
 
 /// Orientation of icon when map is pitched.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum SymbolLayoutLayerIconPitchAlignment {
     #[serde(rename = "auto")]
     Auto,
@@ -5189,7 +6008,11 @@ impl Default for SymbolLayoutLayerIconPitchAlignment {
 
 /// Rotates the icon clockwise.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-pub struct SymbolLayoutLayerIconRotate(serde_json::Number);
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+pub struct SymbolLayoutLayerIconRotate(
+    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
+    serde_json::Number,
+);
 
 impl Default for SymbolLayoutLayerIconRotate {
     fn default() -> Self {
@@ -5202,6 +6025,7 @@ impl Default for SymbolLayoutLayerIconRotate {
 
 /// In combination with `symbol-placement`, determines the rotation behavior of icons.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum SymbolLayoutLayerIconRotationAlignment {
     #[serde(rename = "auto")]
     Auto,
@@ -5219,7 +6043,11 @@ impl Default for SymbolLayoutLayerIconRotationAlignment {
 
 /// Scales the original size of the icon by the provided factor. The new pixel size of the image will be the original pixel size multiplied by `icon-size`. 1 is the original size; 3 triples the size of the image.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-pub struct SymbolLayoutLayerIconSize(serde_json::Number);
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+pub struct SymbolLayoutLayerIconSize(
+    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
+    serde_json::Number,
+);
 
 impl Default for SymbolLayoutLayerIconSize {
     fn default() -> Self {
@@ -5232,6 +6060,7 @@ impl Default for SymbolLayoutLayerIconSize {
 
 /// Scales the icon to fit around the associated text.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum SymbolLayoutLayerIconTextFit {
     #[serde(rename = "both")]
     Both,
@@ -5251,7 +6080,11 @@ impl Default for SymbolLayoutLayerIconTextFit {
 
 /// Size of the additional area added to dimensions determined by `icon-text-fit`, in clockwise order: top, right, bottom, left.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-pub struct SymbolLayoutLayerIconTextFitPadding(Box<[serde_json::Number; 4]>);
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+pub struct SymbolLayoutLayerIconTextFitPadding(
+    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_box_4_json_number))]
+     Box<[serde_json::Number; 4]>,
+);
 
 impl Default for SymbolLayoutLayerIconTextFitPadding {
     fn default() -> Self {
@@ -5270,6 +6103,7 @@ impl Default for SymbolLayoutLayerIconTextFitPadding {
 
 /// If true, the symbols will not cross tile edges to avoid mutual collisions. Recommended in layers that don't have enough padding in the vector tile to prevent collisions, or if it is a point symbol layer placed after a line symbol layer. When using a client that supports global collision detection, like MapLibre GL JS version 0.42.0 or greater, enabling this property is not needed to prevent clipped labels at tile boundaries.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone, Copy)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct SymbolLayoutLayerSymbolAvoidEdges(bool);
 
 impl Default for SymbolLayoutLayerSymbolAvoidEdges {
@@ -5280,6 +6114,7 @@ impl Default for SymbolLayoutLayerSymbolAvoidEdges {
 
 /// Label placement relative to its geometry.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum SymbolLayoutLayerSymbolPlacement {
     #[serde(rename = "line")]
     Line,
@@ -5297,11 +6132,19 @@ impl Default for SymbolLayoutLayerSymbolPlacement {
 
 /// Sorts features in ascending order based on this value. Features with lower sort keys are drawn and placed first.  When `icon-allow-overlap` or `text-allow-overlap` is `false`, features with a lower sort key will have priority during placement. When `icon-allow-overlap` or `text-allow-overlap` is set to `true`, features with a higher sort key will overlap over features with a lower sort key.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-pub struct SymbolLayoutLayerSymbolSortKey(serde_json::Number);
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+pub struct SymbolLayoutLayerSymbolSortKey(
+    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
+    serde_json::Number,
+);
 
 /// Distance between two symbol anchors.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-pub struct SymbolLayoutLayerSymbolSpacing(serde_json::Number);
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+pub struct SymbolLayoutLayerSymbolSpacing(
+    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
+    serde_json::Number,
+);
 
 impl Default for SymbolLayoutLayerSymbolSpacing {
     fn default() -> Self {
@@ -5314,6 +6157,7 @@ impl Default for SymbolLayoutLayerSymbolSpacing {
 
 /// Determines whether overlapping symbols in the same layer are rendered in the order that they appear in the data source or by their y-position relative to the viewport. To control the order and prioritization of symbols otherwise, use `symbol-sort-key`.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum SymbolLayoutLayerSymbolZOrder {
     #[serde(rename = "auto")]
     Auto,
@@ -5331,6 +6175,7 @@ impl Default for SymbolLayoutLayerSymbolZOrder {
 
 /// If true, the text will be visible even if it collides with other previously drawn symbols.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone, Copy)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct SymbolLayoutLayerTextAllowOverlap(bool);
 
 impl Default for SymbolLayoutLayerTextAllowOverlap {
@@ -5341,6 +6186,7 @@ impl Default for SymbolLayoutLayerTextAllowOverlap {
 
 /// Part of the text placed closest to the anchor.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum SymbolLayoutLayerTextAnchor {
     #[serde(rename = "bottom")]
     Bottom,
@@ -5370,6 +6216,7 @@ impl Default for SymbolLayoutLayerTextAnchor {
 
 /// Value to use for a text label. If a plain `string` is provided, it will be treated as a `formatted` with default/inherited formatting options.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct SymbolLayoutLayerTextField(std::string::String);
 
 impl Default for SymbolLayoutLayerTextField {
@@ -5380,6 +6227,7 @@ impl Default for SymbolLayoutLayerTextField {
 
 /// Fonts to use for displaying text. If the `glyphs` root property is specified, this array is joined together and interpreted as a font stack name. Otherwise, it is interpreted as a cascading fallback list of local font names.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct SymbolLayoutLayerTextFont(Vec<std::string::String>);
 
 impl Default for SymbolLayoutLayerTextFont {
@@ -5393,6 +6241,7 @@ impl Default for SymbolLayoutLayerTextFont {
 
 /// If true, other symbols can be visible even if they collide with the text.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone, Copy)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct SymbolLayoutLayerTextIgnorePlacement(bool);
 
 impl Default for SymbolLayoutLayerTextIgnorePlacement {
@@ -5403,6 +6252,7 @@ impl Default for SymbolLayoutLayerTextIgnorePlacement {
 
 /// Text justification options.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum SymbolLayoutLayerTextJustify {
     #[serde(rename = "auto")]
     Auto,
@@ -5422,6 +6272,7 @@ impl Default for SymbolLayoutLayerTextJustify {
 
 /// If true, the text may be flipped vertically to prevent it from being rendered upside-down.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone, Copy)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct SymbolLayoutLayerTextKeepUpright(bool);
 
 impl Default for SymbolLayoutLayerTextKeepUpright {
@@ -5432,7 +6283,11 @@ impl Default for SymbolLayoutLayerTextKeepUpright {
 
 /// Text tracking amount.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-pub struct SymbolLayoutLayerTextLetterSpacing(serde_json::Number);
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+pub struct SymbolLayoutLayerTextLetterSpacing(
+    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
+    serde_json::Number,
+);
 
 impl Default for SymbolLayoutLayerTextLetterSpacing {
     fn default() -> Self {
@@ -5445,7 +6300,11 @@ impl Default for SymbolLayoutLayerTextLetterSpacing {
 
 /// Text leading value for multi-line text.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-pub struct SymbolLayoutLayerTextLineHeight(serde_json::Number);
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+pub struct SymbolLayoutLayerTextLineHeight(
+    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
+    serde_json::Number,
+);
 
 impl Default for SymbolLayoutLayerTextLineHeight {
     fn default() -> Self {
@@ -5458,7 +6317,11 @@ impl Default for SymbolLayoutLayerTextLineHeight {
 
 /// Maximum angle change between adjacent characters.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-pub struct SymbolLayoutLayerTextMaxAngle(serde_json::Number);
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+pub struct SymbolLayoutLayerTextMaxAngle(
+    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
+    serde_json::Number,
+);
 
 impl Default for SymbolLayoutLayerTextMaxAngle {
     fn default() -> Self {
@@ -5471,7 +6334,11 @@ impl Default for SymbolLayoutLayerTextMaxAngle {
 
 /// The maximum line width for text wrapping.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-pub struct SymbolLayoutLayerTextMaxWidth(serde_json::Number);
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+pub struct SymbolLayoutLayerTextMaxWidth(
+    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
+    serde_json::Number,
+);
 
 impl Default for SymbolLayoutLayerTextMaxWidth {
     fn default() -> Self {
@@ -5484,7 +6351,11 @@ impl Default for SymbolLayoutLayerTextMaxWidth {
 
 /// Offset distance of text from its anchor. Positive values indicate right and down, while negative values indicate left and up. If used with text-variable-anchor, input values will be taken as absolute values. Offsets along the x- and y-axis will be applied automatically based on the anchor position.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-pub struct SymbolLayoutLayerTextOffset(Box<[serde_json::Number; 2]>);
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+pub struct SymbolLayoutLayerTextOffset(
+    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_box_2_json_number))]
+     Box<[serde_json::Number; 2]>,
+);
 
 impl Default for SymbolLayoutLayerTextOffset {
     fn default() -> Self {
@@ -5499,6 +6370,7 @@ impl Default for SymbolLayoutLayerTextOffset {
 
 /// If true, icons will display without their corresponding text when the text collides with other symbols and the icon does not.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone, Copy)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct SymbolLayoutLayerTextOptional(bool);
 
 impl Default for SymbolLayoutLayerTextOptional {
@@ -5509,6 +6381,7 @@ impl Default for SymbolLayoutLayerTextOptional {
 
 /// Allows for control over whether to show symbol text when it overlaps other symbols on the map. If `text-overlap` is not set, `text-allow-overlap` is used instead
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum SymbolLayoutLayerTextOverlap {
     #[serde(rename = "always")]
     Always,
@@ -5520,7 +6393,11 @@ pub enum SymbolLayoutLayerTextOverlap {
 
 /// Size of the additional area around the text bounding box used for detecting symbol collisions.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-pub struct SymbolLayoutLayerTextPadding(serde_json::Number);
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+pub struct SymbolLayoutLayerTextPadding(
+    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
+    serde_json::Number,
+);
 
 impl Default for SymbolLayoutLayerTextPadding {
     fn default() -> Self {
@@ -5533,6 +6410,7 @@ impl Default for SymbolLayoutLayerTextPadding {
 
 /// Orientation of text when map is pitched.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum SymbolLayoutLayerTextPitchAlignment {
     #[serde(rename = "auto")]
     Auto,
@@ -5550,7 +6428,11 @@ impl Default for SymbolLayoutLayerTextPitchAlignment {
 
 /// Radial offset of text, in the direction of the symbol's anchor. Useful in combination with `text-variable-anchor`, which defaults to using the two-dimensional `text-offset` if present.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-pub struct SymbolLayoutLayerTextRadialOffset(serde_json::Number);
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+pub struct SymbolLayoutLayerTextRadialOffset(
+    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
+    serde_json::Number,
+);
 
 impl Default for SymbolLayoutLayerTextRadialOffset {
     fn default() -> Self {
@@ -5563,7 +6445,11 @@ impl Default for SymbolLayoutLayerTextRadialOffset {
 
 /// Rotates the text clockwise.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-pub struct SymbolLayoutLayerTextRotate(serde_json::Number);
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+pub struct SymbolLayoutLayerTextRotate(
+    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
+    serde_json::Number,
+);
 
 impl Default for SymbolLayoutLayerTextRotate {
     fn default() -> Self {
@@ -5576,6 +6462,7 @@ impl Default for SymbolLayoutLayerTextRotate {
 
 /// In combination with `symbol-placement`, determines the rotation behavior of the individual glyphs forming the text.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum SymbolLayoutLayerTextRotationAlignment {
     #[serde(rename = "auto")]
     Auto,
@@ -5595,7 +6482,11 @@ impl Default for SymbolLayoutLayerTextRotationAlignment {
 
 /// Font size.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-pub struct SymbolLayoutLayerTextSize(serde_json::Number);
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+pub struct SymbolLayoutLayerTextSize(
+    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
+    serde_json::Number,
+);
 
 impl Default for SymbolLayoutLayerTextSize {
     fn default() -> Self {
@@ -5608,6 +6499,7 @@ impl Default for SymbolLayoutLayerTextSize {
 
 /// Specifies how to capitalize text, similar to the CSS `text-transform` property.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum SymbolLayoutLayerTextTransform {
     #[serde(rename = "lowercase")]
     Lowercase,
@@ -5624,6 +6516,7 @@ impl Default for SymbolLayoutLayerTextTransform {
 }
 
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum SymbolLayoutLayerTextVariableAnchorValue {
     #[serde(rename = "bottom")]
     Bottom,
@@ -5647,6 +6540,7 @@ pub enum SymbolLayoutLayerTextVariableAnchorValue {
 
 /// To increase the chance of placing high-priority labels on the map, you can provide an array of `text-anchor` locations: the renderer will attempt to place the label at each location, in order, before moving onto the next label. Use `text-justify: auto` to choose justification based on anchor position. To apply an offset, use the `text-radial-offset` or the two-dimensional `text-offset`.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct SymbolLayoutLayerTextVariableAnchor(Vec<SymbolLayoutLayerTextVariableAnchorValue>);
 
 /// To increase the chance of placing high-priority labels on the map, you can provide an array of `text-anchor` locations, each paired with an offset value. The renderer will attempt to place the label at each location, in order, before moving on to the next location+offset. Use `text-justify: auto` to choose justification based on anchor position.
@@ -5665,9 +6559,14 @@ pub struct SymbolLayoutLayerTextVariableAnchor(Vec<SymbolLayoutLayerTextVariable
 ///
 ///  When the renderer chooses the `left` anchor, `[3, 0]` will be used for `text-offset`; the text will be shifted right by 3 ems.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-pub struct SymbolLayoutLayerTextVariableAnchorOffset(serde_json::Value);
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+pub struct SymbolLayoutLayerTextVariableAnchorOffset(
+    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
+    serde_json::Value,
+);
 
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum SymbolLayoutLayerTextWritingModeValue {
     #[serde(rename = "horizontal")]
     Horizontal,
@@ -5677,10 +6576,12 @@ pub enum SymbolLayoutLayerTextWritingModeValue {
 
 /// The property allows control over a symbol's orientation. Note that the property values act as a hint, so that a symbol whose language doesn’t support the provided orientation will be laid out in its natural orientation. Example: English point symbol will be rendered horizontally even if array value contains single 'vertical' enum value. The order of elements in an array define priority order for the placement of an orientation variant.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct SymbolLayoutLayerTextWritingMode(Vec<SymbolLayoutLayerTextWritingModeValue>);
 
 /// Whether this layer is displayed.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum SymbolLayoutLayerVisibility {
     #[serde(rename = "none")]
     None,
@@ -5695,6 +6596,7 @@ impl Default for SymbolLayoutLayerVisibility {
 }
 
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct SymbolPaintLayer {
     /// The color of the icon. This can only be used with SDF icons.
     #[serde(rename = "icon-color")]
@@ -5744,7 +6646,11 @@ pub struct SymbolPaintLayer {
 
 /// The color of the icon. This can only be used with SDF icons.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-pub struct SymbolPaintLayerIconColor(color::DynamicColor);
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+pub struct SymbolPaintLayerIconColor(
+    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_dynamic_color))]
+    color::DynamicColor,
+);
 
 impl Default for SymbolPaintLayerIconColor {
     fn default() -> Self {
@@ -5754,7 +6660,11 @@ impl Default for SymbolPaintLayerIconColor {
 
 /// Fade out the halo towards the outside.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-pub struct SymbolPaintLayerIconHaloBlur(serde_json::Number);
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+pub struct SymbolPaintLayerIconHaloBlur(
+    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
+    serde_json::Number,
+);
 
 impl Default for SymbolPaintLayerIconHaloBlur {
     fn default() -> Self {
@@ -5767,7 +6677,11 @@ impl Default for SymbolPaintLayerIconHaloBlur {
 
 /// The color of the icon's halo. Icon halos can only be used with SDF icons.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-pub struct SymbolPaintLayerIconHaloColor(color::DynamicColor);
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+pub struct SymbolPaintLayerIconHaloColor(
+    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_dynamic_color))]
+    color::DynamicColor,
+);
 
 impl Default for SymbolPaintLayerIconHaloColor {
     fn default() -> Self {
@@ -5782,7 +6696,11 @@ impl Default for SymbolPaintLayerIconHaloColor {
 ///
 /// The unit is in pixels only for SDF sprites that were created with a blur radius of 8, multiplied by the display density. I.e., the radius needs to be 16 for `@2x` sprites, etc.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-pub struct SymbolPaintLayerIconHaloWidth(serde_json::Number);
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+pub struct SymbolPaintLayerIconHaloWidth(
+    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
+    serde_json::Number,
+);
 
 impl Default for SymbolPaintLayerIconHaloWidth {
     fn default() -> Self {
@@ -5795,7 +6713,11 @@ impl Default for SymbolPaintLayerIconHaloWidth {
 
 /// The opacity at which the icon will be drawn.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-pub struct SymbolPaintLayerIconOpacity(serde_json::Number);
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+pub struct SymbolPaintLayerIconOpacity(
+    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
+    serde_json::Number,
+);
 
 impl Default for SymbolPaintLayerIconOpacity {
     fn default() -> Self {
@@ -5808,7 +6730,11 @@ impl Default for SymbolPaintLayerIconOpacity {
 
 /// Distance that the icon's anchor is moved from its original placement. Positive values indicate right and down, while negative values indicate left and up.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-pub struct SymbolPaintLayerIconTranslate(Box<[serde_json::Number; 2]>);
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+pub struct SymbolPaintLayerIconTranslate(
+    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_box_2_json_number))]
+     Box<[serde_json::Number; 2]>,
+);
 
 impl Default for SymbolPaintLayerIconTranslate {
     fn default() -> Self {
@@ -5823,6 +6749,7 @@ impl Default for SymbolPaintLayerIconTranslate {
 
 /// Controls the frame of reference for `icon-translate`.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum SymbolPaintLayerIconTranslateAnchor {
     #[serde(rename = "map")]
     Map,
@@ -5838,7 +6765,11 @@ impl Default for SymbolPaintLayerIconTranslateAnchor {
 
 /// The color with which the text will be drawn.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-pub struct SymbolPaintLayerTextColor(color::DynamicColor);
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+pub struct SymbolPaintLayerTextColor(
+    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_dynamic_color))]
+    color::DynamicColor,
+);
 
 impl Default for SymbolPaintLayerTextColor {
     fn default() -> Self {
@@ -5848,7 +6779,11 @@ impl Default for SymbolPaintLayerTextColor {
 
 /// The halo's fadeout distance towards the outside.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-pub struct SymbolPaintLayerTextHaloBlur(serde_json::Number);
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+pub struct SymbolPaintLayerTextHaloBlur(
+    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
+    serde_json::Number,
+);
 
 impl Default for SymbolPaintLayerTextHaloBlur {
     fn default() -> Self {
@@ -5861,7 +6796,11 @@ impl Default for SymbolPaintLayerTextHaloBlur {
 
 /// The color of the text's halo, which helps it stand out from backgrounds.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-pub struct SymbolPaintLayerTextHaloColor(color::DynamicColor);
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+pub struct SymbolPaintLayerTextHaloColor(
+    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_dynamic_color))]
+    color::DynamicColor,
+);
 
 impl Default for SymbolPaintLayerTextHaloColor {
     fn default() -> Self {
@@ -5874,7 +6813,11 @@ impl Default for SymbolPaintLayerTextHaloColor {
 
 /// Distance of halo to the font outline. Max text halo width is 1/4 of the font-size.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-pub struct SymbolPaintLayerTextHaloWidth(serde_json::Number);
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+pub struct SymbolPaintLayerTextHaloWidth(
+    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
+    serde_json::Number,
+);
 
 impl Default for SymbolPaintLayerTextHaloWidth {
     fn default() -> Self {
@@ -5887,7 +6830,11 @@ impl Default for SymbolPaintLayerTextHaloWidth {
 
 /// The opacity at which the text will be drawn.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-pub struct SymbolPaintLayerTextOpacity(serde_json::Number);
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+pub struct SymbolPaintLayerTextOpacity(
+    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
+    serde_json::Number,
+);
 
 impl Default for SymbolPaintLayerTextOpacity {
     fn default() -> Self {
@@ -5900,7 +6847,11 @@ impl Default for SymbolPaintLayerTextOpacity {
 
 /// Distance that the text's anchor is moved from its original placement. Positive values indicate right and down, while negative values indicate left and up.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-pub struct SymbolPaintLayerTextTranslate(Box<[serde_json::Number; 2]>);
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+pub struct SymbolPaintLayerTextTranslate(
+    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_box_2_json_number))]
+     Box<[serde_json::Number; 2]>,
+);
 
 impl Default for SymbolPaintLayerTextTranslate {
     fn default() -> Self {
@@ -5915,6 +6866,7 @@ impl Default for SymbolPaintLayerTextTranslate {
 
 /// Controls the frame of reference for `text-translate`.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum SymbolPaintLayerTextTranslateAnchor {
     #[serde(rename = "map")]
     Map,

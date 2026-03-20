@@ -1,6 +1,7 @@
 use codegen2::Scope;
 
 use crate::generator::autotest::generate_test_from_example_if_present;
+use crate::generator::fuzz;
 use crate::mir::types::FormattedTextField;
 
 pub fn generate(scope: &mut Scope, name: &str, field: &FormattedTextField) {
@@ -9,6 +10,7 @@ pub fn generate(scope: &mut Scope, name: &str, field: &FormattedTextField) {
         .vis("pub")
         .doc(&field.meta.doc)
         .derive("serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone")
+        .attr(fuzz::CFG_DERIVE_ARBITRARY)
         .tuple_field("std::string::String");
 
     let default = &field.default;
@@ -40,6 +42,7 @@ mod tests {
         );
         insta::assert_snapshot!(scope.to_string(), @r#"
         #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+        #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
         pub struct Foo(std::string::String);
 
         impl Default for Foo {

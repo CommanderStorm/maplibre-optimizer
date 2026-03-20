@@ -2,6 +2,7 @@ use codegen2::Scope;
 use serde_json::Value;
 
 use crate::generator::autotest::generate_test_from_example_if_present;
+use crate::generator::fuzz;
 use crate::mir::types::ColorField;
 
 pub fn generate(scope: &mut Scope, name: &str, field: &ColorField) {
@@ -10,7 +11,8 @@ pub fn generate(scope: &mut Scope, name: &str, field: &ColorField) {
         .vis("pub")
         .doc(&field.meta.doc)
         .derive("serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone")
-        .tuple_field("color::DynamicColor");
+        .attr(fuzz::CFG_DERIVE_ARBITRARY)
+        .tuple_field_with_attrs([fuzz::ARB_DYNAMIC_COLOR], "color::DynamicColor");
 
     if let Some(default) = &field.default {
         let fun = scope
@@ -45,9 +47,13 @@ mod tests {
                 default: None,
             },
         );
-        insta::assert_snapshot!(scope.to_string(), @r"
+        insta::assert_snapshot!(scope.to_string(), @r#"
         #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-        pub struct Foo(color::DynamicColor);
-        ")
+        #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+        pub struct Foo(
+            #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_dynamic_color))]
+            color::DynamicColor,
+        );
+        "#)
     }
 }

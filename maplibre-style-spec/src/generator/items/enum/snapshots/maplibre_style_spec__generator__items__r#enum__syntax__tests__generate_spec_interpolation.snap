@@ -4,38 +4,59 @@ expression: "crate::generator::generate_spec_scope(&spec)"
 ---
 /// JSON number in an expression position
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-pub struct NumberLiteral(serde_json::Number);
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+pub struct NumberLiteral(
+    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
+    serde_json::Number,
+);
 
 /// JSON string in an expression position
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct StringLiteral(std::string::String);
 
 /// GeoJSON object literal
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-pub struct GeoJSONObjectLiteral(geojson::GeoJson);
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+pub struct GeoJSONObjectLiteral(
+    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_geojson))]
+    geojson::GeoJson,
+);
 
 /// JSON object literal
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-pub struct JSONObjectLiteral(serde_json::Value);
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+pub struct JSONObjectLiteral(
+    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
+    serde_json::Value,
+);
 
 /// JSON array literal
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-pub struct JSONArrayLiteral(Vec<serde_json::Value>);
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+pub struct JSONArrayLiteral(
+    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_vec_json_value))]
+    Vec<serde_json::Value>,
+);
 
 /// Array whose elements are string literals (e.g. match labels)
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct ArrayOfStringLiteral(Vec<StringLiteral>);
 
 /// Array whose elements are number literals (e.g. match labels)
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct ArrayOfNumberLiteral(Vec<NumberLiteral>);
 
 /// This is a Maplibre Style Specification
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct MaplibreStyleSpecification;
 
 /// First element in an interpolation array. May be followed by a number of arguments.
 #[derive(serde::Serialize, PartialEq, Debug, Clone)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum InterpolationName {
     /// Interpolates linearly between the pair of stops just less than and just greater than the input
     Linear,

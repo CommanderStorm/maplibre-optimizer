@@ -1,6 +1,7 @@
 use codegen2::Scope;
 
 use crate::generator::autotest::generate_test_from_example_if_present;
+use crate::generator::fuzz;
 use crate::mir::types::ResolvedImageField;
 
 pub fn generate(scope: &mut Scope, name: &str, field: &ResolvedImageField) {
@@ -9,6 +10,7 @@ pub fn generate(scope: &mut Scope, name: &str, field: &ResolvedImageField) {
         .vis("pub")
         .doc(&field.meta.doc)
         .derive("serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone")
+        .attr(fuzz::CFG_DERIVE_ARBITRARY)
         .tuple_field("std::string::String");
     generate_test_from_example_if_present(scope, name, field.meta.example.as_ref());
 }
@@ -29,9 +31,10 @@ mod tests {
                 tokens: None,
             },
         );
-        insta::assert_snapshot!(scope.to_string(), @r"
+        insta::assert_snapshot!(scope.to_string(), @r#"
         #[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone)]
+        #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
         pub struct Foo(std::string::String);
-        ")
+        "#)
     }
 }
