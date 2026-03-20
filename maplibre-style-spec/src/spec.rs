@@ -906,7 +906,7 @@ pub enum LightColorExpression {
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 #[serde(untagged)]
 pub enum LightColor {
-    Expr(LightColorExpression),
+    Expr(Box<LightColorExpression>),
     Literal(
         #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
         serde_json::Value,
@@ -935,7 +935,7 @@ pub enum LightIntensityExpression {
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 #[serde(untagged)]
 pub enum LightIntensity {
-    Expr(LightIntensityExpression),
+    Expr(Box<LightIntensityExpression>),
     Literal(
         #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
         serde_json::Number,
@@ -1062,7 +1062,7 @@ pub enum SkyAtmosphereBlendExpression {
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 #[serde(untagged)]
 pub enum SkyAtmosphereBlend {
-    Expr(SkyAtmosphereBlendExpression),
+    Expr(Box<SkyAtmosphereBlendExpression>),
     Literal(
         #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
         serde_json::Number,
@@ -1092,7 +1092,7 @@ pub enum SkyFogColorExpression {
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 #[serde(untagged)]
 pub enum SkyFogColor {
-    Expr(SkyFogColorExpression),
+    Expr(Box<SkyFogColorExpression>),
     Literal(
         #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
         serde_json::Value,
@@ -1121,7 +1121,7 @@ pub enum SkyFogGroundBlendExpression {
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 #[serde(untagged)]
 pub enum SkyFogGroundBlend {
-    Expr(SkyFogGroundBlendExpression),
+    Expr(Box<SkyFogGroundBlendExpression>),
     Literal(
         #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
         serde_json::Number,
@@ -1151,7 +1151,7 @@ pub enum SkyHorizonColorExpression {
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 #[serde(untagged)]
 pub enum SkyHorizonColor {
-    Expr(SkyHorizonColorExpression),
+    Expr(Box<SkyHorizonColorExpression>),
     Literal(
         #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
         serde_json::Value,
@@ -1180,7 +1180,7 @@ pub enum SkyHorizonFogBlendExpression {
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 #[serde(untagged)]
 pub enum SkyHorizonFogBlend {
-    Expr(SkyHorizonFogBlendExpression),
+    Expr(Box<SkyHorizonFogBlendExpression>),
     Literal(
         #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
         serde_json::Number,
@@ -1210,7 +1210,7 @@ pub enum SkySkyColorExpression {
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 #[serde(untagged)]
 pub enum SkySkyColor {
-    Expr(SkySkyColorExpression),
+    Expr(Box<SkySkyColorExpression>),
     Literal(
         #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
         serde_json::Value,
@@ -1239,7 +1239,7 @@ pub enum SkySkyHorizonBlendExpression {
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 #[serde(untagged)]
 pub enum SkySkyHorizonBlend {
-    Expr(SkySkyHorizonBlendExpression),
+    Expr(Box<SkySkyHorizonBlendExpression>),
     Literal(
         #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
         serde_json::Number,
@@ -1359,10 +1359,6 @@ pub enum StringLiteralOrNumberLiteralOrArrayOfStringLiteralOrArrayOfNumberLitera
 pub enum NumberLiteralOrNumberAsUnion {
     NumberLiteral(NumberLiteral),
     Number(Box<Number>),
-    /// Sub-expressions that evaluate to a number but are not represented in [`Number`],
-    /// e.g. `["var", "x"]`.
-    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
-    Expression(serde_json::Value),
 }
 
 /// "Any"
@@ -1443,7 +1439,7 @@ pub enum Any {
     ///  - [Create and style clusters](https://maplibre.org/maplibre-gl-js/docs/examples/create-and-style-clusters/)
     Step(
         (
-            serde_json::Value,
+            NumberLiteralOrNumberAsUnion,
             serde_json::Value,
             Vec<(NumberLiteral, serde_json::Value)>,
         ),
@@ -1500,27 +1496,20 @@ impl<'de> serde::de::Visitor<'de> for AnyVisitor {
                 Ok(Any::At(index, array))
             }
             "case" => {
-                let mut rest: Vec<serde_json::Value> = Vec::new();
-                while let Some(v) = seq.next_element()? {
-                    rest.push(v);
-                }
-                if rest.len() < 3 {
-                    return Err(serde::de::Error::custom(
-                        "Any::Case: need at least one condition, one output, and a fallback",
-                    ));
-                }
-                if rest.len() % 2 == 0 {
-                    return Err(serde::de::Error::custom(
-                        "Any::Case: expected an odd number of arguments after operator (pairs + fallback)",
-                    ));
-                }
-                let fallback = rest.pop().expect("len checked above");
                 let mut inputs = Vec::new();
-                for chunk in rest.chunks_exact(2) {
-                    let condition: Boolean = serde_json::from_value(chunk[0].clone())
-                        .map_err(serde::de::Error::custom)?;
-                    inputs.push((condition, chunk[1].clone()));
+                while let Some(condition_i) = seq.next_element()? {
+                    let output_i = seq.next_element()?.ok_or_else(|| {
+                        serde::de::Error::custom("expected output_i in Any::Case")
+                    })?;
+                    let element = (condition_i, output_i);
+                    inputs.push(element);
                 }
+                if inputs.is_empty() {
+                    return Err(serde::de::Error::custom(
+                        "Any::Case requires at least one argument",
+                    ));
+                }
+                let fallback = visit_seq_field(&mut seq, "fallback")?;
                 Ok(Any::Case((inputs, fallback)))
             }
             "coalesce" => {
@@ -1550,28 +1539,20 @@ impl<'de> serde::de::Visitor<'de> for AnyVisitor {
             }
             "id" => Ok(Any::Id),
             "let" => {
-                let mut rest: Vec<serde_json::Value> = Vec::new();
-                while let Some(v) = seq.next_element()? {
-                    rest.push(v);
-                }
-                if rest.len() < 3 {
-                    return Err(serde::de::Error::custom(
-                        "Any::Let: need at least one name, one value, and a result expression",
-                    ));
-                }
-                if rest.len() % 2 == 0 {
-                    return Err(serde::de::Error::custom(
-                        "Any::Let: expected an odd number of arguments after operator (name/value pairs + expression)",
-                    ));
-                }
-
-                let expression = rest.pop().expect("len checked above");
                 let mut inputs = Vec::new();
-                for chunk in rest.chunks_exact(2) {
-                    let name: StringLiteral = serde_json::from_value(chunk[0].clone())
-                        .map_err(serde::de::Error::custom)?;
-                    inputs.push((name, chunk[1].clone()));
+                while let Some(var_name_i) = seq.next_element()? {
+                    let var_value_i = seq.next_element()?.ok_or_else(|| {
+                        serde::de::Error::custom("expected var_value_i in Any::Let")
+                    })?;
+                    let element = (var_name_i, var_value_i);
+                    inputs.push(element);
                 }
+                if inputs.is_empty() {
+                    return Err(serde::de::Error::custom(
+                        "Any::Let requires at least one argument",
+                    ));
+                }
+                let expression = visit_seq_field(&mut seq, "expression")?;
                 Ok(Any::Let((inputs, expression)))
             }
             "match" => {
@@ -1582,7 +1563,7 @@ impl<'de> serde::de::Visitor<'de> for AnyVisitor {
                 if rest.len() < 2 {
                     return Err(serde::de::Error::custom("Any::Match: too few arguments"));
                 }
-                if !rest.len().is_multiple_of(2) {
+                if rest.len() % 2 != 0 {
                     return Err(serde::de::Error::custom(
                         "Any::Match: expected an even number of arguments after operator (input + label/output pairs + fallback)",
                     ));
@@ -1606,7 +1587,7 @@ impl<'de> serde::de::Visitor<'de> for AnyVisitor {
                 Ok(Any::Match((input, pairs, fallback)))
             }
             "step" => {
-                let input: serde_json::Value = visit_seq_field(&mut seq, "input")?;
+                let input: NumberLiteralOrNumberAsUnion = visit_seq_field(&mut seq, "input")?;
                 let output_0: serde_json::Value = visit_seq_field(&mut seq, "output_0")?;
                 let mut stops = Vec::new();
                 while let Some(stop_input_i) = seq.next_element::<NumberLiteral>()? {
@@ -2080,24 +2061,18 @@ impl<'de> serde::de::Visitor<'de> for BooleanVisitor {
                 Ok(Boolean::NotEqual(input_1, input_2, collator))
             }
             "<" => {
-                let input_1 = visit_seq_field(&mut seq, "input_1")?;
-                let input_2 = visit_seq_field(&mut seq, "input_2")?;
-                let collator = seq.next_element()?;
-                Ok(Boolean::Less(LessOptions::Args((
-                    input_1,
-                    input_2,
-                    collator,
-                ))))
+                // Delegate the remainder of the sequence to LessOptions deserialization
+                let remainder_of_sequence = serde::de::value::SeqAccessDeserializer::new(seq);
+                let options =
+                    <LessOptions as serde::Deserialize>::deserialize(remainder_of_sequence)?;
+                Ok(Boolean::Less(options))
             }
             "<=" => {
-                let input_1 = visit_seq_field(&mut seq, "input_1")?;
-                let input_2 = visit_seq_field(&mut seq, "input_2")?;
-                let collator = seq.next_element()?;
-                Ok(Boolean::LessEqual(LessEqualOptions::Args((
-                    input_1,
-                    input_2,
-                    collator,
-                ))))
+                // Delegate the remainder of the sequence to LessEqualOptions deserialization
+                let remainder_of_sequence = serde::de::value::SeqAccessDeserializer::new(seq);
+                let options =
+                    <LessEqualOptions as serde::Deserialize>::deserialize(remainder_of_sequence)?;
+                Ok(Boolean::LessEqual(options))
             }
             "==" => {
                 let input_1 = visit_seq_field(&mut seq, "input_1")?;
@@ -2106,24 +2081,19 @@ impl<'de> serde::de::Visitor<'de> for BooleanVisitor {
                 Ok(Boolean::EqualEqual(input_1, input_2, collator))
             }
             ">" => {
-                let input_1 = visit_seq_field(&mut seq, "input_1")?;
-                let input_2 = visit_seq_field(&mut seq, "input_2")?;
-                let collator = seq.next_element()?;
-                Ok(Boolean::Greater(GreaterOptions::Args((
-                    input_1,
-                    input_2,
-                    collator,
-                ))))
+                // Delegate the remainder of the sequence to GreaterOptions deserialization
+                let remainder_of_sequence = serde::de::value::SeqAccessDeserializer::new(seq);
+                let options =
+                    <GreaterOptions as serde::Deserialize>::deserialize(remainder_of_sequence)?;
+                Ok(Boolean::Greater(options))
             }
             ">=" => {
-                let input_1 = visit_seq_field(&mut seq, "input_1")?;
-                let input_2 = visit_seq_field(&mut seq, "input_2")?;
-                let collator = seq.next_element()?;
-                Ok(Boolean::GreaterEqual(GreaterEqualOptions::Args((
-                    input_1,
-                    input_2,
-                    collator,
-                ))))
+                // Delegate the remainder of the sequence to GreaterEqualOptions deserialization
+                let remainder_of_sequence = serde::de::value::SeqAccessDeserializer::new(seq);
+                let options = <GreaterEqualOptions as serde::Deserialize>::deserialize(
+                    remainder_of_sequence,
+                )?;
+                Ok(Boolean::GreaterEqual(options))
             }
             "all" => {
                 let mut inputs = Vec::new();
@@ -2851,12 +2821,22 @@ impl<'de> serde::de::Visitor<'de> for NumberVisitor {
                 while let Some(element) = seq.next_element()? {
                     inputs.push(element);
                 }
+                if inputs.is_empty() {
+                    return Err(serde::de::Error::custom(
+                        "Number::Star requires at least one argument",
+                    ));
+                }
                 Ok(Number::Star(inputs))
             }
             "+" => {
                 let mut inputs = Vec::new();
                 while let Some(element) = seq.next_element()? {
                     inputs.push(element);
+                }
+                if inputs.is_empty() {
+                    return Err(serde::de::Error::custom(
+                        "Number::Plus requires at least one argument",
+                    ));
                 }
                 Ok(Number::Plus(inputs))
             }
@@ -2956,12 +2936,22 @@ impl<'de> serde::de::Visitor<'de> for NumberVisitor {
                 while let Some(element) = seq.next_element()? {
                     inputs.push(element);
                 }
+                if inputs.is_empty() {
+                    return Err(serde::de::Error::custom(
+                        "Number::Max requires at least one argument",
+                    ));
+                }
                 Ok(Number::Max(inputs))
             }
             "min" => {
                 let mut inputs = Vec::new();
                 while let Some(element) = seq.next_element()? {
                     inputs.push(element);
+                }
+                if inputs.is_empty() {
+                    return Err(serde::de::Error::custom(
+                        "Number::Min requires at least one argument",
+                    ));
                 }
                 Ok(Number::Min(inputs))
             }
@@ -3508,9 +3498,13 @@ impl Default for GeojsonSourceBuffer {
 ///  * `point_count_abbreviated` An abbreviated point count
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone, Copy)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-#[derive(Default)]
 pub struct GeojsonSourceCluster(bool);
 
+impl Default for GeojsonSourceCluster {
+    fn default() -> Self {
+        Self(false)
+    }
+}
 
 /// Max zoom on which to cluster points if clustering is enabled. Defaults to one zoom less than maxzoom (so that last zoom features are not clustered). Clusters are re-evaluated at integer zoom levels so setting clusterMaxZoom to 14 means the clusters will be displayed until z15.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
@@ -3577,16 +3571,24 @@ pub struct GeojsonSourceFilter(Filter);
 /// Whether to generate ids for the geojson features. When enabled, the `feature.id` property will be auto assigned based on its index in the `features` array, over-writing any previous values.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone, Copy)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-#[derive(Default)]
 pub struct GeojsonSourceGenerateId(bool);
 
+impl Default for GeojsonSourceGenerateId {
+    fn default() -> Self {
+        Self(false)
+    }
+}
 
 /// Whether to calculate line distance metrics. This is required for line layers that specify `line-gradient` values.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone, Copy)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-#[derive(Default)]
 pub struct GeojsonSourceLineMetrics(bool);
 
+impl Default for GeojsonSourceLineMetrics {
+    fn default() -> Self {
+        Self(false)
+    }
+}
 
 /// Maximum zoom level at which to create vector tiles (higher means greater detail at high zoom levels).
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
@@ -3783,9 +3785,13 @@ pub struct RasterSourceUrl(std::string::String);
 /// A setting to determine whether a source's tiles are cached locally.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone, Copy)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-#[derive(Default)]
 pub struct RasterSourceVolatile(bool);
 
+impl Default for RasterSourceVolatile {
+    fn default() -> Self {
+        Self(false)
+    }
+}
 
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
@@ -3999,9 +4005,13 @@ pub struct RasterDemSourceUrl(std::string::String);
 /// A setting to determine whether a source's tiles are cached locally.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone, Copy)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-#[derive(Default)]
 pub struct RasterDemSourceVolatile(bool);
 
+impl Default for RasterDemSourceVolatile {
+    fn default() -> Self {
+        Self(false)
+    }
+}
 
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
@@ -4135,9 +4145,13 @@ pub struct VectorSourceUrl(std::string::String);
 /// A setting to determine whether a source's tiles are cached locally.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone, Copy)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-#[derive(Default)]
 pub struct VectorSourceVolatile(bool);
 
+impl Default for VectorSourceVolatile {
+    fn default() -> Self {
+        Self(false)
+    }
+}
 
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
@@ -4294,7 +4308,7 @@ pub enum BackgroundPaintLayerBackgroundColorExpression {
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 #[serde(untagged)]
 pub enum BackgroundPaintLayerBackgroundColor {
-    Expr(BackgroundPaintLayerBackgroundColorExpression),
+    Expr(Box<BackgroundPaintLayerBackgroundColorExpression>),
     Literal(
         #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
         serde_json::Value,
@@ -4321,7 +4335,7 @@ pub enum BackgroundPaintLayerBackgroundOpacityExpression {
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 #[serde(untagged)]
 pub enum BackgroundPaintLayerBackgroundOpacity {
-    Expr(BackgroundPaintLayerBackgroundOpacityExpression),
+    Expr(Box<BackgroundPaintLayerBackgroundOpacityExpression>),
     Literal(
         #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
         serde_json::Number,
@@ -4366,7 +4380,7 @@ pub enum CircleLayoutLayerCircleSortKeyExpression {
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 #[serde(untagged)]
 pub enum CircleLayoutLayerCircleSortKey {
-    Expr(CircleLayoutLayerCircleSortKeyExpression),
+    Expr(Box<CircleLayoutLayerCircleSortKeyExpression>),
     Literal(
         #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
         serde_json::Number,
@@ -4436,7 +4450,7 @@ pub enum CirclePaintLayerCircleBlurExpression {
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 #[serde(untagged)]
 pub enum CirclePaintLayerCircleBlur {
-    Expr(CirclePaintLayerCircleBlurExpression),
+    Expr(Box<CirclePaintLayerCircleBlurExpression>),
     Literal(
         #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
         serde_json::Number,
@@ -4466,7 +4480,7 @@ pub enum CirclePaintLayerCircleColorExpression {
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 #[serde(untagged)]
 pub enum CirclePaintLayerCircleColor {
-    Expr(CirclePaintLayerCircleColorExpression),
+    Expr(Box<CirclePaintLayerCircleColorExpression>),
     Literal(
         #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
         serde_json::Value,
@@ -4493,7 +4507,7 @@ pub enum CirclePaintLayerCircleOpacityExpression {
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 #[serde(untagged)]
 pub enum CirclePaintLayerCircleOpacity {
-    Expr(CirclePaintLayerCircleOpacityExpression),
+    Expr(Box<CirclePaintLayerCircleOpacityExpression>),
     Literal(
         #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
         serde_json::Number,
@@ -4545,7 +4559,7 @@ pub enum CirclePaintLayerCircleRadiusExpression {
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 #[serde(untagged)]
 pub enum CirclePaintLayerCircleRadius {
-    Expr(CirclePaintLayerCircleRadiusExpression),
+    Expr(Box<CirclePaintLayerCircleRadiusExpression>),
     Literal(
         #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
         serde_json::Number,
@@ -4575,7 +4589,7 @@ pub enum CirclePaintLayerCircleStrokeColorExpression {
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 #[serde(untagged)]
 pub enum CirclePaintLayerCircleStrokeColor {
-    Expr(CirclePaintLayerCircleStrokeColorExpression),
+    Expr(Box<CirclePaintLayerCircleStrokeColorExpression>),
     Literal(
         #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
         serde_json::Value,
@@ -4602,7 +4616,7 @@ pub enum CirclePaintLayerCircleStrokeOpacityExpression {
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 #[serde(untagged)]
 pub enum CirclePaintLayerCircleStrokeOpacity {
-    Expr(CirclePaintLayerCircleStrokeOpacityExpression),
+    Expr(Box<CirclePaintLayerCircleStrokeOpacityExpression>),
     Literal(
         #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
         serde_json::Number,
@@ -4632,7 +4646,7 @@ pub enum CirclePaintLayerCircleStrokeWidthExpression {
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 #[serde(untagged)]
 pub enum CirclePaintLayerCircleStrokeWidth {
-    Expr(CirclePaintLayerCircleStrokeWidthExpression),
+    Expr(Box<CirclePaintLayerCircleStrokeWidthExpression>),
     Literal(
         #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
         serde_json::Number,
@@ -4721,7 +4735,7 @@ pub enum ColorReliefPaintLayerColorReliefColorExpression {
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 #[serde(untagged)]
 pub enum ColorReliefPaintLayerColorReliefColor {
-    Expr(ColorReliefPaintLayerColorReliefColorExpression),
+    Expr(Box<ColorReliefPaintLayerColorReliefColorExpression>),
     Literal(
         #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
         serde_json::Value,
@@ -4742,7 +4756,7 @@ pub enum ColorReliefPaintLayerColorReliefOpacityExpression {
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 #[serde(untagged)]
 pub enum ColorReliefPaintLayerColorReliefOpacity {
-    Expr(ColorReliefPaintLayerColorReliefOpacityExpression),
+    Expr(Box<ColorReliefPaintLayerColorReliefOpacityExpression>),
     Literal(
         #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
         serde_json::Number,
@@ -4782,7 +4796,7 @@ pub enum FillLayoutLayerFillSortKeyExpression {
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 #[serde(untagged)]
 pub enum FillLayoutLayerFillSortKey {
-    Expr(FillLayoutLayerFillSortKeyExpression),
+    Expr(Box<FillLayoutLayerFillSortKeyExpression>),
     Literal(
         #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
         serde_json::Number,
@@ -4851,7 +4865,7 @@ pub enum FillPaintLayerFillColorExpression {
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 #[serde(untagged)]
 pub enum FillPaintLayerFillColor {
-    Expr(FillPaintLayerFillColorExpression),
+    Expr(Box<FillPaintLayerFillColorExpression>),
     Literal(
         #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
         serde_json::Value,
@@ -4878,7 +4892,7 @@ pub enum FillPaintLayerFillOpacityExpression {
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 #[serde(untagged)]
 pub enum FillPaintLayerFillOpacity {
-    Expr(FillPaintLayerFillOpacityExpression),
+    Expr(Box<FillPaintLayerFillOpacityExpression>),
     Literal(
         #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
         serde_json::Number,
@@ -4908,7 +4922,7 @@ pub enum FillPaintLayerFillOutlineColorExpression {
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 #[serde(untagged)]
 pub enum FillPaintLayerFillOutlineColor {
-    Expr(FillPaintLayerFillOutlineColorExpression),
+    Expr(Box<FillPaintLayerFillOutlineColorExpression>),
     Literal(
         #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
         serde_json::Value,
@@ -5013,7 +5027,7 @@ pub enum FillExtrusionPaintLayerFillExtrusionBaseExpression {
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 #[serde(untagged)]
 pub enum FillExtrusionPaintLayerFillExtrusionBase {
-    Expr(FillExtrusionPaintLayerFillExtrusionBaseExpression),
+    Expr(Box<FillExtrusionPaintLayerFillExtrusionBaseExpression>),
     Literal(
         #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
         serde_json::Number,
@@ -5043,7 +5057,7 @@ pub enum FillExtrusionPaintLayerFillExtrusionColorExpression {
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 #[serde(untagged)]
 pub enum FillExtrusionPaintLayerFillExtrusionColor {
-    Expr(FillExtrusionPaintLayerFillExtrusionColorExpression),
+    Expr(Box<FillExtrusionPaintLayerFillExtrusionColorExpression>),
     Literal(
         #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
         serde_json::Value,
@@ -5070,7 +5084,7 @@ pub enum FillExtrusionPaintLayerFillExtrusionHeightExpression {
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 #[serde(untagged)]
 pub enum FillExtrusionPaintLayerFillExtrusionHeight {
-    Expr(FillExtrusionPaintLayerFillExtrusionHeightExpression),
+    Expr(Box<FillExtrusionPaintLayerFillExtrusionHeightExpression>),
     Literal(
         #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
         serde_json::Number,
@@ -5100,7 +5114,7 @@ pub enum FillExtrusionPaintLayerFillExtrusionOpacityExpression {
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 #[serde(untagged)]
 pub enum FillExtrusionPaintLayerFillExtrusionOpacity {
-    Expr(FillExtrusionPaintLayerFillExtrusionOpacityExpression),
+    Expr(Box<FillExtrusionPaintLayerFillExtrusionOpacityExpression>),
     Literal(
         #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
         serde_json::Number,
@@ -5214,7 +5228,7 @@ pub enum HeatmapPaintLayerHeatmapColorExpression {
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 #[serde(untagged)]
 pub enum HeatmapPaintLayerHeatmapColor {
-    Expr(HeatmapPaintLayerHeatmapColorExpression),
+    Expr(Box<HeatmapPaintLayerHeatmapColorExpression>),
     Literal(
         #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
         serde_json::Value,
@@ -5257,7 +5271,7 @@ pub enum HeatmapPaintLayerHeatmapIntensityExpression {
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 #[serde(untagged)]
 pub enum HeatmapPaintLayerHeatmapIntensity {
-    Expr(HeatmapPaintLayerHeatmapIntensityExpression),
+    Expr(Box<HeatmapPaintLayerHeatmapIntensityExpression>),
     Literal(
         #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
         serde_json::Number,
@@ -5287,7 +5301,7 @@ pub enum HeatmapPaintLayerHeatmapOpacityExpression {
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 #[serde(untagged)]
 pub enum HeatmapPaintLayerHeatmapOpacity {
-    Expr(HeatmapPaintLayerHeatmapOpacityExpression),
+    Expr(Box<HeatmapPaintLayerHeatmapOpacityExpression>),
     Literal(
         #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
         serde_json::Number,
@@ -5317,7 +5331,7 @@ pub enum HeatmapPaintLayerHeatmapRadiusExpression {
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 #[serde(untagged)]
 pub enum HeatmapPaintLayerHeatmapRadius {
-    Expr(HeatmapPaintLayerHeatmapRadiusExpression),
+    Expr(Box<HeatmapPaintLayerHeatmapRadiusExpression>),
     Literal(
         #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
         serde_json::Number,
@@ -5347,7 +5361,7 @@ pub enum HeatmapPaintLayerHeatmapWeightExpression {
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 #[serde(untagged)]
 pub enum HeatmapPaintLayerHeatmapWeight {
-    Expr(HeatmapPaintLayerHeatmapWeightExpression),
+    Expr(Box<HeatmapPaintLayerHeatmapWeightExpression>),
     Literal(
         #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
         serde_json::Number,
@@ -5424,7 +5438,7 @@ pub enum HillshadePaintLayerHillshadeAccentColorExpression {
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 #[serde(untagged)]
 pub enum HillshadePaintLayerHillshadeAccentColor {
-    Expr(HillshadePaintLayerHillshadeAccentColorExpression),
+    Expr(Box<HillshadePaintLayerHillshadeAccentColorExpression>),
     Literal(
         #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
         serde_json::Value,
@@ -5451,7 +5465,7 @@ pub enum HillshadePaintLayerHillshadeExaggerationExpression {
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 #[serde(untagged)]
 pub enum HillshadePaintLayerHillshadeExaggeration {
-    Expr(HillshadePaintLayerHillshadeExaggerationExpression),
+    Expr(Box<HillshadePaintLayerHillshadeExaggerationExpression>),
     Literal(
         #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
         serde_json::Number,
@@ -5655,7 +5669,7 @@ pub enum LineLayoutLayerLineMiterLimitExpression {
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 #[serde(untagged)]
 pub enum LineLayoutLayerLineMiterLimit {
-    Expr(LineLayoutLayerLineMiterLimitExpression),
+    Expr(Box<LineLayoutLayerLineMiterLimitExpression>),
     Literal(
         #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
         serde_json::Number,
@@ -5685,7 +5699,7 @@ pub enum LineLayoutLayerLineRoundLimitExpression {
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 #[serde(untagged)]
 pub enum LineLayoutLayerLineRoundLimit {
-    Expr(LineLayoutLayerLineRoundLimitExpression),
+    Expr(Box<LineLayoutLayerLineRoundLimitExpression>),
     Literal(
         #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
         serde_json::Number,
@@ -5715,7 +5729,7 @@ pub enum LineLayoutLayerLineSortKeyExpression {
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 #[serde(untagged)]
 pub enum LineLayoutLayerLineSortKey {
-    Expr(LineLayoutLayerLineSortKeyExpression),
+    Expr(Box<LineLayoutLayerLineSortKeyExpression>),
     Literal(
         #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
         serde_json::Number,
@@ -5785,7 +5799,7 @@ pub enum LinePaintLayerLineBlurExpression {
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 #[serde(untagged)]
 pub enum LinePaintLayerLineBlur {
-    Expr(LinePaintLayerLineBlurExpression),
+    Expr(Box<LinePaintLayerLineBlurExpression>),
     Literal(
         #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
         serde_json::Number,
@@ -5815,7 +5829,7 @@ pub enum LinePaintLayerLineColorExpression {
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 #[serde(untagged)]
 pub enum LinePaintLayerLineColor {
-    Expr(LinePaintLayerLineColorExpression),
+    Expr(Box<LinePaintLayerLineColorExpression>),
     Literal(
         #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
         serde_json::Value,
@@ -5850,7 +5864,7 @@ pub enum LinePaintLayerLineGapWidthExpression {
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 #[serde(untagged)]
 pub enum LinePaintLayerLineGapWidth {
-    Expr(LinePaintLayerLineGapWidthExpression),
+    Expr(Box<LinePaintLayerLineGapWidthExpression>),
     Literal(
         #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
         serde_json::Number,
@@ -5880,7 +5894,7 @@ pub enum LinePaintLayerLineGradientExpression {
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 #[serde(untagged)]
 pub enum LinePaintLayerLineGradient {
-    Expr(LinePaintLayerLineGradientExpression),
+    Expr(Box<LinePaintLayerLineGradientExpression>),
     Literal(
         #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
         serde_json::Value,
@@ -5901,7 +5915,7 @@ pub enum LinePaintLayerLineOffsetExpression {
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 #[serde(untagged)]
 pub enum LinePaintLayerLineOffset {
-    Expr(LinePaintLayerLineOffsetExpression),
+    Expr(Box<LinePaintLayerLineOffsetExpression>),
     Literal(
         #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
         serde_json::Number,
@@ -5931,7 +5945,7 @@ pub enum LinePaintLayerLineOpacityExpression {
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 #[serde(untagged)]
 pub enum LinePaintLayerLineOpacity {
-    Expr(LinePaintLayerLineOpacityExpression),
+    Expr(Box<LinePaintLayerLineOpacityExpression>),
     Literal(
         #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
         serde_json::Number,
@@ -5996,7 +6010,7 @@ pub enum LinePaintLayerLineWidthExpression {
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 #[serde(untagged)]
 pub enum LinePaintLayerLineWidth {
-    Expr(LinePaintLayerLineWidthExpression),
+    Expr(Box<LinePaintLayerLineWidthExpression>),
     Literal(
         #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
         serde_json::Number,
@@ -6073,7 +6087,7 @@ pub enum RasterPaintLayerRasterBrightnessMaxExpression {
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 #[serde(untagged)]
 pub enum RasterPaintLayerRasterBrightnessMax {
-    Expr(RasterPaintLayerRasterBrightnessMaxExpression),
+    Expr(Box<RasterPaintLayerRasterBrightnessMaxExpression>),
     Literal(
         #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
         serde_json::Number,
@@ -6103,7 +6117,7 @@ pub enum RasterPaintLayerRasterBrightnessMinExpression {
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 #[serde(untagged)]
 pub enum RasterPaintLayerRasterBrightnessMin {
-    Expr(RasterPaintLayerRasterBrightnessMinExpression),
+    Expr(Box<RasterPaintLayerRasterBrightnessMinExpression>),
     Literal(
         #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
         serde_json::Number,
@@ -6133,7 +6147,7 @@ pub enum RasterPaintLayerRasterContrastExpression {
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 #[serde(untagged)]
 pub enum RasterPaintLayerRasterContrast {
-    Expr(RasterPaintLayerRasterContrastExpression),
+    Expr(Box<RasterPaintLayerRasterContrastExpression>),
     Literal(
         #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
         serde_json::Number,
@@ -6163,7 +6177,7 @@ pub enum RasterPaintLayerRasterFadeDurationExpression {
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 #[serde(untagged)]
 pub enum RasterPaintLayerRasterFadeDuration {
-    Expr(RasterPaintLayerRasterFadeDurationExpression),
+    Expr(Box<RasterPaintLayerRasterFadeDurationExpression>),
     Literal(
         #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
         serde_json::Number,
@@ -6193,7 +6207,7 @@ pub enum RasterPaintLayerRasterHueRotateExpression {
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 #[serde(untagged)]
 pub enum RasterPaintLayerRasterHueRotate {
-    Expr(RasterPaintLayerRasterHueRotateExpression),
+    Expr(Box<RasterPaintLayerRasterHueRotateExpression>),
     Literal(
         #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
         serde_json::Number,
@@ -6223,7 +6237,7 @@ pub enum RasterPaintLayerRasterOpacityExpression {
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 #[serde(untagged)]
 pub enum RasterPaintLayerRasterOpacity {
-    Expr(RasterPaintLayerRasterOpacityExpression),
+    Expr(Box<RasterPaintLayerRasterOpacityExpression>),
     Literal(
         #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
         serde_json::Number,
@@ -6264,7 +6278,7 @@ pub enum RasterPaintLayerRasterSaturationExpression {
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 #[serde(untagged)]
 pub enum RasterPaintLayerRasterSaturation {
-    Expr(RasterPaintLayerRasterSaturationExpression),
+    Expr(Box<RasterPaintLayerRasterSaturationExpression>),
     Literal(
         #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
         serde_json::Number,
@@ -6436,9 +6450,13 @@ pub struct SymbolLayoutLayer {
 /// If true, the icon will be visible even if it collides with other previously drawn symbols.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone, Copy)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-#[derive(Default)]
 pub struct SymbolLayoutLayerIconAllowOverlap(bool);
 
+impl Default for SymbolLayoutLayerIconAllowOverlap {
+    fn default() -> Self {
+        Self(false)
+    }
+}
 
 /// Part of the icon placed closest to the anchor.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy, Default)]
@@ -6468,9 +6486,13 @@ pub enum SymbolLayoutLayerIconAnchor {
 /// If true, other symbols can be visible even if they collide with the icon.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone, Copy)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-#[derive(Default)]
 pub struct SymbolLayoutLayerIconIgnorePlacement(bool);
 
+impl Default for SymbolLayoutLayerIconIgnorePlacement {
+    fn default() -> Self {
+        Self(false)
+    }
+}
 
 /// Name of image in sprite to use for drawing an image background.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone)]
@@ -6480,9 +6502,13 @@ pub struct SymbolLayoutLayerIconImage(std::string::String);
 /// If true, the icon may be flipped to prevent it from being rendered upside-down.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone, Copy)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-#[derive(Default)]
 pub struct SymbolLayoutLayerIconKeepUpright(bool);
 
+impl Default for SymbolLayoutLayerIconKeepUpright {
+    fn default() -> Self {
+        Self(false)
+    }
+}
 
 /// Offset distance of icon from its anchor. Positive values indicate right and down, while negative values indicate left and up. Each component is multiplied by the value of `icon-size` to obtain the final offset in pixels. When combined with `icon-rotate` the offset will be as if the rotated direction was up.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
@@ -6506,9 +6532,13 @@ impl Default for SymbolLayoutLayerIconOffset {
 /// If true, text will display without their corresponding icons when the icon collides with other symbols and the text does not.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone, Copy)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-#[derive(Default)]
 pub struct SymbolLayoutLayerIconOptional(bool);
 
+impl Default for SymbolLayoutLayerIconOptional {
+    fn default() -> Self {
+        Self(false)
+    }
+}
 
 /// Allows for control over whether to show an icon when it overlaps other symbols on the map. If `icon-overlap` is not set, `icon-allow-overlap` is used instead.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy)]
@@ -6582,7 +6612,7 @@ pub enum SymbolLayoutLayerIconRotateExpression {
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 #[serde(untagged)]
 pub enum SymbolLayoutLayerIconRotate {
-    Expr(SymbolLayoutLayerIconRotateExpression),
+    Expr(Box<SymbolLayoutLayerIconRotateExpression>),
     Literal(
         #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
         serde_json::Number,
@@ -6625,7 +6655,7 @@ pub enum SymbolLayoutLayerIconSizeExpression {
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 #[serde(untagged)]
 pub enum SymbolLayoutLayerIconSize {
-    Expr(SymbolLayoutLayerIconSizeExpression),
+    Expr(Box<SymbolLayoutLayerIconSizeExpression>),
     Literal(
         #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
         serde_json::Number,
@@ -6682,9 +6712,13 @@ impl Default for SymbolLayoutLayerIconTextFitPadding {
 /// If true, the symbols will not cross tile edges to avoid mutual collisions. Recommended in layers that don't have enough padding in the vector tile to prevent collisions, or if it is a point symbol layer placed after a line symbol layer. When using a client that supports global collision detection, like MapLibre GL JS version 0.42.0 or greater, enabling this property is not needed to prevent clipped labels at tile boundaries.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone, Copy)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-#[derive(Default)]
 pub struct SymbolLayoutLayerSymbolAvoidEdges(bool);
 
+impl Default for SymbolLayoutLayerSymbolAvoidEdges {
+    fn default() -> Self {
+        Self(false)
+    }
+}
 
 /// Label placement relative to its geometry.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy, Default)]
@@ -6713,7 +6747,7 @@ pub enum SymbolLayoutLayerSymbolSortKeyExpression {
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 #[serde(untagged)]
 pub enum SymbolLayoutLayerSymbolSortKey {
-    Expr(SymbolLayoutLayerSymbolSortKeyExpression),
+    Expr(Box<SymbolLayoutLayerSymbolSortKeyExpression>),
     Literal(
         #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
         serde_json::Number,
@@ -6734,7 +6768,7 @@ pub enum SymbolLayoutLayerSymbolSpacingExpression {
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 #[serde(untagged)]
 pub enum SymbolLayoutLayerSymbolSpacing {
-    Expr(SymbolLayoutLayerSymbolSpacingExpression),
+    Expr(Box<SymbolLayoutLayerSymbolSpacingExpression>),
     Literal(
         #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
         serde_json::Number,
@@ -6766,9 +6800,13 @@ pub enum SymbolLayoutLayerSymbolZOrder {
 /// If true, the text will be visible even if it collides with other previously drawn symbols.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone, Copy)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-#[derive(Default)]
 pub struct SymbolLayoutLayerTextAllowOverlap(bool);
 
+impl Default for SymbolLayoutLayerTextAllowOverlap {
+    fn default() -> Self {
+        Self(false)
+    }
+}
 
 /// Part of the text placed closest to the anchor.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy, Default)]
@@ -6823,9 +6861,13 @@ impl Default for SymbolLayoutLayerTextFont {
 /// If true, other symbols can be visible even if they collide with the text.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone, Copy)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-#[derive(Default)]
 pub struct SymbolLayoutLayerTextIgnorePlacement(bool);
 
+impl Default for SymbolLayoutLayerTextIgnorePlacement {
+    fn default() -> Self {
+        Self(false)
+    }
+}
 
 /// Text justification options.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy, Default)]
@@ -6867,7 +6909,7 @@ pub enum SymbolLayoutLayerTextLetterSpacingExpression {
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 #[serde(untagged)]
 pub enum SymbolLayoutLayerTextLetterSpacing {
-    Expr(SymbolLayoutLayerTextLetterSpacingExpression),
+    Expr(Box<SymbolLayoutLayerTextLetterSpacingExpression>),
     Literal(
         #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
         serde_json::Number,
@@ -6897,7 +6939,7 @@ pub enum SymbolLayoutLayerTextLineHeightExpression {
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 #[serde(untagged)]
 pub enum SymbolLayoutLayerTextLineHeight {
-    Expr(SymbolLayoutLayerTextLineHeightExpression),
+    Expr(Box<SymbolLayoutLayerTextLineHeightExpression>),
     Literal(
         #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
         serde_json::Number,
@@ -6927,7 +6969,7 @@ pub enum SymbolLayoutLayerTextMaxAngleExpression {
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 #[serde(untagged)]
 pub enum SymbolLayoutLayerTextMaxAngle {
-    Expr(SymbolLayoutLayerTextMaxAngleExpression),
+    Expr(Box<SymbolLayoutLayerTextMaxAngleExpression>),
     Literal(
         #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
         serde_json::Number,
@@ -6957,7 +6999,7 @@ pub enum SymbolLayoutLayerTextMaxWidthExpression {
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 #[serde(untagged)]
 pub enum SymbolLayoutLayerTextMaxWidth {
-    Expr(SymbolLayoutLayerTextMaxWidthExpression),
+    Expr(Box<SymbolLayoutLayerTextMaxWidthExpression>),
     Literal(
         #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
         serde_json::Number,
@@ -6995,9 +7037,13 @@ impl Default for SymbolLayoutLayerTextOffset {
 /// If true, icons will display without their corresponding text when the text collides with other symbols and the icon does not.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone, Copy)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-#[derive(Default)]
 pub struct SymbolLayoutLayerTextOptional(bool);
 
+impl Default for SymbolLayoutLayerTextOptional {
+    fn default() -> Self {
+        Self(false)
+    }
+}
 
 /// Allows for control over whether to show symbol text when it overlaps other symbols on the map. If `text-overlap` is not set, `text-allow-overlap` is used instead
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy)]
@@ -7025,7 +7071,7 @@ pub enum SymbolLayoutLayerTextPaddingExpression {
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 #[serde(untagged)]
 pub enum SymbolLayoutLayerTextPadding {
-    Expr(SymbolLayoutLayerTextPaddingExpression),
+    Expr(Box<SymbolLayoutLayerTextPaddingExpression>),
     Literal(
         #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
         serde_json::Number,
@@ -7068,7 +7114,7 @@ pub enum SymbolLayoutLayerTextRadialOffsetExpression {
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 #[serde(untagged)]
 pub enum SymbolLayoutLayerTextRadialOffset {
-    Expr(SymbolLayoutLayerTextRadialOffsetExpression),
+    Expr(Box<SymbolLayoutLayerTextRadialOffsetExpression>),
     Literal(
         #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
         serde_json::Number,
@@ -7098,7 +7144,7 @@ pub enum SymbolLayoutLayerTextRotateExpression {
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 #[serde(untagged)]
 pub enum SymbolLayoutLayerTextRotate {
-    Expr(SymbolLayoutLayerTextRotateExpression),
+    Expr(Box<SymbolLayoutLayerTextRotateExpression>),
     Literal(
         #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
         serde_json::Number,
@@ -7143,7 +7189,7 @@ pub enum SymbolLayoutLayerTextSizeExpression {
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 #[serde(untagged)]
 pub enum SymbolLayoutLayerTextSize {
-    Expr(SymbolLayoutLayerTextSizeExpression),
+    Expr(Box<SymbolLayoutLayerTextSizeExpression>),
     Literal(
         #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
         serde_json::Number,
@@ -7310,7 +7356,7 @@ pub enum SymbolPaintLayerIconColorExpression {
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 #[serde(untagged)]
 pub enum SymbolPaintLayerIconColor {
-    Expr(SymbolPaintLayerIconColorExpression),
+    Expr(Box<SymbolPaintLayerIconColorExpression>),
     Literal(
         #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
         serde_json::Value,
@@ -7337,7 +7383,7 @@ pub enum SymbolPaintLayerIconHaloBlurExpression {
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 #[serde(untagged)]
 pub enum SymbolPaintLayerIconHaloBlur {
-    Expr(SymbolPaintLayerIconHaloBlurExpression),
+    Expr(Box<SymbolPaintLayerIconHaloBlurExpression>),
     Literal(
         #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
         serde_json::Number,
@@ -7367,7 +7413,7 @@ pub enum SymbolPaintLayerIconHaloColorExpression {
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 #[serde(untagged)]
 pub enum SymbolPaintLayerIconHaloColor {
-    Expr(SymbolPaintLayerIconHaloColorExpression),
+    Expr(Box<SymbolPaintLayerIconHaloColorExpression>),
     Literal(
         #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
         serde_json::Value,
@@ -7396,7 +7442,7 @@ pub enum SymbolPaintLayerIconHaloWidthExpression {
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 #[serde(untagged)]
 pub enum SymbolPaintLayerIconHaloWidth {
-    Expr(SymbolPaintLayerIconHaloWidthExpression),
+    Expr(Box<SymbolPaintLayerIconHaloWidthExpression>),
     Literal(
         #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
         serde_json::Number,
@@ -7426,7 +7472,7 @@ pub enum SymbolPaintLayerIconOpacityExpression {
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 #[serde(untagged)]
 pub enum SymbolPaintLayerIconOpacity {
-    Expr(SymbolPaintLayerIconOpacityExpression),
+    Expr(Box<SymbolPaintLayerIconOpacityExpression>),
     Literal(
         #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
         serde_json::Number,
@@ -7486,7 +7532,7 @@ pub enum SymbolPaintLayerTextColorExpression {
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 #[serde(untagged)]
 pub enum SymbolPaintLayerTextColor {
-    Expr(SymbolPaintLayerTextColorExpression),
+    Expr(Box<SymbolPaintLayerTextColorExpression>),
     Literal(
         #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
         serde_json::Value,
@@ -7513,7 +7559,7 @@ pub enum SymbolPaintLayerTextHaloBlurExpression {
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 #[serde(untagged)]
 pub enum SymbolPaintLayerTextHaloBlur {
-    Expr(SymbolPaintLayerTextHaloBlurExpression),
+    Expr(Box<SymbolPaintLayerTextHaloBlurExpression>),
     Literal(
         #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
         serde_json::Number,
@@ -7543,7 +7589,7 @@ pub enum SymbolPaintLayerTextHaloColorExpression {
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 #[serde(untagged)]
 pub enum SymbolPaintLayerTextHaloColor {
-    Expr(SymbolPaintLayerTextHaloColorExpression),
+    Expr(Box<SymbolPaintLayerTextHaloColorExpression>),
     Literal(
         #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
         serde_json::Value,
@@ -7570,7 +7616,7 @@ pub enum SymbolPaintLayerTextHaloWidthExpression {
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 #[serde(untagged)]
 pub enum SymbolPaintLayerTextHaloWidth {
-    Expr(SymbolPaintLayerTextHaloWidthExpression),
+    Expr(Box<SymbolPaintLayerTextHaloWidthExpression>),
     Literal(
         #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
         serde_json::Number,
@@ -7600,7 +7646,7 @@ pub enum SymbolPaintLayerTextOpacityExpression {
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 #[serde(untagged)]
 pub enum SymbolPaintLayerTextOpacity {
-    Expr(SymbolPaintLayerTextOpacityExpression),
+    Expr(Box<SymbolPaintLayerTextOpacityExpression>),
     Literal(
         #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
         serde_json::Number,

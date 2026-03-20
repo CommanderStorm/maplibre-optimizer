@@ -28,7 +28,7 @@ pub fn generate(scope: &mut Scope, name: &str, field: &NumberField) {
             .derive("serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone")
             .attr(fuzz::CFG_DERIVE_ARBITRARY)
             .attr("serde(untagged)");
-        enu.new_variant("Expr").tuple(&expr_name);
+        enu.new_variant("Expr").tuple(format!("Box<{expr_name}>"));
         enu.new_variant("Literal")
             .tuple_with_attrs([fuzz::ARB_JSON_NUMBER], "serde_json::Number");
     } else {

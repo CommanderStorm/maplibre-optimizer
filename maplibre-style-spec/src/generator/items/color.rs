@@ -25,7 +25,7 @@ pub fn generate(scope: &mut Scope, name: &str, field: &ColorField) {
             .derive("serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone")
             .attr(fuzz::CFG_DERIVE_ARBITRARY)
             .attr("serde(untagged)");
-        enu.new_variant("Expr").tuple(&expr_name);
+        enu.new_variant("Expr").tuple(format!("Box<{expr_name}>"));
         // CSS / JSON color literals (`\"#fff\"`, arrays, …) are not always accepted by
         // `color::DynamicColor`'s serde impl — accept raw JSON here; validation can tighten.
         enu.new_variant("Literal")
