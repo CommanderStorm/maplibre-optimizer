@@ -58,17 +58,18 @@ pub struct MaplibreStyleSpecification;
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
 #[serde(untagged)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum StringLiteralOrStringOrImageAsUnion {
+pub enum StringLiteralOrStringOrImageOrAnyAsUnion {
     StringLiteral(StringLiteral),
     String(String),
     Image(Image),
+    Any(Box<Any>),
 }
 
 /// Tuple row for variadic (content, optional style object) pairs.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct ExpressionNameFormatVariadicRow(
-    StringLiteralOrStringOrImageAsUnion,
+    StringLiteralOrStringOrImageOrAnyAsUnion,
     #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_option_json_map))]
     Option<serde_json::Map<std::string::String, serde_json::Value>>,
 );

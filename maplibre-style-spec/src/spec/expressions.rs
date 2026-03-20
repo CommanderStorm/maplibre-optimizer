@@ -165,7 +165,7 @@ impl<'de> serde::de::Visitor<'de> for AnyVisitor {
                 if rest.len() < 2 + 1 {
                     return Err(serde::de::Error::custom("Any::Case: too few arguments"));
                 }
-                if (rest.len() - 1) % 2 != 0 {
+                if !(rest.len() - 1).is_multiple_of(2) {
                     return Err(serde::de::Error::custom(
                         "Any::Case: malformed template/suffix layout",
                     ));
@@ -184,7 +184,7 @@ impl<'de> serde::de::Visitor<'de> for AnyVisitor {
                         "Any::Case requires at least one argument",
                     ));
                 }
-                let fallback = serde_json::from_value(rest[inputs_len * 2 + 0].clone())
+                let fallback = serde_json::from_value(rest[inputs_len * 2].clone())
                     .map_err(serde::de::Error::custom)?;
                 Ok(Any::Case((inputs, fallback)))
             }
@@ -223,7 +223,7 @@ impl<'de> serde::de::Visitor<'de> for AnyVisitor {
                 if rest.len() < 2 + 1 {
                     return Err(serde::de::Error::custom("Any::Let: too few arguments"));
                 }
-                if (rest.len() - 1) % 2 != 0 {
+                if !(rest.len() - 1).is_multiple_of(2) {
                     return Err(serde::de::Error::custom(
                         "Any::Let: malformed template/suffix layout",
                     ));
@@ -242,7 +242,7 @@ impl<'de> serde::de::Visitor<'de> for AnyVisitor {
                         "Any::Let requires at least one argument",
                     ));
                 }
-                let expression = serde_json::from_value(rest[inputs_len * 2 + 0].clone())
+                let expression = serde_json::from_value(rest[inputs_len * 2].clone())
                     .map_err(serde::de::Error::custom)?;
                 Ok(Any::Let((inputs, expression)))
             }
@@ -1314,17 +1314,18 @@ impl<'de> serde::de::Visitor<'de> for ColorOrArrayOfColorVisitor {
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
 #[serde(untagged)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum StringLiteralOrStringOrImageAsUnion {
+pub enum StringLiteralOrStringOrImageOrAnyAsUnion {
     StringLiteral(StringLiteral),
     String(String),
     Image(Image),
+    Any(Box<Any>),
 }
 
 /// Tuple row for variadic (content, optional style object) pairs.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct FormattedFormatVariadicRow(
-    StringLiteralOrStringOrImageAsUnion,
+    StringLiteralOrStringOrImageOrAnyAsUnion,
     #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_option_json_map))]
     Option<serde_json::Map<std::string::String, serde_json::Value>>,
 );

@@ -229,6 +229,15 @@ fn generate_expression_any_of(scope: &mut Scope, types: &[ParameterType]) -> Str
                 ParameterType::Expression(e) if matches!(e.as_ref(), MirExpression::Number)
             )
         });
+    let string_literal_with_string_expr = types
+        .iter()
+        .any(|p| matches!(p, ParameterType::Literal(Literal::String)))
+        && types.iter().any(|p| {
+            matches!(
+                p,
+                ParameterType::Expression(e) if matches!(e.as_ref(), MirExpression::String)
+            )
+        });
     let mut arms: Vec<(String, String)> = types
         .iter()
         .map(|p| {
@@ -253,6 +262,18 @@ fn generate_expression_any_of(scope: &mut Scope, types: &[ParameterType]) -> Str
             (label, rust_ty)
         })
         .collect();
+
+    // MapLibre style spec allows any expression that evaluates to a given type in places
+    // where the schema says that type (e.g. `["get", "foo"]` in numeric positions). In our
+    // AST, those expressions often live under the generic `Any` syntax enum.
+    //
+    // To keep these typed positions deserializable, extend the classic
+    // `Literal(T)` + `Expression(T)` unions with an `Any(Box<Any>)` arm.
+    if (number_literal_with_number_expr || string_literal_with_string_expr)
+        && !arms.iter().any(|(l, _)| l == "Any")
+    {
+        arms.push(("Any".to_string(), "Box<Any>".to_string()));
+    }
 
     // `interpolate-hcl` / `interpolate-lab` accept CSS color strings (e.g. `"#f00"`) as stop outputs.
     let mut arm_labels: Vec<&str> = arms.iter().map(|(l, _)| l.as_str()).collect();
@@ -1397,16 +1418,14 @@ fn generate_syntax_enum_deserializer_regular_variadic_variant(
             "if rest.len() < {template_len} + {suffix_len} {{ return Err(serde::de::Error::custom(\"{name}::{variant_name}: too few arguments\")); }}"
         ));
         visit_seq.line(format!(
-            "if (rest.len() - {suffix_len}) % {template_len} != 0 {{ return Err(serde::de::Error::custom(\"{name}::{variant_name}: malformed template/suffix layout\")); }}"
+            "if !(rest.len() - {suffix_len}).is_multiple_of({template_len}) {{ return Err(serde::de::Error::custom(\"{name}::{variant_name}: malformed template/suffix layout\")); }}"
         ));
         visit_seq.line(format!(
             "let inputs_len = (rest.len() - {suffix_len}) / {template_len};"
         ));
         if position_of_variadic_separator == 1 {
             visit_seq.line("for i in 0..inputs_len {");
-            visit_seq.line(format!(
-                "let element = serde_json::from_value(rest[i].clone()).map_err(serde::de::Error::custom)?;"
-            ));
+            visit_seq.line("let element = serde_json::from_value(rest[i].clone()).map_err(serde::de::Error::custom)?;");
             visit_seq.line("inputs.push(element);");
             visit_seq.line("}");
         } else {
@@ -1471,10 +1490,11 @@ fn generate_syntax_enum_deserializer_regular_variadic_variant(
         if suffix_len == 0 {
             unreachable!();
         }
-        let idx_expr = format!(
-            "inputs_len * {} + {}",
-            position_of_variadic_separator, suffix_i
-        );
+        let idx_expr = if suffix_i > 0 {
+            format!("inputs_len * {position_of_variadic_separator} + {suffix_i}")
+        } else {
+            format!("inputs_len * {position_of_variadic_separator}")
+        };
         visit_seq.line(format!(
             "let {bind} = serde_json::from_value(rest[{idx_expr}].clone()).map_err(serde::de::Error::custom)?;"
         ));
