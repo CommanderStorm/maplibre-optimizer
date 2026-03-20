@@ -256,10 +256,10 @@ fn walk_value_in_expr_context(v: &Value, known_ops: &HashSet<String>) -> Result<
             if items.is_empty() {
                 return Err("empty sub-array in expression context".into());
             }
-            if let Some(head) = items[0].as_str() {
-                if known_ops.contains(head) {
-                    return walk_mb_expr_array(items, known_ops);
-                }
+            if let Some(head) = items[0].as_str()
+                && known_ops.contains(head)
+            {
+                return walk_mb_expr_array(items, known_ops);
             }
             for item in items {
                 walk_value_in_expr_context(item, known_ops)?;

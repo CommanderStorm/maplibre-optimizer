@@ -2669,7 +2669,9 @@ impl<'de> serde::de::Visitor<'de>
                     inputs.push(element);
                 }
                 if inputs.is_empty() {
-                    return Err(serde::de::Error::custom("NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection::Interpolate requires at least one argument"));
+                    return Err(serde::de::Error::custom(
+                        "NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection::Interpolate requires at least one argument",
+                    ));
                 }
                 Ok(NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection::Interpolate(inputs))
             }
