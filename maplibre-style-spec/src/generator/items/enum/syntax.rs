@@ -163,6 +163,35 @@ fn normalize_expression_union_component_type(component: &str) -> String {
     }
 }
 
+/// Derive syntax enum variant identifier from operator keys by stripping the shared prefix
+/// that equals the output-type enum name.
+///
+/// This directly targets `clippy::enum_variant_names` by ensuring the resulting identifier does
+/// not start with the output-type enum name.
+fn normalized_syntax_variant_ident(syntax_enum_name: &str, operator_key: &str) -> String {
+    let mut base = to_upper_camel_case(operator_key);
+
+    // Strip the entire shared prefix (repeat in case it shows up multiple times).
+    while base.starts_with(syntax_enum_name) {
+        base = base[syntax_enum_name.len()..].to_string();
+    }
+
+    // Also strip the shared suffix. Operators like `to-boolean` become `ToBoolean`, which ends
+    // with the output-type enum name and triggers `clippy::enum_variant_names`.
+    while base.ends_with(syntax_enum_name) {
+        let new_len = base.len() - syntax_enum_name.len();
+        base.truncate(new_len);
+    }
+
+    // If we stripped everything (e.g. operator key exactly equals the output-type enum name),
+    // fall back to a stable non-empty identifier.
+    if base.is_empty() {
+        "Op".to_string()
+    } else {
+        base
+    }
+}
+
 /// `#[serde(untagged)]` is required only when JSON shapes differ by variant (e.g. bare string vs
 /// `["op", …]`). Using it for homogeneous expression unions breaks deserialization (ambiguous arms).
 fn expression_union_needs_untagged(types: &[ParameterType]) -> bool {
@@ -243,6 +272,18 @@ fn generate_expression_any_of(scope: &mut Scope, types: &[ParameterType]) -> Str
         extra_untagged = true;
     }
 
+    // `clippy::enum_variant_names`: avoid common suffixes like `Literal` on untagged literal unions.
+    if arms.iter().all(|(label, _)| label.ends_with("Literal")) {
+        for (label, _) in &mut arms {
+            let stripped = label.trim_end_matches("Literal");
+            *label = if stripped.is_empty() {
+                label.clone()
+            } else {
+                stripped.to_string()
+            };
+        }
+    }
+
     let any_of_type = format!(
         "{}AsUnion",
         arms.iter()
@@ -273,7 +314,7 @@ fn generate_referenced_multi_overload_options_enums(
     values: &BTreeMap<String, SyntaxVariantDef>,
 ) {
     for (key, value) in values {
-        let var_name = to_upper_camel_case(key);
+        let var_name = normalized_syntax_variant_ident(name, key);
         let syntax = &value.syntax;
         let name_and_possibly_group = if let Some(group) = &value.group {
             format!("{name} (group={group})")
@@ -327,10 +368,10 @@ fn generate_syntax_enum_body(
         if syntax.overloads.len() == 1 && syntax.has_variadic_overload() {
             let overload = &syntax.overloads[0];
             let position_of_variadic_separator = overload.position_of_variadic_separator();
-            let variant_name = to_upper_camel_case(key);
+            let variant_name = normalized_syntax_variant_ident(name, key);
 
             if name == "Any" && key == "match" {
-                let variant_name = to_upper_camel_case(key);
+                let variant_name = normalized_syntax_variant_ident(name, key);
                 let label_ty = generate_parameter_type(
                     scope,
                     (name, variant_name.as_str(), "label_i"),
@@ -403,12 +444,19 @@ fn generate_syntax_enum_body(
             let parts: Vec<String> = prefix
                 .iter()
                 .map(|overload_param| {
-                    let part = generate_parameter_type(
+                    let part_ty = generate_parameter_type(
                         scope,
                         (name, variant_name.as_str(), overload_param.as_str()),
                         &syntax.parameters,
                     );
-                    box_recursive_types(name, &part)
+                    // If the repeating element type *is* the parent enum, `Vec<T>` already
+                    // provides the necessary indirection; avoid `Box<T>` which triggers
+                    // `clippy::vec_box` in generated `spec.rs`.
+                    if part_ty == name {
+                        part_ty
+                    } else {
+                        box_recursive_types(name, &part_ty)
+                    }
                 })
                 .collect();
             let tuple_type_names = parts.join(",");
@@ -462,7 +510,7 @@ fn generate_syntax_enum_body(
         .derive("serde::Serialize, PartialEq, Debug, Clone")
         .attr(fuzz::CFG_DERIVE_ARBITRARY);
     for (key, value) in values {
-        let var_name = to_upper_camel_case(key);
+        let var_name = normalized_syntax_variant_ident(name, key);
         let syntax = &value.syntax;
         let name_and_possibly_group = if let Some(group) = &value.group {
             format!("{name} (group={group})")
@@ -529,9 +577,21 @@ fn box_recursive_types(parent_syntax_enum: &str, rust_type: &str) -> String {
             let inner = &rest[1..rest.len() - 1];
             let parts: Vec<String> = inner
                 .split(',')
-                .map(|p| box_recursive_types(parent_syntax_enum, p.trim()))
+                .map(|p| {
+                    let inner = p.trim();
+                    // `Vec<T>` already provides heap indirection; avoid redundant `Box<T>` which
+                    // triggers `clippy::vec_box` in generated `spec.rs`.
+                    if inner == parent_syntax_enum {
+                        inner.to_string()
+                    } else {
+                        box_recursive_types(parent_syntax_enum, inner)
+                    }
+                })
                 .collect();
             return format!("Vec<({})>", parts.join(","));
+        }
+        if rest == parent_syntax_enum {
+            return format!("Vec<{}>", rest);
         }
         return format!("Vec<{}>", box_recursive_types(parent_syntax_enum, rest));
     }
@@ -666,6 +726,14 @@ fn generate_variadic_overload_tuples(
             let s = generate_parameter_type(scope, (name, var_name, param), &syntax.parameters);
             box_recursive_types(name, &s)
         })
+        .collect::<Vec<_>>();
+
+    // When a repeating template is stored in a `Vec<T>`, `Vec` already provides the heap indirection
+    // needed for recursion. Avoid redundant `Box<T>` inside `Vec`, which triggers `clippy::vec_box`.
+    let parent_box = format!("Box<{name}>");
+    let repeating_types = repeating_types
+        .into_iter()
+        .map(|t| if t == parent_box { name.to_string() } else { t })
         .collect::<Vec<_>>();
 
     if repeating_types.len() == 1 {
@@ -900,7 +968,7 @@ fn precompute_variadic_sep4_plans(
             continue;
         }
         let sep = overload.position_of_variadic_separator();
-        let variant_name = to_upper_camel_case(key);
+        let variant_name = normalized_syntax_variant_ident(syntax_enum_name, key);
         let fixed_header_len = sep - 2;
         let mut header_lines = Vec::new();
         let mut header_bind_names = Vec::new();
@@ -975,7 +1043,7 @@ fn emit_any_match_deserializer_arm(visit_seq: &mut Function, (lt, ot, ft): (&str
     visit_seq.line("if rest.len() < 2 {");
     visit_seq.line("return Err(serde::de::Error::custom(\"Any::Match: too few arguments\"));");
     visit_seq.line("}");
-    visit_seq.line("if rest.len() % 2 != 0 {");
+    visit_seq.line("if !rest.len().is_multiple_of(2) {");
     visit_seq.line("return Err(serde::de::Error::custom(\"Any::Match: expected an even number of arguments after operator (input + label/output pairs + fallback)\"));");
     visit_seq.line("}");
     visit_seq.line("let fallback_v = rest.pop().unwrap();");
@@ -1076,7 +1144,7 @@ fn generate_syntax_enum_deserializer(
     visit_seq.line("match op.as_str() {");
     for (key, syntax_docs) in values {
         let syntax = &syntax_docs.syntax;
-        let variant_name = to_upper_camel_case(key);
+        let variant_name = normalized_syntax_variant_ident(name, key);
 
         visit_seq.line(format!("\"{key}\" => {{"));
         if syntax.overloads.len() == 1

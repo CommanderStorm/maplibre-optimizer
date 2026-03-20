@@ -166,10 +166,26 @@ fn generate_oneof(scope: &mut Scope, name: &str, one_of: &IntermediateOneOf) {
         enu.attr("serde(untagged)");
     }
 
+    // `clippy::enum_variant_names`: if all variants share a postfix equal to the enum name
+    // (e.g. `Source::{GeojsonSource,ImageSource,...}`), rename the Rust variants by stripping
+    // that postfix. Keep serde renames keyed by the original variant type names.
+    let base_var_names: Vec<String> = one_of.variants.iter().map(to_upper_camel_case).collect();
+    let strip_suffix = if base_var_names.len() > 1
+        && base_var_names.iter().all(|v| v.ends_with(name))
+        && name.len() > 1
+    {
+        Some(name)
+    } else {
+        None
+    };
+
     for variant_key in &one_of.variants {
-        let var_name = to_upper_camel_case(variant_key);
-        let var = enu.new_variant(&var_name).tuple(&var_name);
-        if let Some(rename) = one_of.renames.get(&var_name) {
+        let base_var_name = to_upper_camel_case(variant_key);
+        let var_ident = strip_suffix
+            .and_then(|s| base_var_name.strip_suffix(s))
+            .unwrap_or(&base_var_name);
+        let var = enu.new_variant(var_ident).tuple(&base_var_name);
+        if let Some(rename) = one_of.renames.get(&base_var_name) {
             var.annotation(format!("#[serde(rename=\"{rename}\")]"));
         }
     }

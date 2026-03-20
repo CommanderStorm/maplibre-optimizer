@@ -1345,11 +1345,11 @@ impl Default for TransitionDuration {
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
 #[serde(untagged)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum StringLiteralOrNumberLiteralOrArrayOfStringLiteralOrArrayOfNumberLiteralAsUnion {
-    StringLiteral(StringLiteral),
-    NumberLiteral(NumberLiteral),
-    ArrayOfStringLiteral(ArrayOfStringLiteral),
-    ArrayOfNumberLiteral(ArrayOfNumberLiteral),
+pub enum StringOrNumberOrArrayOfStringOrArrayOfNumberAsUnion {
+    String(StringLiteral),
+    Number(NumberLiteral),
+    ArrayOfString(ArrayOfStringLiteral),
+    ArrayOfNumber(ArrayOfNumberLiteral),
 }
 
 /// Either of the below variants
@@ -1426,7 +1426,7 @@ pub enum Any {
         (
             serde_json::Value,
             Vec<(
-                StringLiteralOrNumberLiteralOrArrayOfStringLiteralOrArrayOfNumberLiteralAsUnion,
+                StringOrNumberOrArrayOfStringOrArrayOfNumberAsUnion,
                 serde_json::Value,
             )>,
             serde_json::Value,
@@ -1563,7 +1563,7 @@ impl<'de> serde::de::Visitor<'de> for AnyVisitor {
                 if rest.len() < 2 {
                     return Err(serde::de::Error::custom("Any::Match: too few arguments"));
                 }
-                if rest.len() % 2 != 0 {
+                if !rest.len().is_multiple_of(2) {
                     return Err(serde::de::Error::custom(
                         "Any::Match: expected an even number of arguments after operator (input + label/output pairs + fallback)",
                     ));
@@ -1572,7 +1572,9 @@ impl<'de> serde::de::Visitor<'de> for AnyVisitor {
                 let input = rest.remove(0);
                 let mut pairs = Vec::new();
                 for chunk in rest.chunks_exact(2) {
-                    let label_i: StringLiteralOrNumberLiteralOrArrayOfStringLiteralOrArrayOfNumberLiteralAsUnion = serde_json::from_value(chunk[0].clone()).map_err(serde::de::Error::custom)?;
+                    let label_i: StringOrNumberOrArrayOfStringOrArrayOfNumberAsUnion =
+                        serde_json::from_value(chunk[0].clone())
+                            .map_err(serde::de::Error::custom)?;
                     let output_i: serde_json::Value = serde_json::from_value(chunk[1].clone())
                         .map_err(serde::de::Error::custom)?;
                     pairs.push((label_i, output_i));
@@ -1634,7 +1636,7 @@ impl<'de> serde::de::Visitor<'de> for AnyVisitor {
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum Array {
     /// Asserts that the input is an array (optionally with a specific item type and length). If, when the input expression is evaluated, it is not of the asserted type or length, then this assertion will cause the whole expression to be aborted.
-    Array(
+    Op(
         #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
         serde_json::Value,
     ),
@@ -1699,7 +1701,7 @@ impl<'de> serde::de::Visitor<'de> for ArrayVisitor {
         match op.as_str() {
             "array" => {
                 let value = visit_seq_field(&mut seq, "value")?;
-                Ok(Array::Array(value))
+                Ok(Array::Op(value))
             }
             "literal" => {
                 let json_array = visit_seq_field(&mut seq, "json_array")?;
@@ -1907,13 +1909,13 @@ pub enum Boolean {
     /// Returns `true` if all the inputs are `true`, `false` otherwise. The inputs are evaluated in order, and evaluation is short-circuiting: once an input expression evaluates to `false`, the result is `false` and no further input expressions are evaluated.
     ///
     ///  - [Display HTML clusters with custom properties](https://maplibre.org/maplibre-gl-js/docs/examples/display-html-clusters-with-custom-properties/)
-    All(Vec<Box<Boolean>>),
+    All(Vec<Boolean>),
     /// Returns `true` if any of the inputs are `true`, `false` otherwise. The inputs are evaluated in order, and evaluation is short-circuiting: once an input expression evaluates to `true`, the result is `true` and no further input expressions are evaluated.
-    Any(Vec<Box<Boolean>>),
+    Any(Vec<Boolean>),
     /// Asserts that the input value is a boolean. If multiple values are provided, each one is evaluated in order until a boolean is obtained. If none of the inputs are booleans, the expression is an error.
     ///
     ///  - [Create a hover effect](https://maplibre.org/maplibre-gl-js/docs/examples/create-a-hover-effect/)
-    Boolean(Vec<serde_json::Value>),
+    Op(Vec<serde_json::Value>),
     /// Tests for the presence of a property value in the current feature's properties, or from another object if a second argument is provided.
     ///
     ///  - [Create and style clusters](https://maplibre.org/maplibre-gl-js/docs/examples/create-and-style-clusters/)
@@ -1933,7 +1935,7 @@ pub enum Boolean {
         serde_json::Value,
     ),
     /// Converts the input value to a boolean. The result is `false` when the input is an empty string, 0, `false`, `null`, or `NaN`; otherwise it is `true`.
-    ToBoolean(
+    To(
         #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
         serde_json::Value,
     ),
@@ -2126,10 +2128,10 @@ impl<'de> serde::de::Visitor<'de> for BooleanVisitor {
                 }
                 if inputs.is_empty() {
                     return Err(serde::de::Error::custom(
-                        "Boolean::Boolean requires at least one argument",
+                        "Boolean::Op requires at least one argument",
                     ));
                 }
-                Ok(Boolean::Boolean(inputs))
+                Ok(Boolean::Op(inputs))
             }
             "has" => {
                 let property_name = visit_seq_field(&mut seq, "property_name")?;
@@ -2149,7 +2151,7 @@ impl<'de> serde::de::Visitor<'de> for BooleanVisitor {
             }
             "to-boolean" => {
                 let value = visit_seq_field(&mut seq, "value")?;
-                Ok(Boolean::ToBoolean(value))
+                Ok(Boolean::To(value))
             }
             "within" => {
                 let geojson = visit_seq_field(&mut seq, "geojson")?;
@@ -2184,7 +2186,7 @@ impl<'de> serde::de::Visitor<'de> for BooleanVisitor {
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum Collator {
     /// Returns a `collator` for use in locale-dependent comparison operations. Use `resolved-locale` to test the results of locale fallback behavior.
-    Collator(
+    Op(
         #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
         serde_json::Value,
     ),
@@ -2228,7 +2230,7 @@ impl<'de> serde::de::Visitor<'de> for CollatorVisitor {
         match op.as_str() {
             "collator" => {
                 let options = visit_seq_field(&mut seq, "options")?;
-                Ok(Collator::Collator(options))
+                Ok(Collator::Op(options))
             }
             _ => Err(serde::de::Error::unknown_variant(&op, &["collator"])),
         }
@@ -2262,7 +2264,7 @@ pub enum Color {
     /// Converts the input value to a color. If multiple values are provided, each one is evaluated in order until the first successful conversion is obtained. If none of the inputs can be converted, the expression is an error.
     ///
     ///  - [Visualize population density](https://maplibre.org/maplibre-gl-js/docs/examples/visualize-population-density/)
-    ToColor(Vec<serde_json::Value>),
+    To(Vec<serde_json::Value>),
 }
 
 impl<'de> serde::Deserialize<'de> for Color {
@@ -2321,10 +2323,10 @@ impl<'de> serde::de::Visitor<'de> for ColorVisitor {
                 }
                 if inputs.is_empty() {
                     return Err(serde::de::Error::custom(
-                        "Color::ToColor requires at least one argument",
+                        "Color::To requires at least one argument",
                     ));
                 }
-                Ok(Color::ToColor(inputs))
+                Ok(Color::To(inputs))
             }
             _ => Err(serde::de::Error::unknown_variant(
                 &op,
@@ -2553,7 +2555,7 @@ pub enum Image {
     /// Returns an `image` type for use in `icon-image`, `*-pattern` entries and as a section in the `format` expression. If set, the `image` argument will check that the requested image exists in the style and will return either the resolved image name or `null`, depending on whether or not the image is currently in the style. This validation process is synchronous and requires the image to have been added to the style before requesting it in the `image` argument.
     ///
     ///  - [Use a fallback image](https://maplibre.org/maplibre-gl-js/docs/examples/use-a-fallback-image/)
-    Image(
+    Op(
         #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
         serde_json::Value,
     ),
@@ -2597,7 +2599,7 @@ impl<'de> serde::de::Visitor<'de> for ImageVisitor {
         match op.as_str() {
             "image" => {
                 let image_name = visit_seq_field(&mut seq, "image_name")?;
-                Ok(Image::Image(image_name))
+                Ok(Image::Op(image_name))
             }
             _ => Err(serde::de::Error::unknown_variant(&op, &["image"])),
         }
@@ -2722,7 +2724,7 @@ pub enum Number {
     /// Returns the minimum value of the inputs.
     Min(Vec<NumberLiteralOrNumberAsUnion>),
     /// Asserts that the input value is a number. If multiple values are provided, each one is evaluated in order until a number is obtained. If none of the inputs are numbers, the expression is an error.
-    Number(Vec<serde_json::Value>),
+    Op(Vec<serde_json::Value>),
     /// Returns the mathematical constant pi.
     Pi,
     /// Rounds the input to the nearest integer. Halfway values are rounded away from zero. For example, `["round", -1.5]` evaluates to -2.
@@ -2746,7 +2748,7 @@ pub enum Number {
         serde_json::Value,
     ),
     /// Converts the input value to a number, if possible. If the input is `null` or `false`, the result is 0. If the input is `true`, the result is 1. If the input is a string, it is converted to a number as specified by the ["ToNumber Applied to the String Type" algorithm](https://tc39.github.io/ecma262/#sec-tonumber-applied-to-the-string-type) of the ECMAScript Language Specification. If multiple values are provided, each one is evaluated in order until the first successful conversion is obtained. If none of the inputs can be converted, the expression is an error.
-    ToNumber(Vec<serde_json::Value>),
+    To(Vec<serde_json::Value>),
     /// Gets the current zoom level.  Note that in style layout and paint properties, ["zoom"] may only appear as the input to a top-level "step" or "interpolate" expression.
     Zoom,
 }
@@ -2962,10 +2964,10 @@ impl<'de> serde::de::Visitor<'de> for NumberVisitor {
                 }
                 if inputs.is_empty() {
                     return Err(serde::de::Error::custom(
-                        "Number::Number requires at least one argument",
+                        "Number::Op requires at least one argument",
                     ));
                 }
-                Ok(Number::Number(inputs))
+                Ok(Number::Op(inputs))
             }
             "pi" => Ok(Number::Pi),
             "round" => {
@@ -2991,10 +2993,10 @@ impl<'de> serde::de::Visitor<'de> for NumberVisitor {
                 }
                 if inputs.is_empty() {
                     return Err(serde::de::Error::custom(
-                        "Number::ToNumber requires at least one argument",
+                        "Number::To requires at least one argument",
                     ));
                 }
-                Ok(Number::ToNumber(inputs))
+                Ok(Number::To(inputs))
             }
             "zoom" => Ok(Number::Zoom),
             _ => Err(serde::de::Error::unknown_variant(
@@ -3157,7 +3159,7 @@ pub enum Object {
         serde_json::Value,
     ),
     /// Asserts that the input value is an object. If multiple values are provided, each one is evaluated in order until an object is obtained. If none of the inputs are objects, the expression is an error.
-    Object(Vec<serde_json::Value>),
+    Op(Vec<serde_json::Value>),
     /// Gets the feature properties object.  Note that in some cases, it may be more efficient to use ["get", "property_name"] directly.
     Properties,
 }
@@ -3209,10 +3211,10 @@ impl<'de> serde::de::Visitor<'de> for ObjectVisitor {
                 }
                 if inputs.is_empty() {
                     return Err(serde::de::Error::custom(
-                        "Object::Object requires at least one argument",
+                        "Object::Op requires at least one argument",
                     ));
                 }
-                Ok(Object::Object(inputs))
+                Ok(Object::Op(inputs))
             }
             "properties" => Ok(Object::Properties),
             _ => Err(serde::de::Error::unknown_variant(
@@ -3270,11 +3272,11 @@ pub enum String {
          Option<serde_json::Value>,
     ),
     /// Asserts that the input value is a string. If multiple values are provided, each one is evaluated in order until a string is obtained. If none of the inputs are strings, the expression is an error.
-    String(Vec<serde_json::Value>),
+    Op(Vec<serde_json::Value>),
     /// Converts the input value to a string. If the input is `null`, the result is `""`. If the input is a boolean, the result is `"true"` or `"false"`. If the input is a number, it is converted to a string as specified by the ["NumberToString" algorithm](https://tc39.github.io/ecma262/#sec-tostring-applied-to-the-number-type) of the ECMAScript Language Specification. If the input is a color, it is converted to a string of the form `"rgba(r,g,b,a)"`, where `r`, `g`, and `b` are numerals ranging from 0 to 255, and `a` ranges from 0 to 1. Otherwise, the input is converted to a string in the format specified by the [`JSON.stringify`](https://tc39.github.io/ecma262/#sec-json.stringify) function of the ECMAScript Language Specification.
     ///
     ///  - [Create a time slider](https://maplibre.org/maplibre-gl-js/docs/examples/create-a-time-slider/)
-    ToString(
+    To(
         #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
         serde_json::Value,
     ),
@@ -3369,14 +3371,14 @@ impl<'de> serde::de::Visitor<'de> for StringVisitor {
                 }
                 if inputs.is_empty() {
                     return Err(serde::de::Error::custom(
-                        "String::String requires at least one argument",
+                        "String::Op requires at least one argument",
                     ));
                 }
-                Ok(String::String(inputs))
+                Ok(String::Op(inputs))
             }
             "to-string" => {
                 let value = visit_seq_field(&mut seq, "value")?;
-                Ok(String::ToString(value))
+                Ok(String::To(value))
             }
             "typeof" => {
                 let value = visit_seq_field(&mut seq, "value")?;
@@ -3496,15 +3498,9 @@ impl Default for GeojsonSourceBuffer {
 ///  * `point_count` Number of original points grouped into this cluster
 ///
 ///  * `point_count_abbreviated` An abbreviated point count
-#[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone, Copy)]
+#[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone, Copy, Default)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct GeojsonSourceCluster(bool);
-
-impl Default for GeojsonSourceCluster {
-    fn default() -> Self {
-        Self(false)
-    }
-}
 
 /// Max zoom on which to cluster points if clustering is enabled. Defaults to one zoom less than maxzoom (so that last zoom features are not clustered). Clusters are re-evaluated at integer zoom levels so setting clusterMaxZoom to 14 means the clusters will be displayed until z15.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
@@ -3569,26 +3565,14 @@ pub struct GeojsonSourceData(
 pub struct GeojsonSourceFilter(Filter);
 
 /// Whether to generate ids for the geojson features. When enabled, the `feature.id` property will be auto assigned based on its index in the `features` array, over-writing any previous values.
-#[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone, Copy)]
+#[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone, Copy, Default)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct GeojsonSourceGenerateId(bool);
 
-impl Default for GeojsonSourceGenerateId {
-    fn default() -> Self {
-        Self(false)
-    }
-}
-
 /// Whether to calculate line distance metrics. This is required for line layers that specify `line-gradient` values.
-#[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone, Copy)]
+#[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone, Copy, Default)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct GeojsonSourceLineMetrics(bool);
-
-impl Default for GeojsonSourceLineMetrics {
-    fn default() -> Self {
-        Self(false)
-    }
-}
 
 /// Maximum zoom level at which to create vector tiles (higher means greater detail at high zoom levels).
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
@@ -3783,15 +3767,9 @@ pub struct RasterSourceTiles(Vec<std::string::String>);
 pub struct RasterSourceUrl(std::string::String);
 
 /// A setting to determine whether a source's tiles are cached locally.
-#[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone, Copy)]
+#[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone, Copy, Default)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct RasterSourceVolatile(bool);
-
-impl Default for RasterSourceVolatile {
-    fn default() -> Self {
-        Self(false)
-    }
-}
 
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
@@ -4003,15 +3981,9 @@ pub struct RasterDemSourceTiles(Vec<std::string::String>);
 pub struct RasterDemSourceUrl(std::string::String);
 
 /// A setting to determine whether a source's tiles are cached locally.
-#[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone, Copy)]
+#[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone, Copy, Default)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct RasterDemSourceVolatile(bool);
-
-impl Default for RasterDemSourceVolatile {
-    fn default() -> Self {
-        Self(false)
-    }
-}
 
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
@@ -4143,15 +4115,9 @@ pub struct VectorSourceTiles(Vec<std::string::String>);
 pub struct VectorSourceUrl(std::string::String);
 
 /// A setting to determine whether a source's tiles are cached locally.
-#[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone, Copy)]
+#[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone, Copy, Default)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct VectorSourceVolatile(bool);
-
-impl Default for VectorSourceVolatile {
-    fn default() -> Self {
-        Self(false)
-    }
-}
 
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
@@ -4185,17 +4151,17 @@ pub struct VideoSourceUrls(Vec<std::string::String>);
 #[serde(tag = "type")]
 pub enum Source {
     #[serde(rename = "geojson")]
-    GeojsonSource(GeojsonSource),
+    Geojson(GeojsonSource),
     #[serde(rename = "image")]
-    ImageSource(ImageSource),
+    Image(ImageSource),
     #[serde(rename = "raster")]
-    RasterSource(RasterSource),
+    Raster(RasterSource),
     #[serde(rename = "raster_dem")]
-    RasterDemSource(RasterDemSource),
+    RasterDem(RasterDemSource),
     #[serde(rename = "vector")]
-    VectorSource(VectorSource),
+    Vector(VectorSource),
     #[serde(rename = "video")]
-    VideoSource(VideoSource),
+    Video(VideoSource),
 }
 
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
@@ -6448,15 +6414,9 @@ pub struct SymbolLayoutLayer {
 }
 
 /// If true, the icon will be visible even if it collides with other previously drawn symbols.
-#[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone, Copy)]
+#[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone, Copy, Default)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct SymbolLayoutLayerIconAllowOverlap(bool);
-
-impl Default for SymbolLayoutLayerIconAllowOverlap {
-    fn default() -> Self {
-        Self(false)
-    }
-}
 
 /// Part of the icon placed closest to the anchor.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy, Default)]
@@ -6484,15 +6444,9 @@ pub enum SymbolLayoutLayerIconAnchor {
 }
 
 /// If true, other symbols can be visible even if they collide with the icon.
-#[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone, Copy)]
+#[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone, Copy, Default)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct SymbolLayoutLayerIconIgnorePlacement(bool);
-
-impl Default for SymbolLayoutLayerIconIgnorePlacement {
-    fn default() -> Self {
-        Self(false)
-    }
-}
 
 /// Name of image in sprite to use for drawing an image background.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone)]
@@ -6500,15 +6454,9 @@ impl Default for SymbolLayoutLayerIconIgnorePlacement {
 pub struct SymbolLayoutLayerIconImage(std::string::String);
 
 /// If true, the icon may be flipped to prevent it from being rendered upside-down.
-#[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone, Copy)]
+#[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone, Copy, Default)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct SymbolLayoutLayerIconKeepUpright(bool);
-
-impl Default for SymbolLayoutLayerIconKeepUpright {
-    fn default() -> Self {
-        Self(false)
-    }
-}
 
 /// Offset distance of icon from its anchor. Positive values indicate right and down, while negative values indicate left and up. Each component is multiplied by the value of `icon-size` to obtain the final offset in pixels. When combined with `icon-rotate` the offset will be as if the rotated direction was up.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
@@ -6530,15 +6478,9 @@ impl Default for SymbolLayoutLayerIconOffset {
 }
 
 /// If true, text will display without their corresponding icons when the icon collides with other symbols and the text does not.
-#[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone, Copy)]
+#[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone, Copy, Default)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct SymbolLayoutLayerIconOptional(bool);
-
-impl Default for SymbolLayoutLayerIconOptional {
-    fn default() -> Self {
-        Self(false)
-    }
-}
 
 /// Allows for control over whether to show an icon when it overlaps other symbols on the map. If `icon-overlap` is not set, `icon-allow-overlap` is used instead.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy)]
@@ -6710,15 +6652,9 @@ impl Default for SymbolLayoutLayerIconTextFitPadding {
 }
 
 /// If true, the symbols will not cross tile edges to avoid mutual collisions. Recommended in layers that don't have enough padding in the vector tile to prevent collisions, or if it is a point symbol layer placed after a line symbol layer. When using a client that supports global collision detection, like MapLibre GL JS version 0.42.0 or greater, enabling this property is not needed to prevent clipped labels at tile boundaries.
-#[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone, Copy)]
+#[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone, Copy, Default)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct SymbolLayoutLayerSymbolAvoidEdges(bool);
-
-impl Default for SymbolLayoutLayerSymbolAvoidEdges {
-    fn default() -> Self {
-        Self(false)
-    }
-}
 
 /// Label placement relative to its geometry.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy, Default)]
@@ -6798,15 +6734,9 @@ pub enum SymbolLayoutLayerSymbolZOrder {
 }
 
 /// If true, the text will be visible even if it collides with other previously drawn symbols.
-#[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone, Copy)]
+#[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone, Copy, Default)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct SymbolLayoutLayerTextAllowOverlap(bool);
-
-impl Default for SymbolLayoutLayerTextAllowOverlap {
-    fn default() -> Self {
-        Self(false)
-    }
-}
 
 /// Part of the text placed closest to the anchor.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy, Default)]
@@ -6859,15 +6789,9 @@ impl Default for SymbolLayoutLayerTextFont {
 }
 
 /// If true, other symbols can be visible even if they collide with the text.
-#[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone, Copy)]
+#[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone, Copy, Default)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct SymbolLayoutLayerTextIgnorePlacement(bool);
-
-impl Default for SymbolLayoutLayerTextIgnorePlacement {
-    fn default() -> Self {
-        Self(false)
-    }
-}
 
 /// Text justification options.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy, Default)]
@@ -7035,15 +6959,9 @@ impl Default for SymbolLayoutLayerTextOffset {
 }
 
 /// If true, icons will display without their corresponding text when the text collides with other symbols and the icon does not.
-#[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone, Copy)]
+#[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone, Copy, Default)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct SymbolLayoutLayerTextOptional(bool);
-
-impl Default for SymbolLayoutLayerTextOptional {
-    fn default() -> Self {
-        Self(false)
-    }
-}
 
 /// Allows for control over whether to show symbol text when it overlaps other symbols on the map. If `text-overlap` is not set, `text-allow-overlap` is used instead
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy)]

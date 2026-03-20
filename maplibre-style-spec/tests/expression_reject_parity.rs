@@ -96,6 +96,7 @@ fn upstream_expression_reject_parity() {
 
     let mut examined = 0usize;
     let mut mismatches = Vec::new();
+    let mut permissive_mismatches = Vec::new();
     let mut permissive_count = 0usize;
 
     for path in &fixture_paths {
@@ -143,6 +144,27 @@ fn upstream_expression_reject_parity() {
                 ));
             } else if !expected_ok && actual_ok {
                 permissive_count += 1;
+                // Print the upstream errors so we can see what we accepted incorrectly.
+                // Upstream `errors[]` is the most informative part for permissive cases.
+                if permissive_mismatches.len() < 30 {
+                    let upstream_errors = match expected.compiled {
+                        FixtureCompiled::Error { ref errors } => errors
+                            .iter()
+                            .map(|e| format!("{}: {}", e.key, e.error))
+                            .collect::<Vec<_>>()
+                            .join(" | "),
+                        FixtureCompiled::Success { .. } => String::new(),
+                    };
+                    permissive_mismatches.push(format!(
+                        "{} -> expected=error, actual=success{}",
+                        rel,
+                        if upstream_errors.is_empty() {
+                            String::new()
+                        } else {
+                            format!(", upstream_errors=[{upstream_errors}]")
+                        }
+                    ));
+                }
             }
         }
     }
@@ -154,6 +176,16 @@ fn upstream_expression_reject_parity() {
         mismatches.len(),
         permissive_count
     );
+
+    if !permissive_mismatches.is_empty() {
+        eprintln!(
+            "first permissive mismatches (showing {}):",
+            permissive_mismatches.len()
+        );
+        for s in permissive_mismatches.iter() {
+            eprintln!("  {s}");
+        }
+    }
 
     assert!(
         mismatches.is_empty(),

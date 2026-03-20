@@ -5,21 +5,29 @@ use crate::generator::fuzz;
 use crate::mir::types::BooleanField;
 
 pub fn generate(scope: &mut Scope, name: &str, field: &BooleanField) {
+    // `clippy::derivable_impls`: for `Default` implementations that are always `false`, prefer
+    // `#[derive(Default)]` and avoid hand-written `impl Default`.
+    let derives = if field.default == Some(false) {
+        "serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone, Copy, Default"
+    } else {
+        "serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone, Copy"
+    };
+
     scope
         .new_struct(name)
         .vis("pub")
         .doc(&field.meta.doc)
-        .derive("serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone, Copy")
+        .derive(derives)
         .attr(fuzz::CFG_DERIVE_ARBITRARY)
         .tuple_field("bool");
 
-    if let Some(default) = &field.default {
+    if field.default == Some(true) {
         scope
             .new_impl(name)
             .impl_trait("Default")
             .new_fn("default")
             .ret("Self")
-            .line(format!("Self({default})"));
+            .line("Self(true)");
     }
     generate_test_from_example_if_present(scope, name, field.meta.example.as_ref());
 }
