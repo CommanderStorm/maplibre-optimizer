@@ -23,7 +23,8 @@ fn upstream_style_spec_reject_parity() {
         fixtures_dir.display()
     );
 
-    // Keep this empty by default. Add entries only for temporary, explicit exceptions.
+    // Keep this empty by default. Add fixture **filenames** here only for JS-only cases that
+    // Rust intentionally does not model (see project notes on prototype pollution / parity).
     let skip_list: BTreeSet<&str> = BTreeSet::new();
     let mut examined = 0usize;
     let mut skipped = 0usize;

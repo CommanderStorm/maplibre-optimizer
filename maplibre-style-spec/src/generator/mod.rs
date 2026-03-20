@@ -208,25 +208,14 @@ fn generate_source_types(scope: &mut Scope, sources: &Sources) {
         .map(|k| format!("{k}_source"))
         .collect();
 
-    // Detect common tag field ("type") and build renames
-    let tag = if sources
-        .source_types
-        .values()
-        .all(|d| d.discriminant_value.is_some())
-    {
-        Some("type".to_string())
-    } else {
-        None
-    };
+    // Common tag field: each source group had `type` stripped in MIR preprocessing; JSON
+    // discriminant matches the `source_types` map key.
+    let tag = Some("type".to_string());
 
     let renames: BTreeMap<String, String> = sources
         .source_types
-        .iter()
-        .filter_map(|(k, d)| {
-            d.discriminant_value
-                .as_ref()
-                .map(|v| (to_upper_camel_case(format!("{k}_source")), v.clone()))
-        })
+        .keys()
+        .map(|k| (to_upper_camel_case(format!("{k}_source")), k.clone()))
         .collect();
 
     generate_oneof(

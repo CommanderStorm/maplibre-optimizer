@@ -7,6 +7,8 @@ mod root;
 mod sources;
 pub mod types;
 
+pub use root::IntermediateRootPrimitives;
+
 use std::collections::BTreeMap;
 
 pub use expressions::{
@@ -14,7 +16,9 @@ pub use expressions::{
     ExpressionParam, IntermediateExpressions as Expressions, LiteralKind, OverloadParams,
     ResolvedParam,
 };
-pub use layers::{IntermediateLayerField, IntermediateLayerType, IntermediateLayers as Layers};
+pub use layers::{IntermediateLayerField, IntermediateLayerType, IntermediateLayers};
+/// Alias kept for existing imports (`generator`, tests).
+pub type Layers = IntermediateLayers;
 pub use sources::{IntermediateSources as Sources, SourceTypeDef};
 pub use types::{
     ArrayElement, ArrayField, BooleanField, ColorArrayField, ColorField, EnumField,
@@ -26,10 +30,8 @@ pub use types::{
 use crate::decoder;
 use crate::decoder::{ParsedItem, PrimitiveType, TopLevelItem};
 use crate::mir::expressions::IntermediateExpressions;
-use crate::mir::layers::IntermediateLayers;
 use crate::mir::lower::lower_parsed_item;
 use crate::mir::resources::{IntermediateFontResources, IntermediateSpriteResources};
-use crate::mir::root::IntermediateRootPrimitives;
 use crate::mir::sources::IntermediateSources;
 use crate::mir::types::MirField;
 

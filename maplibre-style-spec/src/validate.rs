@@ -1,8 +1,121 @@
 //! Cross-field and spec rules that are not expressible in serde types alone.
 
+use std::collections::{BTreeMap, HashSet};
+use std::sync::OnceLock;
+
 use serde_json::{Map, Value};
 
+use crate::decoder::StyleReference;
+use crate::mir::types::{IntermediateType, MirField};
+use crate::mir::{
+    IntermediateLayerField, IntermediateLayers, IntermediateNamedType, IntermediateRootPrimitives,
+    IntermediateSpec,
+};
 use crate::spec::MaplibreStyleSpecification;
+
+#[derive(Debug)]
+struct MirValidationTables {
+    /// JSON paint/layout property name → optional min/max for scalar numeric leaves.
+    layer_number_bounds: BTreeMap<String, (Option<f64>, Option<f64>)>,
+    root_center_len: Option<usize>,
+    light_allowed_keys: HashSet<String>,
+}
+
+static MIR_VALIDATION: OnceLock<MirValidationTables> = OnceLock::new();
+
+fn mir_tables() -> &'static MirValidationTables {
+    MIR_VALIDATION.get_or_init(|| {
+        let reference: StyleReference =
+            serde_json::from_str(include_str!("../../upstream/src/reference/v8.json"))
+                .expect("parse v8.json for validation tables");
+        let spec = IntermediateSpec::from(reference);
+        MirValidationTables {
+            layer_number_bounds: layer_number_bounds(&spec.layers),
+            root_center_len: root_center_expected_len(&spec.root),
+            light_allowed_keys: light_allowed_keys(&spec.named_types),
+        }
+    })
+}
+
+fn merge_num_bounds(
+    map: &mut BTreeMap<String, (Option<f64>, Option<f64>)>,
+    name: &str,
+    min: Option<f64>,
+    max: Option<f64>,
+) {
+    let merge_lo = |a: Option<f64>, b: Option<f64>| -> Option<f64> {
+        match (a, b) {
+            (Some(x), Some(y)) => Some(x.max(y)),
+            (Some(x), None) | (None, Some(x)) => Some(x),
+            (None, None) => None,
+        }
+    };
+    let merge_hi = |a: Option<f64>, b: Option<f64>| -> Option<f64> {
+        match (a, b) {
+            (Some(x), Some(y)) => Some(x.min(y)),
+            (Some(x), None) | (None, Some(x)) => Some(x),
+            (None, None) => None,
+        }
+    };
+    map.entry(name.to_string())
+        .and_modify(|(cur_min, cur_max)| {
+            *cur_min = merge_lo(*cur_min, min);
+            *cur_max = merge_hi(*cur_max, max);
+        })
+        .or_insert((min, max));
+}
+
+fn merge_fields_bounds(
+    map: &mut BTreeMap<String, (Option<f64>, Option<f64>)>,
+    fields: &BTreeMap<String, IntermediateLayerField>,
+) {
+    for (spec_name, f) in fields {
+        if let IntermediateType::Number { min, max } = &f.r#type {
+            merge_num_bounds(map, spec_name, *min, *max);
+        }
+    }
+}
+
+fn layer_number_bounds(
+    layers: &IntermediateLayers,
+) -> BTreeMap<String, (Option<f64>, Option<f64>)> {
+    let mut out = BTreeMap::new();
+    for lt in layers.layer_types.values() {
+        merge_fields_bounds(&mut out, &lt.paint);
+        merge_fields_bounds(&mut out, &lt.layout);
+    }
+    out
+}
+
+fn root_center_expected_len(root: &IntermediateRootPrimitives) -> Option<usize> {
+    let field = root.0.get("center")?;
+    match field {
+        MirField::Array(a) => a.length,
+        _ => None,
+    }
+}
+
+fn light_allowed_keys(named: &BTreeMap<String, IntermediateNamedType>) -> HashSet<String> {
+    let mut out = match named.get("light") {
+        Some(IntermediateNamedType::Struct(fields)) => {
+            fields.iter().map(|f| f.meta().spec_name.clone()).collect()
+        }
+        _ => HashSet::new(),
+    };
+    if out.is_empty() {
+        // v8 always defines `light`; keep a fallback for trimmed test corpora.
+        for k in [
+            "anchor",
+            "color",
+            "intensity",
+            "position",
+            "color-use-theme",
+        ] {
+            out.insert(k.to_string());
+        }
+    }
+    out
+}
 
 /// Run the same JSON-tree checks as [`parse_and_validate_style`] without deserializing into
 /// [`MaplibreStyleSpecification`] (avoids dropping root keys not yet modeled in `spec.rs`).
@@ -49,9 +162,10 @@ fn validate_root_object(style: &Map<String, Value>) -> Result<(), String> {
     }
     if let Some(center) = style.get("center") {
         if let Some(a) = center.as_array() {
-            if a.len() != 2 {
+            let expected = mir_tables().root_center_len.unwrap_or(2);
+            if a.len() != expected {
                 return Err(format!(
-                    "center: array length 2 expected, length {} found",
+                    "center: array length {expected} expected, length {} found",
                     a.len()
                 ));
             }
@@ -114,12 +228,14 @@ fn validate_layers_value(layers: &Value) -> Result<(), String> {
 }
 
 fn validate_layer_paint_layout(idx: usize, layer: &Map<String, Value>) -> Result<(), String> {
+    let bounds = &mir_tables().layer_number_bounds;
     if let Some(Value::Object(paint)) = layer.get("paint") {
-        validate_numeric_paint(idx, "paint", paint)?;
+        validate_numeric_layer_section(idx, "paint", paint, bounds)?;
         validate_colors_in_paint(idx, paint)?;
         validate_functions_base(idx, paint)?;
     }
     if let Some(Value::Object(layout)) = layer.get("layout") {
+        validate_numeric_layer_section(idx, "layout", layout, bounds)?;
         validate_layout_format_and_font(idx, layout)?;
     }
     Ok(())
@@ -140,25 +256,34 @@ fn validate_functions_base(idx: usize, paint: &Map<String, Value>) -> Result<(),
     Ok(())
 }
 
-fn validate_numeric_paint(
+fn validate_numeric_layer_section(
     idx: usize,
     section: &str,
-    paint: &Map<String, Value>,
+    obj: &Map<String, Value>,
+    bounds: &BTreeMap<String, (Option<f64>, Option<f64>)>,
 ) -> Result<(), String> {
-    let check_ge_0 = |name: &str| -> Result<(), String> {
-        if let Some(v) = paint.get(name) {
-            if let Some(n) = v.as_f64() {
-                if n < 0.0 {
-                    return Err(format!(
-                        "layers[{idx}].{section}.{name}: {n} is less than the minimum value 0",
-                    ));
-                }
-            }
+    for (key, v) in obj {
+        let Some(n) = v.as_f64() else {
+            continue;
+        };
+        let Some(&(min_b, max_b)) = bounds.get(key.as_str()) else {
+            continue;
+        };
+        if let Some(lo) = min_b
+            && n < lo
+        {
+            return Err(format!(
+                "layers[{idx}].{section}.{key}: {n} is less than the minimum value {lo}",
+            ));
         }
-        Ok(())
-    };
-    check_ge_0("circle-radius")?;
-    check_ge_0("fill-opacity")?;
+        if let Some(hi) = max_b
+            && n > hi
+        {
+            return Err(format!(
+                "layers[{idx}].{section}.{key}: {n} is greater than the maximum value {hi}",
+            ));
+        }
+    }
     Ok(())
 }
 
@@ -181,11 +306,6 @@ fn validate_colors_in_paint(idx: usize, paint: &Map<String, Value>) -> Result<()
                 }
             }
             if let Some(s) = fc.as_str() {
-                if s == "__proto__" {
-                    return Err(format!(
-                        "layers[{idx}].paint.{label}: color expected, \"__proto__\" found"
-                    ));
-                }
                 if color::parse_color(s).is_err() {
                     return Err(format!(
                         "layers[{idx}].paint.{label}: color expected, \"{s}\" found"
@@ -200,7 +320,7 @@ fn validate_colors_in_paint(idx: usize, paint: &Map<String, Value>) -> Result<()
                         };
                         let c = pair.get(1);
                         if let Some(Value::String(s)) = c {
-                            if s == "valueOf" || s == "__proto__" {
+                            if color::parse_color(s).is_err() {
                                 return Err(format!(
                                     "layers[{idx}].paint.{label}.stops[{si}][1]: color expected, \"{s}\" found"
                                 ));
@@ -273,6 +393,9 @@ fn validate_glyphs_root(glyphs: Option<&Value>) -> Result<(), String> {
     if !s.contains("{fontstack}") {
         return Err(r#"glyphs: "glyphs" url must include a "{fontstack}" token"#.to_string());
     }
+    if !s.contains("{range}") {
+        return Err(r#"glyphs: "glyphs" url must include a "{range}" token"#.to_string());
+    }
     Ok(())
 }
 
@@ -283,12 +406,9 @@ fn validate_light_value(light: Option<&Value>) -> Result<(), String> {
     let Some(obj) = l.as_object() else {
         return Ok(());
     };
+    let allowed = &mir_tables().light_allowed_keys;
     for key in obj.keys() {
-        let allowed = matches!(
-            key.as_str(),
-            "anchor" | "color" | "intensity" | "position" | "color-use-theme"
-        );
-        if !allowed {
+        if !allowed.contains(key.as_str()) {
             return Err(format!(r#"light: unknown property "{key}""#));
         }
     }
@@ -302,8 +422,8 @@ fn validate_light_value(light: Option<&Value>) -> Result<(), String> {
     }
     if let Some(c) = obj.get("color") {
         if let Some(s) = c.as_str() {
-            if s == "__proto__" {
-                return Err("light.color: color expected, \"__proto__\" found".to_string());
+            if color::parse_color(s).is_err() {
+                return Err(format!("light.color: color expected, \"{s}\" found"));
             }
         }
         if !c.is_string() && !c.is_array() {

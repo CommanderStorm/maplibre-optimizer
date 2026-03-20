@@ -225,8 +225,7 @@ expression: sources
             "period": null
           }
         }
-      ],
-      "discriminant_value": "geojson"
+      ]
     },
     "image": {
       "fields": [
@@ -285,8 +284,7 @@ expression: sources
             "default": null
           }
         }
-      ],
-      "discriminant_value": "image"
+      ]
     },
     "raster": {
       "fields": [
@@ -460,8 +458,7 @@ expression: sources
             "default": false
           }
         }
-      ],
-      "discriminant_value": "raster"
+      ]
     },
     "raster_dem": {
       "fields": [
@@ -710,8 +707,7 @@ expression: sources
             "default": false
           }
         }
-      ],
-      "discriminant_value": "raster-dem"
+      ]
     },
     "vector": {
       "fields": [
@@ -906,8 +902,7 @@ expression: sources
             "default": false
           }
         }
-      ],
-      "discriminant_value": "vector"
+      ]
     },
     "video": {
       "fields": [
@@ -968,8 +963,7 @@ expression: sources
             "length": null
           }
         }
-      ],
-      "discriminant_value": "video"
+      ]
     }
   }
 }

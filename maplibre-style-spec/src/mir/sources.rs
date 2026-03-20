@@ -14,7 +14,4 @@ pub struct IntermediateSources {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct SourceTypeDef {
     pub fields: Vec<MirField>,
-    /// The discriminant value used for `#[serde(rename = "...")]`
-    /// on this source variant (e.g. `Some("vector")` for the vector source).
-    pub discriminant_value: Option<String>,
 }

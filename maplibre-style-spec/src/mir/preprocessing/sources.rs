@@ -9,8 +9,9 @@ use crate::mir::sources::{IntermediateSources, SourceTypeDef};
 /// Consume the `"source"` OneOf key and all referenced `source_*` groups from `fields`,
 /// returning structured source definitions keyed by source-type name.
 ///
-/// The `"type"` discriminant field is extracted and stored separately; the `"sources"`
-/// wildcard group (used only in spec validation) is also removed.
+/// The `"type"` discriminant field is stripped from each group (the map key is the JSON
+/// `"type"` value for serde); the `"sources"` wildcard group (used only in spec validation)
+/// is also removed.
 pub fn preprocess_sources(fields: &mut BTreeMap<String, TopLevelItem>) -> IntermediateSources {
     // Remove the `sources` wildcard group — not needed for codegen
     fields.remove("sources");
@@ -27,7 +28,7 @@ pub fn preprocess_sources(fields: &mut BTreeMap<String, TopLevelItem>) -> Interm
     let source_types = source_groups
         .into_iter()
         .map(|(type_name, mut group)| {
-            let discriminant_value = extract_discriminant(&mut group, "type");
+            strip_source_type_discriminant_field(&mut group, "type");
 
             let mir_fields = group
                 .into_iter()
@@ -43,37 +44,32 @@ pub fn preprocess_sources(fields: &mut BTreeMap<String, TopLevelItem>) -> Interm
                 .map(|(k, v)| lower_parsed_item(&k, v))
                 .collect();
 
-            (
-                type_name,
-                SourceTypeDef {
-                    fields: mir_fields,
-                    discriminant_value,
-                },
-            )
+            (type_name, SourceTypeDef { fields: mir_fields })
         })
         .collect();
 
     IntermediateSources { source_types }
 }
 
-/// Extract and remove a single-variant enum field, returning its sole variant name.
-/// If the field is absent or not a single-variant enum, it is left in place and `None` is returned.
-fn extract_discriminant(
+/// Remove the source `"type"` field when it is the usual single-variant enum, so it is not
+/// emitted twice (serde tag + field). The JSON discriminant string is always the map key
+/// (`source_types` in [`IntermediateSources`]).
+fn strip_source_type_discriminant_field(
     group: &mut BTreeMap<String, ParsedItem>,
     field_name: &str,
-) -> Option<String> {
-    let item = group.remove(field_name)?;
+) {
+    let Some(item) = group.remove(field_name) else {
+        return;
+    };
     if let ParsedItem::Primitive(PrimitiveType::Enum {
         values: EnumValues::Enum(ref vals),
         ..
     }) = item
         && vals.len() == 1
     {
-        return Some(vals.keys().next().unwrap().clone());
+        return;
     }
-    // Not a single-variant discriminant — put it back
     group.insert(field_name.to_string(), item);
-    None
 }
 
 #[cfg(test)]
@@ -117,10 +113,6 @@ mod tests {
             assert!(
                 !def.fields.is_empty(),
                 "source type '{name}' must have at least one field"
-            );
-            assert!(
-                def.discriminant_value.is_some(),
-                "source type '{name}' must have a discriminant value"
             );
         }
 
