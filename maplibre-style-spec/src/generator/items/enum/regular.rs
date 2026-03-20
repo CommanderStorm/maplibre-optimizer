@@ -12,7 +12,7 @@ pub fn generate_regular_enum(
     default: Option<&serde_json::Value>,
 ) {
     let default_key = default.map(|d| d.to_string());
-    let default_variant = default_key.as_ref().map(|d| to_upper_camel_case(d));
+    let default_variant = default_key.as_ref().map(to_upper_camel_case);
     let mut enu = scope
         .new_enum(name)
         .doc(doc)

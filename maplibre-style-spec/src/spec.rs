@@ -1359,6 +1359,10 @@ pub enum StringLiteralOrNumberLiteralOrArrayOfStringLiteralOrArrayOfNumberLitera
 pub enum NumberLiteralOrNumberAsUnion {
     NumberLiteral(NumberLiteral),
     Number(Box<Number>),
+    /// Sub-expressions that evaluate to a number but are not represented in [`Number`],
+    /// e.g. `["var", "x"]`.
+    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
+    Expression(serde_json::Value),
 }
 
 /// "Any"
@@ -1439,7 +1443,7 @@ pub enum Any {
     ///  - [Create and style clusters](https://maplibre.org/maplibre-gl-js/docs/examples/create-and-style-clusters/)
     Step(
         (
-            NumberLiteralOrNumberAsUnion,
+            serde_json::Value,
             serde_json::Value,
             Vec<(NumberLiteral, serde_json::Value)>,
         ),
@@ -1496,20 +1500,27 @@ impl<'de> serde::de::Visitor<'de> for AnyVisitor {
                 Ok(Any::At(index, array))
             }
             "case" => {
-                let mut inputs = Vec::new();
-                while let Some(condition_i) = seq.next_element()? {
-                    let output_i = seq.next_element()?.ok_or_else(|| {
-                        serde::de::Error::custom("expected output_i in Any::Case")
-                    })?;
-                    let element = (condition_i, output_i);
-                    inputs.push(element);
+                let mut rest: Vec<serde_json::Value> = Vec::new();
+                while let Some(v) = seq.next_element()? {
+                    rest.push(v);
                 }
-                if inputs.is_empty() {
+                if rest.len() < 3 {
                     return Err(serde::de::Error::custom(
-                        "Any::Case requires at least one argument",
+                        "Any::Case: need at least one condition, one output, and a fallback",
                     ));
                 }
-                let fallback = visit_seq_field(&mut seq, "fallback")?;
+                if rest.len() % 2 == 0 {
+                    return Err(serde::de::Error::custom(
+                        "Any::Case: expected an odd number of arguments after operator (pairs + fallback)",
+                    ));
+                }
+                let fallback = rest.pop().expect("len checked above");
+                let mut inputs = Vec::new();
+                for chunk in rest.chunks_exact(2) {
+                    let condition: Boolean = serde_json::from_value(chunk[0].clone())
+                        .map_err(serde::de::Error::custom)?;
+                    inputs.push((condition, chunk[1].clone()));
+                }
                 Ok(Any::Case((inputs, fallback)))
             }
             "coalesce" => {
@@ -1539,20 +1550,28 @@ impl<'de> serde::de::Visitor<'de> for AnyVisitor {
             }
             "id" => Ok(Any::Id),
             "let" => {
-                let mut inputs = Vec::new();
-                while let Some(var_name_i) = seq.next_element()? {
-                    let var_value_i = seq.next_element()?.ok_or_else(|| {
-                        serde::de::Error::custom("expected var_value_i in Any::Let")
-                    })?;
-                    let element = (var_name_i, var_value_i);
-                    inputs.push(element);
+                let mut rest: Vec<serde_json::Value> = Vec::new();
+                while let Some(v) = seq.next_element()? {
+                    rest.push(v);
                 }
-                if inputs.is_empty() {
+                if rest.len() < 3 {
                     return Err(serde::de::Error::custom(
-                        "Any::Let requires at least one argument",
+                        "Any::Let: need at least one name, one value, and a result expression",
                     ));
                 }
-                let expression = visit_seq_field(&mut seq, "expression")?;
+                if rest.len() % 2 == 0 {
+                    return Err(serde::de::Error::custom(
+                        "Any::Let: expected an odd number of arguments after operator (name/value pairs + expression)",
+                    ));
+                }
+
+                let expression = rest.pop().expect("len checked above");
+                let mut inputs = Vec::new();
+                for chunk in rest.chunks_exact(2) {
+                    let name: StringLiteral = serde_json::from_value(chunk[0].clone())
+                        .map_err(serde::de::Error::custom)?;
+                    inputs.push((name, chunk[1].clone()));
+                }
                 Ok(Any::Let((inputs, expression)))
             }
             "match" => {
@@ -1563,7 +1582,7 @@ impl<'de> serde::de::Visitor<'de> for AnyVisitor {
                 if rest.len() < 2 {
                     return Err(serde::de::Error::custom("Any::Match: too few arguments"));
                 }
-                if rest.len() % 2 != 0 {
+                if !rest.len().is_multiple_of(2) {
                     return Err(serde::de::Error::custom(
                         "Any::Match: expected an even number of arguments after operator (input + label/output pairs + fallback)",
                     ));
@@ -1587,7 +1606,7 @@ impl<'de> serde::de::Visitor<'de> for AnyVisitor {
                 Ok(Any::Match((input, pairs, fallback)))
             }
             "step" => {
-                let input: NumberLiteralOrNumberAsUnion = visit_seq_field(&mut seq, "input")?;
+                let input: serde_json::Value = visit_seq_field(&mut seq, "input")?;
                 let output_0: serde_json::Value = visit_seq_field(&mut seq, "output_0")?;
                 let mut stops = Vec::new();
                 while let Some(stop_input_i) = seq.next_element::<NumberLiteral>()? {
@@ -2061,18 +2080,24 @@ impl<'de> serde::de::Visitor<'de> for BooleanVisitor {
                 Ok(Boolean::NotEqual(input_1, input_2, collator))
             }
             "<" => {
-                // Delegate the remainder of the sequence to LessOptions deserialization
-                let remainder_of_sequence = serde::de::value::SeqAccessDeserializer::new(seq);
-                let options =
-                    <LessOptions as serde::Deserialize>::deserialize(remainder_of_sequence)?;
-                Ok(Boolean::Less(options))
+                let input_1 = visit_seq_field(&mut seq, "input_1")?;
+                let input_2 = visit_seq_field(&mut seq, "input_2")?;
+                let collator = seq.next_element()?;
+                Ok(Boolean::Less(LessOptions::Args((
+                    input_1,
+                    input_2,
+                    collator,
+                ))))
             }
             "<=" => {
-                // Delegate the remainder of the sequence to LessEqualOptions deserialization
-                let remainder_of_sequence = serde::de::value::SeqAccessDeserializer::new(seq);
-                let options =
-                    <LessEqualOptions as serde::Deserialize>::deserialize(remainder_of_sequence)?;
-                Ok(Boolean::LessEqual(options))
+                let input_1 = visit_seq_field(&mut seq, "input_1")?;
+                let input_2 = visit_seq_field(&mut seq, "input_2")?;
+                let collator = seq.next_element()?;
+                Ok(Boolean::LessEqual(LessEqualOptions::Args((
+                    input_1,
+                    input_2,
+                    collator,
+                ))))
             }
             "==" => {
                 let input_1 = visit_seq_field(&mut seq, "input_1")?;
@@ -2081,19 +2106,24 @@ impl<'de> serde::de::Visitor<'de> for BooleanVisitor {
                 Ok(Boolean::EqualEqual(input_1, input_2, collator))
             }
             ">" => {
-                // Delegate the remainder of the sequence to GreaterOptions deserialization
-                let remainder_of_sequence = serde::de::value::SeqAccessDeserializer::new(seq);
-                let options =
-                    <GreaterOptions as serde::Deserialize>::deserialize(remainder_of_sequence)?;
-                Ok(Boolean::Greater(options))
+                let input_1 = visit_seq_field(&mut seq, "input_1")?;
+                let input_2 = visit_seq_field(&mut seq, "input_2")?;
+                let collator = seq.next_element()?;
+                Ok(Boolean::Greater(GreaterOptions::Args((
+                    input_1,
+                    input_2,
+                    collator,
+                ))))
             }
             ">=" => {
-                // Delegate the remainder of the sequence to GreaterEqualOptions deserialization
-                let remainder_of_sequence = serde::de::value::SeqAccessDeserializer::new(seq);
-                let options = <GreaterEqualOptions as serde::Deserialize>::deserialize(
-                    remainder_of_sequence,
-                )?;
-                Ok(Boolean::GreaterEqual(options))
+                let input_1 = visit_seq_field(&mut seq, "input_1")?;
+                let input_2 = visit_seq_field(&mut seq, "input_2")?;
+                let collator = seq.next_element()?;
+                Ok(Boolean::GreaterEqual(GreaterEqualOptions::Args((
+                    input_1,
+                    input_2,
+                    collator,
+                ))))
             }
             "all" => {
                 let mut inputs = Vec::new();
@@ -2821,22 +2851,12 @@ impl<'de> serde::de::Visitor<'de> for NumberVisitor {
                 while let Some(element) = seq.next_element()? {
                     inputs.push(element);
                 }
-                if inputs.is_empty() {
-                    return Err(serde::de::Error::custom(
-                        "Number::Star requires at least one argument",
-                    ));
-                }
                 Ok(Number::Star(inputs))
             }
             "+" => {
                 let mut inputs = Vec::new();
                 while let Some(element) = seq.next_element()? {
                     inputs.push(element);
-                }
-                if inputs.is_empty() {
-                    return Err(serde::de::Error::custom(
-                        "Number::Plus requires at least one argument",
-                    ));
                 }
                 Ok(Number::Plus(inputs))
             }
@@ -2936,22 +2956,12 @@ impl<'de> serde::de::Visitor<'de> for NumberVisitor {
                 while let Some(element) = seq.next_element()? {
                     inputs.push(element);
                 }
-                if inputs.is_empty() {
-                    return Err(serde::de::Error::custom(
-                        "Number::Max requires at least one argument",
-                    ));
-                }
                 Ok(Number::Max(inputs))
             }
             "min" => {
                 let mut inputs = Vec::new();
                 while let Some(element) = seq.next_element()? {
                     inputs.push(element);
-                }
-                if inputs.is_empty() {
-                    return Err(serde::de::Error::custom(
-                        "Number::Min requires at least one argument",
-                    ));
                 }
                 Ok(Number::Min(inputs))
             }
@@ -3498,13 +3508,9 @@ impl Default for GeojsonSourceBuffer {
 ///  * `point_count_abbreviated` An abbreviated point count
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone, Copy)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[derive(Default)]
 pub struct GeojsonSourceCluster(bool);
 
-impl Default for GeojsonSourceCluster {
-    fn default() -> Self {
-        Self(false)
-    }
-}
 
 /// Max zoom on which to cluster points if clustering is enabled. Defaults to one zoom less than maxzoom (so that last zoom features are not clustered). Clusters are re-evaluated at integer zoom levels so setting clusterMaxZoom to 14 means the clusters will be displayed until z15.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
@@ -3571,24 +3577,16 @@ pub struct GeojsonSourceFilter(Filter);
 /// Whether to generate ids for the geojson features. When enabled, the `feature.id` property will be auto assigned based on its index in the `features` array, over-writing any previous values.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone, Copy)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[derive(Default)]
 pub struct GeojsonSourceGenerateId(bool);
 
-impl Default for GeojsonSourceGenerateId {
-    fn default() -> Self {
-        Self(false)
-    }
-}
 
 /// Whether to calculate line distance metrics. This is required for line layers that specify `line-gradient` values.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone, Copy)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[derive(Default)]
 pub struct GeojsonSourceLineMetrics(bool);
 
-impl Default for GeojsonSourceLineMetrics {
-    fn default() -> Self {
-        Self(false)
-    }
-}
 
 /// Maximum zoom level at which to create vector tiles (higher means greater detail at high zoom levels).
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
@@ -3785,13 +3783,9 @@ pub struct RasterSourceUrl(std::string::String);
 /// A setting to determine whether a source's tiles are cached locally.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone, Copy)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[derive(Default)]
 pub struct RasterSourceVolatile(bool);
 
-impl Default for RasterSourceVolatile {
-    fn default() -> Self {
-        Self(false)
-    }
-}
 
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
@@ -4005,13 +3999,9 @@ pub struct RasterDemSourceUrl(std::string::String);
 /// A setting to determine whether a source's tiles are cached locally.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone, Copy)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[derive(Default)]
 pub struct RasterDemSourceVolatile(bool);
 
-impl Default for RasterDemSourceVolatile {
-    fn default() -> Self {
-        Self(false)
-    }
-}
 
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
@@ -4145,13 +4135,9 @@ pub struct VectorSourceUrl(std::string::String);
 /// A setting to determine whether a source's tiles are cached locally.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone, Copy)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[derive(Default)]
 pub struct VectorSourceVolatile(bool);
 
-impl Default for VectorSourceVolatile {
-    fn default() -> Self {
-        Self(false)
-    }
-}
 
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
@@ -6450,13 +6436,9 @@ pub struct SymbolLayoutLayer {
 /// If true, the icon will be visible even if it collides with other previously drawn symbols.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone, Copy)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[derive(Default)]
 pub struct SymbolLayoutLayerIconAllowOverlap(bool);
 
-impl Default for SymbolLayoutLayerIconAllowOverlap {
-    fn default() -> Self {
-        Self(false)
-    }
-}
 
 /// Part of the icon placed closest to the anchor.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy, Default)]
@@ -6486,13 +6468,9 @@ pub enum SymbolLayoutLayerIconAnchor {
 /// If true, other symbols can be visible even if they collide with the icon.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone, Copy)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[derive(Default)]
 pub struct SymbolLayoutLayerIconIgnorePlacement(bool);
 
-impl Default for SymbolLayoutLayerIconIgnorePlacement {
-    fn default() -> Self {
-        Self(false)
-    }
-}
 
 /// Name of image in sprite to use for drawing an image background.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone)]
@@ -6502,13 +6480,9 @@ pub struct SymbolLayoutLayerIconImage(std::string::String);
 /// If true, the icon may be flipped to prevent it from being rendered upside-down.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone, Copy)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[derive(Default)]
 pub struct SymbolLayoutLayerIconKeepUpright(bool);
 
-impl Default for SymbolLayoutLayerIconKeepUpright {
-    fn default() -> Self {
-        Self(false)
-    }
-}
 
 /// Offset distance of icon from its anchor. Positive values indicate right and down, while negative values indicate left and up. Each component is multiplied by the value of `icon-size` to obtain the final offset in pixels. When combined with `icon-rotate` the offset will be as if the rotated direction was up.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
@@ -6532,13 +6506,9 @@ impl Default for SymbolLayoutLayerIconOffset {
 /// If true, text will display without their corresponding icons when the icon collides with other symbols and the text does not.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone, Copy)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[derive(Default)]
 pub struct SymbolLayoutLayerIconOptional(bool);
 
-impl Default for SymbolLayoutLayerIconOptional {
-    fn default() -> Self {
-        Self(false)
-    }
-}
 
 /// Allows for control over whether to show an icon when it overlaps other symbols on the map. If `icon-overlap` is not set, `icon-allow-overlap` is used instead.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy)]
@@ -6712,13 +6682,9 @@ impl Default for SymbolLayoutLayerIconTextFitPadding {
 /// If true, the symbols will not cross tile edges to avoid mutual collisions. Recommended in layers that don't have enough padding in the vector tile to prevent collisions, or if it is a point symbol layer placed after a line symbol layer. When using a client that supports global collision detection, like MapLibre GL JS version 0.42.0 or greater, enabling this property is not needed to prevent clipped labels at tile boundaries.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone, Copy)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[derive(Default)]
 pub struct SymbolLayoutLayerSymbolAvoidEdges(bool);
 
-impl Default for SymbolLayoutLayerSymbolAvoidEdges {
-    fn default() -> Self {
-        Self(false)
-    }
-}
 
 /// Label placement relative to its geometry.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy, Default)]
@@ -6800,13 +6766,9 @@ pub enum SymbolLayoutLayerSymbolZOrder {
 /// If true, the text will be visible even if it collides with other previously drawn symbols.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone, Copy)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[derive(Default)]
 pub struct SymbolLayoutLayerTextAllowOverlap(bool);
 
-impl Default for SymbolLayoutLayerTextAllowOverlap {
-    fn default() -> Self {
-        Self(false)
-    }
-}
 
 /// Part of the text placed closest to the anchor.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy, Default)]
@@ -6861,13 +6823,9 @@ impl Default for SymbolLayoutLayerTextFont {
 /// If true, other symbols can be visible even if they collide with the text.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone, Copy)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[derive(Default)]
 pub struct SymbolLayoutLayerTextIgnorePlacement(bool);
 
-impl Default for SymbolLayoutLayerTextIgnorePlacement {
-    fn default() -> Self {
-        Self(false)
-    }
-}
 
 /// Text justification options.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy, Default)]
@@ -7037,13 +6995,9 @@ impl Default for SymbolLayoutLayerTextOffset {
 /// If true, icons will display without their corresponding text when the text collides with other symbols and the icon does not.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone, Copy)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[derive(Default)]
 pub struct SymbolLayoutLayerTextOptional(bool);
 
-impl Default for SymbolLayoutLayerTextOptional {
-    fn default() -> Self {
-        Self(false)
-    }
-}
 
 /// Allows for control over whether to show symbol text when it overlaps other symbols on the map. If `text-overlap` is not set, `text-allow-overlap` is used instead
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy)]

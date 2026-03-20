@@ -146,7 +146,7 @@ fn validate_interpolate_chain(
         return Err("interpolate: too few arguments".into());
     }
     let n_stops_vals = args.len().saturating_sub(3);
-    if n_stops_vals % 2 != 0 {
+    if !n_stops_vals.is_multiple_of(2) {
         return Err("interpolate: malformed stop/value pairs".into());
     }
     for a in args.iter().skip(1) {
@@ -272,13 +272,91 @@ pub fn validate_expression_with_spec(
                 return Ok(());
             }
 
-            if matches!(op, "case" | "match" | "let" | "step") {
+            if op == "case" {
+                if args.len() < 4 {
+                    return Err("case: too few arguments".into());
+                }
+                let tail = &args[1..];
+                if tail.len() % 2 == 0 {
+                    return Err("case: expected condition/output pairs plus fallback".into());
+                }
+                let fallback = tail.last().expect("len checked");
+                let pairs = &tail[..tail.len() - 1];
+                for i in (0..pairs.len()).step_by(2) {
+                    validate_expression_with_spec(&pairs[i], op_to_groups, known_ops)?;
+                    validate_expression_with_spec(&pairs[i + 1], op_to_groups, known_ops)?;
+                }
+                validate_expression_with_spec(fallback, op_to_groups, known_ops)?;
+                return Ok(());
+            }
+
+            if op == "let" {
+                if args.len() < 4 {
+                    return Err("let: too few arguments".into());
+                }
+                let tail = &args[1..];
+                if tail.len() % 2 == 0 {
+                    return Err("let: expected name/value pairs plus body".into());
+                }
+                let body = tail.last().expect("len checked");
+                let binds = &tail[..tail.len() - 1];
+                for i in (0..binds.len()).step_by(2) {
+                    if !binds[i].is_string() {
+                        return Err("let: binding name must be a string".into());
+                    }
+                    validate_expression_with_spec(&binds[i + 1], op_to_groups, known_ops)?;
+                }
+                validate_expression_with_spec(body, op_to_groups, known_ops)?;
+                return Ok(());
+            }
+
+            if op == "match" {
+                if args.len() < 4 {
+                    return Err("match: too few arguments".into());
+                }
+                validate_expression_with_spec(&args[1], op_to_groups, known_ops)?;
+                let rest = &args[2..];
+                let default = rest
+                    .last()
+                    .ok_or_else(|| "match: missing fallback".to_string())?;
+                let pairs = &rest[..rest.len() - 1];
+                if pairs.len() % 2 != 0 {
+                    return Err("match: label/output pairs must precede fallback".into());
+                }
+                for i in (0..pairs.len()).step_by(2) {
+                    walk_nested_expr_operand(&pairs[i], op_to_groups, known_ops)?;
+                    validate_expression_with_spec(&pairs[i + 1], op_to_groups, known_ops)?;
+                }
+                validate_expression_with_spec(default, op_to_groups, known_ops)?;
+                return Ok(());
+            }
+
+            if op == "step" {
+                if args.len() < 5 {
+                    return Err("step: too few arguments".into());
+                }
+                validate_expression_with_spec(&args[1], op_to_groups, known_ops)?;
+                validate_expression_with_spec(&args[2], op_to_groups, known_ops)?;
+                let stops = &args[3..];
+                if stops.len() % 2 != 0 {
+                    return Err("step: stop inputs and outputs must come in pairs".into());
+                }
+                for i in (0..stops.len()).step_by(2) {
+                    walk_nested_expr_operand(&stops[i], op_to_groups, known_ops)?;
+                    validate_expression_with_spec(&stops[i + 1], op_to_groups, known_ops)?;
+                }
+                return Ok(());
+            }
+
+            if op == "number-format" {
                 if args.len() < 2 {
-                    return Err(format!("{op}: too few arguments"));
+                    return Err("number-format: too few arguments".into());
                 }
-                for a in args.iter().skip(1) {
-                    validate_expression_with_spec(a, op_to_groups, known_ops)?;
-                }
+                validate_expression_with_spec(&args[1], op_to_groups, known_ops)?;
+                if let Some(opts) = args.get(2)
+                    && !opts.is_object() {
+                        validate_expression_with_spec(opts, op_to_groups, known_ops)?;
+                    }
                 return Ok(());
             }
 
@@ -336,10 +414,23 @@ pub fn validate_expression_with_spec(
 
 #[cfg(test)]
 mod tests {
+    use std::collections::{HashMap, HashSet};
+
     use std::collections::BTreeMap;
+
+    use super::{operator_groups_map, validate_expression_with_spec};
 
     use crate::decoder::StyleReference;
     use crate::mir::IntermediateSpec;
+
+    fn setup() -> (HashMap<String, Vec<String>>, HashSet<String>) {
+        let v8 = include_str!("../../upstream/src/reference/v8.json");
+        let reference: StyleReference = serde_json::from_str(v8).expect("v8.json should parse");
+        let spec = IntermediateSpec::from(reference);
+        let op_to_groups = operator_groups_map(&spec.expressions);
+        let known_ops: HashSet<String> = spec.expressions.operators.keys().cloned().collect();
+        (op_to_groups, known_ops)
+    }
 
     #[test]
     fn dump_expression_output_groups() {
@@ -382,5 +473,63 @@ mod tests {
             "add try_deserialize arms for: {:?}",
             unknown.keys().collect::<Vec<_>>()
         );
+    }
+
+    #[test]
+    fn validates_any_case_fallback_structure() {
+        let (op_to_groups, known_ops) = setup();
+        let expr = serde_json::json!(["case", ["boolean", ["feature-state","hover"], false], 1, 0.5]);
+        assert!(validate_expression_with_spec(&expr, &op_to_groups, &known_ops).is_ok());
+    }
+
+    #[test]
+    fn validates_any_let_binding_structure() {
+        let (op_to_groups, known_ops) = setup();
+        let expr = serde_json::json!(["let","someNumber",500,["interpolate",["linear"],["var","someNumber"],274,"#edf8e9",1551,"#006d2c"]]);
+        assert!(validate_expression_with_spec(&expr, &op_to_groups, &known_ops).is_ok());
+    }
+
+    #[test]
+    fn validates_any_step_input_can_be_expression() {
+        let (op_to_groups, known_ops) = setup();
+        let expr = serde_json::json!(["step",["get","point_count"],20,100,30,750,40]);
+        assert!(validate_expression_with_spec(&expr, &op_to_groups, &known_ops).is_ok());
+    }
+
+    #[test]
+    fn validates_comparison_ops_with_nested_get() {
+        let (op_to_groups, known_ops) = setup();
+        let expr = serde_json::json!(["<",["get","mag"],2]);
+        assert!(validate_expression_with_spec(&expr, &op_to_groups, &known_ops).is_ok());
+    }
+
+    #[test]
+    fn validates_match_labels_can_be_arrays() {
+        let (op_to_groups, known_ops) = setup();
+        let expr = serde_json::json!(["match",["get","x"],[-2,-1],"negative",0,"zero",[1,2],"positive","otherwise"]);
+        assert!(validate_expression_with_spec(&expr, &op_to_groups, &known_ops).is_ok());
+    }
+
+    #[test]
+    fn validates_number_format_with_bare_options_object() {
+        let (op_to_groups, known_ops) = setup();
+        let expr = serde_json::json!(["number-format",["get","mag"],{}]);
+        assert!(validate_expression_with_spec(&expr, &op_to_groups, &known_ops).is_ok());
+    }
+
+    #[test]
+    fn validates_number_plus_allows_var_operands() {
+        let (op_to_groups, known_ops) = setup();
+        let expr = serde_json::json!(["+",["var","x"],2]);
+        assert!(validate_expression_with_spec(&expr, &op_to_groups, &known_ops).is_ok());
+    }
+
+    #[test]
+    fn validates_empty_max_min() {
+        let (op_to_groups, known_ops) = setup();
+        let max_expr = serde_json::json!(["max"]);
+        let min_expr = serde_json::json!(["min"]);
+        assert!(validate_expression_with_spec(&max_expr, &op_to_groups, &known_ops).is_ok());
+        assert!(validate_expression_with_spec(&min_expr, &op_to_groups, &known_ops).is_ok());
     }
 }

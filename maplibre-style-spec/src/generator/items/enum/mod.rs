@@ -23,8 +23,8 @@ pub fn generate_mir(scope: &mut Scope, name: &str, field: &EnumField) {
 
     // `regular::generate_regular_enum` already emits `Default` when a default is set.
     // Version enums still need it here (see `items/enum/version.rs`).
-    if matches!(&field.variants, MirEnum::Version(_)) {
-        if let Some(default) = &field.default {
+    if matches!(&field.variants, MirEnum::Version(_))
+        && let Some(default) = &field.default {
             scope
                 .new_impl(name)
                 .impl_trait("Default")
@@ -35,7 +35,6 @@ pub fn generate_mir(scope: &mut Scope, name: &str, field: &EnumField) {
                     to_upper_camel_case(default.to_string())
                 ));
         }
-    }
     if matches!(&field.variants, MirEnum::Regular(_) | MirEnum::Version(_)) {
         generate_test_from_example_if_present(scope, name, field.meta.example.as_ref());
     }
