@@ -1,4 +1,4 @@
-//! JSON-tree optimizations for MapLibre style documents.
+//! JSON-tree optimizations for `MapLibre` style documents.
 //!
 //! Operates on [`serde_json::Value`] so root keys not yet in generated `spec.rs` are preserved.
 
@@ -12,7 +12,7 @@ use maplibre_style_spec::decoder::StyleReference;
 use maplibre_style_spec::mir::IntermediateSpec;
 pub use optimize::{OptPasses, optimize_style_json_value};
 
-/// Load MIR from a MapLibre style reference `v8.json` on disk.
+/// Load MIR from a `MapLibre` style reference `v8.json` on disk.
 pub fn load_intermediate_spec_from_v8_path(path: &Path) -> anyhow::Result<IntermediateSpec> {
     let text =
         fs::read_to_string(path).with_context(|| format!("read reference {}", path.display()))?;

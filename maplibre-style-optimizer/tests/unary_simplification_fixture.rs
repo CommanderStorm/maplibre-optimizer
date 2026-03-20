@@ -30,6 +30,7 @@ fn unary_simplification_fixture_matches_expected() {
         &sample_mir(),
         &OptPasses {
             simplify_unary: true,
+            ..Default::default()
         },
     );
 

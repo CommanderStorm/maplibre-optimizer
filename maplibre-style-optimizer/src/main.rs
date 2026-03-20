@@ -9,9 +9,10 @@ use maplibre_style_optimizer::{
 };
 use maplibre_style_spec::validate::validate_style_value;
 
-/// Optimize a MapLibre style JSON document (preserves unmodeled root keys).
+/// Optimize a `MapLibre` style JSON document (preserves unmodeled root keys).
 #[derive(Parser, Debug)]
 #[command(name = "maplibre-style-optimize", version)]
+#[allow(clippy::struct_excessive_bools)]
 struct Cli {
     /// Input style JSON path.
     #[arg(long)]
@@ -28,6 +29,26 @@ struct Cli {
     /// Simplify unary boolean ops: `["any"|"all", e]` → `e`, `["!",["!",e]]` → `e`.
     #[arg(long)]
     simplify_unary: bool,
+
+    /// Rewrite negated comparisons to `!=` / `==` when MIR defines those operators.
+    #[arg(long)]
+    expression_kind: bool,
+
+    /// Fold constant comparisons and boolean `any`/`all`/`!` (style-static only).
+    #[arg(long)]
+    constant_fold: bool,
+
+    /// Remove layers with always-false filters and unused sources.
+    #[arg(long)]
+    dead_elimination: bool,
+
+    /// Tighten `minzoom`/`maxzoom` from `["zoom"]` predicates inside filters.
+    #[arg(long)]
+    metadata_refinement: bool,
+
+    /// Reorder `any`/`all` operands for static short-circuit hints (literals first/last).
+    #[arg(long)]
+    selectivity_reorder: bool,
 
     /// Run JSON-tree validation after optimization (`maplibre_style_spec::validate`).
     #[arg(long)]
@@ -58,6 +79,11 @@ fn main() -> anyhow::Result<()> {
 
     let passes = OptPasses {
         simplify_unary: cli.simplify_unary,
+        expression_kind: cli.expression_kind,
+        constant_fold: cli.constant_fold,
+        dead_elimination: cli.dead_elimination,
+        metadata_refinement: cli.metadata_refinement,
+        selectivity_reorder: cli.selectivity_reorder,
     };
     optimize_style_json_value(&mut value, &mir, &passes);
 
