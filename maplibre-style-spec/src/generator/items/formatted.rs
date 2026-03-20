@@ -39,7 +39,7 @@ mod tests {
         );
         insta::assert_snapshot!(scope.to_string(), @r#"
         #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-        struct Foo(String);
+        struct Foo(std::string::String);
 
         impl Default for Foo {
             fn default() -> Self {

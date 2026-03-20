@@ -5,11 +5,18 @@ use crate::generator::formatter::to_upper_camel_case;
 use crate::mir::types::ReferenceField;
 
 pub fn generate(scope: &mut Scope, name: &str, field: &ReferenceField) {
+    let rust_inner = match field.target.as_str() {
+        // `$root.sources` uses `type: "sources"` but sources are modeled as `Source` plus a map.
+        "sources" => "std::collections::BTreeMap<std::string::String, Source>".to_string(),
+        // Named typedef `expression` is the spec's "expression array" shape; the syntax enum is `Any`.
+        "expression" => "Any".to_string(),
+        other => to_upper_camel_case(other),
+    };
     scope
         .new_struct(name)
         .doc(&field.meta.doc)
         .derive("serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone")
-        .tuple_field(to_upper_camel_case(&field.target));
+        .tuple_field(rust_inner);
 
     generate_test_from_example_if_present(scope, name, field.meta.example.as_ref());
 }

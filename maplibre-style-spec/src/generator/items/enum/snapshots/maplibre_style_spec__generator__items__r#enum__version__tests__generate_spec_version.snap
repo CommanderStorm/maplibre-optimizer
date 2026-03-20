@@ -2,6 +2,34 @@
 source: maplibre-style-spec/src/generator/items/enum/version.rs
 expression: "crate::generator::generate_spec_scope(&spec)"
 ---
+/// JSON number in an expression position
+#[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+pub struct NumberLiteral(serde_json::Number);
+
+/// JSON string in an expression position
+#[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+pub struct StringLiteral(std::string::String);
+
+/// GeoJSON object literal
+#[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+pub struct GeoJSONObjectLiteral(geojson::GeoJson);
+
+/// JSON object literal
+#[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+pub struct JSONObjectLiteral(serde_json::Value);
+
+/// JSON array literal
+#[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+pub struct JSONArrayLiteral(Vec<serde_json::Value>);
+
+/// Array whose elements are string literals (e.g. match labels)
+#[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+pub struct ArrayOfStringLiteral(Vec<StringLiteral>);
+
+/// Array whose elements are number literals (e.g. match labels)
+#[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+pub struct ArrayOfNumberLiteral(Vec<NumberLiteral>);
+
 /// This is a Maplibre Style Specification
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
 pub struct MaplibreStyleSpecification {
@@ -10,7 +38,7 @@ pub struct MaplibreStyleSpecification {
 }
 
 /// Style specification version number. Must be 8.
-#[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy)]
+#[derive(serde_repr::Serialize_repr, serde_repr::Deserialize_repr, PartialEq, Eq, Debug, Clone, Copy)]
 #[repr(u8)]
 pub enum RootVersion {
     Eight = 8,
@@ -19,12 +47,6 @@ pub enum RootVersion {
 #[cfg(test)]
 mod test {
     use super::*;
-
-    #[test]
-    fn test_example_root_version_decodes() {
-        let example = serde_json::json!(8);
-        let _ = serde_json::from_value::<RootVersion>(example).expect("example should decode");
-    }
 
     #[test]
     fn test_example_root_version_decodes() {

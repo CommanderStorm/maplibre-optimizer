@@ -40,7 +40,7 @@ pub fn generate(scope: &mut Scope, name: &str, meta: &FieldMeta) {
         .derive("serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone")
         .doc(SPRITE_URL_AND_ID_DOCS);
     sprite_url_and_id
-        .field("id", "String")
+        .field("id", "std::string::String")
         .doc("Identifier of a sprite");
     sprite_url_and_id.field("url", "url::Url").doc(
         r#"URL where the sprite can be loaded from.
@@ -92,7 +92,7 @@ mod tests {
         /// ```
         #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
         pub struct SpriteUrlAndId {
-            id: String,
+            id: std::string::String,
             url: url::Url,
         }
 

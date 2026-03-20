@@ -1,16 +1,9 @@
 use codegen2::Scope;
 
-use crate::generator::autotest::generate_test_from_example_if_present;
 use crate::generator::formatter::to_upper_camel_case;
 use crate::mir::types::VersionEnum;
 
-pub fn generate_version(
-    scope: &mut Scope,
-    name: &str,
-    doc: &str,
-    versions: &VersionEnum,
-    example: Option<&serde_json::Value>,
-) {
+pub fn generate_version(scope: &mut Scope, name: &str, doc: &str, versions: &VersionEnum) {
     assert!(versions.versions.len() <= u8::MAX as usize);
 
     let enu = scope
@@ -18,13 +11,13 @@ pub fn generate_version(
         .doc(doc)
         .vis("pub")
         .repr("u8")
-        .derive("serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy");
+        .derive(
+            "serde_repr::Serialize_repr, serde_repr::Deserialize_repr, PartialEq, Eq, Debug, Clone, Copy",
+        );
     for v in &versions.versions {
         enu.new_variant(to_upper_camel_case(v.to_string()))
             .discriminant(v.to_string());
     }
-
-    generate_test_from_example_if_present(scope, name, example);
 }
 
 #[cfg(test)]

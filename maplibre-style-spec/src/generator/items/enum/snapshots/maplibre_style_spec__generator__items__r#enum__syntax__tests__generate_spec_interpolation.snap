@@ -2,12 +2,40 @@
 source: maplibre-style-spec/src/generator/items/enum/syntax.rs
 expression: "crate::generator::generate_spec_scope(&spec)"
 ---
+/// JSON number in an expression position
+#[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+pub struct NumberLiteral(serde_json::Number);
+
+/// JSON string in an expression position
+#[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+pub struct StringLiteral(std::string::String);
+
+/// GeoJSON object literal
+#[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+pub struct GeoJSONObjectLiteral(geojson::GeoJson);
+
+/// JSON object literal
+#[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+pub struct JSONObjectLiteral(serde_json::Value);
+
+/// JSON array literal
+#[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+pub struct JSONArrayLiteral(Vec<serde_json::Value>);
+
+/// Array whose elements are string literals (e.g. match labels)
+#[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+pub struct ArrayOfStringLiteral(Vec<StringLiteral>);
+
+/// Array whose elements are number literals (e.g. match labels)
+#[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+pub struct ArrayOfNumberLiteral(Vec<NumberLiteral>);
+
 /// This is a Maplibre Style Specification
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
 pub struct MaplibreStyleSpecification;
 
 /// First element in an interpolation array. May be followed by a number of arguments.
-#[derive(PartialEq, Debug, Clone)]
+#[derive(serde::Serialize, PartialEq, Debug, Clone)]
 pub enum InterpolationName {
     /// Interpolates linearly between the pair of stops just less than and just greater than the input
     Linear,
@@ -28,19 +56,19 @@ impl<'de> serde::de::Visitor<'de> for InterpolationNameVisitor {
     type Value = InterpolationName;
 
     fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
-        formatter.write_str(r#"an InterpolationName like ["linear"]"#)
+        formatter.write_str("an InterpolationName expression (example: [\"linear\"])")
     }
 
     fn visit_seq<A: serde::de::SeqAccess<'de>>(self, mut seq: A) -> Result<Self::Value, A::Error> {
-        use serde::Deserialize;
         /// Reads the next element from the sequence or reports a missing field error.
+        #[allow(dead_code)]
         fn visit_seq_field<'de, A, T>(seq: &mut A, name: &'static str) -> Result<T, A::Error>
         where A: serde::de::SeqAccess<'de>, T: serde::Deserialize<'de> {
         seq.next_element()?.ok_or_else(|| serde::de::Error::missing_field(name))
         }
 
         // First element: operator string
-        let op: String = seq.next_element()?.ok_or_else(|| serde::de::Error::custom("missing operator"))?;
+        let op: std::string::String = seq.next_element()?.ok_or_else(|| serde::de::Error::custom("missing operator"))?;
         match op.as_str() {
         "linear" => {
         Ok(InterpolationName::Linear)

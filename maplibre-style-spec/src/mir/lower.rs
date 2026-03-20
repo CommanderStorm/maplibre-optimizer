@@ -4,10 +4,10 @@ use crate::decoder::{Fields, ParsedItem, PrimitiveType};
 use crate::generator::formatter::to_snake_case;
 use crate::mir::types::{
     ArrayElement, ArrayField, BooleanField, ColorArrayField, ColorField, EnumField,
-    ExpressionCapabilities, FieldMeta, FormattedTextField, MirEnum, MirField, NumberArrayField,
-    NumberField, PaddingField, ProjectionDefinitionField, ReferenceField, RegularEnum,
-    RegularVariant, ResolvedImageField, StateField, StringField, SyntaxEnumMap, SyntaxVariantDef,
-    VersionEnum,
+    ExpressionCapabilities, FieldMeta, FormattedTextField, MirEnum, MirField, MirSyntax,
+    NumberArrayField, NumberField, PaddingField, ProjectionDefinitionField, ReferenceField,
+    RegularEnum, RegularVariant, ResolvedImageField, StateField, StringField, SyntaxEnumMap,
+    SyntaxVariantDef, VersionEnum,
 };
 
 /// The single conversion point: `ParsedItem` (decoder) → `MirField` (MIR).
@@ -16,10 +16,22 @@ pub fn lower_parsed_item(spec_name: &str, item: ParsedItem) -> MirField {
     let optional = item.optional();
     match item {
         ParsedItem::Primitive(p) => lower_primitive(spec_name, p, optional),
-        ParsedItem::Reference { references, common } => MirField::Reference(ReferenceField {
-            meta: make_meta(spec_name, &common, optional),
-            target: references,
-        }),
+        ParsedItem::Reference { references, common } => {
+            // `$root["font-faces"]` references `type: "fontFaces"` but there is no named `fontFaces`
+            // group in `fields` — lower as the concrete map-of-font-faces array shape (see v8.json).
+            if references == "fontFaces" {
+                return MirField::Array(ArrayField {
+                    meta: make_meta(spec_name, &common, optional),
+                    default: None,
+                    element: ArrayElement::FontFaces,
+                    length: None,
+                });
+            }
+            MirField::Reference(ReferenceField {
+                meta: make_meta(spec_name, &common, optional),
+                target: references,
+            })
+        }
     }
 }
 
@@ -190,11 +202,12 @@ pub fn lower_enum_values(values: EnumValues) -> MirEnum {
             variants: map
                 .into_iter()
                 .map(|(k, v)| {
+                    let syntax = MirSyntax::from_decoder(&k, v.syntax);
                     (
                         k,
                         SyntaxVariantDef {
                             doc: v.doc,
-                            syntax: v.syntax.into(),
+                            syntax,
                             example: v.example,
                             group: v.group,
                         },

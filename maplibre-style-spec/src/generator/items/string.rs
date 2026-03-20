@@ -9,7 +9,7 @@ pub fn generate(scope: &mut Scope, name: &str, field: &StringField) {
         .vis("pub")
         .doc(&field.meta.doc)
         .derive("serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone")
-        .tuple_field("String");
+        .tuple_field("std::string::String");
 
     if let Some(default) = &field.default {
         scope
@@ -40,7 +40,7 @@ mod tests {
         );
         insta::assert_snapshot!(scope.to_string(), @r"
         #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-        pub struct Foo(String);
+        pub struct Foo(std::string::String);
         ")
     }
 }

@@ -25,8 +25,9 @@ mod literals;
 pub fn generate_spec_scope(spec: &IntermediateSpec) -> String {
     let mut scope = Scope::new();
 
-    generate_root_struct(&mut scope, spec);
+    // Expression syntax tuples reference literal newtypes (`StringLiteral`, …).
     generate_literals(&mut scope);
+    generate_root_struct(&mut scope, spec);
 
     // Named types (groups, type aliases, OneOf enums)
     for (key, named_type) in &spec.named_types {
@@ -105,7 +106,9 @@ fn generate_struct_from_fields(scope: &mut Scope, name: &str, fields: &[MirField
             .new_struct(name)
             .vis("pub")
             .derive("serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone")
-            .tuple_field(format!("std::collections::BTreeMap<String,{inner_name}>"));
+            .tuple_field(format!(
+                "std::collections::BTreeMap<std::string::String,{inner_name}>"
+            ));
         items::star::generate(scope, &inner_name, meta);
         return;
     }
@@ -119,7 +122,7 @@ fn generate_struct_from_fields(scope: &mut Scope, name: &str, fields: &[MirField
         let meta = field.meta();
         let field_type_name = to_upper_camel_case(format!("{name} {}", meta.spec_name));
         let mut field_type = if meta.spec_name == "*" {
-            format!("std::collections::BTreeMap<String,{field_type_name}>")
+            format!("std::collections::BTreeMap<std::string::String,{field_type_name}>")
         } else {
             field_type_name.clone()
         };
@@ -137,13 +140,9 @@ fn generate_struct_from_fields(scope: &mut Scope, name: &str, fields: &[MirField
         }
     }
 
-    // Generate subtypes for each field
+    // Generate subtypes for each field (including `*` wildcard keys — e.g. promoteId groups).
     for field in fields {
         let meta = field.meta();
-        if meta.spec_name == "*" {
-            // Already handled above via star::generate
-            continue;
-        }
         let field_type_name = to_upper_camel_case(format!("{name} {}", meta.spec_name));
         generate_mir_type(scope, &field_type_name, field);
     }

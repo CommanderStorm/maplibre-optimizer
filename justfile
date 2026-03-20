@@ -112,7 +112,8 @@ fmt-toml *args: (cargo-install 'cargo-sort')
 
 # Generate a new spec file
 gen: clean-gen
-    cargo run --bin generate_spec
+    # `full` pulls in `spec`/`validate`/`expression_validate`; stub `spec.rs` from clean-gen would break the build.
+    cargo run --no-default-features -p maplibre-style-spec --bin generate_spec
     {{ just_executable() }} fmt
     rustfmt maplibre-style-spec/src/spec.rs
 

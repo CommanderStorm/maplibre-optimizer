@@ -233,6 +233,31 @@ impl MirSyntax {
             .iter()
             .any(|overload| overload.is_variadic(&self.parameters))
     }
+
+    /// Fixes where v8 JSON types are too narrow for real styles (see `from_decoder`).
+    pub fn patch_expression_parameters(operator: &str, parameters: &mut [MirParameter]) {
+        if operator == "format" {
+            for p in parameters.iter_mut() {
+                if p.name == "input_i" {
+                    // v8 documents `["string","image"]` as JSON literals + `["image", …]`, but real styles
+                    // (and the official example) also use string-producing operators (`upcase`, `get`, …).
+                    // `spec::Any` is only the small polymorphic "value" subset — it is not "any expression".
+                    p.r#type = MirParameterType::ExpressionAnyOf(vec![
+                        MirParameterType::Literal(MirLiteral::String),
+                        MirParameterType::Expression(Box::new(MirExpression::String)),
+                        MirParameterType::Expression(Box::new(MirExpression::Image)),
+                    ]);
+                }
+            }
+        }
+    }
+
+    /// Lower decoded reference syntax into MIR, applying fixes where the JSON schema is too narrow.
+    pub fn from_decoder(operator: &str, syntax: crate::decoder::r#enum::Syntax) -> Self {
+        let mut mir = MirSyntax::from(syntax);
+        Self::patch_expression_parameters(operator, &mut mir.parameters);
+        mir
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]

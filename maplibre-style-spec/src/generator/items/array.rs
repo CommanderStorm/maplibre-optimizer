@@ -67,7 +67,7 @@ fn generate_array_element(scope: &mut Scope, name: &str, element: &ArrayElement)
 
         ArrayElement::FontFaces => {
             generate_font_faces(scope);
-            "std::collections::BTreeMap<String,FontFace>".to_string()
+            "std::collections::BTreeMap<std::string::String,FontFace>".to_string()
         }
 
         ArrayElement::Either(options) => {
@@ -231,6 +231,34 @@ mod tests {
         let reference: StyleReference = serde_json::from_value(reference).unwrap();
         let spec = crate::mir::IntermediateSpec::from(reference);
         insta::assert_snapshot!(crate::generator::generate_spec_scope(&spec), @r#"
+        /// JSON number in an expression position
+        #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+        pub struct NumberLiteral(serde_json::Number);
+
+        /// JSON string in an expression position
+        #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+        pub struct StringLiteral(std::string::String);
+
+        /// GeoJSON object literal
+        #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+        pub struct GeoJSONObjectLiteral(geojson::GeoJson);
+
+        /// JSON object literal
+        #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+        pub struct JSONObjectLiteral(serde_json::Value);
+
+        /// JSON array literal
+        #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+        pub struct JSONArrayLiteral(Vec<serde_json::Value>);
+
+        /// Array whose elements are string literals (e.g. match labels)
+        #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+        pub struct ArrayOfStringLiteral(Vec<StringLiteral>);
+
+        /// Array whose elements are number literals (e.g. match labels)
+        #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+        pub struct ArrayOfNumberLiteral(Vec<NumberLiteral>);
+
         /// This is a Maplibre Style Specification
         #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
         pub struct MaplibreStyleSpecification;
@@ -284,6 +312,34 @@ mod tests {
         let reference: StyleReference = serde_json::from_value(reference).unwrap();
         let spec = crate::mir::IntermediateSpec::from(reference);
         insta::assert_snapshot!(crate::generator::generate_spec_scope(&spec), @r##"
+        /// JSON number in an expression position
+        #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+        pub struct NumberLiteral(serde_json::Number);
+
+        /// JSON string in an expression position
+        #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+        pub struct StringLiteral(std::string::String);
+
+        /// GeoJSON object literal
+        #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+        pub struct GeoJSONObjectLiteral(geojson::GeoJson);
+
+        /// JSON object literal
+        #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+        pub struct JSONObjectLiteral(serde_json::Value);
+
+        /// JSON array literal
+        #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+        pub struct JSONArrayLiteral(Vec<serde_json::Value>);
+
+        /// Array whose elements are string literals (e.g. match labels)
+        #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+        pub struct ArrayOfStringLiteral(Vec<StringLiteral>);
+
+        /// Array whose elements are number literals (e.g. match labels)
+        #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+        pub struct ArrayOfNumberLiteral(Vec<NumberLiteral>);
+
         /// This is a Maplibre Style Specification
         #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
         pub struct MaplibreStyleSpecification;
@@ -320,6 +376,34 @@ mod tests {
         let reference: StyleReference = serde_json::from_value(reference).unwrap();
         let spec = crate::mir::IntermediateSpec::from(reference);
         insta::assert_snapshot!(crate::generator::generate_spec_scope(&spec), @r#"
+        /// JSON number in an expression position
+        #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+        pub struct NumberLiteral(serde_json::Number);
+
+        /// JSON string in an expression position
+        #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+        pub struct StringLiteral(std::string::String);
+
+        /// GeoJSON object literal
+        #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+        pub struct GeoJSONObjectLiteral(geojson::GeoJson);
+
+        /// JSON object literal
+        #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+        pub struct JSONObjectLiteral(serde_json::Value);
+
+        /// JSON array literal
+        #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+        pub struct JSONArrayLiteral(Vec<serde_json::Value>);
+
+        /// Array whose elements are string literals (e.g. match labels)
+        #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+        pub struct ArrayOfStringLiteral(Vec<StringLiteral>);
+
+        /// Array whose elements are number literals (e.g. match labels)
+        #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+        pub struct ArrayOfNumberLiteral(Vec<NumberLiteral>);
+
         /// This is a Maplibre Style Specification
         #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
         pub struct MaplibreStyleSpecification;

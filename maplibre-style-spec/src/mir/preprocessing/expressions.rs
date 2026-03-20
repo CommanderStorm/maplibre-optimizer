@@ -81,20 +81,24 @@ fn build_by_output_type(expression_name: &TopLevelItem) -> BTreeMap<String, Expr
                 .and_modify(|def: &mut SyntaxVariantDef| {
                     def.syntax.overloads.push(mir_overload.clone())
                 })
-                .or_insert_with(|| SyntaxVariantDef {
-                    doc: syntax_enum.doc.clone(),
-                    syntax: MirSyntax {
-                        overloads: vec![mir_overload],
-                        parameters: syntax_enum
-                            .syntax
-                            .parameters
-                            .clone()
-                            .into_iter()
-                            .map(Into::into)
-                            .collect(),
-                    },
-                    example: syntax_enum.example.clone(),
-                    group: syntax_enum.group.clone(),
+                .or_insert_with(|| {
+                    let mut parameters: Vec<_> = syntax_enum
+                        .syntax
+                        .parameters
+                        .clone()
+                        .into_iter()
+                        .map(Into::into)
+                        .collect();
+                    MirSyntax::patch_expression_parameters(expr_key, &mut parameters);
+                    SyntaxVariantDef {
+                        doc: syntax_enum.doc.clone(),
+                        syntax: MirSyntax {
+                            overloads: vec![mir_overload],
+                            parameters,
+                        },
+                        example: syntax_enum.example.clone(),
+                        group: syntax_enum.group.clone(),
+                    }
                 });
         }
     }
