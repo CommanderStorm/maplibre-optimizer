@@ -3,6 +3,11 @@ name = "maplibre-style-spec"
 version = "0.1.0"
 edition = "2024"
 
+[features]
+default = ["full"]
+# Disable for `cargo run --no-default-features --bin generate_spec` when `spec.rs` is out of date.
+full = []
+
 [[bin]]
 name = "generate_spec"
 path = "src/bin/generate_spec.rs"
@@ -15,6 +20,7 @@ serde_json.workspace = true
 url = { workspace = true, features = ["serde"] }
 geojson.workspace = true
 serde_with.workspace = true
+serde_repr.workspace = true
 
 [dev-dependencies]
 insta.workspace = true

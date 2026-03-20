@@ -116,10 +116,12 @@ fn generate_font_faces(scope: &mut Scope) {
         .vis("pub")
         .doc("URL the font can retrieved under");
     font_with_range
-        .new_field("unicode_range", "String")
+        .new_field("unicode_range", "Vec<String>")
         .vis("pub")
-        .doc("Unicode characters where this font should be used")
-        .annotation("#[serde(rename=\"unicode-range\")]");
+        .doc("Unicode range(s) where this font applies (CSS `unicode-range` semantics)")
+        .annotation("#[serde(rename=\"unicode-range\")]")
+        .annotation("#[serde(default)]")
+        .annotation("#[serde(skip_serializing_if = \"Vec::is_empty\")]");
 
     let enu = scope
         .new_enum("FontFace")

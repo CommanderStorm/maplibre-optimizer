@@ -310,6 +310,7 @@ impl MirParameterType {
                 .collect::<Vec<_>>()
                 .join("Or"),
             MirParameterType::Object(_) => "Object".to_string(),
+            MirParameterType::Reference(r) if r == "T" => "Any".to_string(),
             MirParameterType::Reference(r) => to_upper_camel_case(r),
         }
     }
@@ -377,7 +378,12 @@ impl MirExpression {
                         format!("ArrayLength{}", to_upper_camel_case(length.to_string()))
                     }
                 } else if let Some(r#type) = r#type {
-                    format!("ArrayOf{}", r#type.to_upper_camel_case())
+                    // `array<T>` in the reference uses the type variable `T` (e.g. `in`, `index-of`).
+                    if matches!(&r#type, MirParameterType::Reference(r) if r == "T") {
+                        "Array".to_string()
+                    } else {
+                        format!("ArrayOf{}", r#type.to_upper_camel_case())
+                    }
                 } else {
                     "Array".to_string()
                 }

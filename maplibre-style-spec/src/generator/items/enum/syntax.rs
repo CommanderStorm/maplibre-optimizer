@@ -6,7 +6,7 @@ use serde_json::Value;
 use crate::generator::autotest::generate_test_from_examples_if_present;
 use crate::generator::formatter::{to_snake_case, to_upper_camel_case};
 use crate::mir::types::{
-    MirLiteral as Literal, MirOverload as Overload, MirParameter as Parameter,
+    MirExpression, MirLiteral as Literal, MirOverload as Overload, MirParameter as Parameter,
     MirParameterType as ParameterType, MirSyntax as Syntax, SyntaxVariantDef,
 };
 
@@ -16,6 +16,7 @@ pub fn generate_syntax_enum(
     doc: &str,
     values: &BTreeMap<String, SyntaxVariantDef>,
 ) {
+    pregenerate_all_operator_parameter_types(scope, values);
     // pass 1: populate enum variants
     generate_syntax_enum_body(scope, name, doc, values);
     // pass 2: generate the previously referenced enum variants for overloaded variants
@@ -27,6 +28,90 @@ pub fn generate_syntax_enum(
     generate_syntax_enum_deserializer(scope, name, values, examples[0]);
 
     generate_test_from_examples_if_present(scope, name, examples);
+}
+
+fn pregenerate_all_operator_parameter_types(
+    scope: &mut Scope,
+    values: &BTreeMap<String, SyntaxVariantDef>,
+) {
+    for def in values.values() {
+        for overload in &def.syntax.overloads {
+            for pname in &overload.parameters {
+                if pname == "..." {
+                    continue;
+                }
+                let Some(param) = def
+                    .syntax
+                    .parameters
+                    .iter()
+                    .find(|p| p.matches_overload_parameter_name(pname))
+                else {
+                    continue;
+                };
+                pregenerate_parameter_type(scope, &param.r#type);
+            }
+        }
+    }
+}
+
+fn pregenerate_parameter_type(scope: &mut Scope, param: &ParameterType) {
+    match param {
+        ParameterType::LiteralAnyOf(ls) => {
+            generate_any_of(scope, ls);
+        }
+        ParameterType::ExpressionAnyOf(es) => {
+            generate_expression_any_of(scope, es);
+            for e in es {
+                pregenerate_parameter_type(scope, e);
+            }
+        }
+        ParameterType::Expression(inner) => {
+            pregenerate_mir_expression(scope, inner.as_ref());
+        }
+        _ => {}
+    }
+}
+
+fn pregenerate_mir_expression(scope: &mut Scope, ex: &MirExpression) {
+    if let MirExpression::Array { r#type: Some(et), .. } = ex {
+        pregenerate_parameter_type(scope, et);
+    }
+}
+
+/// `array<color>` / `array<number>` arms in an expression `any-of` refer to the recursive
+/// interpolate stop types, not separate `ArrayOfColor` / `ArrayOfNumber` enums.
+fn normalize_expression_union_component_type(component: &str) -> String {
+    match component {
+        "ArrayOfColor" => "ColorOrArrayOfColor".to_string(),
+        "ArrayOfNumber" => "NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection".to_string(),
+        other => other.to_string(),
+    }
+}
+
+fn generate_expression_any_of(scope: &mut Scope, types: &[ParameterType]) -> String {
+    let arms: Vec<(String, String)> = types
+        .iter()
+        .map(|p| {
+            let label = p.to_upper_camel_case();
+            let rust_ty = normalize_expression_union_component_type(&label);
+            (label, rust_ty)
+        })
+        .collect();
+    let any_of_type = format!(
+        "{}AsUnion",
+        arms.iter().map(|(a, _)| a.as_str()).collect::<Vec<_>>().join("Or")
+    );
+    if scope.get_enum_mut(&any_of_type).is_none() {
+        let enu = scope
+            .new_enum(&any_of_type)
+            .doc("Either of the below variants")
+            .vis("pub")
+            .derive("serde::Deserialize, PartialEq, Debug, Clone");
+        for (variant, rust_ty) in &arms {
+            enu.new_variant(variant).tuple(rust_ty);
+        }
+    }
+    any_of_type
 }
 
 fn generate_referenced_multi_overload_options_enums(
@@ -60,6 +145,48 @@ fn generate_syntax_enum_body(
     doc: &str,
     values: &BTreeMap<String, SyntaxVariantDef>,
 ) {
+    // Variadic variants need `generate_parameter_variant`, which mutates `scope`. `new_enum` also
+    // holds a `scope` borrow via its handle, so precompute tuple types before creating the enum.
+    let mut variadic_tuple_types: BTreeMap<String, String> = BTreeMap::new();
+    for (key, value) in values {
+        let syntax = &value.syntax;
+        let name_and_possibly_group = if let Some(group) = &value.group {
+            format!("{name} (group={group})")
+        } else {
+            name.to_string()
+        };
+        assert!(
+            !syntax.overloads.is_empty(),
+            "{key} in {name_and_possibly_group} does not have a single overload"
+        );
+        if syntax.overloads.len() == 1 && syntax.has_variadic_overload() {
+            let overload = &syntax.overloads[0];
+            let position_of_variadic_separator = overload.position_of_variadic_separator();
+
+            let params = &overload.parameters[0..position_of_variadic_separator]
+                .iter()
+                .map(|o| {
+                    syntax
+                        .parameters
+                        .iter()
+                        .find(|p| p.matches_overload_parameter_name(o))
+                        .expect("overload parameter not found in syntax parameters")
+                })
+                .collect::<Vec<_>>();
+            let mut tuple_type_names = generate_parameter_variant(scope, &params[0].r#type);
+            for p in &params[1..] {
+                tuple_type_names.push(',');
+                tuple_type_names.push_str(&generate_parameter_variant(scope, &p.r#type));
+            }
+            let tuple = if params.len() > 1 {
+                format!("Vec<({tuple_type_names})>")
+            } else {
+                format!("Vec<{tuple_type_names}>")
+            };
+            variadic_tuple_types.insert(key.clone(), tuple);
+        }
+    }
+
     let enu = scope
         .new_enum(name)
         .doc(doc)
@@ -67,7 +194,6 @@ fn generate_syntax_enum_body(
         .derive("PartialEq, Debug, Clone");
     for (key, value) in values {
         let var_name = to_upper_camel_case(key);
-        let var = enu.new_variant(&var_name).doc(&value.doc);
         let syntax = &value.syntax;
         let name_and_possibly_group = if let Some(group) = &value.group {
             format!("{name} (group={group})")
@@ -79,33 +205,16 @@ fn generate_syntax_enum_body(
             "{key} in {name_and_possibly_group} does not have a single overload"
         );
         if syntax.overloads.len() == 1 {
-            // not overloaded, above the Option<T> level
             let overload = &syntax.overloads[0];
             if syntax.has_variadic_overload() {
-                let position_of_variadic_separator = overload.position_of_variadic_separator();
-
-                let params = &overload.parameters[0..position_of_variadic_separator]
-                    .iter()
-                    .map(|o| {
-                        syntax
-                            .parameters
-                            .iter()
-                            .find(|p| p.matches_overload_parameter_name(o))
-                            .expect("overload parameter not found in syntax parameters")
-                    })
-                    .collect::<Vec<_>>();
-                let mut tuple_type_names = params[0].r#type.to_upper_camel_case();
-                for p in &params[1..] {
-                    tuple_type_names.push(',');
-                    tuple_type_names.push_str(p.r#type.to_upper_camel_case().as_str());
-                }
-                if params.len() > 1 {
-                    var.tuple(format!("Vec<({tuple_type_names})>"));
-                } else {
-                    var.tuple(format!("Vec<{tuple_type_names}>"));
-                }
+                let var = enu.new_variant(&var_name).doc(&value.doc);
+                let tuple = variadic_tuple_types
+                    .get(key)
+                    .unwrap_or_else(|| panic!("variadic tuple missing for operator {key}"));
+                var.tuple(tuple);
                 continue;
             }
+            let var = enu.new_variant(&var_name).doc(&value.doc);
             for p in &overload.parameters {
                 let param = p.clone();
                 let tuple_identifier = if param.strip_suffix('?').is_some() {
@@ -117,8 +226,8 @@ fn generate_syntax_enum_body(
                 var.tuple(tuple_identifier);
             }
         } else {
-            // actually overloaded
             let options_name = format!("{var_name}Options");
+            let var = enu.new_variant(&var_name).doc(&value.doc);
             var.tuple(&options_name);
         }
     }
@@ -327,9 +436,15 @@ fn generate_parameter_variant(scope: &mut Scope, param: &ParameterType) -> Strin
         ParameterType::Literal(l) => l.to_upper_camel_case().to_string(),
         ParameterType::LiteralAnyOf(ls) => generate_any_of(scope, ls),
         ParameterType::Expression(e) => e.to_upper_camel_case().to_string(),
-        ParameterType::ExpressionAnyOf(_) => "serde_json::Value".to_string(),
+        ParameterType::ExpressionAnyOf(es) => generate_expression_any_of(scope, es),
         ParameterType::Object(_) => "serde_json::Map".to_string(),
-        ParameterType::Reference(r) => to_upper_camel_case(r),
+        ParameterType::Reference(r) => {
+            if r == "T" {
+                "Any".to_string()
+            } else {
+                to_upper_camel_case(r)
+            }
+        }
     }
 }
 fn generate_any_of(scope: &mut Scope, any_of: &[Literal]) -> String {
@@ -337,7 +452,8 @@ fn generate_any_of(scope: &mut Scope, any_of: &[Literal]) -> String {
         .iter()
         .map(|l| l.to_upper_camel_case())
         .collect::<Vec<_>>();
-    let any_of_type = ts.join("Or");
+    // Suffix avoids clashing with real expression output-type enums (e.g. `ColorOrArrayOfColor`).
+    let any_of_type = format!("{}AsUnion", ts.join("Or"));
     if scope.get_enum_mut(&any_of_type).is_none() {
         let enu = scope
             .new_enum(&any_of_type)
@@ -437,13 +553,13 @@ fn generate_visitor<'a>(scope: &'a mut Scope, name: &str, example: &Value) -> &'
         .generic("'de")
         .impl_trait("serde::de::Visitor<'de>")
         .associate_type("Value", name);
+    let example_compact = serde_json::to_string(example).unwrap_or_default();
+    let expecting_msg = format!("an {name} expression (example: {example_compact})");
     vis.new_fn("expecting")
         .arg_ref_self()
         .arg("formatter", "&mut std::fmt::Formatter")
         .ret("std::fmt::Result")
-        .line(format!(
-            "formatter.write_str(r#\"an {name} like {example}\"#)"
-        ));
+        .line(format!("formatter.write_str({expecting_msg:?})"));
     vis
 }
 
