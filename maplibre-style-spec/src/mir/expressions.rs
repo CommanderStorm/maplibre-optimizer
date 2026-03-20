@@ -263,6 +263,26 @@ impl From<&Parameter> for ExpressionParam {
 // ── Constructor ───────────────────────────────────────────────────────────────
 
 impl IntermediateExpressions {
+    /// Returns the logical negation of a comparison operator if the negated operator exists in MIR.
+    ///
+    /// e.g. `"=="` → `Some("!=")`, `"<"` → `Some(">=")`
+    pub fn negation_of(&self, op: &str) -> Option<&'static str> {
+        let (neg, check) = match op {
+            "==" => ("!=", "!="),
+            "!=" => ("==", "=="),
+            "<" => (">=", ">="),
+            "<=" => (">", ">"),
+            ">" => ("<=", "<="),
+            ">=" => ("<", "<"),
+            _ => return None,
+        };
+        if self.operators.contains_key(check) {
+            Some(neg)
+        } else {
+            None
+        }
+    }
+
     /// Construct from the raw `expression_name` top-level item.
     ///
     /// All operators are taken from the `expression_name` SyntaxEnum.
@@ -283,6 +303,15 @@ impl IntermediateExpressions {
 }
 
 impl ExpressionOperator {
+    /// Whether this operator's output depends only on its arguments (no camera, feature, or
+    /// state dependency), making it safe to constant-fold when all inputs are literals.
+    pub fn is_pure(&self) -> bool {
+        matches!(
+            self.group.as_deref(),
+            Some("Math" | "String" | "Type" | "Color")
+        )
+    }
+
     /// Convert a single `SyntaxEnum` entry from the decoder into a fully resolved MIR operator.
     pub fn from_syntax_enum(s: &SyntaxEnum) -> Self {
         let parameters: Vec<ExpressionParam> = s

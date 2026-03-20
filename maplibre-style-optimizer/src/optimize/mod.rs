@@ -3,9 +3,14 @@
 mod dead;
 mod expr;
 mod metadata;
+mod walk;
 
+use dead::DeadEliminationVisitor;
+use expr::{NormalizeFoldVisitor, ReorderSelectivityVisitor};
 use maplibre_style_spec::mir::IntermediateSpec;
+use metadata::MetadataRefinementVisitor;
 use serde_json::Value;
+use walk::walk_style_mut;
 
 const NORMALIZE_FOLD_FIXPOINT_CAP: usize = 8;
 
@@ -41,27 +46,30 @@ pub fn optimize_style_json_value(v: &mut Value, mir: &IntermediateSpec, passes: 
         return;
     }
 
-    for _ in 0..NORMALIZE_FOLD_FIXPOINT_CAP {
-        if !wants_normalize_fold(passes) {
-            break;
-        }
-        let mut changed = false;
-        expr::normalize_and_fold(v, mir, passes, &mut changed);
-        if !changed {
-            break;
+    if wants_normalize_fold(passes) {
+        for _ in 0..NORMALIZE_FOLD_FIXPOINT_CAP {
+            let mut visitor = NormalizeFoldVisitor {
+                mir,
+                passes,
+                changed: false,
+            };
+            walk_style_mut(v, mir, &mut visitor);
+            if !visitor.changed {
+                break;
+            }
         }
     }
 
     if passes.dead_elimination {
-        dead::eliminate_dead_sources_and_layers(v);
+        walk_style_mut(v, mir, &mut DeadEliminationVisitor);
     }
 
     if passes.metadata_refinement {
-        metadata::refine_layer_zoom_metadata(v);
+        walk_style_mut(v, mir, &mut MetadataRefinementVisitor);
     }
 
     if passes.selectivity_reorder {
-        expr::reorder_selectivity(v, mir);
+        walk_style_mut(v, mir, &mut ReorderSelectivityVisitor { mir });
     }
 }
 
@@ -88,17 +96,17 @@ mod tests {
     fn simplify_unary_any_in_filter() {
         let mir = sample_mir();
         let mut v = serde_json::json!({
-            "filter": ["any", ["==", 1, 1]]
+            "layers": [{ "id": "x", "type": "fill", "filter": ["any", ["==", 1, 1]] }]
         });
         optimize_style_json_value(&mut v, &mir, &passes_unary_only());
-        assert_eq!(v, serde_json::json!({ "filter": ["==", 1, 1] }));
+        assert_eq!(v["layers"][0]["filter"], serde_json::json!(["==", 1, 1]));
     }
 
     #[test]
     fn simplify_unary_disabled_is_noop() {
         let mir = sample_mir();
         let original = serde_json::json!({
-            "filter": ["any", ["==", 1, 1]]
+            "layers": [{ "id": "x", "type": "fill", "filter": ["any", ["==", 1, 1]] }]
         });
         let mut v = original.clone();
         optimize_style_json_value(&mut v, &mir, &OptPasses::default());
@@ -109,26 +117,28 @@ mod tests {
     fn simplify_nested_unary_any() {
         let mir = sample_mir();
         let mut v = serde_json::json!({
-            "filter": ["any", ["any", ["==", 1, 1]]]
+            "layers": [{ "id": "x", "type": "fill", "filter": ["any", ["any", ["==", 1, 1]]] }]
         });
         optimize_style_json_value(&mut v, &mir, &passes_unary_only());
-        assert_eq!(v, serde_json::json!({ "filter": ["==", 1, 1] }));
+        assert_eq!(v["layers"][0]["filter"], serde_json::json!(["==", 1, 1]));
     }
 
     #[test]
     fn simplify_unary_all() {
         let mir = sample_mir();
         let mut v = serde_json::json!({
-            "filter": ["all", ["==", 1, 1]]
+            "layers": [{ "id": "x", "type": "fill", "filter": ["all", ["==", 1, 1]] }]
         });
         optimize_style_json_value(&mut v, &mir, &passes_unary_only());
-        assert_eq!(v, serde_json::json!({ "filter": ["==", 1, 1] }));
+        assert_eq!(v["layers"][0]["filter"], serde_json::json!(["==", 1, 1]));
     }
 
     #[test]
     fn bare_any_single_element_unchanged() {
         let mir = sample_mir();
-        let mut v = serde_json::json!({ "filter": ["any"] });
+        let mut v = serde_json::json!({
+            "layers": [{ "id": "x", "type": "fill", "filter": ["any"] }]
+        });
         let expected = v.clone();
         optimize_style_json_value(&mut v, &mir, &passes_unary_only());
         assert_eq!(v, expected);
@@ -138,27 +148,30 @@ mod tests {
     fn simplify_double_not() {
         let mir = sample_mir();
         let mut v = serde_json::json!({
-            "filter": ["!", ["!", ["has", "x"]]]
+            "layers": [{ "id": "x", "type": "fill", "filter": ["!", ["!", ["has", "x"]]] }]
         });
         optimize_style_json_value(&mut v, &mir, &passes_unary_only());
-        assert_eq!(v, serde_json::json!({ "filter": ["has", "x"] }));
+        assert_eq!(v["layers"][0]["filter"], serde_json::json!(["has", "x"]));
     }
 
     #[test]
     fn simplify_triple_not() {
         let mir = sample_mir();
         let mut v = serde_json::json!({
-            "filter": ["!", ["!", ["!", ["has", "x"]]]]
+            "layers": [{ "id": "x", "type": "fill", "filter": ["!", ["!", ["!", ["has", "x"]]]] }]
         });
         optimize_style_json_value(&mut v, &mir, &passes_unary_only());
-        assert_eq!(v, serde_json::json!({ "filter": ["!", ["has", "x"]] }));
+        assert_eq!(
+            v["layers"][0]["filter"],
+            serde_json::json!(["!", ["has", "x"]])
+        );
     }
 
     #[test]
     fn negated_eq_to_neq() {
         let mir = sample_mir();
         let mut v = serde_json::json!({
-            "filter": ["!", ["==", ["get", "a"], 1]]
+            "layers": [{ "id": "x", "type": "fill", "filter": ["!", ["==", ["get", "a"], 1]] }]
         });
         optimize_style_json_value(
             &mut v,
@@ -168,14 +181,17 @@ mod tests {
                 ..Default::default()
             },
         );
-        assert_eq!(v, serde_json::json!({ "filter": ["!=", ["get", "a"], 1] }));
+        assert_eq!(
+            v["layers"][0]["filter"],
+            serde_json::json!(["!=", ["get", "a"], 1])
+        );
     }
 
     #[test]
     fn fold_literal_eq() {
         let mir = sample_mir();
         let mut v = serde_json::json!({
-            "filter": ["==", 2, 3]
+            "layers": [{ "id": "x", "type": "fill", "filter": ["==", 2, 3] }]
         });
         optimize_style_json_value(
             &mut v,
@@ -185,7 +201,10 @@ mod tests {
                 ..Default::default()
             },
         );
-        assert_eq!(v, serde_json::json!({ "filter": ["literal", false] }));
+        assert_eq!(
+            v["layers"][0]["filter"],
+            serde_json::json!(["literal", false])
+        );
     }
 
     #[test]
@@ -267,7 +286,11 @@ mod tests {
     fn reorder_any_puts_literal_true_first() {
         let mir = sample_mir();
         let mut v = serde_json::json!({
-            "filter": ["any", ["==", 1, 2], ["literal", true]]
+            "layers": [{
+                "id": "x",
+                "type": "fill",
+                "filter": ["any", ["==", 1, 2], ["literal", true]]
+            }]
         });
         optimize_style_json_value(
             &mut v,
@@ -277,7 +300,7 @@ mod tests {
                 ..Default::default()
             },
         );
-        let arr = v["filter"].as_array().unwrap();
+        let arr = v["layers"][0]["filter"].as_array().unwrap();
         assert_eq!(arr[1], serde_json::json!(["literal", true]));
     }
 }

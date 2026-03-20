@@ -14,7 +14,9 @@ pub use expressions::{
     ExpressionParam, IntermediateExpressions as Expressions, LiteralKind, OverloadParams,
     ResolvedParam,
 };
-pub use layers::{IntermediateLayerField, IntermediateLayerType, IntermediateLayers};
+pub use layers::{
+    IntermediateLayerField, IntermediateLayerType, IntermediateLayers, PropertySection,
+};
 pub use root::IntermediateRootPrimitives;
 /// Alias kept for existing imports (`generator`, tests).
 pub type Layers = IntermediateLayers;

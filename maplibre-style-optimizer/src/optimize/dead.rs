@@ -5,8 +5,21 @@ use std::collections::{HashMap, HashSet};
 use serde_json::Value;
 
 use super::expr::bool_literal;
+use super::walk::StyleVisitor;
 
-pub(crate) fn eliminate_dead_sources_and_layers(v: &mut Value) {
+// ── Visitor ───────────────────────────────────────────────────────────────────
+
+pub(crate) struct DeadEliminationVisitor;
+
+impl StyleVisitor for DeadEliminationVisitor {
+    fn visit_root(&mut self, root: &mut Value) {
+        eliminate_dead_sources_and_layers(root);
+    }
+}
+
+// ── Implementation ────────────────────────────────────────────────────────────
+
+fn eliminate_dead_sources_and_layers(v: &mut Value) {
     let Some(root) = v.as_object_mut() else {
         return;
     };

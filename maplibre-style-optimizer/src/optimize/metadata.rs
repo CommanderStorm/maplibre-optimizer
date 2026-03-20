@@ -3,52 +3,53 @@
 use serde_json::Value;
 
 use super::expr::extract_json_literal;
+use super::walk::StyleVisitor;
 
-pub(crate) fn refine_layer_zoom_metadata(style: &mut Value) {
-    let Some(root) = style.as_object_mut() else {
+// ── Visitor ───────────────────────────────────────────────────────────────────
+
+pub(crate) struct MetadataRefinementVisitor;
+
+impl StyleVisitor for MetadataRefinementVisitor {
+    fn visit_layer(&mut self, _: usize, _: &str, layer: &mut Value) {
+        refine_layer_zoom_metadata(layer);
+    }
+}
+
+// ── Implementation ────────────────────────────────────────────────────────────
+
+fn refine_layer_zoom_metadata(layer: &mut Value) {
+    let Some(obj) = layer.as_object_mut() else {
         return;
     };
-    let Some(layers_val) = root.get_mut("layers") else {
-        return;
-    };
-    let Some(layers) = layers_val.as_array_mut() else {
+    let Some(filter) = obj.get("filter").cloned() else {
         return;
     };
 
-    for layer in layers.iter_mut() {
-        let Some(obj) = layer.as_object_mut() else {
-            continue;
-        };
-        let Some(filter) = obj.get("filter").cloned() else {
-            continue;
-        };
+    let (lb_raw, ub_raw) = zoom_bounds_from_expression(&filter);
+    let lb = lb_raw.map(zoom_lower_to_min_zoom);
+    let ub = ub_raw.map(zoom_upper_to_max_zoom);
 
-        let (lb_raw, ub_raw) = zoom_bounds_from_expression(&filter);
-        let lb = lb_raw.map(zoom_lower_to_min_zoom);
-        let ub = ub_raw.map(zoom_upper_to_max_zoom);
-
-        if let Some(bound) = lb {
-            match obj.get("minzoom").and_then(Value::as_f64) {
-                Some(cur) => {
-                    if bound > cur {
-                        obj.insert("minzoom".to_string(), json_number(bound));
-                    }
-                }
-                None => {
+    if let Some(bound) = lb {
+        match obj.get("minzoom").and_then(Value::as_f64) {
+            Some(cur) => {
+                if bound > cur {
                     obj.insert("minzoom".to_string(), json_number(bound));
                 }
             }
+            None => {
+                obj.insert("minzoom".to_string(), json_number(bound));
+            }
         }
+    }
 
-        if let Some(bound) = ub {
-            match obj.get("maxzoom").and_then(Value::as_f64) {
-                Some(cur) => {
-                    let tightened = cur.min(bound);
-                    obj.insert("maxzoom".to_string(), json_number(tightened));
-                }
-                None => {
-                    obj.insert("maxzoom".to_string(), json_number(bound));
-                }
+    if let Some(bound) = ub {
+        match obj.get("maxzoom").and_then(Value::as_f64) {
+            Some(cur) => {
+                let tightened = cur.min(bound);
+                obj.insert("maxzoom".to_string(), json_number(tightened));
+            }
+            None => {
+                obj.insert("maxzoom".to_string(), json_number(bound));
             }
         }
     }

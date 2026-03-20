@@ -4,8 +4,43 @@ use maplibre_style_spec::mir::IntermediateSpec;
 use serde_json::Value;
 
 use super::OptPasses;
+use super::walk::{PropertyContext, StyleVisitor};
 
-pub(crate) fn normalize_and_fold(
+// ── Visitors ──────────────────────────────────────────────────────────────────
+
+pub(crate) struct NormalizeFoldVisitor<'a> {
+    pub mir: &'a IntermediateSpec,
+    pub passes: &'a OptPasses,
+    pub changed: bool,
+}
+
+impl StyleVisitor for NormalizeFoldVisitor<'_> {
+    fn visit_filter(&mut self, _: usize, _: &str, filter: &mut Value) {
+        normalize_and_fold(filter, self.mir, self.passes, &mut self.changed);
+    }
+
+    fn visit_property(&mut self, _: &PropertyContext<'_>, value: &mut Value) {
+        normalize_and_fold(value, self.mir, self.passes, &mut self.changed);
+    }
+}
+
+pub(crate) struct ReorderSelectivityVisitor<'a> {
+    pub mir: &'a IntermediateSpec,
+}
+
+impl StyleVisitor for ReorderSelectivityVisitor<'_> {
+    fn visit_filter(&mut self, _: usize, _: &str, filter: &mut Value) {
+        reorder_selectivity(filter, self.mir);
+    }
+
+    fn visit_property(&mut self, _: &PropertyContext<'_>, value: &mut Value) {
+        reorder_selectivity(value, self.mir);
+    }
+}
+
+// ── Recursive walkers ─────────────────────────────────────────────────────────
+
+fn normalize_and_fold(
     v: &mut Value,
     mir: &IntermediateSpec,
     passes: &OptPasses,
@@ -55,7 +90,7 @@ pub(crate) fn normalize_and_fold(
     }
 }
 
-pub(crate) fn reorder_selectivity(v: &mut Value, mir: &IntermediateSpec) {
+fn reorder_selectivity(v: &mut Value, mir: &IntermediateSpec) {
     match v {
         Value::Array(arr) => {
             for x in arr.iter_mut() {
@@ -72,13 +107,14 @@ pub(crate) fn reorder_selectivity(v: &mut Value, mir: &IntermediateSpec) {
     }
 }
 
+// ── Per-node rewriting ────────────────────────────────────────────────────────
+
 fn rewrite_expression_array(
     arr: &mut Vec<Value>,
     mir: &IntermediateSpec,
     passes: &OptPasses,
     changed: &mut bool,
 ) {
-    // Re-apply until this node stabilizes (kind rewrites expose fold opportunities).
     while apply_one_rewrite_pass(arr, mir, passes) {
         *changed = true;
     }
@@ -89,13 +125,8 @@ fn apply_one_rewrite_pass(
     mir: &IntermediateSpec,
     passes: &OptPasses,
 ) -> bool {
-    if passes.expression_kind {
-        if try_negated_eq_to_neq(arr, mir) {
-            return true;
-        }
-        if try_negated_neq_to_eq(arr, mir) {
-            return true;
-        }
+    if passes.expression_kind && try_negate_comparison(arr, mir) {
+        return true;
     }
     if passes.constant_fold {
         if try_fold_boolean_algebra(arr) {
@@ -111,43 +142,28 @@ fn apply_one_rewrite_pass(
     false
 }
 
-/// `["!", ["==", a, b]]` → `["!=", a, b]` when `!=` exists in MIR.
-fn try_negated_eq_to_neq(arr: &mut Vec<Value>, mir: &IntermediateSpec) -> bool {
-    if arr.len() != 2 || arr.first().and_then(Value::as_str) != Some("!") {
-        return false;
-    }
-    if !mir.expressions.operators.contains_key("!=") {
-        return false;
-    }
-    let Value::Array(inner) = &arr[1] else {
-        return false;
-    };
-    if inner.len() != 3 || inner.first().and_then(Value::as_str) != Some("==") {
-        return false;
-    }
-    let a = inner[1].clone();
-    let b = inner[2].clone();
-    *arr = vec![Value::String("!=".to_string()), a, b];
-    true
-}
-
-/// `["!", ["!=", a, b]]` → `["==", a, b]` when `==` exists in MIR.
-fn try_negated_neq_to_eq(arr: &mut Vec<Value>, mir: &IntermediateSpec) -> bool {
-    if arr.len() != 2 || arr.first().and_then(Value::as_str) != Some("!") {
-        return false;
-    }
-    if !mir.expressions.operators.contains_key("==") {
+/// `["!", [op, a, b]]` → `[negation_of(op), a, b]` when the negated operator exists in MIR.
+///
+/// Handles `==`↔`!=`, `<`↔`>=`, `>`↔`<=` generically via `IntermediateExpressions::negation_of`.
+fn try_negate_comparison(arr: &mut Vec<Value>, mir: &IntermediateSpec) -> bool {
+    if arr.len() != 2 || arr[0].as_str() != Some("!") {
         return false;
     }
     let Value::Array(inner) = &arr[1] else {
         return false;
     };
-    if inner.len() != 3 || inner.first().and_then(Value::as_str) != Some("!=") {
+    if inner.len() != 3 {
         return false;
     }
+    let Some(inner_op) = inner[0].as_str() else {
+        return false;
+    };
+    let Some(negated) = mir.expressions.negation_of(inner_op) else {
+        return false;
+    };
     let a = inner[1].clone();
     let b = inner[2].clone();
-    *arr = vec![Value::String("==".to_string()), a, b];
+    *arr = vec![Value::String(negated.to_string()), a, b];
     true
 }
 
