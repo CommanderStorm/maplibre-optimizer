@@ -4,7 +4,7 @@ pub struct NumberLiteral(serde_json::Number);
 
 /// JSON string in an expression position
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-pub struct StringLiteral(String);
+pub struct StringLiteral(std::string::String);
 
 /// GeoJSON object literal
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
@@ -398,7 +398,7 @@ pub struct FontWithRange {
     #[serde(rename="unicode-range")]
     #[serde(default)]
     #[serde(skip_serializing_if = "Vec::is_empty")]
-    pub unicode_range: Vec<String>,
+    pub unicode_range: Vec<std::string::String>,
 }
 
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone)]
@@ -430,7 +430,7 @@ pub struct RootMetadata(serde_json::Value);
 
 /// A human-readable name for the style.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-pub struct RootName(String);
+pub struct RootName(std::string::String);
 
 /// Default pitch, in degrees. Zero is perpendicular to the surface, for a look straight down at the map, while a greater value like 60 looks ahead towards the horizon. The style pitch will be used only if the map has not been positioned by other means (e.g. map options or user interaction).
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
@@ -607,12 +607,6 @@ impl Default for FunctionColorSpace {
     }
 }
 
-impl Default for FunctionColorSpace {
-    fn default() -> Self {
-        Self::Rgb
-    }
-}
-
 /// A value to serve as a fallback function result when a value isn't otherwise available. It is used in the following circumstances:
 ///
 /// * In categorical functions, when the feature value does not match any of the stop domain values.
@@ -633,7 +627,7 @@ struct FunctionExpression(Any);
 
 /// The name of a feature property to use as the function input.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-pub struct FunctionProperty(String);
+pub struct FunctionProperty(std::string::String);
 
 impl Default for FunctionProperty {
     fn default() -> Self {
@@ -660,12 +654,6 @@ pub enum FunctionType {
     /// Return the output value of the stop just less than the function input.
     #[serde(rename="interval")]
     Interval,
-}
-
-impl Default for FunctionType {
-    fn default() -> Self {
-        Self::Exponential
-    }
 }
 
 impl Default for FunctionType {
@@ -706,7 +694,7 @@ pub enum GeometryType {
 struct Interpolation(InterpolationName);
 
 /// First element in an interpolation array. May be followed by a number of arguments.
-#[derive(PartialEq, Debug, Clone)]
+#[derive(serde::Serialize, PartialEq, Debug, Clone)]
 pub enum InterpolationName {
     /// Interpolates using the cubic bézier curve defined by the given control points.
     CubicBezier(serde_json::Value, serde_json::Value, serde_json::Value, serde_json::Value),
@@ -743,7 +731,7 @@ impl<'de> serde::de::Visitor<'de> for InterpolationNameVisitor {
         }
 
         // First element: operator string
-        let op: String = seq.next_element()?.ok_or_else(|| serde::de::Error::custom("missing operator"))?;
+        let op: std::string::String = seq.next_element()?.ok_or_else(|| serde::de::Error::custom("missing operator"))?;
         match op.as_str() {
         "cubic-bezier" => {
         let x1 = visit_seq_field(&mut seq, "x1")?;
@@ -795,12 +783,6 @@ impl Default for LightAnchor {
     }
 }
 
-impl Default for LightAnchor {
-    fn default() -> Self {
-        Self::Viewport
-    }
-}
-
 /// Color tint for lighting extruded geometries.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
 struct LightColor(color::DynamicColor);
@@ -842,7 +824,7 @@ pub struct Projection {
 
 /// The projection definition type. Can be specified as a string, a transition state, or an expression.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone)]
-pub struct ProjectionType(String);
+pub struct ProjectionType(std::string::String);
 
 impl Default for ProjectionType {
     fn default() -> Self {
@@ -854,12 +836,12 @@ impl Default for ProjectionType {
 pub struct PromoteId {
     /// A name of a feature property to use as ID for feature state.
     #[serde(flatten)]
-    pub star: Option<std::collections::BTreeMap<String,PromoteIdStar>>,
+    pub star: Option<std::collections::BTreeMap<std::string::String,PromoteIdStar>>,
 }
 
 /// A name of a feature property to use as ID for feature state.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-pub struct PromoteIdStar(String);
+pub struct PromoteIdStar(std::string::String);
 
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
 pub struct PropertyType;
@@ -999,7 +981,7 @@ impl Default for TerrainExaggeration {
 
 /// The source for the terrain data.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-pub struct TerrainSource(String);
+pub struct TerrainSource(std::string::String);
 
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
 pub struct Transition {
@@ -1038,14 +1020,14 @@ impl Default for TransitionDuration {
 }
 
 /// Either of the below variants
-#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+#[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
 pub enum StringOrNumberAsUnion {
     String(String),
     Number(Number),
 }
 
 /// Either of the below variants
-#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+#[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
 pub enum StringLiteralOrNumberLiteralOrArrayOfStringLiteralOrArrayOfNumberLiteralAsUnion {
     StringLiteral(StringLiteral),
     NumberLiteral(NumberLiteral),
@@ -1054,7 +1036,7 @@ pub enum StringLiteralOrNumberLiteralOrArrayOfStringLiteralOrArrayOfNumberLitera
 }
 
 /// "Any"
-#[derive(PartialEq, Debug, Clone)]
+#[derive(serde::Serialize, PartialEq, Debug, Clone)]
 pub enum Any {
     /// Gets the value of a cluster property accumulated so far. Can only be used in the `clusterProperties` option of a clustered GeoJSON source.
     Accumulated,
@@ -1097,7 +1079,7 @@ pub enum Any {
     ///  - an array of literal values, whose values must be all strings or all numbers (e.g. `[100, 101]` or `["c", "b"]`). The input matches if any of the values in the array matches, similar to the `"in"` operator.
     /// 
     /// Each label must be unique. If the input type does not match the type of the labels, the result will be the fallback value.
-    Match(Vec<(StringOrNumber,StringLiteralOrNumberLiteralOrArrayOfStringLiteralOrArrayOfNumberLiteral,Any)>),
+    Match(Vec<(StringOrNumberAsUnion,StringLiteralOrNumberLiteralOrArrayOfStringLiteralOrArrayOfNumberLiteralAsUnion,Any)>),
     /// Produces discrete, stepped results by evaluating a piecewise-constant function defined by pairs of input and output values ("stops"). The `input` may be any numeric expression (e.g., `["get", "population"]`). Stop inputs must be numeric literals in strictly ascending order.
     /// 
     /// Returns the output value of the stop just less than the input, or the first output if the input is less than the first stop.
@@ -1137,7 +1119,7 @@ impl<'de> serde::de::Visitor<'de> for AnyVisitor {
         }
 
         // First element: operator string
-        let op: String = seq.next_element()?.ok_or_else(|| serde::de::Error::custom("missing operator"))?;
+        let op: std::string::String = seq.next_element()?.ok_or_else(|| serde::de::Error::custom("missing operator"))?;
         match op.as_str() {
         "accumulated" => {
         Ok(Any::Accumulated)
@@ -1234,7 +1216,7 @@ impl<'de> serde::de::Visitor<'de> for AnyVisitor {
 }
 
 /// "Array"
-#[derive(PartialEq, Debug, Clone)]
+#[derive(serde::Serialize, PartialEq, Debug, Clone)]
 pub enum Array {
     /// Asserts that the input is an array (optionally with a specific item type and length). If, when the input expression is evaluated, it is not of the asserted type or length, then this assertion will cause the whole expression to be aborted.
     Array(serde_json::Value),
@@ -1275,7 +1257,7 @@ impl<'de> serde::de::Visitor<'de> for ArrayVisitor {
         }
 
         // First element: operator string
-        let op: String = seq.next_element()?.ok_or_else(|| serde::de::Error::custom("missing operator"))?;
+        let op: std::string::String = seq.next_element()?.ok_or_else(|| serde::de::Error::custom("missing operator"))?;
         match op.as_str() {
         "array" => {
         let value = visit_seq_field(&mut seq, "value")?;
@@ -1301,7 +1283,7 @@ impl<'de> serde::de::Visitor<'de> for ArrayVisitor {
 }
 
 /// Either of the below variants
-#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+#[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
 pub enum StringOrNumberOrBooleanAsUnion {
     String(String),
     Number(Number),
@@ -1309,7 +1291,7 @@ pub enum StringOrNumberOrBooleanAsUnion {
 }
 
 /// "ArrayLessTypeLengthGreater"
-#[derive(PartialEq, Debug, Clone)]
+#[derive(serde::Serialize, PartialEq, Debug, Clone)]
 pub enum ArrayLessTypeLengthGreater {
     /// Asserts that the input is an array (optionally with a specific item type and length). If, when the input expression is evaluated, it is not of the asserted type or length, then this assertion will cause the whole expression to be aborted.
     Array(serde_json::Value, serde_json::Value, serde_json::Value),
@@ -1342,7 +1324,7 @@ impl<'de> serde::de::Visitor<'de> for ArrayLessTypeLengthGreaterVisitor {
         }
 
         // First element: operator string
-        let op: String = seq.next_element()?.ok_or_else(|| serde::de::Error::custom("missing operator"))?;
+        let op: std::string::String = seq.next_element()?.ok_or_else(|| serde::de::Error::custom("missing operator"))?;
         match op.as_str() {
         "array" => {
         let r#type = visit_seq_field(&mut seq, "type")?;
@@ -1356,7 +1338,7 @@ impl<'de> serde::de::Visitor<'de> for ArrayLessTypeLengthGreaterVisitor {
 }
 
 /// "ArrayOfType"
-#[derive(PartialEq, Debug, Clone)]
+#[derive(serde::Serialize, PartialEq, Debug, Clone)]
 pub enum ArrayOfType {
     /// Asserts that the input is an array (optionally with a specific item type and length). If, when the input expression is evaluated, it is not of the asserted type or length, then this assertion will cause the whole expression to be aborted.
     Array(serde_json::Value, serde_json::Value),
@@ -1389,7 +1371,7 @@ impl<'de> serde::de::Visitor<'de> for ArrayOfTypeVisitor {
         }
 
         // First element: operator string
-        let op: String = seq.next_element()?.ok_or_else(|| serde::de::Error::custom("missing operator"))?;
+        let op: std::string::String = seq.next_element()?.ok_or_else(|| serde::de::Error::custom("missing operator"))?;
         match op.as_str() {
         "array" => {
         let r#type = visit_seq_field(&mut seq, "type")?;
@@ -1402,7 +1384,7 @@ impl<'de> serde::de::Visitor<'de> for ArrayOfTypeVisitor {
 }
 
 /// "Boolean"
-#[derive(PartialEq, Debug, Clone)]
+#[derive(serde::Serialize, PartialEq, Debug, Clone)]
 pub enum Boolean {
     /// Logical negation. Returns `true` if the input is `false`, and `false` if the input is `true`.
     /// 
@@ -1465,7 +1447,7 @@ pub enum Boolean {
 }
 
 /// Options for deserializing the syntax enum variant [`Boolean::Less`]
-#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+#[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
 #[serde(untagged)]
 pub enum LessOptions {
     Number(String, String, Option<Collator>),
@@ -1473,7 +1455,7 @@ pub enum LessOptions {
 }
 
 /// Options for deserializing the syntax enum variant [`Boolean::LessEqual`]
-#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+#[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
 #[serde(untagged)]
 pub enum LessEqualOptions {
     Number(String, String, Option<Collator>),
@@ -1481,7 +1463,7 @@ pub enum LessEqualOptions {
 }
 
 /// Options for deserializing the syntax enum variant [`Boolean::Greater`]
-#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+#[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
 #[serde(untagged)]
 pub enum GreaterOptions {
     Number(String, String, Option<Collator>),
@@ -1489,7 +1471,7 @@ pub enum GreaterOptions {
 }
 
 /// Options for deserializing the syntax enum variant [`Boolean::GreaterEqual`]
-#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+#[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
 #[serde(untagged)]
 pub enum GreaterEqualOptions {
     Number(String, String, Option<Collator>),
@@ -1497,7 +1479,7 @@ pub enum GreaterEqualOptions {
 }
 
 /// Options for deserializing the syntax enum variant [`Boolean::In`]
-#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+#[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
 #[serde(untagged)]
 pub enum InOptions {
     Item(Any, Array),
@@ -1531,7 +1513,7 @@ impl<'de> serde::de::Visitor<'de> for BooleanVisitor {
         }
 
         // First element: operator string
-        let op: String = seq.next_element()?.ok_or_else(|| serde::de::Error::custom("missing operator"))?;
+        let op: std::string::String = seq.next_element()?.ok_or_else(|| serde::de::Error::custom("missing operator"))?;
         match op.as_str() {
         "!" => {
         let input = visit_seq_field(&mut seq, "input")?;
@@ -1632,7 +1614,7 @@ impl<'de> serde::de::Visitor<'de> for BooleanVisitor {
 }
 
 /// "Collator"
-#[derive(PartialEq, Debug, Clone)]
+#[derive(serde::Serialize, PartialEq, Debug, Clone)]
 pub enum Collator {
     /// Returns a `collator` for use in locale-dependent comparison operations. Use `resolved-locale` to test the results of locale fallback behavior.
     Collator(serde_json::Value),
@@ -1665,7 +1647,7 @@ impl<'de> serde::de::Visitor<'de> for CollatorVisitor {
         }
 
         // First element: operator string
-        let op: String = seq.next_element()?.ok_or_else(|| serde::de::Error::custom("missing operator"))?;
+        let op: std::string::String = seq.next_element()?.ok_or_else(|| serde::de::Error::custom("missing operator"))?;
         match op.as_str() {
         "collator" => {
         let options = visit_seq_field(&mut seq, "options")?;
@@ -1677,7 +1659,7 @@ impl<'de> serde::de::Visitor<'de> for CollatorVisitor {
 }
 
 /// "Color"
-#[derive(PartialEq, Debug, Clone)]
+#[derive(serde::Serialize, PartialEq, Debug, Clone)]
 pub enum Color {
     /// Creates a color value from red, green, and blue components, which must range between 0 and 255, and an alpha component of 1. If any component is out of range, the expression is an error.
     Rgb(serde_json::Value, serde_json::Value, serde_json::Value),
@@ -1716,7 +1698,7 @@ impl<'de> serde::de::Visitor<'de> for ColorVisitor {
         }
 
         // First element: operator string
-        let op: String = seq.next_element()?.ok_or_else(|| serde::de::Error::custom("missing operator"))?;
+        let op: std::string::String = seq.next_element()?.ok_or_else(|| serde::de::Error::custom("missing operator"))?;
         match op.as_str() {
         "rgb" => {
         let red = visit_seq_field(&mut seq, "red")?;
@@ -1747,19 +1729,19 @@ impl<'de> serde::de::Visitor<'de> for ColorVisitor {
 }
 
 /// Either of the below variants
-#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+#[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
 pub enum ColorOrArrayOfColorAsUnion {
     Color(Color),
-    ArrayOfColor(ArrayOfColor),
+    ArrayOfColor(ColorOrArrayOfColor),
 }
 
 /// "ColorOrArrayOfColor"
-#[derive(PartialEq, Debug, Clone)]
+#[derive(serde::Serialize, PartialEq, Debug, Clone)]
 pub enum ColorOrArrayOfColor {
     /// Produces continuous, smooth results by interpolating between pairs of input and output values ("stops"). Works like `interpolate`, but the output type must be `color` or `array<color>`, and the interpolation is performed in the Hue-Chroma-Luminance color space.
-    InterpolateHcl(Vec<(Interpolation,Number,NumberLiteral,ColorOrArrayOfColor)>),
+    InterpolateHcl(Vec<(Interpolation,Number,NumberLiteral,ColorOrArrayOfColorAsUnion)>),
     /// Produces continuous, smooth results by interpolating between pairs of input and output values ("stops"). Works like `interpolate`, but the output type must be `color` or `array<color>`, and the interpolation is performed in the CIELAB color space.
-    InterpolateLab(Vec<(Interpolation,Number,NumberLiteral,ColorOrArrayOfColor)>),
+    InterpolateLab(Vec<(Interpolation,Number,NumberLiteral,ColorOrArrayOfColorAsUnion)>),
 }
 
 impl<'de> serde::Deserialize<'de> for ColorOrArrayOfColor {
@@ -1789,7 +1771,7 @@ impl<'de> serde::de::Visitor<'de> for ColorOrArrayOfColorVisitor {
         }
 
         // First element: operator string
-        let op: String = seq.next_element()?.ok_or_else(|| serde::de::Error::custom("missing operator"))?;
+        let op: std::string::String = seq.next_element()?.ok_or_else(|| serde::de::Error::custom("missing operator"))?;
         match op.as_str() {
         "interpolate-hcl" => {
         let mut inputs = Vec::new();
@@ -1825,21 +1807,21 @@ impl<'de> serde::de::Visitor<'de> for ColorOrArrayOfColorVisitor {
 }
 
 /// Either of the below variants
-#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+#[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
 pub enum StringOrImageAsUnion {
     String(String),
     Image(Image),
 }
 
 /// "Formatted"
-#[derive(PartialEq, Debug, Clone)]
+#[derive(serde::Serialize, PartialEq, Debug, Clone)]
 pub enum Formatted {
     /// Returns a `formatted` string for displaying mixed-format text in the `text-field` property. The input may contain a string literal or expression, including an [`'image'`](#image) expression. Strings may be followed by a style override object.
     /// 
     ///  - [Change the case of labels](https://maplibre.org/maplibre-gl-js/docs/examples/change-case-of-labels/)
     /// 
     ///  - [Display and style rich text labels](https://maplibre.org/maplibre-gl-js/docs/examples/display-and-style-rich-text-labels/)
-    Format(Vec<(StringOrImage,Object)>),
+    Format(Vec<(StringOrImageAsUnion,serde_json::Map<String, serde_json::Value>)>),
 }
 
 impl<'de> serde::Deserialize<'de> for Formatted {
@@ -1869,7 +1851,7 @@ impl<'de> serde::de::Visitor<'de> for FormattedVisitor {
         }
 
         // First element: operator string
-        let op: String = seq.next_element()?.ok_or_else(|| serde::de::Error::custom("missing operator"))?;
+        let op: std::string::String = seq.next_element()?.ok_or_else(|| serde::de::Error::custom("missing operator"))?;
         match op.as_str() {
         "format" => {
         let mut inputs = Vec::new();
@@ -1889,7 +1871,7 @@ impl<'de> serde::de::Visitor<'de> for FormattedVisitor {
 }
 
 /// "Image"
-#[derive(PartialEq, Debug, Clone)]
+#[derive(serde::Serialize, PartialEq, Debug, Clone)]
 pub enum Image {
     /// Returns an `image` type for use in `icon-image`, `*-pattern` entries and as a section in the `format` expression. If set, the `image` argument will check that the requested image exists in the style and will return either the resolved image name or `null`, depending on whether or not the image is currently in the style. This validation process is synchronous and requires the image to have been added to the style before requesting it in the `image` argument.
     /// 
@@ -1924,7 +1906,7 @@ impl<'de> serde::de::Visitor<'de> for ImageVisitor {
         }
 
         // First element: operator string
-        let op: String = seq.next_element()?.ok_or_else(|| serde::de::Error::custom("missing operator"))?;
+        let op: std::string::String = seq.next_element()?.ok_or_else(|| serde::de::Error::custom("missing operator"))?;
         match op.as_str() {
         "image" => {
         let image_name = visit_seq_field(&mut seq, "image_name")?;
@@ -1936,14 +1918,14 @@ impl<'de> serde::de::Visitor<'de> for ImageVisitor {
 }
 
 /// Either of the below variants
-#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+#[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
 pub enum ArrayOrStringAsUnion {
     Array(Array),
     String(String),
 }
 
 /// "Number"
-#[derive(PartialEq, Debug, Clone)]
+#[derive(serde::Serialize, PartialEq, Debug, Clone)]
 pub enum Number {
     /// Returns the remainder after integer division of the first input by the second.
     Percentage(serde_json::Value, serde_json::Value),
@@ -2018,7 +2000,7 @@ pub enum Number {
 }
 
 /// Options for deserializing the syntax enum variant [`Number::Minus`]
-#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+#[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
 #[serde(untagged)]
 pub enum MinusOptions {
     TwoParams(Number, Number),
@@ -2026,7 +2008,7 @@ pub enum MinusOptions {
 }
 
 /// Options for deserializing the syntax enum variant [`Number::IndexOf`]
-#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+#[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
 #[serde(untagged)]
 pub enum IndexOfOptions {
     Item(Any, Array, Option<Number>),
@@ -2060,7 +2042,7 @@ impl<'de> serde::de::Visitor<'de> for NumberVisitor {
         }
 
         // First element: operator string
-        let op: String = seq.next_element()?.ok_or_else(|| serde::de::Error::custom("missing operator"))?;
+        let op: std::string::String = seq.next_element()?.ok_or_else(|| serde::de::Error::custom("missing operator"))?;
         match op.as_str() {
         "%" => {
         let input_1 = visit_seq_field(&mut seq, "input_1")?;
@@ -2240,17 +2222,17 @@ impl<'de> serde::de::Visitor<'de> for NumberVisitor {
 }
 
 /// Either of the below variants
-#[derive(serde::Deserialize, PartialEq, Debug, Clone)]
+#[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
 pub enum NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjectionAsUnion {
     Number(Number),
-    ArrayOfNumber(ArrayOfNumber),
+    ArrayOfNumber(serde_json::Value),
     Color(Color),
-    ArrayOfColor(ArrayOfColor),
+    ArrayOfColor(ColorOrArrayOfColor),
     Projection(Projection),
 }
 
 /// "NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection"
-#[derive(PartialEq, Debug, Clone)]
+#[derive(serde::Serialize, PartialEq, Debug, Clone)]
 pub enum NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection {
     /// Produces continuous, smooth results by interpolating between pairs of input and output values ("stops"). The `input` may be any numeric expression (e.g., `["get", "population"]`). Stop inputs must be numeric literals in strictly ascending order. The output type must be `number`, `array<number>`, `color`, `array<color>`, or `projection`.
     /// 
@@ -2261,7 +2243,7 @@ pub enum NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection {
     ///  - [Create a heatmap layer](https://maplibre.org/maplibre-gl-js/docs/examples/heatmap-layer/)
     /// 
     ///  - [Visualize population density](https://maplibre.org/maplibre-gl-js/docs/examples/visualize-population-density/)
-    Interpolate(Vec<(Interpolation,Number,NumberLiteral,NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection)>),
+    Interpolate(Vec<(Interpolation,Number,NumberLiteral,NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjectionAsUnion)>),
 }
 
 impl<'de> serde::Deserialize<'de> for NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection {
@@ -2291,7 +2273,7 @@ impl<'de> serde::de::Visitor<'de> for NumberOrArrayOfNumberOrColorOrArrayOfColor
         }
 
         // First element: operator string
-        let op: String = seq.next_element()?.ok_or_else(|| serde::de::Error::custom("missing operator"))?;
+        let op: std::string::String = seq.next_element()?.ok_or_else(|| serde::de::Error::custom("missing operator"))?;
         match op.as_str() {
         "interpolate" => {
         let mut inputs = Vec::new();
@@ -2313,7 +2295,7 @@ impl<'de> serde::de::Visitor<'de> for NumberOrArrayOfNumberOrColorOrArrayOfColor
 }
 
 /// "Object"
-#[derive(PartialEq, Debug, Clone)]
+#[derive(serde::Serialize, PartialEq, Debug, Clone)]
 pub enum Object {
     /// Provides a literal array or object value.
     /// 
@@ -2352,7 +2334,7 @@ impl<'de> serde::de::Visitor<'de> for ObjectVisitor {
         }
 
         // First element: operator string
-        let op: String = seq.next_element()?.ok_or_else(|| serde::de::Error::custom("missing operator"))?;
+        let op: std::string::String = seq.next_element()?.ok_or_else(|| serde::de::Error::custom("missing operator"))?;
         match op.as_str() {
         "literal" => {
         let json_object = visit_seq_field(&mut seq, "json_object")?;
@@ -2377,7 +2359,7 @@ impl<'de> serde::de::Visitor<'de> for ObjectVisitor {
 }
 
 /// "String"
-#[derive(PartialEq, Debug, Clone)]
+#[derive(serde::Serialize, PartialEq, Debug, Clone)]
 pub enum String {
     /// Returns a `string` consisting of the concatenation of the inputs. Each input is converted to a string as if by `to-string`.
     /// 
@@ -2444,7 +2426,7 @@ impl<'de> serde::de::Visitor<'de> for StringVisitor {
         }
 
         // First element: operator string
-        let op: String = seq.next_element()?.ok_or_else(|| serde::de::Error::custom("missing operator"))?;
+        let op: std::string::String = seq.next_element()?.ok_or_else(|| serde::de::Error::custom("missing operator"))?;
         match op.as_str() {
         "concat" => {
         let mut inputs = Vec::new();
@@ -2564,7 +2546,7 @@ pub struct GeojsonSource {
 
 /// Contains an attribution to be displayed when the map is shown to a user.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-pub struct GeojsonSourceAttribution(String);
+pub struct GeojsonSourceAttribution(std::string::String);
 
 /// Size of the tile buffer on each side. A value of 0 produces no buffer. A value of 512 produces a buffer as wide as the tile itself. Larger values produce fewer rendering artifacts near tile edges and slower performance.
 ///
@@ -2666,7 +2648,7 @@ impl Default for GeojsonSourceMaxzoom {
 
 /// A property to use as a feature id (for feature state). Either a property name, or an object of the form `{<sourceLayer>: <propertyName>}`.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-pub struct GeojsonSourcePromoteId(String);
+pub struct GeojsonSourcePromoteId(std::string::String);
 
 /// Douglas-Peucker simplification tolerance (higher means simpler geometries and faster performance).
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
@@ -2696,7 +2678,7 @@ struct ImageSourceCoordinates(Box<[ImageSourceCoordinatesValue; 4]>);
 
 /// URL that points to an image.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-pub struct ImageSourceUrl(String);
+pub struct ImageSourceUrl(std::string::String);
 
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
 pub struct RasterSource {
@@ -2723,7 +2705,7 @@ pub struct RasterSource {
 
 /// Contains an attribution to be displayed when the map is shown to a user.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-pub struct RasterSourceAttribution(String);
+pub struct RasterSourceAttribution(std::string::String);
 
 /// An array containing the longitude and latitude of the southwest and northeast corners of the source's bounding box in the following order: `[sw.lng, sw.lat, ne.lng, ne.lat]`. When this property is included in a source, no tiles outside of the given bounds are requested by MapLibre.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
@@ -2772,12 +2754,6 @@ impl Default for RasterSourceScheme {
     }
 }
 
-impl Default for RasterSourceScheme {
-    fn default() -> Self {
-        Self::Xyz
-    }
-}
-
 /// The minimum visual size to display tiles for this layer. Only configurable for raster layers.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
 pub struct RasterSourceTileSize(serde_json::Number);
@@ -2790,11 +2766,11 @@ impl Default for RasterSourceTileSize {
 
 /// An array of one or more tile source URLs, as in the TileJSON spec.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-struct RasterSourceTiles(Vec<String>);
+struct RasterSourceTiles(Vec<std::string::String>);
 
 /// A URL to a TileJSON resource. Supported protocols are `http:` and `https:`.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-pub struct RasterSourceUrl(String);
+pub struct RasterSourceUrl(std::string::String);
 
 /// A setting to determine whether a source's tiles are cached locally.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone, Copy)]
@@ -2843,7 +2819,7 @@ pub struct RasterDemSource {
 
 /// Contains an attribution to be displayed when the map is shown to a user.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-pub struct RasterDemSourceAttribution(String);
+pub struct RasterDemSourceAttribution(std::string::String);
 
 /// Value that will be added to the encoding mix when decoding. Only used on custom encodings.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
@@ -2887,12 +2863,6 @@ pub enum RasterDemSourceEncoding {
     /// Terrarium format PNG tiles. See https://aws.amazon.com/es/public-datasets/terrain/ for more info.
     #[serde(rename="terrarium")]
     Terrarium,
-}
-
-impl Default for RasterDemSourceEncoding {
-    fn default() -> Self {
-        Self::Mapbox
-    }
 }
 
 impl Default for RasterDemSourceEncoding {
@@ -2953,11 +2923,11 @@ impl Default for RasterDemSourceTileSize {
 
 /// An array of one or more tile source URLs, as in the TileJSON spec.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-struct RasterDemSourceTiles(Vec<String>);
+struct RasterDemSourceTiles(Vec<std::string::String>);
 
 /// A URL to a TileJSON resource. Supported protocols are `http:` and `https:`.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-pub struct RasterDemSourceUrl(String);
+pub struct RasterDemSourceUrl(std::string::String);
 
 /// A setting to determine whether a source's tiles are cached locally.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone, Copy)]
@@ -2996,7 +2966,7 @@ pub struct VectorSource {
 
 /// Contains an attribution to be displayed when the map is shown to a user.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-pub struct VectorSourceAttribution(String);
+pub struct VectorSourceAttribution(std::string::String);
 
 /// An array containing the longitude and latitude of the southwest and northeast corners of the source's bounding box in the following order: `[sw.lng, sw.lat, ne.lng, ne.lat]`. When this property is included in a source, no tiles outside of the given bounds are requested by MapLibre.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
@@ -3017,12 +2987,6 @@ pub enum VectorSourceEncoding {
     /// Mapbox Vector Tiles. See http://github.com/mapbox/vector-tile-spec for more info.
     #[serde(rename="mvt")]
     Mvt,
-}
-
-impl Default for VectorSourceEncoding {
-    fn default() -> Self {
-        Self::Mvt
-    }
 }
 
 impl Default for VectorSourceEncoding {
@@ -3053,7 +3017,7 @@ impl Default for VectorSourceMinzoom {
 
 /// A property to use as a feature id (for feature state). Either a property name, or an object of the form `{<sourceLayer>: <propertyName>}`. If specified as a string for a vector tile source, the same property is used across all its source layers.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-pub struct VectorSourcePromoteId(String);
+pub struct VectorSourcePromoteId(std::string::String);
 
 /// Influences the y direction of the tile coordinates. The global-mercator (aka Spherical Mercator) profile is assumed.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy)]
@@ -3072,19 +3036,13 @@ impl Default for VectorSourceScheme {
     }
 }
 
-impl Default for VectorSourceScheme {
-    fn default() -> Self {
-        Self::Xyz
-    }
-}
-
 /// An array of one or more tile source URLs, as in the TileJSON spec.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-struct VectorSourceTiles(Vec<String>);
+struct VectorSourceTiles(Vec<std::string::String>);
 
 /// A URL to a TileJSON resource. Supported protocols are `http:` and `https:`.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-pub struct VectorSourceUrl(String);
+pub struct VectorSourceUrl(std::string::String);
 
 /// A setting to determine whether a source's tiles are cached locally.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone, Copy)]
@@ -3114,7 +3072,7 @@ struct VideoSourceCoordinates(Box<[VideoSourceCoordinatesValue; 4]>);
 
 /// URLs to video content in order of preferred format.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-struct VideoSourceUrls(Vec<String>);
+struct VideoSourceUrls(Vec<std::string::String>);
 
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
 #[serde(tag="type")]
@@ -3154,11 +3112,11 @@ pub struct Layer {
 
 /// A expression specifying conditions on source features. Only features that match the filter are displayed. Zoom expressions in filters are only evaluated at integer zoom levels. The `feature-state` expression is not supported in filter expressions.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-pub struct LayerFilter(String);
+pub struct LayerFilter(std::string::String);
 
 /// Unique layer name.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-pub struct LayerId(String);
+pub struct LayerId(std::string::String);
 
 /// The maximum zoom level for the layer. At zoom levels equal to or greater than the maxzoom, the layer will be hidden.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
@@ -3174,11 +3132,11 @@ pub struct LayerMinzoom(serde_json::Number);
 
 /// Name of a source description to be used for this layer. Required for all layer types except `background`.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-pub struct LayerSource(String);
+pub struct LayerSource(std::string::String);
 
 /// Layer to use from a vector tile source. Required for vector tile sources; prohibited for all other source types, including GeoJSON sources.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-pub struct LayerSourceLayer(String);
+pub struct LayerSourceLayer(std::string::String);
 
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
 pub struct BackgroundLayoutLayer {
@@ -3193,12 +3151,6 @@ pub enum BackgroundLayoutLayerVisibility {
     None,
     #[serde(rename="visible")]
     Visible,
-}
-
-impl Default for BackgroundLayoutLayerVisibility {
-    fn default() -> Self {
-        Self::Visible
-    }
 }
 
 impl Default for BackgroundLayoutLayerVisibility {
@@ -3242,7 +3194,7 @@ impl Default for BackgroundPaintLayerBackgroundOpacity {
 
 /// Name of image in sprite to use for drawing an image background. For seamless patterns, image width and height must be a factor of two (2, 4, 8, ..., 512). Note that zoom-dependent expressions will be evaluated only at integer zoom levels.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone)]
-struct BackgroundPaintLayerBackgroundPattern(String);
+struct BackgroundPaintLayerBackgroundPattern(std::string::String);
 
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
 pub struct CircleLayoutLayer {
@@ -3264,12 +3216,6 @@ pub enum CircleLayoutLayerVisibility {
     None,
     #[serde(rename="visible")]
     Visible,
-}
-
-impl Default for CircleLayoutLayerVisibility {
-    fn default() -> Self {
-        Self::Visible
-    }
 }
 
 impl Default for CircleLayoutLayerVisibility {
@@ -3360,12 +3306,6 @@ impl Default for CirclePaintLayerCirclePitchAlignment {
     }
 }
 
-impl Default for CirclePaintLayerCirclePitchAlignment {
-    fn default() -> Self {
-        Self::Viewport
-    }
-}
-
 /// Controls the scaling behavior of the circle when the map is pitched.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy)]
 pub enum CirclePaintLayerCirclePitchScale {
@@ -3373,12 +3313,6 @@ pub enum CirclePaintLayerCirclePitchScale {
     Map,
     #[serde(rename="viewport")]
     Viewport,
-}
-
-impl Default for CirclePaintLayerCirclePitchScale {
-    fn default() -> Self {
-        Self::Map
-    }
 }
 
 impl Default for CirclePaintLayerCirclePitchScale {
@@ -3452,12 +3386,6 @@ impl Default for CirclePaintLayerCircleTranslateAnchor {
     }
 }
 
-impl Default for CirclePaintLayerCircleTranslateAnchor {
-    fn default() -> Self {
-        Self::Map
-    }
-}
-
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
 pub struct ColorReliefLayoutLayer {
     /// Whether this layer is displayed.
@@ -3471,12 +3399,6 @@ pub enum ColorReliefLayoutLayerVisibility {
     None,
     #[serde(rename="visible")]
     Visible,
-}
-
-impl Default for ColorReliefLayoutLayerVisibility {
-    fn default() -> Self {
-        Self::Visible
-    }
 }
 
 impl Default for ColorReliefLayoutLayerVisibility {
@@ -3529,12 +3451,6 @@ pub enum FillLayoutLayerVisibility {
     None,
     #[serde(rename="visible")]
     Visible,
-}
-
-impl Default for FillLayoutLayerVisibility {
-    fn default() -> Self {
-        Self::Visible
-    }
 }
 
 impl Default for FillLayoutLayerVisibility {
@@ -3604,7 +3520,7 @@ struct FillPaintLayerFillOutlineColor(color::DynamicColor);
 
 /// Name of image in sprite to use for drawing image fills. For seamless patterns, image width and height must be a factor of two (2, 4, 8, ..., 512). Note that zoom-dependent expressions will be evaluated only at integer zoom levels.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone)]
-struct FillPaintLayerFillPattern(String);
+struct FillPaintLayerFillPattern(std::string::String);
 
 /// The geometry's offset. Values are [x, y] where negatives indicate left and up, respectively.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
@@ -3631,12 +3547,6 @@ impl Default for FillPaintLayerFillTranslateAnchor {
     }
 }
 
-impl Default for FillPaintLayerFillTranslateAnchor {
-    fn default() -> Self {
-        Self::Map
-    }
-}
-
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
 pub struct FillExtrusionLayoutLayer {
     /// Whether this layer is displayed.
@@ -3650,12 +3560,6 @@ pub enum FillExtrusionLayoutLayerVisibility {
     None,
     #[serde(rename="visible")]
     Visible,
-}
-
-impl Default for FillExtrusionLayoutLayerVisibility {
-    fn default() -> Self {
-        Self::Visible
-    }
 }
 
 impl Default for FillExtrusionLayoutLayerVisibility {
@@ -3734,7 +3638,7 @@ impl Default for FillExtrusionPaintLayerFillExtrusionOpacity {
 
 /// Name of image in sprite to use for drawing images on extruded fills. For seamless patterns, image width and height must be a factor of two (2, 4, 8, ..., 512). Note that zoom-dependent expressions will be evaluated only at integer zoom levels.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone)]
-struct FillExtrusionPaintLayerFillExtrusionPattern(String);
+struct FillExtrusionPaintLayerFillExtrusionPattern(std::string::String);
 
 /// The geometry's offset. Values are [x, y] where negatives indicate left and up (on the flat plane), respectively.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
@@ -3753,12 +3657,6 @@ pub enum FillExtrusionPaintLayerFillExtrusionTranslateAnchor {
     Map,
     #[serde(rename="viewport")]
     Viewport,
-}
-
-impl Default for FillExtrusionPaintLayerFillExtrusionTranslateAnchor {
-    fn default() -> Self {
-        Self::Map
-    }
 }
 
 impl Default for FillExtrusionPaintLayerFillExtrusionTranslateAnchor {
@@ -3790,12 +3688,6 @@ pub enum HeatmapLayoutLayerVisibility {
     None,
     #[serde(rename="visible")]
     Visible,
-}
-
-impl Default for HeatmapLayoutLayerVisibility {
-    fn default() -> Self {
-        Self::Visible
-    }
 }
 
 impl Default for HeatmapLayoutLayerVisibility {
@@ -3888,12 +3780,6 @@ pub enum HillshadeLayoutLayerVisibility {
     None,
     #[serde(rename="visible")]
     Visible,
-}
-
-impl Default for HillshadeLayoutLayerVisibility {
-    fn default() -> Self {
-        Self::Visible
-    }
 }
 
 impl Default for HillshadeLayoutLayerVisibility {
@@ -3995,12 +3881,6 @@ impl Default for HillshadePaintLayerHillshadeIlluminationAnchor {
     }
 }
 
-impl Default for HillshadePaintLayerHillshadeIlluminationAnchor {
-    fn default() -> Self {
-        Self::Viewport
-    }
-}
-
 /// The direction of the light source(s) used to generate the hillshading with 0 as the top of the viewport if `hillshade-illumination-anchor` is set to `viewport` and due north if `hillshade-illumination-anchor` is set to `map`. Only when `hillshade-method` is set to `multidirectional` can you specify multiple light sources.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
 #[serde(untagged)]
@@ -4028,12 +3908,6 @@ pub enum HillshadePaintLayerHillshadeMethod {
     Multidirectional,
     #[serde(rename="standard")]
     Standard,
-}
-
-impl Default for HillshadePaintLayerHillshadeMethod {
-    fn default() -> Self {
-        Self::Standard
-    }
 }
 
 impl Default for HillshadePaintLayerHillshadeMethod {
@@ -4096,12 +3970,6 @@ impl Default for LineLayoutLayerLineCap {
     }
 }
 
-impl Default for LineLayoutLayerLineCap {
-    fn default() -> Self {
-        Self::Butt
-    }
-}
-
 /// The display of lines when joining.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy)]
 pub enum LineLayoutLayerLineJoin {
@@ -4111,12 +3979,6 @@ pub enum LineLayoutLayerLineJoin {
     Miter,
     #[serde(rename="round")]
     Round,
-}
-
-impl Default for LineLayoutLayerLineJoin {
-    fn default() -> Self {
-        Self::Miter
-    }
 }
 
 impl Default for LineLayoutLayerLineJoin {
@@ -4156,12 +4018,6 @@ pub enum LineLayoutLayerVisibility {
     None,
     #[serde(rename="visible")]
     Visible,
-}
-
-impl Default for LineLayoutLayerVisibility {
-    fn default() -> Self {
-        Self::Visible
-    }
 }
 
 impl Default for LineLayoutLayerVisibility {
@@ -4267,7 +4123,7 @@ impl Default for LinePaintLayerLineOpacity {
 
 /// Name of image in sprite to use for drawing image lines. For seamless patterns, image width must be a factor of two (2, 4, 8, ..., 512). Note that zoom-dependent expressions will be evaluated only at integer zoom levels.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone)]
-struct LinePaintLayerLinePattern(String);
+struct LinePaintLayerLinePattern(std::string::String);
 
 /// The geometry's offset. Values are [x, y] where negatives indicate left and up, respectively.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
@@ -4286,12 +4142,6 @@ pub enum LinePaintLayerLineTranslateAnchor {
     Map,
     #[serde(rename="viewport")]
     Viewport,
-}
-
-impl Default for LinePaintLayerLineTranslateAnchor {
-    fn default() -> Self {
-        Self::Map
-    }
 }
 
 impl Default for LinePaintLayerLineTranslateAnchor {
@@ -4323,12 +4173,6 @@ pub enum RasterLayoutLayerVisibility {
     None,
     #[serde(rename="visible")]
     Visible,
-}
-
-impl Default for RasterLayoutLayerVisibility {
-    fn default() -> Self {
-        Self::Visible
-    }
 }
 
 impl Default for RasterLayoutLayerVisibility {
@@ -4432,12 +4276,6 @@ pub enum RasterPaintLayerRasterResampling {
     Linear,
     #[serde(rename="nearest")]
     Nearest,
-}
-
-impl Default for RasterPaintLayerRasterResampling {
-    fn default() -> Self {
-        Self::Linear
-    }
 }
 
 impl Default for RasterPaintLayerRasterResampling {
@@ -4647,12 +4485,6 @@ impl Default for SymbolLayoutLayerIconAnchor {
     }
 }
 
-impl Default for SymbolLayoutLayerIconAnchor {
-    fn default() -> Self {
-        Self::Center
-    }
-}
-
 /// If true, other symbols can be visible even if they collide with the icon.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone, Copy)]
 struct SymbolLayoutLayerIconIgnorePlacement(bool);
@@ -4665,7 +4497,7 @@ impl Default for SymbolLayoutLayerIconIgnorePlacement {
 
 /// Name of image in sprite to use for drawing an image background.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone)]
-struct SymbolLayoutLayerIconImage(String);
+struct SymbolLayoutLayerIconImage(std::string::String);
 
 /// If true, the icon may be flipped to prevent it from being rendered upside-down.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone, Copy)]
@@ -4750,12 +4582,6 @@ impl Default for SymbolLayoutLayerIconPitchAlignment {
     }
 }
 
-impl Default for SymbolLayoutLayerIconPitchAlignment {
-    fn default() -> Self {
-        Self::Auto
-    }
-}
-
 /// Rotates the icon clockwise.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
 pub struct SymbolLayoutLayerIconRotate(serde_json::Number);
@@ -4775,12 +4601,6 @@ pub enum SymbolLayoutLayerIconRotationAlignment {
     Map,
     #[serde(rename="viewport")]
     Viewport,
-}
-
-impl Default for SymbolLayoutLayerIconRotationAlignment {
-    fn default() -> Self {
-        Self::Auto
-    }
 }
 
 impl Default for SymbolLayoutLayerIconRotationAlignment {
@@ -4810,12 +4630,6 @@ pub enum SymbolLayoutLayerIconTextFit {
     None,
     #[serde(rename="width")]
     Width,
-}
-
-impl Default for SymbolLayoutLayerIconTextFit {
-    fn default() -> Self {
-        Self::None
-    }
 }
 
 impl Default for SymbolLayoutLayerIconTextFit {
@@ -4861,12 +4675,6 @@ impl Default for SymbolLayoutLayerSymbolPlacement {
     }
 }
 
-impl Default for SymbolLayoutLayerSymbolPlacement {
-    fn default() -> Self {
-        Self::Point
-    }
-}
-
 /// Sorts features in ascending order based on this value. Features with lower sort keys are drawn and placed first.  When `icon-allow-overlap` or `text-allow-overlap` is `false`, features with a lower sort key will have priority during placement. When `icon-allow-overlap` or `text-allow-overlap` is set to `true`, features with a higher sort key will overlap over features with a lower sort key.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
 pub struct SymbolLayoutLayerSymbolSortKey(serde_json::Number);
@@ -4890,12 +4698,6 @@ pub enum SymbolLayoutLayerSymbolZOrder {
     Source,
     #[serde(rename="viewport-y")]
     ViewportY,
-}
-
-impl Default for SymbolLayoutLayerSymbolZOrder {
-    fn default() -> Self {
-        Self::Auto
-    }
 }
 
 impl Default for SymbolLayoutLayerSymbolZOrder {
@@ -4943,15 +4745,9 @@ impl Default for SymbolLayoutLayerTextAnchor {
     }
 }
 
-impl Default for SymbolLayoutLayerTextAnchor {
-    fn default() -> Self {
-        Self::Center
-    }
-}
-
 /// Value to use for a text label. If a plain `string` is provided, it will be treated as a `formatted` with default/inherited formatting options.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-struct SymbolLayoutLayerTextField(String);
+struct SymbolLayoutLayerTextField(std::string::String);
 
 impl Default for SymbolLayoutLayerTextField {
     fn default() -> Self {
@@ -4961,7 +4757,7 @@ impl Default for SymbolLayoutLayerTextField {
 
 /// Fonts to use for displaying text. If the `glyphs` root property is specified, this array is joined together and interpreted as a font stack name. Otherwise, it is interpreted as a cascading fallback list of local font names.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-struct SymbolLayoutLayerTextFont(Vec<String>);
+struct SymbolLayoutLayerTextFont(Vec<std::string::String>);
 
 impl Default for SymbolLayoutLayerTextFont {
     fn default() -> Self {
@@ -4990,12 +4786,6 @@ pub enum SymbolLayoutLayerTextJustify {
     Left,
     #[serde(rename="right")]
     Right,
-}
-
-impl Default for SymbolLayoutLayerTextJustify {
-    fn default() -> Self {
-        Self::Center
-    }
 }
 
 impl Default for SymbolLayoutLayerTextJustify {
@@ -5112,12 +4902,6 @@ impl Default for SymbolLayoutLayerTextPitchAlignment {
     }
 }
 
-impl Default for SymbolLayoutLayerTextPitchAlignment {
-    fn default() -> Self {
-        Self::Auto
-    }
-}
-
 /// Radial offset of text, in the direction of the symbol's anchor. Useful in combination with `text-variable-anchor`, which defaults to using the two-dimensional `text-offset` if present.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
 pub struct SymbolLayoutLayerTextRadialOffset(serde_json::Number);
@@ -5157,12 +4941,6 @@ impl Default for SymbolLayoutLayerTextRotationAlignment {
     }
 }
 
-impl Default for SymbolLayoutLayerTextRotationAlignment {
-    fn default() -> Self {
-        Self::Auto
-    }
-}
-
 /// Font size.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
 pub struct SymbolLayoutLayerTextSize(serde_json::Number);
@@ -5182,12 +4960,6 @@ pub enum SymbolLayoutLayerTextTransform {
     None,
     #[serde(rename="uppercase")]
     Uppercase,
-}
-
-impl Default for SymbolLayoutLayerTextTransform {
-    fn default() -> Self {
-        Self::None
-    }
 }
 
 impl Default for SymbolLayoutLayerTextTransform {
@@ -5259,12 +5031,6 @@ pub enum SymbolLayoutLayerVisibility {
     None,
     #[serde(rename="visible")]
     Visible,
-}
-
-impl Default for SymbolLayoutLayerVisibility {
-    fn default() -> Self {
-        Self::Visible
-    }
 }
 
 impl Default for SymbolLayoutLayerVisibility {
@@ -5398,12 +5164,6 @@ impl Default for SymbolPaintLayerIconTranslateAnchor {
     }
 }
 
-impl Default for SymbolPaintLayerIconTranslateAnchor {
-    fn default() -> Self {
-        Self::Map
-    }
-}
-
 /// The color with which the text will be drawn.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
 struct SymbolPaintLayerTextColor(color::DynamicColor);
@@ -5471,12 +5231,6 @@ pub enum SymbolPaintLayerTextTranslateAnchor {
     Map,
     #[serde(rename="viewport")]
     Viewport,
-}
-
-impl Default for SymbolPaintLayerTextTranslateAnchor {
-    fn default() -> Self {
-        Self::Map
-    }
 }
 
 impl Default for SymbolPaintLayerTextTranslateAnchor {

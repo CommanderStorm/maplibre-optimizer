@@ -50,7 +50,7 @@ fn is_direct_element(element: &ArrayElement) -> bool {
 /// helper types into `scope`.
 fn generate_array_element(scope: &mut Scope, name: &str, element: &ArrayElement) -> String {
     match element {
-        ArrayElement::String => "String".to_string(),
+        ArrayElement::String => "std::string::String".to_string(),
         ArrayElement::Number { .. } => "serde_json::Number".to_string(),
         ArrayElement::Boolean => "bool".to_string(),
         ArrayElement::Color => "color::DynamicColor".to_string(),
@@ -116,7 +116,7 @@ fn generate_font_faces(scope: &mut Scope) {
         .vis("pub")
         .doc("URL the font can retrieved under");
     font_with_range
-        .new_field("unicode_range", "Vec<String>")
+        .new_field("unicode_range", "Vec<std::string::String>")
         .vis("pub")
         .doc("Unicode range(s) where this font applies (CSS `unicode-range` semantics)")
         .annotation("#[serde(rename=\"unicode-range\")]")

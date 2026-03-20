@@ -8,7 +8,7 @@ pub fn generate(scope: &mut Scope, name: &str, field: &ResolvedImageField) {
         .new_struct(name)
         .doc(&field.meta.doc)
         .derive("serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone")
-        .tuple_field("String");
+        .tuple_field("std::string::String");
     generate_test_from_example_if_present(scope, name, field.meta.example.as_ref());
 }
 

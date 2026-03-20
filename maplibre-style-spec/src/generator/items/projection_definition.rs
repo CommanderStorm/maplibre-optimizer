@@ -9,7 +9,7 @@ pub fn generate(scope: &mut Scope, name: &str, field: &ProjectionDefinitionField
         .vis("pub")
         .doc(&field.meta.doc)
         .derive("serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone")
-        .tuple_field("String");
+        .tuple_field("std::string::String");
 
     let default = &field.default;
     scope

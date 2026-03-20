@@ -9,7 +9,7 @@ pub fn generate(scope: &mut Scope, name: &str, meta: &FieldMeta) {
         .vis("pub")
         .doc(&meta.doc)
         .derive("serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone")
-        .tuple_field("String");
+        .tuple_field("std::string::String");
     generate_test_from_example_if_present(scope, name, meta.example.as_ref());
 }
 

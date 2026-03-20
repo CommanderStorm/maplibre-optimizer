@@ -8,7 +8,7 @@ pub fn generate(scope: &mut Scope, name: &str, field: &FormattedTextField) {
         .new_struct(name)
         .doc(&field.meta.doc)
         .derive("serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone")
-        .tuple_field("String");
+        .tuple_field("std::string::String");
 
     let default = &field.default;
     scope
