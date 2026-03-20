@@ -3,23 +3,19 @@
 //! (e.g. `image` inside `coalesce`); those paths rely on recursion instead of serde.
 
 use std::collections::{HashMap, HashSet};
-use std::sync::OnceLock;
+use std::sync::LazyLock;
 
 use serde_json::Value;
 
 use crate::decoder::StyleReference;
 use crate::mir::{ExprParamType, ExprType, Expressions, IntermediateSpec, LiteralKind};
 
-static MIR_SPEC: OnceLock<IntermediateSpec> = OnceLock::new();
-
-fn mir_spec() -> &'static IntermediateSpec {
-    MIR_SPEC.get_or_init(|| {
-        let v8 = include_str!("../../upstream/src/reference/v8.json");
-        let reference: StyleReference =
-            serde_json::from_str(v8).expect("v8.json should parse as StyleReference");
-        IntermediateSpec::from(reference)
-    })
-}
+static MIR_SPEC: LazyLock<IntermediateSpec> = LazyLock::new(|| {
+    let v8 = include_str!("../../upstream/src/reference/v8.json");
+    let reference: StyleReference =
+        serde_json::from_str(v8).expect("v8.json should parse as StyleReference");
+    IntermediateSpec::from(reference)
+});
 
 #[derive(Debug, Clone, Default)]
 struct TypeEnv {
@@ -757,7 +753,7 @@ pub fn validate_expression_with_spec(
     _op_to_groups: &HashMap<String, Vec<String>>,
     _known_ops: &HashSet<String>,
 ) -> Result<(), String> {
-    let spec = mir_spec();
+    let spec = &*MIR_SPEC;
     let mut env = TypeEnv::default();
     validate_expression_with_mir(expr, &ExprType::Any, spec, &mut env).map(|_| ())
 }

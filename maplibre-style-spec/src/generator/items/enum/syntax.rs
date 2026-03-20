@@ -538,7 +538,23 @@ fn generate_syntax_enum_body(
             let var = enu.new_variant(&var_name).doc(&value.doc);
             for p in &overload.parameters {
                 let param = p.clone();
-                let tuple_identifier = if param.strip_suffix('?').is_some() {
+                // Most single-overload syntax enums model parameters as raw JSON values.
+                // Collator is special: upstream defines `collator` as a typed expression, and
+                // we want its operands/arguments to remain strongly typed.
+                let tuple_identifier = if name == "Collator"
+                    && key == "collator"
+                    && param == "options"
+                {
+                    // Collator options are an object schema; represent them as a JSON object map.
+                    "serde_json::Map<std::string::String, serde_json::Value>".to_string()
+                } else if name == "String" && key == "resolved-locale" && param == "collator" {
+                    // `resolved-locale` takes a `collator` expression, not an opaque JSON value.
+                    "Collator".to_string()
+                } else if name == "Boolean" && (key == "==" || key == "!=") && param == "collator?"
+                {
+                    // Equality operators inline `collator?` as an optional third argument.
+                    "Option<Collator>".to_string()
+                } else if param.strip_suffix('?').is_some() {
                     "Option<serde_json::Value>".to_string()
                 } else {
                     "serde_json::Value".to_string()
@@ -633,7 +649,7 @@ fn generate_multi_overload(
             .derive("serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone")
             .attr(fuzz::CFG_DERIVE_ARBITRARY)
             .new_variant("Args")
-            .tuple("(serde_json::Value, serde_json::Value, Option<serde_json::Value>)");
+            .tuple("(serde_json::Value, serde_json::Value, Option<Collator>)");
         return;
     }
     // because scope can only be owned by one owner, we first need to generate all tuples, then can add them
@@ -652,7 +668,11 @@ fn generate_multi_overload(
             for param in &overload.parameters {
                 // Trailing optional tuple fields + untagged enums + `SeqAccessDeserializer` cannot
                 // reliably rewind; accept JSON for common optional slots.
-                if matches!(param.as_str(), "collator?" | "from_index?") {
+                if param.as_str() == "collator?" {
+                    tuples.push("Option<Collator>".to_string());
+                    continue;
+                }
+                if param.as_str() == "from_index?" {
                     tuples.push("Option<serde_json::Value>".to_string());
                     continue;
                 }

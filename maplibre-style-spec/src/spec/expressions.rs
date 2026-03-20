@@ -697,8 +697,7 @@ pub enum Boolean {
         serde_json::Value,
         #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
         serde_json::Value,
-        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_option_json_value))]
-         Option<serde_json::Value>,
+        Option<Collator>,
     ),
     /// Returns `true` if the first input is strictly less than the second, `false` otherwise. The arguments are required to be either both strings or both numbers; if during evaluation they are not, expression evaluation produces an error. Cases where this constraint is known not to hold at parse time are considered in valid and will produce a parse error. Accepts an optional `collator` argument to control locale-dependent string comparisons.
     ///
@@ -720,8 +719,7 @@ pub enum Boolean {
         serde_json::Value,
         #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
         serde_json::Value,
-        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_option_json_value))]
-         Option<serde_json::Value>,
+        Option<Collator>,
     ),
     /// Returns `true` if the first input is strictly greater than the second, `false` otherwise. The arguments are required to be either both strings or both numbers; if during evaluation they are not, expression evaluation produces an error. Cases where this constraint is known not to hold at parse time are considered in valid and will produce a parse error. Accepts an optional `collator` argument to control locale-dependent string comparisons.
     Greater(GreaterOptions),
@@ -777,52 +775,28 @@ pub enum Boolean {
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum LessOptions {
-    Args(
-        (
-            serde_json::Value,
-            serde_json::Value,
-            Option<serde_json::Value>,
-        ),
-    ),
+    Args((serde_json::Value, serde_json::Value, Option<Collator>)),
 }
 
 /// Options for deserializing the syntax enum variant [`Boolean::LessEqual`]
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum LessEqualOptions {
-    Args(
-        (
-            serde_json::Value,
-            serde_json::Value,
-            Option<serde_json::Value>,
-        ),
-    ),
+    Args((serde_json::Value, serde_json::Value, Option<Collator>)),
 }
 
 /// Options for deserializing the syntax enum variant [`Boolean::Greater`]
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum GreaterOptions {
-    Args(
-        (
-            serde_json::Value,
-            serde_json::Value,
-            Option<serde_json::Value>,
-        ),
-    ),
+    Args((serde_json::Value, serde_json::Value, Option<Collator>)),
 }
 
 /// Options for deserializing the syntax enum variant [`Boolean::GreaterEqual`]
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum GreaterEqualOptions {
-    Args(
-        (
-            serde_json::Value,
-            serde_json::Value,
-            Option<serde_json::Value>,
-        ),
-    ),
+    Args((serde_json::Value, serde_json::Value, Option<Collator>)),
 }
 
 /// Options for deserializing the syntax enum variant [`Boolean::In`]
@@ -1010,8 +984,8 @@ impl<'de> serde::de::Visitor<'de> for BooleanVisitor {
 pub enum Collator {
     /// Returns a `collator` for use in locale-dependent comparison operations. Use `resolved-locale` to test the results of locale fallback behavior.
     Op(
-        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
-        serde_json::Value,
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_map))]
+        serde_json::Map<std::string::String, serde_json::Value>,
     ),
 }
 
@@ -2081,10 +2055,7 @@ pub enum String {
         serde_json::Value,
     ),
     /// Returns the IETF language tag of the locale being used by the provided `collator`. This can be used to determine the default system locale, or to determine if a requested locale was successfully loaded.
-    ResolvedLocale(
-        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
-        serde_json::Value,
-    ),
+    ResolvedLocale(Collator),
     /// Returns a subarray from an array or a substring from a string from a specified start index, or between a start index and an end index if set. The return value is inclusive of the start index but not of the end index. In a string, a UTF-16 surrogate pair counts as a single position.
     Slice(
         #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
