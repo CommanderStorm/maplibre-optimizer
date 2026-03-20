@@ -20,6 +20,7 @@ pub fn generate(scope: &mut Scope, name: &str, field: &ArrayField) {
 
     scope
         .new_struct(name)
+        .vis("pub")
         .doc(&field.meta.doc)
         .derive("serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone")
         .tuple_field(field_type);
@@ -194,7 +195,7 @@ mod tests {
         );
         insta::assert_snapshot!(scope.to_string(), @r"
         #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-        struct Foo(Vec<serde_json::Value>);
+        pub struct Foo(Vec<serde_json::Value>);
         ")
     }
 
@@ -265,7 +266,7 @@ mod tests {
 
         /// Position of the light source relative to lit (extruded) geometries, in [r radial coordinate, a azimuthal angle, p polar angle] where r indicates the distance from the center of the base of an object to its light, a indicates the position of the light relative to 0° (0° when `light.anchor` is set to `viewport` corresponds to the top of the viewport, or 0° when `light.anchor` is set to `map` corresponds to due north, and degrees proceed clockwise), and p indicates the height of the light (from 0°, directly above, to 180°, directly below).
         #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-        struct Position(Box<[serde_json::Number; 3]>);
+        pub struct Position(Box<[serde_json::Number; 3]>);
 
         impl Default for Position {
             fn default() -> Self {
@@ -346,7 +347,7 @@ mod tests {
 
         /// A style's `layers` property lists all the layers available in that style.
         #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-        struct Layers(Vec<Layer>);
+        pub struct Layers(Vec<Layer>);
 
         #[cfg(test)]
         mod test {
@@ -412,7 +413,7 @@ mod tests {
         ///
         /// Range: 1..
         #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-        struct Interpolation(InterpolationName);
+        pub struct Interpolation(InterpolationName);
 
         #[cfg(test)]
         mod test {

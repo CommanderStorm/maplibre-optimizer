@@ -7,6 +7,7 @@ use crate::mir::types::ColorField;
 pub fn generate(scope: &mut Scope, name: &str, field: &ColorField) {
     scope
         .new_struct(name)
+        .vis("pub")
         .doc(&field.meta.doc)
         .derive("serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone")
         .tuple_field("color::DynamicColor");
@@ -46,7 +47,7 @@ mod tests {
         );
         insta::assert_snapshot!(scope.to_string(), @r"
         #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-        struct Foo(color::DynamicColor);
+        pub struct Foo(color::DynamicColor);
         ")
     }
 }

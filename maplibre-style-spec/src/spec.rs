@@ -389,7 +389,7 @@ mod test {
 
 /// Default map center in longitude and latitude.  The style center will be used only if the map has not been positioned by other means (e.g. map options or user interaction).
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-struct RootCenter(Box<[serde_json::Number; 2]>);
+pub struct RootCenter(Box<[serde_json::Number; 2]>);
 
 /// Default map center altitude in meters above sea level. The style center altitude defines the altitude where the camera is looking at and will be used only if the map has not been positioned by other means (e.g. map options or user interaction).
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
@@ -424,11 +424,11 @@ pub enum FontFace {
 ///
 /// <h2>Supported Fonts</h2>What type of fonts are supported is implementation-defined. Unsupported fonts are ignored.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-struct RootFontFaces(std::collections::BTreeMap<std::string::String, FontFace>);
+pub struct RootFontFaces(std::collections::BTreeMap<std::string::String, FontFace>);
 
 /// The global light source.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-struct RootLight(Light);
+pub struct RootLight(Light);
 
 /// Arbitrary properties useful to track with the stylesheet, but do not influence rendering. Properties should be prefixed to avoid collisions, like 'maplibre:'.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
@@ -453,7 +453,7 @@ impl Default for RootPitch {
 
 /// The projection configuration
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-struct RootProjection(Projection);
+pub struct RootProjection(Projection);
 
 /// Default roll, in degrees. The roll angle is measured counterclockwise about the camera boresight. The style roll will be used only if the map has not been positioned by other means (e.g. map options or user interaction).
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
@@ -470,13 +470,13 @@ impl Default for RootRoll {
 
 /// The map's sky configuration. **Note:** this definition is still experimental and is under development in maplibre-gl-js.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-struct RootSky(Sky);
+pub struct RootSky(Sky);
 
 /// Sources state which data the map should display. Specify the type of source with the `type` property. Adding a source isn't enough to make data appear on the map because sources don't contain styling details like color or width. Layers refer to a source and give it a visual representation. This makes it possible to style the same source in different ways, like differentiating between types of roads in a highways layer.
 ///
 /// Tiled sources (vector and raster) must specify their details according to the [TileJSON specification](https://github.com/mapbox/tilejson-spec).
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-struct RootSources(std::collections::BTreeMap<std::string::String, Source>);
+pub struct RootSources(std::collections::BTreeMap<std::string::String, Source>);
 
 /// An object used to define default values when using the [`global-state`](https://maplibre.org/maplibre-style-spec/expressions/#global-state) expression.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
@@ -490,11 +490,11 @@ impl Default for RootState {
 
 /// The terrain configuration.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-struct RootTerrain(Terrain);
+pub struct RootTerrain(Terrain);
 
 /// A global transition definition to use as a default across properties, to be used for timing transitions between one value and the next when no property-specific transition is set. Collision-based symbol fading is controlled independently of the style's `transition` property.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-struct RootTransition(Transition);
+pub struct RootTransition(Transition);
 
 /// Style specification version number. Must be 8.
 #[derive(
@@ -511,7 +511,7 @@ pub struct RootZoom(serde_json::Number);
 
 /// A filter selects specific features from a layer.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone, Copy)]
-struct Filter(bool);
+pub struct Filter(bool);
 
 /// The filter operator.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy)]
@@ -640,7 +640,7 @@ pub struct FunctionDefault(serde_json::Value);
 
 /// An expression.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-struct FunctionExpression(Any);
+pub struct FunctionExpression(Any);
 
 /// The name of a feature property to use as the function input.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
@@ -654,7 +654,7 @@ impl Default for FunctionProperty {
 
 /// An array of stops.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-struct FunctionStops(Vec<FunctionStop>);
+pub struct FunctionStops(Vec<FunctionStop>);
 
 /// The interpolation strategy to use in function evaluation.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy)]
@@ -691,7 +691,7 @@ pub enum FunctionStopValue {
 ///
 /// Range: 0..=24
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-struct FunctionStop(Box<[FunctionStopValue; 2]>);
+pub struct FunctionStop(Box<[FunctionStopValue; 2]>);
 
 /// The geometry type for the filter to select.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy)]
@@ -708,7 +708,7 @@ pub enum GeometryType {
 ///
 /// Range: 1..
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-struct Interpolation(InterpolationName);
+pub struct Interpolation(InterpolationName);
 
 /// First element in an interpolation array. May be followed by a number of arguments.
 #[derive(serde::Serialize, PartialEq, Debug, Clone)]
@@ -815,7 +815,7 @@ impl Default for LightAnchor {
 
 /// Color tint for lighting extruded geometries.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-struct LightColor(color::DynamicColor);
+pub struct LightColor(color::DynamicColor);
 
 impl Default for LightColor {
     fn default() -> Self {
@@ -840,7 +840,7 @@ impl Default for LightIntensity {
 
 /// Position of the light source relative to lit (extruded) geometries, in [r radial coordinate, a azimuthal angle, p polar angle] where r indicates the distance from the center of the base of an object to its light, a indicates the position of the light relative to 0° (0° when `light.anchor` is set to `viewport` corresponds to the top of the viewport, or 0° when `light.anchor` is set to `map` corresponds to due north, and degrees proceed clockwise), and p indicates the height of the light (from 0°, directly above, to 180°, directly below).
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-struct LightPosition(Box<[serde_json::Number; 3]>);
+pub struct LightPosition(Box<[serde_json::Number; 3]>);
 
 impl Default for LightPosition {
     fn default() -> Self {
@@ -936,7 +936,7 @@ impl Default for SkyAtmosphereBlend {
 
 /// The base color for the fog. Requires 3D terrain.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-struct SkyFogColor(color::DynamicColor);
+pub struct SkyFogColor(color::DynamicColor);
 
 impl Default for SkyFogColor {
     fn default() -> Self {
@@ -961,7 +961,7 @@ impl Default for SkyFogGroundBlend {
 
 /// The base color at the horizon.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-struct SkyHorizonColor(color::DynamicColor);
+pub struct SkyHorizonColor(color::DynamicColor);
 
 impl Default for SkyHorizonColor {
     fn default() -> Self {
@@ -986,7 +986,7 @@ impl Default for SkyHorizonFogBlend {
 
 /// The base color for the sky.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-struct SkySkyColor(color::DynamicColor);
+pub struct SkySkyColor(color::DynamicColor);
 
 impl Default for SkySkyColor {
     fn default() -> Self {
@@ -2959,7 +2959,7 @@ impl Default for GeojsonSourceBuffer {
 ///
 ///  * `point_count_abbreviated` An abbreviated point count
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone, Copy)]
-struct GeojsonSourceCluster(bool);
+pub struct GeojsonSourceCluster(bool);
 
 impl Default for GeojsonSourceCluster {
     fn default() -> Self {
@@ -3006,11 +3006,11 @@ pub struct GeojsonSourceData(serde_json::Value);
 
 /// An expression for filtering features prior to processing them for rendering.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-struct GeojsonSourceFilter(Filter);
+pub struct GeojsonSourceFilter(Filter);
 
 /// Whether to generate ids for the geojson features. When enabled, the `feature.id` property will be auto assigned based on its index in the `features` array, over-writing any previous values.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone, Copy)]
-struct GeojsonSourceGenerateId(bool);
+pub struct GeojsonSourceGenerateId(bool);
 
 impl Default for GeojsonSourceGenerateId {
     fn default() -> Self {
@@ -3020,7 +3020,7 @@ impl Default for GeojsonSourceGenerateId {
 
 /// Whether to calculate line distance metrics. This is required for line layers that specify `line-gradient` values.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone, Copy)]
-struct GeojsonSourceLineMetrics(bool);
+pub struct GeojsonSourceLineMetrics(bool);
 
 impl Default for GeojsonSourceLineMetrics {
     fn default() -> Self {
@@ -3068,11 +3068,11 @@ pub struct ImageSource {
 
 /// A single longitude, latitude pair.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-struct ImageSourceCoordinatesValue(Box<[serde_json::Number; 2]>);
+pub struct ImageSourceCoordinatesValue(Box<[serde_json::Number; 2]>);
 
 /// Corners of image specified in longitude, latitude pairs.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-struct ImageSourceCoordinates(Box<[ImageSourceCoordinatesValue; 4]>);
+pub struct ImageSourceCoordinates(Box<[ImageSourceCoordinatesValue; 4]>);
 
 /// URL that points to an image.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
@@ -3107,7 +3107,7 @@ pub struct RasterSourceAttribution(std::string::String);
 
 /// An array containing the longitude and latitude of the southwest and northeast corners of the source's bounding box in the following order: `[sw.lng, sw.lat, ne.lng, ne.lat]`. When this property is included in a source, no tiles outside of the given bounds are requested by MapLibre.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-struct RasterSourceBounds(Box<[serde_json::Number; 4]>);
+pub struct RasterSourceBounds(Box<[serde_json::Number; 4]>);
 
 impl Default for RasterSourceBounds {
     fn default() -> Self {
@@ -3182,7 +3182,7 @@ impl Default for RasterSourceTileSize {
 
 /// An array of one or more tile source URLs, as in the TileJSON spec.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-struct RasterSourceTiles(Vec<std::string::String>);
+pub struct RasterSourceTiles(Vec<std::string::String>);
 
 /// A URL to a TileJSON resource. Supported protocols are `http:` and `https:`.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
@@ -3190,7 +3190,7 @@ pub struct RasterSourceUrl(std::string::String);
 
 /// A setting to determine whether a source's tiles are cached locally.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone, Copy)]
-struct RasterSourceVolatile(bool);
+pub struct RasterSourceVolatile(bool);
 
 impl Default for RasterSourceVolatile {
     fn default() -> Self {
@@ -3265,7 +3265,7 @@ impl Default for RasterDemSourceBlueFactor {
 
 /// An array containing the longitude and latitude of the southwest and northeast corners of the source's bounding box in the following order: `[sw.lng, sw.lat, ne.lng, ne.lat]`. When this property is included in a source, no tiles outside of the given bounds are requested by MapLibre.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-struct RasterDemSourceBounds(Box<[serde_json::Number; 4]>);
+pub struct RasterDemSourceBounds(Box<[serde_json::Number; 4]>);
 
 impl Default for RasterDemSourceBounds {
     fn default() -> Self {
@@ -3369,7 +3369,7 @@ impl Default for RasterDemSourceTileSize {
 
 /// An array of one or more tile source URLs, as in the TileJSON spec.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-struct RasterDemSourceTiles(Vec<std::string::String>);
+pub struct RasterDemSourceTiles(Vec<std::string::String>);
 
 /// A URL to a TileJSON resource. Supported protocols are `http:` and `https:`.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
@@ -3377,7 +3377,7 @@ pub struct RasterDemSourceUrl(std::string::String);
 
 /// A setting to determine whether a source's tiles are cached locally.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone, Copy)]
-struct RasterDemSourceVolatile(bool);
+pub struct RasterDemSourceVolatile(bool);
 
 impl Default for RasterDemSourceVolatile {
     fn default() -> Self {
@@ -3416,7 +3416,7 @@ pub struct VectorSourceAttribution(std::string::String);
 
 /// An array containing the longitude and latitude of the southwest and northeast corners of the source's bounding box in the following order: `[sw.lng, sw.lat, ne.lng, ne.lat]`. When this property is included in a source, no tiles outside of the given bounds are requested by MapLibre.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-struct VectorSourceBounds(Box<[serde_json::Number; 4]>);
+pub struct VectorSourceBounds(Box<[serde_json::Number; 4]>);
 
 impl Default for VectorSourceBounds {
     fn default() -> Self {
@@ -3499,7 +3499,7 @@ impl Default for VectorSourceScheme {
 
 /// An array of one or more tile source URLs, as in the TileJSON spec.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-struct VectorSourceTiles(Vec<std::string::String>);
+pub struct VectorSourceTiles(Vec<std::string::String>);
 
 /// A URL to a TileJSON resource. Supported protocols are `http:` and `https:`.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
@@ -3507,7 +3507,7 @@ pub struct VectorSourceUrl(std::string::String);
 
 /// A setting to determine whether a source's tiles are cached locally.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone, Copy)]
-struct VectorSourceVolatile(bool);
+pub struct VectorSourceVolatile(bool);
 
 impl Default for VectorSourceVolatile {
     fn default() -> Self {
@@ -3525,15 +3525,15 @@ pub struct VideoSource {
 
 /// A single longitude, latitude pair.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-struct VideoSourceCoordinatesValue(Box<[serde_json::Number; 2]>);
+pub struct VideoSourceCoordinatesValue(Box<[serde_json::Number; 2]>);
 
 /// Corners of video specified in longitude, latitude pairs.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-struct VideoSourceCoordinates(Box<[VideoSourceCoordinatesValue; 4]>);
+pub struct VideoSourceCoordinates(Box<[VideoSourceCoordinatesValue; 4]>);
 
 /// URLs to video content in order of preferred format.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-struct VideoSourceUrls(Vec<std::string::String>);
+pub struct VideoSourceUrls(Vec<std::string::String>);
 
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
 #[serde(tag = "type")]
@@ -3635,7 +3635,7 @@ pub struct BackgroundPaintLayer {
 
 /// The color with which the background will be drawn.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-struct BackgroundPaintLayerBackgroundColor(color::DynamicColor);
+pub struct BackgroundPaintLayerBackgroundColor(color::DynamicColor);
 
 impl Default for BackgroundPaintLayerBackgroundColor {
     fn default() -> Self {
@@ -3658,7 +3658,7 @@ impl Default for BackgroundPaintLayerBackgroundOpacity {
 
 /// Name of image in sprite to use for drawing an image background. For seamless patterns, image width and height must be a factor of two (2, 4, 8, ..., 512). Note that zoom-dependent expressions will be evaluated only at integer zoom levels.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone)]
-struct BackgroundPaintLayerBackgroundPattern(std::string::String);
+pub struct BackgroundPaintLayerBackgroundPattern(std::string::String);
 
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
 pub struct CircleLayoutLayer {
@@ -3740,7 +3740,7 @@ impl Default for CirclePaintLayerCircleBlur {
 
 /// The fill color of the circle.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-struct CirclePaintLayerCircleColor(color::DynamicColor);
+pub struct CirclePaintLayerCircleColor(color::DynamicColor);
 
 impl Default for CirclePaintLayerCircleColor {
     fn default() -> Self {
@@ -3806,7 +3806,7 @@ impl Default for CirclePaintLayerCircleRadius {
 
 /// The stroke color of the circle.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-struct CirclePaintLayerCircleStrokeColor(color::DynamicColor);
+pub struct CirclePaintLayerCircleStrokeColor(color::DynamicColor);
 
 impl Default for CirclePaintLayerCircleStrokeColor {
     fn default() -> Self {
@@ -3842,7 +3842,7 @@ impl Default for CirclePaintLayerCircleStrokeWidth {
 
 /// The geometry's offset. Values are [x, y] where negatives indicate left and up, respectively.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-struct CirclePaintLayerCircleTranslate(Box<[serde_json::Number; 2]>);
+pub struct CirclePaintLayerCircleTranslate(Box<[serde_json::Number; 2]>);
 
 impl Default for CirclePaintLayerCircleTranslate {
     fn default() -> Self {
@@ -3903,7 +3903,7 @@ pub struct ColorReliefPaintLayer {
 
 /// Defines the color of each pixel based on its elevation. Should be an expression that uses `["elevation"]` as input.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-struct ColorReliefPaintLayerColorReliefColor(color::DynamicColor);
+pub struct ColorReliefPaintLayerColorReliefColor(color::DynamicColor);
 
 /// The opacity at which the color-relief will be drawn.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
@@ -3973,7 +3973,7 @@ pub struct FillPaintLayer {
 
 /// Whether or not the fill should be antialiased.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone, Copy)]
-struct FillPaintLayerFillAntialias(bool);
+pub struct FillPaintLayerFillAntialias(bool);
 
 impl Default for FillPaintLayerFillAntialias {
     fn default() -> Self {
@@ -3983,7 +3983,7 @@ impl Default for FillPaintLayerFillAntialias {
 
 /// The color of the filled part of this layer. This color can be specified as `rgba` with an alpha component and the color's opacity will not affect the opacity of the 1px stroke, if it is used.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-struct FillPaintLayerFillColor(color::DynamicColor);
+pub struct FillPaintLayerFillColor(color::DynamicColor);
 
 impl Default for FillPaintLayerFillColor {
     fn default() -> Self {
@@ -4006,15 +4006,15 @@ impl Default for FillPaintLayerFillOpacity {
 
 /// The outline color of the fill. Matches the value of `fill-color` if unspecified.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-struct FillPaintLayerFillOutlineColor(color::DynamicColor);
+pub struct FillPaintLayerFillOutlineColor(color::DynamicColor);
 
 /// Name of image in sprite to use for drawing image fills. For seamless patterns, image width and height must be a factor of two (2, 4, 8, ..., 512). Note that zoom-dependent expressions will be evaluated only at integer zoom levels.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone)]
-struct FillPaintLayerFillPattern(std::string::String);
+pub struct FillPaintLayerFillPattern(std::string::String);
 
 /// The geometry's offset. Values are [x, y] where negatives indicate left and up, respectively.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-struct FillPaintLayerFillTranslate(Box<[serde_json::Number; 2]>);
+pub struct FillPaintLayerFillTranslate(Box<[serde_json::Number; 2]>);
 
 impl Default for FillPaintLayerFillTranslate {
     fn default() -> Self {
@@ -4108,7 +4108,7 @@ impl Default for FillExtrusionPaintLayerFillExtrusionBase {
 
 /// The base color of the extruded fill. The extrusion's surfaces will be shaded differently based on this color in combination with the root `light` settings. If this color is specified as `rgba` with an alpha component, the alpha component will be ignored; use `fill-extrusion-opacity` to set layer opacity.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-struct FillExtrusionPaintLayerFillExtrusionColor(color::DynamicColor);
+pub struct FillExtrusionPaintLayerFillExtrusionColor(color::DynamicColor);
 
 impl Default for FillExtrusionPaintLayerFillExtrusionColor {
     fn default() -> Self {
@@ -4144,11 +4144,11 @@ impl Default for FillExtrusionPaintLayerFillExtrusionOpacity {
 
 /// Name of image in sprite to use for drawing images on extruded fills. For seamless patterns, image width and height must be a factor of two (2, 4, 8, ..., 512). Note that zoom-dependent expressions will be evaluated only at integer zoom levels.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone)]
-struct FillExtrusionPaintLayerFillExtrusionPattern(std::string::String);
+pub struct FillExtrusionPaintLayerFillExtrusionPattern(std::string::String);
 
 /// The geometry's offset. Values are [x, y] where negatives indicate left and up (on the flat plane), respectively.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-struct FillExtrusionPaintLayerFillExtrusionTranslate(Box<[serde_json::Number; 2]>);
+pub struct FillExtrusionPaintLayerFillExtrusionTranslate(Box<[serde_json::Number; 2]>);
 
 impl Default for FillExtrusionPaintLayerFillExtrusionTranslate {
     fn default() -> Self {
@@ -4178,7 +4178,7 @@ impl Default for FillExtrusionPaintLayerFillExtrusionTranslateAnchor {
 
 /// Whether to apply a vertical gradient to the sides of a fill-extrusion layer. If true, sides will be shaded slightly darker farther down.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone, Copy)]
-struct FillExtrusionPaintLayerFillExtrusionVerticalGradient(bool);
+pub struct FillExtrusionPaintLayerFillExtrusionVerticalGradient(bool);
 
 impl Default for FillExtrusionPaintLayerFillExtrusionVerticalGradient {
     fn default() -> Self {
@@ -4228,7 +4228,7 @@ pub struct HeatmapPaintLayer {
 
 /// Defines the color of each pixel based on its density value in a heatmap.  Should be an expression that uses `["heatmap-density"]` as input.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-struct HeatmapPaintLayerHeatmapColor(color::DynamicColor);
+pub struct HeatmapPaintLayerHeatmapColor(color::DynamicColor);
 
 impl Default for HeatmapPaintLayerHeatmapColor {
     fn default() -> Self {
@@ -4358,7 +4358,7 @@ pub struct HillshadePaintLayer {
 
 /// The shading color used to accentuate rugged terrain like sharp cliffs and gorges.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-struct HillshadePaintLayerHillshadeAccentColor(color::DynamicColor);
+pub struct HillshadePaintLayerHillshadeAccentColor(color::DynamicColor);
 
 impl Default for HillshadePaintLayerHillshadeAccentColor {
     fn default() -> Self {
@@ -4637,7 +4637,7 @@ impl Default for LinePaintLayerLineBlur {
 
 /// The color with which the line will be drawn.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-struct LinePaintLayerLineColor(color::DynamicColor);
+pub struct LinePaintLayerLineColor(color::DynamicColor);
 
 impl Default for LinePaintLayerLineColor {
     fn default() -> Self {
@@ -4647,7 +4647,7 @@ impl Default for LinePaintLayerLineColor {
 
 /// Specifies the lengths of the alternating dashes and gaps that form the dash pattern. The lengths are later scaled by the line width. To convert a dash length to pixels, multiply the length by the current line width. GeoJSON sources with `lineMetrics: true` specified won't render dashed lines to the expected scale. Zoom-dependent expressions will be evaluated only at integer zoom levels. The only way to create an array value is using `["literal", [...]]`; arrays cannot be read from or derived from feature properties.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-struct LinePaintLayerLineDasharray(Vec<serde_json::Number>);
+pub struct LinePaintLayerLineDasharray(Vec<serde_json::Number>);
 
 /// Draws a line casing outside of a line's actual path. Value indicates the width of the inner gap.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
@@ -4664,7 +4664,7 @@ impl Default for LinePaintLayerLineGapWidth {
 
 /// Defines a gradient with which to color a line feature. Can only be used with GeoJSON sources that specify `"lineMetrics": true`.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-struct LinePaintLayerLineGradient(color::DynamicColor);
+pub struct LinePaintLayerLineGradient(color::DynamicColor);
 
 /// The line's offset. For linear features, a positive value offsets the line to the right, relative to the direction of the line, and a negative value to the left. For polygon features, a positive value results in an inset, and a negative value results in an outset.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
@@ -4694,11 +4694,11 @@ impl Default for LinePaintLayerLineOpacity {
 
 /// Name of image in sprite to use for drawing image lines. For seamless patterns, image width must be a factor of two (2, 4, 8, ..., 512). Note that zoom-dependent expressions will be evaluated only at integer zoom levels.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone)]
-struct LinePaintLayerLinePattern(std::string::String);
+pub struct LinePaintLayerLinePattern(std::string::String);
 
 /// The geometry's offset. Values are [x, y] where negatives indicate left and up, respectively.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-struct LinePaintLayerLineTranslate(Box<[serde_json::Number; 2]>);
+pub struct LinePaintLayerLineTranslate(Box<[serde_json::Number; 2]>);
 
 impl Default for LinePaintLayerLineTranslate {
     fn default() -> Self {
@@ -5048,7 +5048,7 @@ pub struct SymbolLayoutLayer {
 
 /// If true, the icon will be visible even if it collides with other previously drawn symbols.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone, Copy)]
-struct SymbolLayoutLayerIconAllowOverlap(bool);
+pub struct SymbolLayoutLayerIconAllowOverlap(bool);
 
 impl Default for SymbolLayoutLayerIconAllowOverlap {
     fn default() -> Self {
@@ -5087,7 +5087,7 @@ impl Default for SymbolLayoutLayerIconAnchor {
 
 /// If true, other symbols can be visible even if they collide with the icon.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone, Copy)]
-struct SymbolLayoutLayerIconIgnorePlacement(bool);
+pub struct SymbolLayoutLayerIconIgnorePlacement(bool);
 
 impl Default for SymbolLayoutLayerIconIgnorePlacement {
     fn default() -> Self {
@@ -5097,11 +5097,11 @@ impl Default for SymbolLayoutLayerIconIgnorePlacement {
 
 /// Name of image in sprite to use for drawing an image background.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone)]
-struct SymbolLayoutLayerIconImage(std::string::String);
+pub struct SymbolLayoutLayerIconImage(std::string::String);
 
 /// If true, the icon may be flipped to prevent it from being rendered upside-down.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone, Copy)]
-struct SymbolLayoutLayerIconKeepUpright(bool);
+pub struct SymbolLayoutLayerIconKeepUpright(bool);
 
 impl Default for SymbolLayoutLayerIconKeepUpright {
     fn default() -> Self {
@@ -5111,7 +5111,7 @@ impl Default for SymbolLayoutLayerIconKeepUpright {
 
 /// Offset distance of icon from its anchor. Positive values indicate right and down, while negative values indicate left and up. Each component is multiplied by the value of `icon-size` to obtain the final offset in pixels. When combined with `icon-rotate` the offset will be as if the rotated direction was up.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-struct SymbolLayoutLayerIconOffset(Box<[serde_json::Number; 2]>);
+pub struct SymbolLayoutLayerIconOffset(Box<[serde_json::Number; 2]>);
 
 impl Default for SymbolLayoutLayerIconOffset {
     fn default() -> Self {
@@ -5126,7 +5126,7 @@ impl Default for SymbolLayoutLayerIconOffset {
 
 /// If true, text will display without their corresponding icons when the icon collides with other symbols and the text does not.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone, Copy)]
-struct SymbolLayoutLayerIconOptional(bool);
+pub struct SymbolLayoutLayerIconOptional(bool);
 
 impl Default for SymbolLayoutLayerIconOptional {
     fn default() -> Self {
@@ -5251,7 +5251,7 @@ impl Default for SymbolLayoutLayerIconTextFit {
 
 /// Size of the additional area added to dimensions determined by `icon-text-fit`, in clockwise order: top, right, bottom, left.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-struct SymbolLayoutLayerIconTextFitPadding(Box<[serde_json::Number; 4]>);
+pub struct SymbolLayoutLayerIconTextFitPadding(Box<[serde_json::Number; 4]>);
 
 impl Default for SymbolLayoutLayerIconTextFitPadding {
     fn default() -> Self {
@@ -5270,7 +5270,7 @@ impl Default for SymbolLayoutLayerIconTextFitPadding {
 
 /// If true, the symbols will not cross tile edges to avoid mutual collisions. Recommended in layers that don't have enough padding in the vector tile to prevent collisions, or if it is a point symbol layer placed after a line symbol layer. When using a client that supports global collision detection, like MapLibre GL JS version 0.42.0 or greater, enabling this property is not needed to prevent clipped labels at tile boundaries.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone, Copy)]
-struct SymbolLayoutLayerSymbolAvoidEdges(bool);
+pub struct SymbolLayoutLayerSymbolAvoidEdges(bool);
 
 impl Default for SymbolLayoutLayerSymbolAvoidEdges {
     fn default() -> Self {
@@ -5331,7 +5331,7 @@ impl Default for SymbolLayoutLayerSymbolZOrder {
 
 /// If true, the text will be visible even if it collides with other previously drawn symbols.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone, Copy)]
-struct SymbolLayoutLayerTextAllowOverlap(bool);
+pub struct SymbolLayoutLayerTextAllowOverlap(bool);
 
 impl Default for SymbolLayoutLayerTextAllowOverlap {
     fn default() -> Self {
@@ -5370,7 +5370,7 @@ impl Default for SymbolLayoutLayerTextAnchor {
 
 /// Value to use for a text label. If a plain `string` is provided, it will be treated as a `formatted` with default/inherited formatting options.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-struct SymbolLayoutLayerTextField(std::string::String);
+pub struct SymbolLayoutLayerTextField(std::string::String);
 
 impl Default for SymbolLayoutLayerTextField {
     fn default() -> Self {
@@ -5380,7 +5380,7 @@ impl Default for SymbolLayoutLayerTextField {
 
 /// Fonts to use for displaying text. If the `glyphs` root property is specified, this array is joined together and interpreted as a font stack name. Otherwise, it is interpreted as a cascading fallback list of local font names.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-struct SymbolLayoutLayerTextFont(Vec<std::string::String>);
+pub struct SymbolLayoutLayerTextFont(Vec<std::string::String>);
 
 impl Default for SymbolLayoutLayerTextFont {
     fn default() -> Self {
@@ -5393,7 +5393,7 @@ impl Default for SymbolLayoutLayerTextFont {
 
 /// If true, other symbols can be visible even if they collide with the text.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone, Copy)]
-struct SymbolLayoutLayerTextIgnorePlacement(bool);
+pub struct SymbolLayoutLayerTextIgnorePlacement(bool);
 
 impl Default for SymbolLayoutLayerTextIgnorePlacement {
     fn default() -> Self {
@@ -5422,7 +5422,7 @@ impl Default for SymbolLayoutLayerTextJustify {
 
 /// If true, the text may be flipped vertically to prevent it from being rendered upside-down.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone, Copy)]
-struct SymbolLayoutLayerTextKeepUpright(bool);
+pub struct SymbolLayoutLayerTextKeepUpright(bool);
 
 impl Default for SymbolLayoutLayerTextKeepUpright {
     fn default() -> Self {
@@ -5484,7 +5484,7 @@ impl Default for SymbolLayoutLayerTextMaxWidth {
 
 /// Offset distance of text from its anchor. Positive values indicate right and down, while negative values indicate left and up. If used with text-variable-anchor, input values will be taken as absolute values. Offsets along the x- and y-axis will be applied automatically based on the anchor position.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-struct SymbolLayoutLayerTextOffset(Box<[serde_json::Number; 2]>);
+pub struct SymbolLayoutLayerTextOffset(Box<[serde_json::Number; 2]>);
 
 impl Default for SymbolLayoutLayerTextOffset {
     fn default() -> Self {
@@ -5499,7 +5499,7 @@ impl Default for SymbolLayoutLayerTextOffset {
 
 /// If true, icons will display without their corresponding text when the text collides with other symbols and the icon does not.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone, Copy)]
-struct SymbolLayoutLayerTextOptional(bool);
+pub struct SymbolLayoutLayerTextOptional(bool);
 
 impl Default for SymbolLayoutLayerTextOptional {
     fn default() -> Self {
@@ -5647,7 +5647,7 @@ pub enum SymbolLayoutLayerTextVariableAnchorValue {
 
 /// To increase the chance of placing high-priority labels on the map, you can provide an array of `text-anchor` locations: the renderer will attempt to place the label at each location, in order, before moving onto the next label. Use `text-justify: auto` to choose justification based on anchor position. To apply an offset, use the `text-radial-offset` or the two-dimensional `text-offset`.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-struct SymbolLayoutLayerTextVariableAnchor(Vec<SymbolLayoutLayerTextVariableAnchorValue>);
+pub struct SymbolLayoutLayerTextVariableAnchor(Vec<SymbolLayoutLayerTextVariableAnchorValue>);
 
 /// To increase the chance of placing high-priority labels on the map, you can provide an array of `text-anchor` locations, each paired with an offset value. The renderer will attempt to place the label at each location, in order, before moving on to the next location+offset. Use `text-justify: auto` to choose justification based on anchor position.
 ///
@@ -5677,7 +5677,7 @@ pub enum SymbolLayoutLayerTextWritingModeValue {
 
 /// The property allows control over a symbol's orientation. Note that the property values act as a hint, so that a symbol whose language doesn’t support the provided orientation will be laid out in its natural orientation. Example: English point symbol will be rendered horizontally even if array value contains single 'vertical' enum value. The order of elements in an array define priority order for the placement of an orientation variant.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-struct SymbolLayoutLayerTextWritingMode(Vec<SymbolLayoutLayerTextWritingModeValue>);
+pub struct SymbolLayoutLayerTextWritingMode(Vec<SymbolLayoutLayerTextWritingModeValue>);
 
 /// Whether this layer is displayed.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy)]
@@ -5744,7 +5744,7 @@ pub struct SymbolPaintLayer {
 
 /// The color of the icon. This can only be used with SDF icons.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-struct SymbolPaintLayerIconColor(color::DynamicColor);
+pub struct SymbolPaintLayerIconColor(color::DynamicColor);
 
 impl Default for SymbolPaintLayerIconColor {
     fn default() -> Self {
@@ -5767,7 +5767,7 @@ impl Default for SymbolPaintLayerIconHaloBlur {
 
 /// The color of the icon's halo. Icon halos can only be used with SDF icons.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-struct SymbolPaintLayerIconHaloColor(color::DynamicColor);
+pub struct SymbolPaintLayerIconHaloColor(color::DynamicColor);
 
 impl Default for SymbolPaintLayerIconHaloColor {
     fn default() -> Self {
@@ -5808,7 +5808,7 @@ impl Default for SymbolPaintLayerIconOpacity {
 
 /// Distance that the icon's anchor is moved from its original placement. Positive values indicate right and down, while negative values indicate left and up.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-struct SymbolPaintLayerIconTranslate(Box<[serde_json::Number; 2]>);
+pub struct SymbolPaintLayerIconTranslate(Box<[serde_json::Number; 2]>);
 
 impl Default for SymbolPaintLayerIconTranslate {
     fn default() -> Self {
@@ -5838,7 +5838,7 @@ impl Default for SymbolPaintLayerIconTranslateAnchor {
 
 /// The color with which the text will be drawn.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-struct SymbolPaintLayerTextColor(color::DynamicColor);
+pub struct SymbolPaintLayerTextColor(color::DynamicColor);
 
 impl Default for SymbolPaintLayerTextColor {
     fn default() -> Self {
@@ -5861,7 +5861,7 @@ impl Default for SymbolPaintLayerTextHaloBlur {
 
 /// The color of the text's halo, which helps it stand out from backgrounds.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-struct SymbolPaintLayerTextHaloColor(color::DynamicColor);
+pub struct SymbolPaintLayerTextHaloColor(color::DynamicColor);
 
 impl Default for SymbolPaintLayerTextHaloColor {
     fn default() -> Self {
@@ -5900,7 +5900,7 @@ impl Default for SymbolPaintLayerTextOpacity {
 
 /// Distance that the text's anchor is moved from its original placement. Positive values indicate right and down, while negative values indicate left and up.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-struct SymbolPaintLayerTextTranslate(Box<[serde_json::Number; 2]>);
+pub struct SymbolPaintLayerTextTranslate(Box<[serde_json::Number; 2]>);
 
 impl Default for SymbolPaintLayerTextTranslate {
     fn default() -> Self {

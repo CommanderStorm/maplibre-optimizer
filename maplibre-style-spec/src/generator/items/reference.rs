@@ -14,6 +14,7 @@ pub fn generate(scope: &mut Scope, name: &str, field: &ReferenceField) {
     };
     scope
         .new_struct(name)
+        .vis("pub")
         .doc(&field.meta.doc)
         .derive("serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone")
         .tuple_field(rust_inner);
@@ -39,7 +40,7 @@ mod tests {
         );
         insta::assert_snapshot!(scope.to_string(), @r"
         #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-        struct Foo(Sky);
+        pub struct Foo(Sky);
         ")
     }
 }

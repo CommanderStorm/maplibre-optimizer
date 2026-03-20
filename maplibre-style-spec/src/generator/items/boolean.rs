@@ -6,6 +6,7 @@ use crate::mir::types::BooleanField;
 pub fn generate(scope: &mut Scope, name: &str, field: &BooleanField) {
     scope
         .new_struct(name)
+        .vis("pub")
         .doc(&field.meta.doc)
         .derive("serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone, Copy")
         .tuple_field("bool");
@@ -39,7 +40,7 @@ mod tests {
         );
         insta::assert_snapshot!(scope.to_string(), @r"
         #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone, Copy)]
-        struct Foo(bool);
+        pub struct Foo(bool);
         ")
     }
 }
