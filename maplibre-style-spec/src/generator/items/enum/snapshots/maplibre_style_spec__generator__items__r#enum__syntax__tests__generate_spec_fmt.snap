@@ -75,7 +75,7 @@ pub struct ExpressionNameFormatVariadicRow(
 );
 
 /// First element in an expression array. May be followed by a number of arguments.
-#[derive(serde::Serialize, PartialEq, Debug, Clone)]
+#[derive(PartialEq, Debug, Clone)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum ExpressionName {
     /// Returns a `formatted` string for displaying mixed-format text in the `text-field` property.
@@ -133,6 +133,48 @@ impl<'de> serde::de::Visitor<'de> for ExpressionNameVisitor {
                 Ok(ExpressionName::Format(inputs))
             }
             _ => Err(serde::de::Error::unknown_variant(&op, &["format"])),
+        }
+    }
+}
+
+impl serde::Serialize for ExpressionName {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        use serde::ser::SerializeSeq;
+        match self {
+            ExpressionName::Format(inner) => {
+                let inner_val = serde_json::to_value(inner).map_err(serde::ser::Error::custom)?;
+                let mut seq = serializer.serialize_seq(None)?;
+                seq.serialize_element("format")?;
+                if let serde_json::Value::Array(top) = &inner_val {
+                    for elem in top {
+                        if let serde_json::Value::Array(sub) = elem {
+                            // An array-of-arrays is the Vec<(A,B)> — flatten it.
+                            if !sub.is_empty() && sub[0].is_array() {
+                                for pair in sub {
+                                    if let serde_json::Value::Array(pair_elems) = pair {
+                                        for pe in pair_elems {
+                                            seq.serialize_element(pe)?;
+                                        }
+                                    } else {
+                                        seq.serialize_element(pair)?;
+                                    }
+                                }
+                            } else {
+                                // Plain array value (e.g. a sub-expression like ["zoom"]).
+                                seq.serialize_element(elem)?;
+                            }
+                        } else {
+                            seq.serialize_element(elem)?;
+                        }
+                    }
+                } else {
+                    seq.serialize_element(&inner_val)?;
+                }
+                seq.end()
+            }
         }
     }
 }

@@ -13,9 +13,11 @@ pub struct Function {
     /// The exponential base of the interpolation curve. It controls the rate at which the result increases. Higher values make the result increase more towards the high end of the range. With `1` the stops are interpolated linearly.
     ///
     /// Range: 0..
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub base: Option<FunctionBase>,
     /// The color space in which colors interpolated. Interpolating colors in perceptual color spaces like LAB and HCL tend to produce color ramps that look more consistent and produce colors that can be differentiated more easily than those interpolated in RGB space.
     #[serde(rename = "colorSpace")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub color_space: Option<FunctionColorSpace>,
     /// A value to serve as a fallback function result when a value isn't otherwise available. It is used in the following circumstances:
     ///
@@ -28,15 +30,20 @@ pub struct Function {
     /// * In interval or exponential property and zoom-and-property functions, when the feature value is not numeric.
     ///
     /// If no default is provided, the style property's default is used in these circumstances.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub default: Option<FunctionDefault>,
     /// An expression.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub expression: Option<FunctionExpression>,
     /// The name of a feature property to use as the function input.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub property: Option<FunctionProperty>,
     /// An array of stops.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub stops: Option<FunctionStops>,
     /// The interpolation strategy to use in function evaluation.
     #[serde(rename = "type")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub r#type: Option<FunctionType>,
 }
 
@@ -175,7 +182,7 @@ pub enum GeometryType {
 pub struct Interpolation(InterpolationName);
 
 /// First element in an interpolation array. May be followed by a number of arguments.
-#[derive(serde::Serialize, PartialEq, Debug, Clone)]
+#[derive(PartialEq, Debug, Clone)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum InterpolationName {
     /// Interpolates using the cubic bézier curve defined by the given control points.
@@ -242,6 +249,58 @@ impl<'de> serde::de::Visitor<'de> for InterpolationNameVisitor {
     }
 }
 
+impl serde::Serialize for InterpolationName {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        use serde::ser::SerializeSeq;
+        match self {
+            InterpolationName::CubicBezier(f0, f1, f2, f3) => {
+                let mut elems: Vec<serde_json::Value> = Vec::new();
+                elems.push(serde_json::to_value(&f0).map_err(serde::ser::Error::custom)?);
+                elems.push(serde_json::to_value(&f1).map_err(serde::ser::Error::custom)?);
+                elems.push(serde_json::to_value(&f2).map_err(serde::ser::Error::custom)?);
+                elems.push(serde_json::to_value(&f3).map_err(serde::ser::Error::custom)?);
+                while elems.last().is_some_and(serde_json::Value::is_null) {
+                    elems.pop();
+                }
+                let mut seq = serializer.serialize_seq(None)?;
+                seq.serialize_element("cubic-bezier")?;
+                for elem in &elems {
+                    seq.serialize_element(elem)?;
+                }
+                seq.end()
+            }
+            InterpolationName::Exponential(f0) => {
+                let mut elems: Vec<serde_json::Value> = Vec::new();
+                elems.push(serde_json::to_value(&f0).map_err(serde::ser::Error::custom)?);
+                while elems.last().is_some_and(serde_json::Value::is_null) {
+                    elems.pop();
+                }
+                let mut seq = serializer.serialize_seq(None)?;
+                seq.serialize_element("exponential")?;
+                for elem in &elems {
+                    seq.serialize_element(elem)?;
+                }
+                seq.end()
+            }
+            InterpolationName::Linear => {
+                let mut elems: Vec<serde_json::Value> = Vec::new();
+                while elems.last().is_some_and(serde_json::Value::is_null) {
+                    elems.pop();
+                }
+                let mut seq = serializer.serialize_seq(None)?;
+                seq.serialize_element("linear")?;
+                for elem in &elems {
+                    seq.serialize_element(elem)?;
+                }
+                seq.end()
+            }
+        }
+    }
+}
+
 #[cfg(test)]
 #[allow(unused_imports)]
 mod test {
@@ -273,14 +332,18 @@ mod test {
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct Light {
     /// Whether extruded geometries are lit relative to the map or viewport.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub anchor: Option<LightAnchor>,
     /// Color tint for lighting extruded geometries.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub color: Option<LightColor>,
     /// Intensity of lighting (on a scale from 0 to 1). Higher numbers will present as more extreme contrast.
     ///
     /// Range: 0..=1
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub intensity: Option<LightIntensity>,
     /// Position of the light source relative to lit (extruded) geometries, in [r radial coordinate, a azimuthal angle, p polar angle] where r indicates the distance from the center of the base of an object to its light, a indicates the position of the light relative to 0° (0° when `light.anchor` is set to `viewport` corresponds to the top of the viewport, or 0° when `light.anchor` is set to `map` corresponds to due north, and degrees proceed clockwise), and p indicates the height of the light (from 0°, directly above, to 180°, directly below).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub position: Option<LightPosition>,
 }
 
@@ -382,6 +445,7 @@ impl Default for LightPosition {
 pub struct Projection {
     /// The projection definition type. Can be specified as a string, a transition state, or an expression.
     #[serde(rename = "type")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub r#type: Option<ProjectionType>,
 }
 
@@ -405,6 +469,7 @@ impl Default for ProjectionType {
 pub struct PromoteId {
     /// A name of a feature property to use as ID for feature state.
     #[serde(flatten)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub star: Option<std::collections::BTreeMap<std::string::String, PromoteIdStar>>,
 }
 
@@ -424,30 +489,37 @@ pub struct Sky {
     ///
     /// Range: 0..=1
     #[serde(rename = "atmosphere-blend")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub atmosphere_blend: Option<SkyAtmosphereBlend>,
     /// The base color for the fog. Requires 3D terrain.
     #[serde(rename = "fog-color")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub fog_color: Option<SkyFogColor>,
     /// How to blend the fog over the 3D terrain. Where 0 is the map center and 1 is the horizon.
     ///
     /// Range: 0..=1
     #[serde(rename = "fog-ground-blend")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub fog_ground_blend: Option<SkyFogGroundBlend>,
     /// The base color at the horizon.
     #[serde(rename = "horizon-color")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub horizon_color: Option<SkyHorizonColor>,
     /// How to blend the fog color and the horizon color. Where 0 is using the horizon color only and 1 is using the fog color only.
     ///
     /// Range: 0..=1
     #[serde(rename = "horizon-fog-blend")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub horizon_fog_blend: Option<SkyHorizonFogBlend>,
     /// The base color for the sky.
     #[serde(rename = "sky-color")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub sky_color: Option<SkySkyColor>,
     /// How to blend the sky color and the horizon color. Where 1 is blending the color at the middle of the sky and 0 is not blending at all and using the sky color only.
     ///
     /// Range: 0..=1
     #[serde(rename = "sky-horizon-blend")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub sky_horizon_blend: Option<SkySkyHorizonBlend>,
 }
 
@@ -666,6 +738,7 @@ pub struct Terrain {
     /// The exaggeration of the terrain - how high it will look.
     ///
     /// Range: 0..
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub exaggeration: Option<TerrainExaggeration>,
     /// The source for the terrain data.
     pub source: TerrainSource,
@@ -701,10 +774,12 @@ pub struct Transition {
     /// Length of time before a transition begins.
     ///
     /// Range: 0..
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub delay: Option<TransitionDelay>,
     /// Time allotted for transitions to complete.
     ///
     /// Range: 0..
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub duration: Option<TransitionDuration>,
 }
 

@@ -12,18 +12,14 @@
 use arbitrary::{Arbitrary, Unstructured};
 use libfuzzer_sys::fuzz_target;
 use maplibre_style_spec::spec::MaplibreStyleSpecification;
-use pretty_assertions::assert_eq;
 
 fuzz_target!(|data: &[u8]| {
     let mut u = Unstructured::new(data);
     let Ok(v) = MaplibreStyleSpecification::arbitrary(&mut u) else {
         return;
     };
-    let Ok(json) = serde_json::to_value(&v) else {
-        return;
-    };
-    let Ok(w) = serde_json::from_value::<MaplibreStyleSpecification>(json) else {
-        return;
-    };
-    assert_eq!(v, w);
+    let json = serde_json::to_value(&v).expect("serialize must not fail");
+    let w: MaplibreStyleSpecification = serde_json::from_value(json.clone())
+        .unwrap_or_else(|e| panic!("deserialize of own serialization failed: {e}\njson: {json}"));
+    pretty_assertions::assert_eq!(v, w);
 });

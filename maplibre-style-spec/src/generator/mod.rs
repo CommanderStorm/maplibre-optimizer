@@ -166,6 +166,17 @@ fn generate_root_struct(scope: &mut Scope, spec: &IntermediateSpec) {
         if &meta.rust_name != key {
             sf.annotation(format!("#[serde(rename=\"{key}\")]"));
         }
+        if meta.optional {
+            sf.annotation("#[serde(default, skip_serializing_if = \"Option::is_none\")]");
+        }
+    }
+
+    // Add `layers` field — removed from root during MIR preprocessing but needed for typed access.
+    if !spec.layers.layer_types.is_empty() {
+        s.new_field("layers", "Vec<AnyLayer>")
+            .vis("pub")
+            .doc("Layers will be drawn in the order of this array.")
+            .annotation("#[serde(default)]");
     }
 
     // Generate subtypes for each root field
@@ -230,6 +241,9 @@ fn generate_struct_from_fields(scope: &mut Scope, name: &str, fields: &[MirField
             sf.annotation("#[serde(flatten)]");
         } else if meta.rust_name != meta.spec_name.as_str() {
             sf.annotation(format!("#[serde(rename=\"{}\")]", meta.spec_name));
+        }
+        if meta.optional {
+            sf.annotation("#[serde(default, skip_serializing_if = \"Option::is_none\")]");
         }
     }
 
@@ -344,9 +358,15 @@ fn generate_layer_types(scope: &mut Scope, layers: &Layers) {
         return;
     }
 
-    // Common `Layer` struct
+    // Hand-written `LayerFilter` — a boolean expression or literal bool.
+    // The `filter` field was removed from common_fields in MIR preprocessing
+    // so that we can emit this typed enum instead of the spec's string type.
+    generate_layer_filter(scope);
+
+    // Common `Layer` struct — the `filter` field was removed from MIR
+    // common_fields, so we generate the struct and add it manually.
     let common_mir: Vec<MirField> = layer_fields_to_mir(&layers.common_fields);
-    generate_struct_from_fields(scope, "Layer", &common_mir);
+    generate_layer_struct(scope, &common_mir);
 
     // Per-type layout and paint structs
     for (type_key, layer_type) in &layers.layer_types {
@@ -357,6 +377,305 @@ fn generate_layer_types(scope: &mut Scope, layers: &Layers) {
         generate_struct_from_fields(scope, &layout_name, &layout_mir);
         generate_struct_from_fields(scope, &paint_name, &paint_mir);
     }
+
+    // TypedLayer discriminated enum
+    generate_typed_layer_enum(scope, layers);
+
+    // RefLayer struct for layers that use "ref" instead of "type"
+    generate_ref_layer(scope);
+
+    // AnyLayer wrapper enum (typed or ref)
+    generate_any_layer(scope);
+
+    // Helper impls on TypedLayer, AnyLayer, and newtype wrappers
+    generate_layer_helper_impls(scope, layers);
+}
+
+/// Generate the `LayerFilter` type.
+///
+/// Ideally this would be `Boolean | bool`, but the generated expression enums
+/// don't yet have custom `Serialize` impls that produce the `["op", ...]` JSON
+/// array format (only custom `Deserialize`).  So we use `serde_json::Value` to
+/// preserve round-trip fidelity, with typed accessors for common patterns.
+fn generate_layer_filter(scope: &mut Scope) {
+    scope.raw(
+        r#"
+/// A filter expression — semantically a boolean expression or literal,
+/// stored as `serde_json::Value` for lossless JSON round-tripping.
+#[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+pub struct LayerFilter(
+    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
+    serde_json::Value,
+);
+"#,
+    );
+}
+
+/// Generate the common `Layer` struct with the hand-written `filter` field
+/// injected alongside the MIR-generated fields.
+fn generate_layer_struct(scope: &mut Scope, common_mir: &[MirField]) {
+    let s = scope
+        .new_struct("Layer")
+        .vis("pub")
+        .derive("serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone")
+        .attr(fuzz::CFG_DERIVE_ARBITRARY);
+
+    // Hand-written filter field (not in MIR because we override its type).
+    s.new_field("filter", "Option<LayerFilter>")
+        .vis("pub")
+        .doc("A expression specifying conditions on source features. Only features that match the filter are displayed.")
+        .annotation("#[serde(default, skip_serializing_if = \"Option::is_none\")]");
+
+    // MIR-generated fields.
+    for field in common_mir {
+        let meta = field.meta();
+        let field_type_name = to_upper_camel_case(format!("Layer {}", meta.spec_name));
+        let mut field_type = field_type_name.clone();
+        if meta.optional {
+            field_type = format!("Option<{field_type}>");
+        }
+        let sf = s
+            .new_field(&meta.rust_name, field_type)
+            .vis("pub")
+            .doc(&meta.doc);
+        if meta.rust_name != meta.spec_name.as_str() {
+            sf.annotation(format!("#[serde(rename=\"{}\")]", meta.spec_name));
+        }
+        if meta.optional {
+            sf.annotation("#[serde(default, skip_serializing_if = \"Option::is_none\")]");
+        }
+    }
+
+    // Generate subtypes for each MIR field.
+    for field in common_mir {
+        let meta = field.meta();
+        let field_type_name = to_upper_camel_case(format!("Layer {}", meta.spec_name));
+        generate_mir_type(scope, &field_type_name, field);
+    }
+}
+
+/// Generate a `#[serde(tag = "type")]` enum dispatching on the layer type.
+///
+/// Each variant contains `#[serde(flatten)] common: Layer` plus optional paint/layout
+/// structs for that layer type.
+fn generate_typed_layer_enum(scope: &mut Scope, layers: &Layers) {
+    let enu = scope
+        .new_enum("TypedLayer")
+        .doc("A style layer with its type-specific paint and layout properties.")
+        .vis("pub")
+        .derive("serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone")
+        .attr(fuzz::CFG_DERIVE_ARBITRARY)
+        .attr("serde(tag = \"type\")");
+
+    for type_key in layers.layer_types.keys() {
+        let variant_name = to_upper_camel_case(type_key);
+        let layout_type = to_upper_camel_case(format!("{type_key} layout layer"));
+        let paint_type = to_upper_camel_case(format!("{type_key} paint layer"));
+
+        let var = enu.new_variant(&variant_name);
+        var.annotation(format!("#[serde(rename = \"{type_key}\")]"));
+
+        var.new_named("common", "Layer")
+            .annotation("#[serde(flatten)]");
+        var.new_named("paint", format!("Option<{paint_type}>"))
+            .annotation("#[serde(default, skip_serializing_if = \"Option::is_none\")]");
+        var.new_named("layout", format!("Option<{layout_type}>"))
+            .annotation("#[serde(default, skip_serializing_if = \"Option::is_none\")]");
+    }
+}
+
+/// Generate `RefLayer` — a layer that references another layer via `"ref"` instead of `"type"`.
+fn generate_ref_layer(scope: &mut Scope) {
+    let s = scope
+        .new_struct("RefLayer")
+        .doc("A layer that inherits its type and properties from a referenced layer via `ref`.")
+        .vis("pub")
+        .derive("serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone")
+        .attr(fuzz::CFG_DERIVE_ARBITRARY);
+
+    s.new_field("id", "LayerId").vis("pub");
+    s.new_field("r#ref", "std::string::String")
+        .vis("pub")
+        .annotation("#[serde(rename = \"ref\")]");
+    s.new_field("filter", "Option<LayerFilter>")
+        .vis("pub")
+        .annotation("#[serde(default, skip_serializing_if = \"Option::is_none\")]");
+    s.new_field("minzoom", "Option<LayerMinzoom>")
+        .vis("pub")
+        .annotation("#[serde(default, skip_serializing_if = \"Option::is_none\")]");
+    s.new_field("maxzoom", "Option<LayerMaxzoom>")
+        .vis("pub")
+        .annotation("#[serde(default, skip_serializing_if = \"Option::is_none\")]");
+    s.new_field("metadata", "Option<LayerMetadata>")
+        .vis("pub")
+        .annotation("#[serde(default, skip_serializing_if = \"Option::is_none\")]");
+}
+
+/// Generate `AnyLayer` — an `#[serde(untagged)]` enum wrapping `TypedLayer` or `RefLayer`.
+fn generate_any_layer(scope: &mut Scope) {
+    let enu = scope
+        .new_enum("AnyLayer")
+        .doc("A layer in the style: either a fully typed layer or a `ref` layer.")
+        .vis("pub")
+        .derive("serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone")
+        .attr(fuzz::CFG_DERIVE_ARBITRARY)
+        .attr("serde(untagged)");
+
+    enu.new_variant("Typed").tuple("TypedLayer");
+    enu.new_variant("Ref").tuple("RefLayer");
+}
+
+/// Emit hand-written helper impls on `TypedLayer`, `AnyLayer`, and newtype wrappers.
+fn generate_layer_helper_impls(scope: &mut Scope, layers: &Layers) {
+    // Build match arms for common() / common_mut() / layer_type()
+    let mut common_arms = String::new();
+    let mut type_arms = String::new();
+    for type_key in layers.layer_types.keys() {
+        let variant = to_upper_camel_case(type_key);
+        common_arms.push_str(&format!(
+            "            TypedLayer::{variant} {{ common, .. }} |\n"
+        ));
+        type_arms.push_str(&format!(
+            "            TypedLayer::{variant} {{ .. }} => \"{type_key}\",\n"
+        ));
+    }
+    // Remove trailing " |\n" from common_arms and replace with " => common,\n"
+    if common_arms.ends_with(" |\n") {
+        common_arms.truncate(common_arms.len() - 3);
+        common_arms.push_str(" => common,\n");
+    }
+
+    scope.raw(format!(
+        r#"
+impl TypedLayer {{
+    /// Access the common `Layer` fields shared by all typed layers.
+    pub fn common(&self) -> &Layer {{
+        match self {{
+{common_arms}        }}
+    }}
+
+    /// Mutably access the common `Layer` fields.
+    pub fn common_mut(&mut self) -> &mut Layer {{
+        match self {{
+{common_arms}        }}
+    }}
+
+    /// The layer type string as it appears in JSON (e.g. `"fill"`, `"line"`).
+    pub fn layer_type(&self) -> &'static str {{
+        match self {{
+{type_arms}        }}
+    }}
+}}
+
+impl AnyLayer {{
+    /// Get the layer ID regardless of layer kind.
+    pub fn id(&self) -> &LayerId {{
+        match self {{
+            AnyLayer::Typed(t) => &t.common().id,
+            AnyLayer::Ref(r) => &r.id,
+        }}
+    }}
+
+    /// Access the common `Layer` if this is a typed layer.
+    pub fn common(&self) -> Option<&Layer> {{
+        match self {{
+            AnyLayer::Typed(t) => Some(t.common()),
+            AnyLayer::Ref(_) => None,
+        }}
+    }}
+
+    /// Access the common `Layer` mutably if this is a typed layer.
+    pub fn common_mut(&mut self) -> Option<&mut Layer> {{
+        match self {{
+            AnyLayer::Typed(t) => Some(t.common_mut()),
+            AnyLayer::Ref(_) => None,
+        }}
+    }}
+
+    /// The effective layer type string, or `None` for ref layers.
+    pub fn layer_type(&self) -> Option<&'static str> {{
+        match self {{
+            AnyLayer::Typed(t) => Some(t.layer_type()),
+            AnyLayer::Ref(_) => None,
+        }}
+    }}
+
+    /// Get the source name if this is a typed layer with a source.
+    pub fn source(&self) -> Option<&str> {{
+        self.common()?.source.as_ref().map(|s| s.as_str())
+    }}
+
+    /// Get the source-layer name if this is a typed layer with one.
+    pub fn source_layer(&self) -> Option<&str> {{
+        self.common()?.source_layer.as_ref().map(|s| s.as_str())
+    }}
+}}
+
+impl LayerId {{
+    pub fn as_str(&self) -> &str {{
+        &self.0
+    }}
+}}
+
+impl LayerSource {{
+    pub fn as_str(&self) -> &str {{
+        &self.0
+    }}
+}}
+
+impl LayerSourceLayer {{
+    pub fn as_str(&self) -> &str {{
+        &self.0
+    }}
+}}
+
+impl LayerFilter {{
+    pub fn as_value(&self) -> &serde_json::Value {{
+        &self.0
+    }}
+
+    pub fn as_value_mut(&mut self) -> &mut serde_json::Value {{
+        &mut self.0
+    }}
+
+    pub fn from_value(v: serde_json::Value) -> Self {{
+        Self(v)
+    }}
+
+    /// Returns `Some(true)` or `Some(false)` if this filter is a literal boolean
+    /// (`true`, `false`, `["literal", true]`, or `["literal", false]`).
+    pub fn as_literal_bool(&self) -> Option<bool> {{
+        match &self.0 {{
+            serde_json::Value::Bool(b) => Some(*b),
+            serde_json::Value::Array(a) if a.len() == 2
+                && a[0].as_str() == Some("literal") => a[1].as_bool(),
+            _ => None,
+        }}
+    }}
+}}
+
+impl LayerMinzoom {{
+    pub fn as_f64(&self) -> Option<f64> {{
+        self.0.as_f64()
+    }}
+
+    pub fn from_f64(n: f64) -> Option<Self> {{
+        serde_json::Number::from_f64(n).map(Self)
+    }}
+}}
+
+impl LayerMaxzoom {{
+    pub fn as_f64(&self) -> Option<f64> {{
+        self.0.as_f64()
+    }}
+
+    pub fn from_f64(n: f64) -> Option<Self> {{
+        serde_json::Number::from_f64(n).map(Self)
+    }}
+}}
+"#
+    ));
 }
 
 fn layer_fields_to_mir(

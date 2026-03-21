@@ -6,10 +6,12 @@ use super::*;
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct GeojsonSource {
     /// Contains an attribution to be displayed when the map is shown to a user.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub attribution: Option<GeojsonSourceAttribution>,
     /// Size of the tile buffer on each side. A value of 0 produces no buffer. A value of 512 produces a buffer as wide as the tile itself. Larger values produce fewer rendering artifacts near tile edges and slower performance.
     ///
     /// Range: 0..=512
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub buffer: Option<GeojsonSourceBuffer>,
     /// If the data is a collection of point features, setting this to true clusters the points by radius into groups. Cluster groups become new `Point` features in the source with additional properties:
     ///
@@ -20,12 +22,15 @@ pub struct GeojsonSource {
     ///  * `point_count` Number of original points grouped into this cluster
     ///
     ///  * `point_count_abbreviated` An abbreviated point count
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cluster: Option<GeojsonSourceCluster>,
     /// Max zoom on which to cluster points if clustering is enabled. Defaults to one zoom less than maxzoom (so that last zoom features are not clustered). Clusters are re-evaluated at integer zoom levels so setting clusterMaxZoom to 14 means the clusters will be displayed until z15.
     #[serde(rename = "clusterMaxZoom")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cluster_max_zoom: Option<GeojsonSourceClusterMaxZoom>,
     /// Minimum number of points necessary to form a cluster if clustering is enabled. Defaults to `2`.
     #[serde(rename = "clusterMinPoints")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cluster_min_points: Option<GeojsonSourceClusterMinPoints>,
     /// An object defining custom properties on the generated clusters if clustering is enabled, aggregating values from clustered points. Has the form `{"property_name": [operator, map_expression]}`. `operator` is any expression function that accepts at least 2 operands (e.g. `"+"` or `"max"`) — it accumulates the property value from clusters/points the cluster contains; `map_expression` produces the value of a single point.
     ///
@@ -35,28 +40,36 @@ pub struct GeojsonSource {
     ///
     /// `{"sum": [["+", ["accumulated"], ["get", "sum"]], ["get", "scalerank"]]}`
     #[serde(rename = "clusterProperties")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cluster_properties: Option<GeojsonSourceClusterProperties>,
     /// Radius of each cluster if clustering is enabled. A value of 512 indicates a radius equal to the width of a tile.
     ///
     /// Range: 0..
     #[serde(rename = "clusterRadius")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cluster_radius: Option<GeojsonSourceClusterRadius>,
     /// A URL to a GeoJSON file, or inline GeoJSON.
     pub data: GeojsonSourceData,
     /// An expression for filtering features prior to processing them for rendering.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub filter: Option<GeojsonSourceFilter>,
     /// Whether to generate ids for the geojson features. When enabled, the `feature.id` property will be auto assigned based on its index in the `features` array, over-writing any previous values.
     #[serde(rename = "generateId")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub generate_id: Option<GeojsonSourceGenerateId>,
     /// Whether to calculate line distance metrics. This is required for line layers that specify `line-gradient` values.
     #[serde(rename = "lineMetrics")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub line_metrics: Option<GeojsonSourceLineMetrics>,
     /// Maximum zoom level at which to create vector tiles (higher means greater detail at high zoom levels).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub maxzoom: Option<GeojsonSourceMaxzoom>,
     /// A property to use as a feature id (for feature state). Either a property name, or an object of the form `{<sourceLayer>: <propertyName>}`.
     #[serde(rename = "promoteId")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub promote_id: Option<GeojsonSourcePromoteId>,
     /// Douglas-Peucker simplification tolerance (higher means simpler geometries and faster performance).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub tolerance: Option<GeojsonSourceTolerance>,
 }
 
@@ -239,23 +252,32 @@ pub struct ImageSourceUrl(std::string::String);
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct RasterSource {
     /// Contains an attribution to be displayed when the map is shown to a user.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub attribution: Option<RasterSourceAttribution>,
     /// An array containing the longitude and latitude of the southwest and northeast corners of the source's bounding box in the following order: `[sw.lng, sw.lat, ne.lng, ne.lat]`. When this property is included in a source, no tiles outside of the given bounds are requested by MapLibre.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub bounds: Option<RasterSourceBounds>,
     /// Maximum zoom level for which tiles are available, as in the TileJSON spec. Data from tiles at the maxzoom are used when displaying the map at higher zoom levels.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub maxzoom: Option<RasterSourceMaxzoom>,
     /// Minimum zoom level for which tiles are available, as in the TileJSON spec.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub minzoom: Option<RasterSourceMinzoom>,
     /// Influences the y direction of the tile coordinates. The global-mercator (aka Spherical Mercator) profile is assumed.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub scheme: Option<RasterSourceScheme>,
     /// The minimum visual size to display tiles for this layer. Only configurable for raster layers.
     #[serde(rename = "tileSize")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub tile_size: Option<RasterSourceTileSize>,
     /// An array of one or more tile source URLs, as in the TileJSON spec.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub tiles: Option<RasterSourceTiles>,
     /// A URL to a TileJSON resource. Supported protocols are `http:` and `https:`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub url: Option<RasterSourceUrl>,
     /// A setting to determine whether a source's tiles are cached locally.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub volatile: Option<RasterSourceVolatile>,
 }
 
@@ -370,35 +392,48 @@ pub struct RasterSourceVolatile(bool);
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct RasterDemSource {
     /// Contains an attribution to be displayed when the map is shown to a user.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub attribution: Option<RasterDemSourceAttribution>,
     /// Value that will be added to the encoding mix when decoding. Only used on custom encodings.
     #[serde(rename = "baseShift")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub base_shift: Option<RasterDemSourceBaseShift>,
     /// Value that will be multiplied by the blue channel value when decoding. Only used on custom encodings.
     #[serde(rename = "blueFactor")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub blue_factor: Option<RasterDemSourceBlueFactor>,
     /// An array containing the longitude and latitude of the southwest and northeast corners of the source's bounding box in the following order: `[sw.lng, sw.lat, ne.lng, ne.lat]`. When this property is included in a source, no tiles outside of the given bounds are requested by MapLibre.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub bounds: Option<RasterDemSourceBounds>,
     /// The encoding used by this source. Mapbox Terrain RGB is used by default.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub encoding: Option<RasterDemSourceEncoding>,
     /// Value that will be multiplied by the green channel value when decoding. Only used on custom encodings.
     #[serde(rename = "greenFactor")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub green_factor: Option<RasterDemSourceGreenFactor>,
     /// Maximum zoom level for which tiles are available, as in the TileJSON spec. Data from tiles at the maxzoom are used when displaying the map at higher zoom levels.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub maxzoom: Option<RasterDemSourceMaxzoom>,
     /// Minimum zoom level for which tiles are available, as in the TileJSON spec.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub minzoom: Option<RasterDemSourceMinzoom>,
     /// Value that will be multiplied by the red channel value when decoding. Only used on custom encodings.
     #[serde(rename = "redFactor")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub red_factor: Option<RasterDemSourceRedFactor>,
     /// The minimum visual size to display tiles for this layer. Only configurable for raster layers.
     #[serde(rename = "tileSize")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub tile_size: Option<RasterDemSourceTileSize>,
     /// An array of one or more tile source URLs, as in the TileJSON spec.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub tiles: Option<RasterDemSourceTiles>,
     /// A URL to a TileJSON resource. Supported protocols are `http:` and `https:`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub url: Option<RasterDemSourceUrl>,
     /// A setting to determine whether a source's tiles are cached locally.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub volatile: Option<RasterDemSourceVolatile>,
 }
 
@@ -584,25 +619,35 @@ pub struct RasterDemSourceVolatile(bool);
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct VectorSource {
     /// Contains an attribution to be displayed when the map is shown to a user.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub attribution: Option<VectorSourceAttribution>,
     /// An array containing the longitude and latitude of the southwest and northeast corners of the source's bounding box in the following order: `[sw.lng, sw.lat, ne.lng, ne.lat]`. When this property is included in a source, no tiles outside of the given bounds are requested by MapLibre.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub bounds: Option<VectorSourceBounds>,
     /// The encoding used by this source. Mapbox Vector Tiles encoding is used by default.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub encoding: Option<VectorSourceEncoding>,
     /// Maximum zoom level for which tiles are available, as in the TileJSON spec. Data from tiles at the maxzoom are used when displaying the map at higher zoom levels.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub maxzoom: Option<VectorSourceMaxzoom>,
     /// Minimum zoom level for which tiles are available, as in the TileJSON spec.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub minzoom: Option<VectorSourceMinzoom>,
     /// A property to use as a feature id (for feature state). Either a property name, or an object of the form `{<sourceLayer>: <propertyName>}`. If specified as a string for a vector tile source, the same property is used across all its source layers.
     #[serde(rename = "promoteId")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub promote_id: Option<VectorSourcePromoteId>,
     /// Influences the y direction of the tile coordinates. The global-mercator (aka Spherical Mercator) profile is assumed.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub scheme: Option<VectorSourceScheme>,
     /// An array of one or more tile source URLs, as in the TileJSON spec.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub tiles: Option<VectorSourceTiles>,
     /// A URL to a TileJSON resource. Supported protocols are `http:` and `https:`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub url: Option<VectorSourceUrl>,
     /// A setting to determine whether a source's tiles are cached locally.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub volatile: Option<VectorSourceVolatile>,
 }
 

@@ -302,7 +302,12 @@ pub fn preprocess_layers(reference: &mut decoder::StyleReference) -> Intermediat
         "paint and layout must have the same keys"
     );
 
-    let common_fields = parsed_items_to_layer_fields(layer);
+    let mut common_fields = parsed_items_to_layer_fields(layer);
+
+    // Remove `filter` from auto-generated common fields — the generator emits
+    // the `Layer` struct with a hand-written `filter: Option<LayerFilter>` field
+    // and a dedicated `LayerFilter` type.
+    common_fields.remove("filter");
 
     let mut layer_types = BTreeMap::new();
     for key in layer_type_keys {

@@ -9,11 +9,14 @@ pub struct MaplibreStyleSpecification {
     /// Default bearing, in degrees. The bearing is the compass direction that is "up"; for example, a bearing of 90° orients the map so that east is up. This value will be used only if the map has not been positioned by other means (e.g. map options or user interaction).
     ///
     /// Range: every 360
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub bearing: Option<RootBearing>,
     /// Default map center in longitude and latitude.  The style center will be used only if the map has not been positioned by other means (e.g. map options or user interaction).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub center: Option<RootCenter>,
     /// Default map center altitude in meters above sea level. The style center altitude defines the altitude where the camera is looking at and will be used only if the map has not been positioned by other means (e.g. map options or user interaction).
     #[serde(rename = "centerAltitude")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub center_altitude: Option<RootCenterAltitude>,
     /// The `font-faces` property can be used to specify what font files to use for rendering text. Font faces contain information needed to render complex texts such as [Devanagari](https://en.wikipedia.org/wiki/Devanagari), [Khmer](https://en.wikipedia.org/wiki/Khmer_script) among many others.<h2>Unicode range</h2>The optional `unicode-range` property can be used to only use a particular font file for characters within the specified unicode range(s). Its value should be an array of strings, each indicating a start and end of a unicode range, similar to the [CSS descriptor with the same name](https://developer.mozilla.org/en-US/docs/Web/CSS/@font-face/unicode-range). This allows specifying multiple non-consecutive unicode ranges. When not specified, the default value is `U+0-10FFFF`, meaning the font file will be used for all unicode characters.
     ///
@@ -23,35 +26,50 @@ pub struct MaplibreStyleSpecification {
     ///
     /// <h2>Supported Fonts</h2>What type of fonts are supported is implementation-defined. Unsupported fonts are ignored.
     #[serde(rename = "font-faces")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub font_faces: Option<RootFontFaces>,
     /// The global light source.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub light: Option<RootLight>,
     /// Arbitrary properties useful to track with the stylesheet, but do not influence rendering. Properties should be prefixed to avoid collisions, like 'maplibre:'.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub metadata: Option<RootMetadata>,
     /// A human-readable name for the style.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub name: Option<RootName>,
     /// Default pitch, in degrees. Zero is perpendicular to the surface, for a look straight down at the map, while a greater value like 60 looks ahead towards the horizon. The style pitch will be used only if the map has not been positioned by other means (e.g. map options or user interaction).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub pitch: Option<RootPitch>,
     /// The projection configuration
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub projection: Option<RootProjection>,
     /// Default roll, in degrees. The roll angle is measured counterclockwise about the camera boresight. The style roll will be used only if the map has not been positioned by other means (e.g. map options or user interaction).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub roll: Option<RootRoll>,
     /// The map's sky configuration. **Note:** this definition is still experimental and is under development in maplibre-gl-js.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub sky: Option<RootSky>,
     /// Sources state which data the map should display. Specify the type of source with the `type` property. Adding a source isn't enough to make data appear on the map because sources don't contain styling details like color or width. Layers refer to a source and give it a visual representation. This makes it possible to style the same source in different ways, like differentiating between types of roads in a highways layer.
     ///
     /// Tiled sources (vector and raster) must specify their details according to the [TileJSON specification](https://github.com/mapbox/tilejson-spec).
     pub sources: RootSources,
     /// An object used to define default values when using the [`global-state`](https://maplibre.org/maplibre-style-spec/expressions/#global-state) expression.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub state: Option<RootState>,
     /// The terrain configuration.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub terrain: Option<RootTerrain>,
     /// A global transition definition to use as a default across properties, to be used for timing transitions between one value and the next when no property-specific transition is set. Collision-based symbol fading is controlled independently of the style's `transition` property.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub transition: Option<RootTransition>,
     /// Style specification version number. Must be 8.
     pub version: RootVersion,
     /// Default zoom level.  The style zoom will be used only if the map has not been positioned by other means (e.g. map options or user interaction).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub zoom: Option<RootZoom>,
+    /// Layers will be drawn in the order of this array.
+    #[serde(default)]
+    pub layers: Vec<AnyLayer>,
 }
 
 /// Default bearing, in degrees. The bearing is the compass direction that is "up"; for example, a bearing of 90° orients the map so that east is up. This value will be used only if the map has not been positioned by other means (e.g. map options or user interaction).

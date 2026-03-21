@@ -101,6 +101,8 @@ pub fn generate_syntax_enum(
         &variadic_row_struct_names,
     );
 
+    generate_syntax_enum_serializer(scope, name, values);
+
     generate_test_from_examples_if_present(scope, name, examples);
 }
 
@@ -628,7 +630,7 @@ fn generate_syntax_enum_body(
         .new_enum(name)
         .doc(doc)
         .vis("pub")
-        .derive("serde::Serialize, PartialEq, Debug, Clone")
+        .derive("PartialEq, Debug, Clone")
         .attr(fuzz::CFG_DERIVE_ARBITRARY);
     for (key, value) in values {
         let var_name = normalized_syntax_variant_ident(name, key);
@@ -1792,4 +1794,173 @@ mod tests {
         let spec = IntermediateSpec::from(reference);
         insta::assert_snapshot!(crate::generator::generate_spec_scope(&spec));
     }
+}
+
+// ── Custom Serialize impl ────────────────────────────────────────────────────
+
+/// Generate a custom `Serialize` impl for an expression syntax enum that
+/// produces the `["operator", arg1, arg2, ...]` JSON array format expected by
+/// MapLibre style specifications.
+fn generate_syntax_enum_serializer(
+    scope: &mut Scope,
+    name: &str,
+    values: &BTreeMap<String, SyntaxVariantDef>,
+) {
+    let mut arms = String::new();
+
+    for (key, value) in values {
+        let var_name = normalized_syntax_variant_ident(name, key);
+        let syntax = &value.syntax;
+
+        if syntax.overloads.len() == 1 {
+            let overload = &syntax.overloads[0];
+            if syntax.has_variadic_overload() {
+                let sep = overload.position_of_variadic_separator();
+                arms.push_str(&generate_ser_arm_variadic(name, key, &var_name, sep));
+            } else {
+                // Fixed-arity: variant has N tuple fields.
+                let n = overload.parameters.len();
+                arms.push_str(&generate_ser_arm_fixed(name, key, &var_name, n));
+            }
+        } else {
+            // Multi-overload: variant wraps an Options enum.
+            // The Options enum uses derive(Serialize) which serializes as a tuple.
+            // We need to serialize as ["op", ...options_fields].
+            arms.push_str(&generate_ser_arm_options(name, key, &var_name));
+        }
+    }
+
+    scope.raw(format!(
+        r#"
+impl serde::Serialize for {name} {{
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {{
+        use serde::ser::SerializeSeq;
+        match self {{
+{arms}        }}
+    }}
+}}
+"#
+    ));
+}
+
+/// Serialize a fixed-arity variant: `Variant(a, b, c)` → `["op", a, b, c]`.
+/// Trailing `None` values (from optional parameters) are omitted.
+fn generate_ser_arm_fixed(name: &str, op: &str, var_name: &str, n: usize) -> String {
+    let bindings: Vec<String> = (0..n).map(|i| format!("f{i}")).collect();
+    let pattern = if bindings.is_empty() {
+        format!("            {name}::{var_name}")
+    } else {
+        format!("            {name}::{var_name}({})", bindings.join(", "))
+    };
+
+    // Convert each field to Value, collect into a vec, strip trailing nulls, then serialize.
+    let mut body = String::new();
+    body.push_str(" => {\n");
+    body.push_str("                let mut elems: Vec<serde_json::Value> = Vec::new();\n");
+    for b in &bindings {
+        body.push_str(&format!(
+            "                elems.push(serde_json::to_value(&{b}).map_err(serde::ser::Error::custom)?);\n"
+        ));
+    }
+    body.push_str("                while elems.last().is_some_and(serde_json::Value::is_null) { elems.pop(); }\n");
+    body.push_str("                let mut seq = serializer.serialize_seq(None)?;\n");
+    body.push_str(&format!(
+        "                seq.serialize_element({op:?})?;\n"
+    ));
+    body.push_str("                for elem in &elems { seq.serialize_element(elem)?; }\n");
+    body.push_str("                seq.end()\n            }\n");
+    format!("{pattern}{body}")
+}
+
+/// Serialize a variadic variant. The inner type is either:
+/// - `Vec<T>` → `["op", elem1, elem2, ...]`
+/// - `(header..., Vec<(a, b)>)` → `["op", hdr1, hdr2, ..., a1, b1, a2, b2, ...]`
+/// - `(Vec<(a, b)>, suffix)` → `["op", a1, b1, ..., suffix]`
+/// `sep` is the variadic separator position (number of fields per template group).
+/// When `sep == 1`, each Vec element is a single value → no flattening needed.
+/// When `sep > 1`, each Vec element is a tuple → flatten within each group.
+fn generate_ser_arm_variadic(name: &str, op: &str, var_name: &str, sep: usize) -> String {
+    if sep <= 1 {
+        // Simple variadic: Vec<T> or (hdr..., Vec<T>).
+        // Each element is a single value; don't flatten nested arrays.
+        format!(
+            r#"            {name}::{var_name}(inner) => {{
+                let inner_val = serde_json::to_value(inner).map_err(serde::ser::Error::custom)?;
+                let mut seq = serializer.serialize_seq(None)?;
+                seq.serialize_element({op:?})?;
+                if let serde_json::Value::Array(top) = &inner_val {{
+                    for elem in top {{
+                        seq.serialize_element(elem)?;
+                    }}
+                }} else {{
+                    seq.serialize_element(&inner_val)?;
+                }}
+                seq.end()
+            }}
+"#
+        )
+    } else {
+        // Tuple variadic: (hdr..., Vec<(a, b, ...)>) or (Vec<(a, b)>, suffix).
+        // The inner serializes as `[hdr1, ..., [[a1,b1], [a2,b2], ...], suffix?]`.
+        // We emit header fields as-is, then flatten the Vec-of-tuples element,
+        // then emit suffix fields as-is.
+        format!(
+            r#"            {name}::{var_name}(inner) => {{
+                let inner_val = serde_json::to_value(inner).map_err(serde::ser::Error::custom)?;
+                let mut seq = serializer.serialize_seq(None)?;
+                seq.serialize_element({op:?})?;
+                if let serde_json::Value::Array(top) = &inner_val {{
+                    for elem in top {{
+                        if let serde_json::Value::Array(sub) = elem {{
+                            // An array-of-arrays is the Vec<(A,B)> — flatten it.
+                            if !sub.is_empty() && sub[0].is_array() {{
+                                for pair in sub {{
+                                    if let serde_json::Value::Array(pair_elems) = pair {{
+                                        for pe in pair_elems {{
+                                            seq.serialize_element(pe)?;
+                                        }}
+                                    }} else {{
+                                        seq.serialize_element(pair)?;
+                                    }}
+                                }}
+                            }} else {{
+                                // Plain array value (e.g. a sub-expression like ["zoom"]).
+                                seq.serialize_element(elem)?;
+                            }}
+                        }} else {{
+                            seq.serialize_element(elem)?;
+                        }}
+                    }}
+                }} else {{
+                    seq.serialize_element(&inner_val)?;
+                }}
+                seq.end()
+            }}
+"#
+        )
+    }
+}
+
+/// Serialize a multi-overload variant: `Variant(Options)`.
+/// Options is an `#[serde(untagged)]` tuple enum, so it serializes as a JSON array.
+/// We emit `["op", ...options_elements]`.
+fn generate_ser_arm_options(name: &str, op: &str, var_name: &str) -> String {
+    format!(
+        r#"            {name}::{var_name}(opts) => {{
+                let opts_val = serde_json::to_value(opts).map_err(serde::ser::Error::custom)?;
+                let mut seq = serializer.serialize_seq(None)?;
+                seq.serialize_element({op:?})?;
+                if let serde_json::Value::Array(mut arr) = opts_val {{
+                    while arr.last().is_some_and(serde_json::Value::is_null) {{ arr.pop(); }}
+                    for elem in &arr {{
+                        seq.serialize_element(elem)?;
+                    }}
+                }}
+                seq.end()
+            }}
+"#
+    )
 }

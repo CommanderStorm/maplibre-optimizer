@@ -55,7 +55,7 @@ pub struct ArrayOfNumberLiteral(Vec<NumberLiteral>);
 pub struct MaplibreStyleSpecification;
 
 /// First element in an interpolation array. May be followed by a number of arguments.
-#[derive(serde::Serialize, PartialEq, Debug, Clone)]
+#[derive(PartialEq, Debug, Clone)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum InterpolationName {
     /// Interpolates linearly between the pair of stops just less than and just greater than the input
@@ -100,6 +100,29 @@ impl<'de> serde::de::Visitor<'de> for InterpolationNameVisitor {
         match op.as_str() {
             "linear" => Ok(InterpolationName::Linear),
             _ => Err(serde::de::Error::unknown_variant(&op, &["linear"])),
+        }
+    }
+}
+
+impl serde::Serialize for InterpolationName {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        use serde::ser::SerializeSeq;
+        match self {
+            InterpolationName::Linear => {
+                let mut elems: Vec<serde_json::Value> = Vec::new();
+                while elems.last().is_some_and(serde_json::Value::is_null) {
+                    elems.pop();
+                }
+                let mut seq = serializer.serialize_seq(None)?;
+                seq.serialize_element("linear")?;
+                for elem in &elems {
+                    seq.serialize_element(elem)?;
+                }
+                seq.end()
+            }
         }
     }
 }
