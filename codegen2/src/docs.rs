@@ -4,7 +4,7 @@ use crate::formatter::Formatter;
 
 #[derive(Debug, Clone)]
 pub struct Docs {
-    docs: String,
+    pub(crate) docs: String,
 }
 
 impl Docs {

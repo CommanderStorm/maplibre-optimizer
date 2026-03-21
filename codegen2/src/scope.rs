@@ -290,7 +290,9 @@ impl Scope {
 
     /// Return a `rustfmt`-formatted string representation of the scope.
     ///
-    /// Falls back to the built-in formatter when `rustfmt` is not available.
+    /// # Panics
+    ///
+    /// Panics if nightly `rustfmt` is not available via `rustup`.
     #[expect(
         clippy::inherent_to_string,
         reason = "return type differs from Display convention"
@@ -301,17 +303,17 @@ impl Scope {
         self.fmt(&mut Formatter::new(&mut ret))
             .expect("formatting to String cannot fail");
 
-        if let Some(b'\n') = ret.as_bytes().last() {
-            ret.pop();
-        }
-
-        rustfmt(&ret).unwrap_or(ret)
+        rustfmt(&ret)
     }
 
     /// Formats the scope using the given formatter.
     pub fn fmt(&self, fmt: &mut Formatter<'_>) -> fmt::Result {
+        // Scope-level docs use inner doc comments (`//!`), which are valid
+        // at the top of a file or module without an item following them.
         if let Some(ref docs) = self.docs {
-            docs.fmt(fmt)?;
+            for line in docs.docs.lines() {
+                writeln!(fmt, "//! {line}")?;
+            }
         }
 
         self.fmt_imports(fmt)?;
@@ -356,9 +358,14 @@ impl Scope {
     }
 }
 
-/// Run nightly `rustfmt` on a source string, returning `None` if the
-/// toolchain is unavailable or formatting fails.
-fn rustfmt(source: &str) -> Option<String> {
+/// Run nightly `rustfmt` on a source string.
+///
+/// # Panics
+///
+/// Panics if `rustup run nightly rustfmt` is not available or returns an error.
+fn rustfmt(source: &str) -> String {
+    use std::io::Write as _;
+
     let mut child = Command::new("rustup")
         .args(["run", "nightly", "rustfmt"])
         .arg("--edition")
@@ -367,22 +374,28 @@ fn rustfmt(source: &str) -> Option<String> {
         .arg("imports_granularity=Module,group_imports=StdExternalCrate")
         .stdin(std::process::Stdio::piped())
         .stdout(std::process::Stdio::piped())
-        .stderr(std::process::Stdio::null())
+        .stderr(std::process::Stdio::piped())
         .spawn()
-        .ok()?;
+        .expect("failed to spawn rustfmt — is `rustup run nightly rustfmt` available?");
 
-    use std::io::Write as _;
-    child.stdin.take()?.write_all(source.as_bytes()).ok()?;
+    child
+        .stdin
+        .take()
+        .expect("stdin was piped")
+        .write_all(source.as_bytes())
+        .expect("failed to write to rustfmt stdin");
 
-    let output = child.wait_with_output().ok()?;
-    if !output.status.success() {
-        return None;
-    }
+    let output = child.wait_with_output().expect("failed to wait on rustfmt");
+    assert!(
+        output.status.success(),
+        "rustfmt failed (status {}):\n{}",
+        output.status,
+        String::from_utf8_lossy(&output.stderr),
+    );
 
-    let mut formatted = String::from_utf8(output.stdout).ok()?;
-    // Match the convention: no trailing newline
+    let mut formatted = String::from_utf8(output.stdout).expect("rustfmt produced invalid UTF-8");
     if formatted.ends_with('\n') {
         formatted.pop();
     }
-    Some(formatted)
+    formatted
 }

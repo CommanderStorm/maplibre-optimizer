@@ -352,11 +352,12 @@ fn function_doc() {
 #[test]
 fn scope_doc() {
     let mut scope = Scope::new();
-    scope.doc("This is a scope comment.\nThis is a newline");
+    scope.doc("This is a scope comment.\n\nThis is a newline");
 
     insta::assert_snapshot!(scope.to_string(), @r"
-    /// This is a scope comment.
-    /// This is a newline
+    //! This is a scope comment.
+    //!
+    //! This is a newline
     ");
 }
 
