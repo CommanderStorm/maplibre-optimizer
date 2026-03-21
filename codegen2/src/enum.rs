@@ -1,6 +1,6 @@
 use std::fmt;
 
-use crate::formatter::write_block;
+use crate::util::write_block;
 use crate::r#type::Type;
 use crate::type_def::TypeDef;
 use crate::variant::Variant;

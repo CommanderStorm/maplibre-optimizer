@@ -2,7 +2,7 @@ use std::fmt::{self, Display, Write};
 
 use crate::docs::Docs;
 use crate::r#enum::Enum;
-use crate::formatter::write_block;
+use crate::util::write_block;
 use crate::function::Function;
 use crate::r#impl::Impl;
 use crate::scope::Scope;

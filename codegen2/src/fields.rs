@@ -1,7 +1,7 @@
 use std::fmt::{self, Write};
 
 use crate::field::Field;
-use crate::formatter::write_block;
+use crate::util::write_block;
 use crate::r#type::Type;
 
 /// One slot in a tuple struct or tuple enum variant, optionally with outer attributes.

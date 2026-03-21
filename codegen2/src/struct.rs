@@ -151,14 +151,8 @@ impl Struct {
         self.type_def.fmt_head("struct", &[], dst)?;
         self.fields.fmt(dst)?;
 
-        match self.fields {
-            Fields::Empty => {
-                writeln!(dst, ";")?;
-            }
-            Fields::Tuple(..) => {
-                writeln!(dst, ";")?;
-            }
-            _ => {}
+        if matches!(self.fields, Fields::Empty | Fields::Tuple(..)) {
+            writeln!(dst, ";")?;
         }
 
         Ok(())

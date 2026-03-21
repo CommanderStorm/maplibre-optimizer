@@ -5,7 +5,7 @@ use crate::body::Body;
 use crate::bound::Bound;
 use crate::docs::Docs;
 use crate::field::Field;
-use crate::formatter::{fmt_bounds, fmt_generics, write_block};
+use crate::util::{fmt_bounds, fmt_generics, write_block};
 use crate::r#type::Type;
 
 /// Defines a function.

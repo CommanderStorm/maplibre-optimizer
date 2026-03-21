@@ -2,7 +2,7 @@ use std::fmt::{self, Write};
 
 use crate::bound::Bound;
 use crate::docs::Docs;
-use crate::formatter::fmt_bounds;
+use crate::util::fmt_bounds;
 use crate::r#type::Type;
 
 /// Defines a type definition.
@@ -83,11 +83,21 @@ impl TypeDef {
             docs.fmt(dst)?;
         }
 
-        self.fmt_allow(dst)?;
-        self.fmt_derive(dst)?;
-        self.fmt_repr(dst)?;
-        self.fmt_attributes(dst)?;
-        self.fmt_macros(dst)?;
+        for allow in &self.allow {
+            writeln!(dst, "#[allow({})]", allow)?;
+        }
+        if !self.derive.is_empty() {
+            writeln!(dst, "#[derive({})]", self.derive.join(", "))?;
+        }
+        if let Some(ref repr) = self.repr {
+            writeln!(dst, "#[repr({})]", repr)?;
+        }
+        for attr in &self.attributes {
+            writeln!(dst, "#[{}]", attr)?;
+        }
+        for m in &self.macros {
+            writeln!(dst, "{}", m)?;
+        }
 
         if let Some(ref vis) = self.vis {
             write!(dst, "{} ", vis)?;
@@ -110,54 +120,6 @@ impl TypeDef {
 
         fmt_bounds(&self.bounds, dst)?;
 
-        Ok(())
-    }
-
-    fn fmt_attributes(&self, dst: &mut String) -> fmt::Result {
-        for attr in &self.attributes {
-            writeln!(dst, "#[{}]", attr)?;
-        }
-
-        Ok(())
-    }
-
-    fn fmt_allow(&self, dst: &mut String) -> fmt::Result {
-        for allow in &self.allow {
-            writeln!(dst, "#[allow({})]", allow)?;
-        }
-
-        Ok(())
-    }
-
-    fn fmt_repr(&self, dst: &mut String) -> fmt::Result {
-        if let Some(ref repr) = self.repr {
-            writeln!(dst, "#[repr({})]", repr)?;
-        }
-
-        Ok(())
-    }
-
-    fn fmt_derive(&self, dst: &mut String) -> fmt::Result {
-        if !self.derive.is_empty() {
-            write!(dst, "#[derive(")?;
-
-            for (i, name) in self.derive.iter().enumerate() {
-                if i != 0 {
-                    write!(dst, ", ")?
-                }
-                write!(dst, "{}", name)?;
-            }
-
-            writeln!(dst, ")]")?;
-        }
-
-        Ok(())
-    }
-
-    fn fmt_macros(&self, dst: &mut String) -> fmt::Result {
-        for m in self.macros.iter() {
-            writeln!(dst, "{}", m)?;
-        }
         Ok(())
     }
 }

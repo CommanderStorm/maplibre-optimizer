@@ -2,7 +2,7 @@ use std::fmt::{self, Write};
 
 use crate::bound::Bound;
 use crate::field::Field;
-use crate::formatter::{fmt_bounds, fmt_generics, write_block};
+use crate::util::{fmt_bounds, fmt_generics, write_block};
 use crate::function::Function;
 use crate::r#type::Type;
 
