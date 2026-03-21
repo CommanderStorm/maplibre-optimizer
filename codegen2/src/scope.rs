@@ -80,11 +80,8 @@ impl Scope {
     /// [`get_or_new_module`]: #method.get_or_new_module
     pub fn new_module(&mut self, name: impl ToString) -> &mut Module {
         self.push_module(Module::new(name));
-
-        match *self.items.last_mut().expect("items was just pushed to") {
-            Item::Module(ref mut v) => v,
-            _ => unreachable!(),
-        }
+        let Some(Item::Module(v)) = self.items.last_mut() else { unreachable!() };
+        v
     }
 
     /// Returns a mutable reference to a module if it is exists in this scope.
@@ -150,11 +147,8 @@ impl Scope {
     /// Push a new [`Struct`] definition, returning a mutable reference to it.
     pub fn new_struct(&mut self, name: impl ToString) -> &mut Struct {
         self.push_struct(Struct::new(name));
-
-        match *self.items.last_mut().expect("items was just pushed to") {
-            Item::Struct(ref mut v) => v,
-            _ => unreachable!(),
-        }
+        let Some(Item::Struct(v)) = self.items.last_mut() else { unreachable!() };
+        v
     }
 
     /// Push a [`Struct`] definition
@@ -187,11 +181,8 @@ impl Scope {
     /// Push a new function definition, returning a mutable reference to it.
     pub fn new_fn(&mut self, name: impl ToString) -> &mut Function {
         self.push_fn(Function::new(name));
-
-        match *self.items.last_mut().expect("items was just pushed to") {
-            Item::Function(ref mut v) => v,
-            _ => unreachable!(),
-        }
+        let Some(Item::Function(v)) = self.items.last_mut() else { unreachable!() };
+        v
     }
 
     /// Push a function definition
@@ -214,11 +205,8 @@ impl Scope {
     /// Push a new trait definition, returning a mutable reference to it.
     pub fn new_trait(&mut self, name: impl ToString) -> &mut Trait {
         self.push_trait(Trait::new(name));
-
-        match *self.items.last_mut().expect("items was just pushed to") {
-            Item::Trait(ref mut v) => v,
-            _ => unreachable!(),
-        }
+        let Some(Item::Trait(v)) = self.items.last_mut() else { unreachable!() };
+        v
     }
 
     /// Push a trait definition
@@ -230,11 +218,8 @@ impl Scope {
     /// Push a new struct definition, returning a mutable reference to it.
     pub fn new_enum(&mut self, name: impl ToString) -> &mut Enum {
         self.push_enum(Enum::new(name));
-
-        match *self.items.last_mut().expect("items was just pushed to") {
-            Item::Enum(ref mut v) => v,
-            _ => unreachable!(),
-        }
+        let Some(Item::Enum(v)) = self.items.last_mut() else { unreachable!() };
+        v
     }
 
     /// Push a structure definition
@@ -257,11 +242,8 @@ impl Scope {
     /// Push a new `impl` block, returning a mutable reference to it.
     pub fn new_impl(&mut self, target: impl ToString) -> &mut Impl {
         self.push_impl(Impl::new(target));
-
-        match *self.items.last_mut().expect("items was just pushed to") {
-            Item::Impl(ref mut v) => v,
-            _ => unreachable!(),
-        }
+        let Some(Item::Impl(v)) = self.items.last_mut() else { unreachable!() };
+        v
     }
 
     /// Push an `impl` block.
@@ -281,11 +263,8 @@ impl Scope {
     /// Push a new `TypeAlias`, returning a mutable reference to it.
     pub fn new_type_alias(&mut self, name: impl ToString, target: impl ToString) -> &mut TypeAlias {
         self.push_type_alias(TypeAlias::new(name, target));
-
-        match *self.items.last_mut().expect("items was just pushed to") {
-            Item::TypeAlias(ref mut v) => v,
-            _ => unreachable!(),
-        }
+        let Some(Item::TypeAlias(v)) = self.items.last_mut() else { unreachable!() };
+        v
     }
 
     /// Push an `TypeAlias`.

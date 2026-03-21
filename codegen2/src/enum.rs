@@ -86,9 +86,7 @@ impl Enum {
     /// Push a variant to the enum, returning a mutable reference to it.
     pub fn new_variant(&mut self, name: impl ToString) -> &mut Variant {
         self.push_variant(Variant::new(name.to_string()));
-        self.variants
-            .last_mut()
-            .expect("variants was just pushed to")
+        self.variants.last_mut().expect("variants was just pushed to")
     }
 
     /// Push a variant to the enum.
