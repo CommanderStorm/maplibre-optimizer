@@ -118,20 +118,16 @@ pub fn fmt_generics(generics: &[String], fmt: &mut Formatter<'_>) -> fmt::Result
 /// Format generic bounds.
 pub fn fmt_bounds(bounds: &[Bound], fmt: &mut Formatter<'_>) -> fmt::Result {
     if !bounds.is_empty() {
-        writeln!(fmt)?;
-
-        // Write first bound
-        write!(fmt, "where {}: ", bounds[0].name)?;
-        fmt_bound_rhs(&bounds[0].bound, fmt)?;
-        writeln!(fmt, ",")?;
-
-        for bound in &bounds[1..] {
-            write!(fmt, "      {}: ", bound.name)?;
+        // Emit a flat `where` clause; rustfmt handles alignment.
+        write!(fmt, " where ")?;
+        for (i, bound) in bounds.iter().enumerate() {
+            if i != 0 {
+                write!(fmt, ", ")?;
+            }
+            write!(fmt, "{}: ", bound.name)?;
             fmt_bound_rhs(&bound.bound, fmt)?;
-            writeln!(fmt, ",")?;
         }
     }
-
     Ok(())
 }
 

@@ -1,4 +1,5 @@
 use std::fmt::{self, Display, Write};
+use std::process::Command;
 
 use indexmap::IndexMap;
 
@@ -80,7 +81,9 @@ impl Scope {
     /// [`get_or_new_module`]: #method.get_or_new_module
     pub fn new_module(&mut self, name: impl ToString) -> &mut Module {
         self.push_module(Module::new(name));
-        let Some(Item::Module(v)) = self.items.last_mut() else { unreachable!() };
+        let Some(Item::Module(v)) = self.items.last_mut() else {
+            unreachable!()
+        };
         v
     }
 
@@ -147,7 +150,9 @@ impl Scope {
     /// Push a new [`Struct`] definition, returning a mutable reference to it.
     pub fn new_struct(&mut self, name: impl ToString) -> &mut Struct {
         self.push_struct(Struct::new(name));
-        let Some(Item::Struct(v)) = self.items.last_mut() else { unreachable!() };
+        let Some(Item::Struct(v)) = self.items.last_mut() else {
+            unreachable!()
+        };
         v
     }
 
@@ -181,7 +186,9 @@ impl Scope {
     /// Push a new function definition, returning a mutable reference to it.
     pub fn new_fn(&mut self, name: impl ToString) -> &mut Function {
         self.push_fn(Function::new(name));
-        let Some(Item::Function(v)) = self.items.last_mut() else { unreachable!() };
+        let Some(Item::Function(v)) = self.items.last_mut() else {
+            unreachable!()
+        };
         v
     }
 
@@ -205,7 +212,9 @@ impl Scope {
     /// Push a new trait definition, returning a mutable reference to it.
     pub fn new_trait(&mut self, name: impl ToString) -> &mut Trait {
         self.push_trait(Trait::new(name));
-        let Some(Item::Trait(v)) = self.items.last_mut() else { unreachable!() };
+        let Some(Item::Trait(v)) = self.items.last_mut() else {
+            unreachable!()
+        };
         v
     }
 
@@ -218,7 +227,9 @@ impl Scope {
     /// Push a new struct definition, returning a mutable reference to it.
     pub fn new_enum(&mut self, name: impl ToString) -> &mut Enum {
         self.push_enum(Enum::new(name));
-        let Some(Item::Enum(v)) = self.items.last_mut() else { unreachable!() };
+        let Some(Item::Enum(v)) = self.items.last_mut() else {
+            unreachable!()
+        };
         v
     }
 
@@ -242,7 +253,9 @@ impl Scope {
     /// Push a new `impl` block, returning a mutable reference to it.
     pub fn new_impl(&mut self, target: impl ToString) -> &mut Impl {
         self.push_impl(Impl::new(target));
-        let Some(Item::Impl(v)) = self.items.last_mut() else { unreachable!() };
+        let Some(Item::Impl(v)) = self.items.last_mut() else {
+            unreachable!()
+        };
         v
     }
 
@@ -263,7 +276,9 @@ impl Scope {
     /// Push a new `TypeAlias`, returning a mutable reference to it.
     pub fn new_type_alias(&mut self, name: impl ToString, target: impl ToString) -> &mut TypeAlias {
         self.push_type_alias(TypeAlias::new(name, target));
-        let Some(Item::TypeAlias(v)) = self.items.last_mut() else { unreachable!() };
+        let Some(Item::TypeAlias(v)) = self.items.last_mut() else {
+            unreachable!()
+        };
         v
     }
 
@@ -273,12 +288,12 @@ impl Scope {
         self
     }
 
-    // TODO: remove this and implement fmt::Display
-    //
-    /// Return a string representation of the scope.
-    #[allow(
+    /// Return a `rustfmt`-formatted string representation of the scope.
+    ///
+    /// Falls back to the built-in formatter when `rustfmt` is not available.
+    #[expect(
         clippy::inherent_to_string,
-        reason = "our formatter does not 100% match the requirements for Display"
+        reason = "return type differs from Display convention"
     )]
     pub fn to_string(&self) -> String {
         let mut ret = String::new();
@@ -290,7 +305,7 @@ impl Scope {
             ret.pop();
         }
 
-        ret
+        rustfmt(&ret).unwrap_or(ret)
     }
 
     /// Formats the scope using the given formatter.
@@ -328,54 +343,46 @@ impl Scope {
     }
 
     fn fmt_imports(&self, fmt: &mut Formatter<'_>) -> fmt::Result {
-        let mut visibilities: Vec<Option<String>> = vec![];
-
+        // Emit one `use` per import; rustfmt merges and sorts them.
         for imports in self.imports.values() {
             for import in imports.values() {
-                if !visibilities.contains(&import.vis) {
-                    visibilities.push(import.vis.clone());
+                if let Some(ref vis) = import.vis {
+                    write!(fmt, "{} ", vis)?;
                 }
+                writeln!(fmt, "use {}::{};", import.path, import.ty)?;
             }
         }
-
-        let mut tys = vec![];
-
-        // Group imports by visibility so each `use` statement has a single vis prefix.
-        for vis in &visibilities {
-            for (path, imports) in &self.imports {
-                tys.clear();
-
-                for (ty, import) in imports {
-                    if vis == &import.vis {
-                        tys.push(ty);
-                    }
-                }
-
-                if !tys.is_empty() {
-                    if let Some(ref vis) = *vis {
-                        write!(fmt, "{} ", vis)?;
-                    }
-
-                    write!(fmt, "use {}::", path)?;
-
-                    if tys.len() > 1 {
-                        write!(fmt, "{{")?;
-
-                        for (i, ty) in tys.iter().enumerate() {
-                            if i != 0 {
-                                write!(fmt, ", ")?;
-                            }
-                            write!(fmt, "{}", ty)?;
-                        }
-
-                        writeln!(fmt, "}};")?;
-                    } else if tys.len() == 1 {
-                        writeln!(fmt, "{};", tys[0])?;
-                    }
-                }
-            }
-        }
-
         Ok(())
     }
+}
+
+/// Run nightly `rustfmt` on a source string, returning `None` if the
+/// toolchain is unavailable or formatting fails.
+fn rustfmt(source: &str) -> Option<String> {
+    let mut child = Command::new("rustup")
+        .args(["run", "nightly", "rustfmt"])
+        .arg("--edition")
+        .arg("2024")
+        .arg("--config")
+        .arg("imports_granularity=Module,group_imports=StdExternalCrate")
+        .stdin(std::process::Stdio::piped())
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::null())
+        .spawn()
+        .ok()?;
+
+    use std::io::Write as _;
+    child.stdin.take()?.write_all(source.as_bytes()).ok()?;
+
+    let output = child.wait_with_output().ok()?;
+    if !output.status.success() {
+        return None;
+    }
+
+    let mut formatted = String::from_utf8(output.stdout).ok()?;
+    // Match the convention: no trailing newline
+    if formatted.ends_with('\n') {
+        formatted.pop();
+    }
+    Some(formatted)
 }

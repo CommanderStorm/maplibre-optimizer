@@ -39,7 +39,10 @@ impl Type {
     /// Panics if the type name already contains a path separator (`::`)
     /// since prepending a path to a qualified name is ambiguous.
     pub fn path(&self, path: impl ToString) -> Type {
-        assert!(!self.name.contains("::"), "type name already contains a path separator");
+        assert!(
+            !self.name.contains("::"),
+            "type name already contains a path separator"
+        );
 
         let mut name = path.to_string();
         name.push_str("::");

@@ -128,10 +128,7 @@ fn tuple_struct_with_slot_attributes() {
 
     insta::assert_snapshot!(scope.to_string(), @r"
     #[derive(Debug)]
-    struct Lit(
-        #[serde(transparent)]
-        i32,
-    );
+    struct Lit(#[serde(transparent)] i32);
     ");
 }
 
@@ -283,7 +280,8 @@ fn struct_where_clause_1() {
 
     insta::assert_snapshot!(scope.to_string(), @r"
     struct Foo<T>
-    where T: Foo,
+    where
+        T: Foo,
     {
         one: T,
     }
@@ -304,8 +302,9 @@ fn struct_where_clause_2() {
 
     insta::assert_snapshot!(scope.to_string(), @r"
     struct Foo<T, U>
-    where T: Foo,
-          U: Baz,
+    where
+        T: Foo,
+        U: Baz,
     {
         one: T,
         two: U,
@@ -369,8 +368,7 @@ fn module_doc() {
 
     insta::assert_snapshot!(scope.to_string(), @r"
     /// This is a module comment.
-    mod toby {
-    }
+    mod toby {}
     ");
 }
 
@@ -396,8 +394,9 @@ fn struct_in_mod() {
         /// Hello some docs
         #[derive(Debug)]
         struct Foo<T, U>
-        where T: SomeBound,
-              U: SomeOtherBound,
+        where
+            T: SomeBound,
+            U: SomeOtherBound,
         {
             one: T,
             two: U,
@@ -481,8 +480,7 @@ fn enum_variant_with_doc() {
         Bar {
             /// Documentation for the named bo field
             bo: bool,
-        }
-        ,
+        },
         /// Documentation for Baz variant
         /// With multiple lines
         Baz,
@@ -543,8 +541,8 @@ fn scoped_imports() {
 
     insta::assert_snapshot!(scope.to_string(), @r"
     mod foo {
-        use bar::{Bar, baz};
         use bar::quux::quuux;
+        use bar::{Bar, baz};
 
         struct Foo {
             bar: Bar,

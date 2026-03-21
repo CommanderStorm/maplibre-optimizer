@@ -152,35 +152,18 @@ impl Fields {
             Fields::Tuple(ref slots) => {
                 assert!(!slots.is_empty());
 
-                let multiline = slots.iter().any(|s| !s.annotations.is_empty());
-
-                if !multiline {
-                    write!(fmt, "(")?;
-                    for (i, slot) in slots.iter().enumerate() {
-                        if i > 0 {
-                            write!(fmt, ", ")?;
-                        }
-                        slot.ty.fmt(fmt)?;
+                // Emit all slots inline; rustfmt handles line-breaking.
+                write!(fmt, "(")?;
+                for (i, slot) in slots.iter().enumerate() {
+                    if i > 0 {
+                        write!(fmt, ", ")?;
                     }
-                    write!(fmt, ")")?;
-                } else {
-                    write!(fmt, "(")?;
-                    writeln!(fmt)?;
-                    fmt.indent(|fmt| {
-                        for (i, slot) in slots.iter().enumerate() {
-                            if i > 0 {
-                                writeln!(fmt, ",")?;
-                            }
-                            for ann in &slot.annotations {
-                                writeln!(fmt, "{}", ann)?;
-                            }
-                            slot.ty.fmt(fmt)?;
-                        }
-                        writeln!(fmt, ",")?;
-                        Ok(())
-                    })?;
-                    write!(fmt, ")")?;
+                    for ann in &slot.annotations {
+                        write!(fmt, "{} ", ann)?;
+                    }
+                    slot.ty.fmt(fmt)?;
                 }
+                write!(fmt, ")")?;
             }
             Fields::Empty => {}
         }
