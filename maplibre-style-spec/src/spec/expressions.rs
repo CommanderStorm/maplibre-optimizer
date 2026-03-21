@@ -104,7 +104,7 @@ pub enum Any {
     /// Each label must be unique. If the input type does not match the type of the labels, the result will be the fallback value.
     Match(
         (
-            serde_json::Value,
+            ExprOrLiteral,
             Vec<(
                 StringOrNumberOrArrayOfStringOrArrayOfNumberAsUnion,
                 ExprOrLiteral,
@@ -276,7 +276,8 @@ impl<'de> serde::de::Visitor<'de> for AnyVisitor {
                     ));
                 }
                 let fallback_v = rest.pop().unwrap();
-                let input = rest.remove(0);
+                let input: ExprOrLiteral =
+                    serde_json::from_value(rest.remove(0)).map_err(serde::de::Error::custom)?;
                 let mut pairs = Vec::new();
                 for chunk in rest.chunks_exact(2) {
                     let label_i: StringOrNumberOrArrayOfStringOrArrayOfNumberAsUnion =
@@ -1143,7 +1144,9 @@ pub enum Boolean {
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum LessOptions {
     Args(
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
         serde_json::Value,
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
         serde_json::Value,
         #[serde(default)] Option<Collator>,
     ),
@@ -1155,7 +1158,9 @@ pub enum LessOptions {
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum LessEqualOptions {
     Args(
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
         serde_json::Value,
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
         serde_json::Value,
         #[serde(default)] Option<Collator>,
     ),
@@ -1167,7 +1172,9 @@ pub enum LessEqualOptions {
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum GreaterOptions {
     Args(
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
         serde_json::Value,
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
         serde_json::Value,
         #[serde(default)] Option<Collator>,
     ),
@@ -1179,7 +1186,9 @@ pub enum GreaterOptions {
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum GreaterEqualOptions {
     Args(
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
         serde_json::Value,
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
         serde_json::Value,
         #[serde(default)] Option<Collator>,
     ),
@@ -2328,12 +2337,16 @@ pub enum IndexOfOptions {
     Item(
         ExprOrLiteral,
         ExprOrLiteral,
-        #[serde(default)] Option<serde_json::Value>,
+        #[serde(default)]
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_option_json_value))]
+        Option<serde_json::Value>,
     ),
     Substring(
         StringLiteralOrStringOrAnyAsUnion,
         StringLiteralOrStringOrAnyAsUnion,
-        #[serde(default)] Option<serde_json::Value>,
+        #[serde(default)]
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_option_json_value))]
+        Option<serde_json::Value>,
     ),
 }
 

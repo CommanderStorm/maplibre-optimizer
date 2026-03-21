@@ -475,7 +475,7 @@ fn generate_syntax_enum_body(
                 let ft = box_recursive_types(name, &fallback_ty);
                 variadic_tuple_types.insert(
                     key.clone(),
-                    format!("(serde_json::Value, Vec<({lt},{ot})>, {ft})"),
+                    format!("(ExprOrLiteral, Vec<({lt},{ot})>, {ft})"),
                 );
                 continue;
             }
@@ -649,12 +649,12 @@ fn generate_syntax_enum_body(
             if syntax.has_variadic_overload() {
                 let var = enu.new_variant(&var_name).doc(&value.doc);
                 if let Some(shape) = variadic_interpolate_style.get(key) {
-                    var.tuple(shape.combined_tuple_type.as_str());
+                    emit_tuple_slot(var, shape.combined_tuple_type.as_str());
                 } else {
                     let tuple = variadic_tuple_types
                         .get(key)
                         .unwrap_or_else(|| panic!("variadic tuple missing for operator {key}"));
-                    var.tuple(tuple);
+                    emit_tuple_slot(var, tuple);
                 }
                 continue;
             }
@@ -757,8 +757,8 @@ fn generate_multi_overload(
         let args = enu.new_variant("Args");
         // Build the tuple explicitly so the trailing `collator?` slot gets a serde default.
         // Without `#[serde(default)]`, serde won't accept the shortened 2-operand form.
-        args.tuple("serde_json::Value");
-        args.tuple("serde_json::Value");
+        emit_tuple_slot(args, "serde_json::Value");
+        emit_tuple_slot(args, "serde_json::Value");
         args.tuple_with_attrs(["#[serde(default)]"], "Option<Collator>");
         return;
     }
@@ -815,7 +815,14 @@ fn generate_multi_overload(
             for (pi, param_raw) in overload.parameters.iter().enumerate() {
                 let t = &overloads_tuples[i][pi];
                 if param_raw.ends_with('?') {
-                    var.tuple_with_attrs(["#[serde(default)]"], t.as_str());
+                    if t.contains("serde_json::Value") {
+                        var.tuple_with_attrs(
+                            ["#[serde(default)]", fuzz::ARB_OPTION_JSON_VALUE],
+                            t.as_str(),
+                        );
+                    } else {
+                        var.tuple_with_attrs(["#[serde(default)]"], t.as_str());
+                    }
                 } else {
                     emit_tuple_slot(var, t);
                 }
@@ -1226,7 +1233,7 @@ fn emit_any_match_deserializer_arm(visit_seq: &mut Function, (lt, ot, ft): (&str
     visit_seq.line("return Err(serde::de::Error::custom(\"Any::Match: expected an even number of arguments after operator (input + label/output pairs + fallback)\"));");
     visit_seq.line("}");
     visit_seq.line("let fallback_v = rest.pop().unwrap();");
-    visit_seq.line("let input = rest.remove(0);");
+    visit_seq.line("let input: ExprOrLiteral = serde_json::from_value(rest.remove(0)).map_err(serde::de::Error::custom)?;");
     visit_seq.line("let mut pairs = Vec::new();");
     visit_seq.line("for chunk in rest.chunks_exact(2) {");
     visit_seq.line(format!(
