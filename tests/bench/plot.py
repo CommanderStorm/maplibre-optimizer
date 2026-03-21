@@ -1,11 +1,12 @@
-#!/usr/bin/env python3
+#!/usr/bin/env -S uv run
 """
 Plot benchmark results from JSONL files produced by the bench harness.
 
 Usage:
-    python plot.py results/bench-*.jsonl
-    python plot.py results/bench-*.jsonl --out figures/
-    python plot.py results/bench-*.jsonl --metric fps --metric loadMs
+    uv run plot.py results/bench-*.jsonl
+    uv run plot.py results/bench-*.jsonl --out figures/
+    uv run plot.py results/bench-*.jsonl --metric fps --metric loadMs
+    uv run plot.py results/bench-*.jsonl --format html
 """
 
 import argparse
@@ -16,7 +17,21 @@ from pathlib import Path
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
-from plotly.subplots import make_subplots
+
+IMG_WIDTH = 1400
+IMG_HEIGHT = 700
+IMG_SCALE = 2  # 2x for retina-quality PNGs
+
+
+def write_fig(fig: go.Figure, out: Path, name: str, fmt: str) -> None:
+    """Write a figure in the chosen format (png or html)."""
+    if fmt == "html":
+        path = out / f"{name}.html"
+        fig.write_html(path)
+    else:
+        path = out / f"{name}.png"
+        fig.write_image(path, width=IMG_WIDTH, height=IMG_HEIGHT, scale=IMG_SCALE)
+    print(f"  {path}")
 
 
 def load_jsonl(paths: list[Path]) -> pd.DataFrame:
@@ -47,7 +62,7 @@ METRIC_LABELS = {
 }
 
 
-def plot_box_comparison(df: pd.DataFrame, metrics: list[str], out: Path) -> None:
+def plot_box_comparison(df: pd.DataFrame, metrics: list[str], out: Path, fmt: str) -> None:
     """Box plots comparing original vs optimized for each scenario."""
     for metric in metrics:
         fig = px.box(
@@ -64,12 +79,10 @@ def plot_box_comparison(df: pd.DataFrame, metrics: list[str], out: Path) -> None
             legend_title_text="Variant",
             template="plotly_white",
         )
-        path = out / f"box_{metric}.html"
-        fig.write_html(path)
-        print(f"  {path}")
+        write_fig(fig, out, f"box_{metric}", fmt)
 
 
-def plot_delta_bar(df: pd.DataFrame, metrics: list[str], out: Path) -> None:
+def plot_delta_bar(df: pd.DataFrame, metrics: list[str], out: Path, fmt: str) -> None:
     """Bar chart showing % change (optimized vs original) per scenario."""
     medians = df.groupby(["scenario", "variant"])[metrics].median().reset_index()
     orig = medians[medians.variant == "original"].set_index("scenario")
@@ -97,12 +110,10 @@ def plot_delta_bar(df: pd.DataFrame, metrics: list[str], out: Path) -> None:
             xaxis_tickangle=-45,
             template="plotly_white",
         )
-        path = out / f"delta_{metric}.html"
-        fig.write_html(path)
-        print(f"  {path}")
+        write_fig(fig, out, f"delta_{metric}", fmt)
 
 
-def plot_geo_map(df: pd.DataFrame, metrics: list[str], out: Path) -> None:
+def plot_geo_map(df: pd.DataFrame, metrics: list[str], out: Path, fmt: str) -> None:
     """Scatter map showing per-location delta for each metric."""
     medians = df.groupby(["scenario", "variant", "location", "lat", "lng"])[metrics].median().reset_index()
     orig = medians[medians.variant == "original"].set_index("scenario")
@@ -137,12 +148,10 @@ def plot_geo_map(df: pd.DataFrame, metrics: list[str], out: Path) -> None:
             coloraxis_colorbar_title="Improvement",
             template="plotly_white",
         )
-        path = out / f"geo_{metric}.html"
-        fig.write_html(path)
-        print(f"  {path}")
+        write_fig(fig, out, f"geo_{metric}", fmt)
 
 
-def plot_frame_time_distribution(df: pd.DataFrame, out: Path) -> None:
+def plot_frame_time_distribution(df: pd.DataFrame, out: Path, fmt: str) -> None:
     """Histogram of p95 frame times across all runs, original vs optimized."""
     fig = px.histogram(
         df,
@@ -156,9 +165,7 @@ def plot_frame_time_distribution(df: pd.DataFrame, out: Path) -> None:
         color_discrete_map={"original": "#636EFA", "optimized": "#00CC96"},
     )
     fig.update_layout(template="plotly_white")
-    path = out / "hist_p95.html"
-    fig.write_html(path)
-    print(f"  {path}")
+    write_fig(fig, out, "hist_p95", fmt)
 
 
 def main() -> None:
@@ -166,25 +173,27 @@ def main() -> None:
     parser.add_argument("files", nargs="+", type=Path, help="JSONL benchmark result files")
     parser.add_argument("--out", type=Path, default=Path("tests/bench/figures"), help="Output directory for figures")
     parser.add_argument("--metric", action="append", dest="metrics", help="Metrics to plot (default: all)")
+    parser.add_argument("--format", choices=["png", "html"], default="png", help="Output format (default: png)")
     args = parser.parse_args()
 
     metrics = args.metrics or METRICS
+    fmt = args.format
     args.out.mkdir(parents=True, exist_ok=True)
 
     df = load_jsonl(args.files)
     print(f"Loaded {len(df)} records from {len(args.files)} file(s)\n")
 
     print("Box plots:")
-    plot_box_comparison(df, metrics, args.out)
+    plot_box_comparison(df, metrics, args.out, fmt)
 
     print("\nDelta bar charts:")
-    plot_delta_bar(df, metrics, args.out)
+    plot_delta_bar(df, metrics, args.out, fmt)
 
     print("\nGeo maps:")
-    plot_geo_map(df, metrics, args.out)
+    plot_geo_map(df, metrics, args.out, fmt)
 
     print("\nDistributions:")
-    plot_frame_time_distribution(df, args.out)
+    plot_frame_time_distribution(df, args.out, fmt)
 
     print(f"\nAll figures written to {args.out}/")
 

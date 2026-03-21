@@ -218,9 +218,15 @@ bench *ARGS:
 bench-debug *ARGS:
     npx tsx run.ts --debug {{ARGS}}
 
+# Sync bench Python venv from lockfile
+[private]
+bench-venv:
+    uv sync --project tests/bench
+
 # Plot benchmark results (uses latest JSONL by default)
-bench-plot *ARGS:
-    python tests/bench/plot.py {{ARGS}}
+[working-directory: 'tests/bench']
+bench-plot *ARGS: bench-venv
+    uv run plot.py {{ARGS}}
 
 # Install SQLX cli if not already installed.
 [private]
