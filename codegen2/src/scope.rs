@@ -1,5 +1,4 @@
-use std::collections::hash_map::RandomState;
-use std::fmt::{self, Debug, Display, Write};
+use std::fmt::{self, Display, Write};
 
 use indexmap::IndexMap;
 
@@ -24,7 +23,7 @@ pub struct Scope {
     docs: Option<Docs>,
 
     /// Imports
-    imports: IndexMap<String, IndexMap<String, Import, RandomState>, RandomState>,
+    imports: IndexMap<String, IndexMap<String, Import>>,
 
     /// Contents of the documentation,
     items: Vec<Item>,
@@ -41,7 +40,7 @@ impl Scope {
     pub fn new() -> Self {
         Scope {
             docs: None,
-            imports: IndexMap::with_hasher(RandomState::new()),
+            imports: IndexMap::new(),
             items: vec![],
         }
     }
@@ -62,7 +61,7 @@ impl Scope {
         let ty = ty.split("::").next().unwrap_or(ty.as_str());
         self.imports
             .entry(path.to_string())
-            .or_insert(IndexMap::with_hasher(RandomState::new()))
+            .or_default()
             .entry(ty.to_string())
             .or_insert_with(|| Import::new(path, ty))
     }
@@ -82,7 +81,7 @@ impl Scope {
     pub fn new_module(&mut self, name: impl ToString) -> &mut Module {
         self.push_module(Module::new(name));
 
-        match *self.items.last_mut().unwrap() {
+        match *self.items.last_mut().expect("items was just pushed to") {
             Item::Module(ref mut v) => v,
             _ => unreachable!(),
         }
@@ -123,7 +122,8 @@ impl Scope {
         String: PartialEq<Q>,
     {
         if self.get_module(name).is_some() {
-            self.get_module_mut(name).unwrap()
+            self.get_module_mut(name)
+                .expect("module existence was just checked")
         } else {
             self.new_module(name)
         }
@@ -151,7 +151,7 @@ impl Scope {
     pub fn new_struct(&mut self, name: impl ToString) -> &mut Struct {
         self.push_struct(Struct::new(name));
 
-        match *self.items.last_mut().unwrap() {
+        match *self.items.last_mut().expect("items was just pushed to") {
             Item::Struct(ref mut v) => v,
             _ => unreachable!(),
         }
@@ -188,7 +188,7 @@ impl Scope {
     pub fn new_fn(&mut self, name: impl ToString) -> &mut Function {
         self.push_fn(Function::new(name));
 
-        match *self.items.last_mut().unwrap() {
+        match *self.items.last_mut().expect("items was just pushed to") {
             Item::Function(ref mut v) => v,
             _ => unreachable!(),
         }
@@ -215,7 +215,7 @@ impl Scope {
     pub fn new_trait(&mut self, name: impl ToString) -> &mut Trait {
         self.push_trait(Trait::new(name));
 
-        match *self.items.last_mut().unwrap() {
+        match *self.items.last_mut().expect("items was just pushed to") {
             Item::Trait(ref mut v) => v,
             _ => unreachable!(),
         }
@@ -231,7 +231,7 @@ impl Scope {
     pub fn new_enum(&mut self, name: impl ToString) -> &mut Enum {
         self.push_enum(Enum::new(name));
 
-        match *self.items.last_mut().unwrap() {
+        match *self.items.last_mut().expect("items was just pushed to") {
             Item::Enum(ref mut v) => v,
             _ => unreachable!(),
         }
@@ -258,7 +258,7 @@ impl Scope {
     pub fn new_impl(&mut self, target: impl ToString) -> &mut Impl {
         self.push_impl(Impl::new(target));
 
-        match *self.items.last_mut().unwrap() {
+        match *self.items.last_mut().expect("items was just pushed to") {
             Item::Impl(ref mut v) => v,
             _ => unreachable!(),
         }
@@ -282,7 +282,7 @@ impl Scope {
     pub fn new_type_alias(&mut self, name: impl ToString, target: impl ToString) -> &mut TypeAlias {
         self.push_type_alias(TypeAlias::new(name, target));
 
-        match *self.items.last_mut().unwrap() {
+        match *self.items.last_mut().expect("items was just pushed to") {
             Item::TypeAlias(ref mut v) => v,
             _ => unreachable!(),
         }
@@ -304,7 +304,8 @@ impl Scope {
     pub fn to_string(&self) -> String {
         let mut ret = String::new();
 
-        self.fmt(&mut Formatter::new(&mut ret)).unwrap();
+        self.fmt(&mut Formatter::new(&mut ret))
+            .expect("formatting to String cannot fail");
 
         if let Some(b'\n') = ret.as_bytes().last() {
             ret.pop();
@@ -348,10 +349,10 @@ impl Scope {
     }
 
     fn fmt_imports(&self, fmt: &mut Formatter<'_>) -> fmt::Result {
-        let mut visibilities = vec![];
+        let mut visibilities: Vec<Option<String>> = vec![];
 
-        for (_, imports) in &self.imports {
-            for (_, import) in imports {
+        for imports in self.imports.values() {
+            for import in imports.values() {
                 if !visibilities.contains(&import.vis) {
                     visibilities.push(import.vis.clone());
                 }
@@ -366,7 +367,7 @@ impl Scope {
                 tys.clear();
 
                 for (ty, import) in imports {
-                    if *vis == import.vis {
+                    if vis == &import.vis {
                         tys.push(ty);
                     }
                 }

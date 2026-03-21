@@ -82,7 +82,7 @@ impl Fields {
     {
         self.named(name, ty);
         if let Fields::Named(ref mut fields) = *self {
-            fields.last_mut().unwrap()
+            fields.last_mut().expect("fields was just pushed to")
         } else {
             unreachable!()
         }

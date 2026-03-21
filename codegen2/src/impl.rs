@@ -137,7 +137,7 @@ impl Impl {
     /// Push a new function definition, returning a mutable reference to it.
     pub fn new_fn(&mut self, name: impl ToString) -> &mut Function {
         self.push_fn(Function::new(name));
-        self.fns.last_mut().unwrap()
+        self.fns.last_mut().expect("fns was just pushed to")
     }
 
     /// Push a function definition.

@@ -32,12 +32,14 @@ impl Type {
         self
     }
 
-    /// Rewrite the `Type` with the provided path
+    /// Rewrite the `Type` with the provided path prefix.
     ///
-    /// TODO: Is this needed?
+    /// # Panics
+    ///
+    /// Panics if the type name already contains a path separator (`::`)
+    /// since prepending a path to a qualified name is ambiguous.
     pub fn path(&self, path: impl ToString) -> Type {
-        // TODO: This isn't really correct
-        assert!(!self.name.contains("::"));
+        assert!(!self.name.contains("::"), "type name already contains a path separator");
 
         let mut name = path.to_string();
         name.push_str("::");

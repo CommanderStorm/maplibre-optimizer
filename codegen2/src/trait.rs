@@ -17,8 +17,6 @@ pub struct Trait {
     attributes: Vec<String>,
     associated_tys: Vec<AssociatedType>,
     fns: Vec<Function>,
-    #[allow(dead_code)]
-    macros: Vec<String>,
 }
 
 impl Trait {
@@ -31,7 +29,6 @@ impl Trait {
             attributes: Vec::new(),
             associated_tys: Vec::new(),
             fns: Vec::new(),
-            macros: Vec::new(),
         }
     }
 
@@ -99,7 +96,9 @@ impl Trait {
             bound: vec![ty.into()],
         }));
 
-        self.associated_consts.last_mut().unwrap()
+        self.associated_consts
+            .last_mut()
+            .expect("associated_consts was just pushed to")
     }
 
     /// Add an associated type. Returns a mutable reference to the new
@@ -110,7 +109,9 @@ impl Trait {
             bound: vec![],
         }));
 
-        self.associated_tys.last_mut().unwrap()
+        self.associated_tys
+            .last_mut()
+            .expect("associated_tys was just pushed to")
     }
 
     /// Push a new function definition, returning a mutable reference to it.
@@ -119,7 +120,7 @@ impl Trait {
         func.body = None;
 
         self.push_fn(func);
-        self.fns.last_mut().unwrap()
+        self.fns.last_mut().expect("fns was just pushed to")
     }
 
     /// Push a function definition.
