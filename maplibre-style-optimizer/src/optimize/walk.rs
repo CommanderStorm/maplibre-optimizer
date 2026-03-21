@@ -82,40 +82,42 @@ pub(crate) fn walk_style_mut(
 
                 if let Some(type_def) = type_def {
                     if let Some(paint_val) = obj.get_mut("paint")
-                        && let Some(paint_obj) = paint_val.as_object_mut() {
-                            for (prop_name, field) in &type_def.paint {
-                                if let Some(value) = paint_obj.get_mut(prop_name.as_str()) {
-                                    visitor.visit_property(
-                                        &PropertyContext {
-                                            layer_index: i,
-                                            layer_type,
-                                            section: PropertySection::Paint,
-                                            property_name: prop_name,
-                                            field,
-                                        },
-                                        value,
-                                    );
-                                }
+                        && let Some(paint_obj) = paint_val.as_object_mut()
+                    {
+                        for (prop_name, field) in &type_def.paint {
+                            if let Some(value) = paint_obj.get_mut(prop_name.as_str()) {
+                                visitor.visit_property(
+                                    &PropertyContext {
+                                        layer_index: i,
+                                        layer_type,
+                                        section: PropertySection::Paint,
+                                        property_name: prop_name,
+                                        field,
+                                    },
+                                    value,
+                                );
                             }
                         }
+                    }
 
                     if let Some(layout_val) = obj.get_mut("layout")
-                        && let Some(layout_obj) = layout_val.as_object_mut() {
-                            for (prop_name, field) in &type_def.layout {
-                                if let Some(value) = layout_obj.get_mut(prop_name.as_str()) {
-                                    visitor.visit_property(
-                                        &PropertyContext {
-                                            layer_index: i,
-                                            layer_type,
-                                            section: PropertySection::Layout,
-                                            property_name: prop_name,
-                                            field,
-                                        },
-                                        value,
-                                    );
-                                }
+                        && let Some(layout_obj) = layout_val.as_object_mut()
+                    {
+                        for (prop_name, field) in &type_def.layout {
+                            if let Some(value) = layout_obj.get_mut(prop_name.as_str()) {
+                                visitor.visit_property(
+                                    &PropertyContext {
+                                        layer_index: i,
+                                        layer_type,
+                                        section: PropertySection::Layout,
+                                        property_name: prop_name,
+                                        field,
+                                    },
+                                    value,
+                                );
                             }
                         }
+                    }
                 }
             } // `obj` borrow released here
 

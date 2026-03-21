@@ -26,6 +26,10 @@ struct Cli {
     #[arg(long)]
     reference: Option<PathBuf>,
 
+    /// Enable all optimization passes (overrides individual flags).
+    #[arg(long)]
+    all: bool,
+
     /// Simplify unary boolean ops: `["any"|"all", e]` → `e`, `["!",["!",e]]` → `e`.
     #[arg(long)]
     simplify_unary: bool,
@@ -34,7 +38,7 @@ struct Cli {
     #[arg(long)]
     expression_kind: bool,
 
-    /// Fold constant comparisons and boolean `any`/`all`/`!` (style-static only).
+    /// Fold constant comparisons, boolean `any`/`all`/`!`, arithmetic, strings, and colors.
     #[arg(long)]
     constant_fold: bool,
 
@@ -43,12 +47,29 @@ struct Cli {
     dead_elimination: bool,
 
     /// Tighten `minzoom`/`maxzoom` from `["zoom"]` predicates inside filters.
+    /// Also removes zoom predicates that are fully captured by the extracted bounds.
     #[arg(long)]
     metadata_refinement: bool,
 
     /// Reorder `any`/`all` operands for static short-circuit hints (literals first/last).
     #[arg(long)]
     selectivity_reorder: bool,
+
+    /// Remove `metadata` keys from style root and layers.
+    #[arg(long)]
+    strip_metadata: bool,
+
+    /// Remove paint/layout properties that equal their spec-defined default values.
+    #[arg(long)]
+    strip_defaults: bool,
+
+    /// Simplify `interpolate`/`step` with identical stops and deduplicate `match` arms.
+    #[arg(long)]
+    simplify_expressions: bool,
+
+    /// Remove empty `paint`/`layout` objects, `visibility:none` layers, and zero-opacity layers.
+    #[arg(long)]
+    cleanup: bool,
 
     /// Run JSON-tree validation after optimization (`maplibre_style_spec::validate`).
     #[arg(long)]
@@ -77,13 +98,21 @@ fn main() -> anyhow::Result<()> {
     let mut value: serde_json::Value = serde_json::from_str(&json_text)
         .with_context(|| format!("parse style JSON {}", cli.input.display()))?;
 
-    let passes = OptPasses {
-        simplify_unary: cli.simplify_unary,
-        expression_kind: cli.expression_kind,
-        constant_fold: cli.constant_fold,
-        dead_elimination: cli.dead_elimination,
-        metadata_refinement: cli.metadata_refinement,
-        selectivity_reorder: cli.selectivity_reorder,
+    let passes = if cli.all {
+        OptPasses::all()
+    } else {
+        OptPasses {
+            simplify_unary: cli.simplify_unary,
+            expression_kind: cli.expression_kind,
+            constant_fold: cli.constant_fold,
+            dead_elimination: cli.dead_elimination,
+            metadata_refinement: cli.metadata_refinement,
+            selectivity_reorder: cli.selectivity_reorder,
+            strip_metadata: cli.strip_metadata,
+            strip_defaults: cli.strip_defaults,
+            simplify_expressions: cli.simplify_expressions,
+            cleanup: cli.cleanup,
+        }
     };
     optimize_style_json_value(&mut value, &mir, &passes);
 

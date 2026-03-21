@@ -53,6 +53,16 @@ fn refine_layer_zoom_metadata(layer: &mut Value) {
             }
         }
     }
+
+    // Pass 7: remove zoom predicates from the filter that were fully captured by
+    // the minzoom/maxzoom we just set.
+    let adopted_min = obj.get("minzoom").and_then(Value::as_f64);
+    let adopted_max = obj.get("maxzoom").and_then(Value::as_f64);
+    if (adopted_min.is_some() || adopted_max.is_some())
+        && let Some(filter_mut) = obj.get_mut("filter")
+    {
+        remove_consumed_zoom_predicates(filter_mut, adopted_min, adopted_max);
+    }
 }
 
 fn json_number(n: f64) -> Value {
@@ -101,8 +111,38 @@ fn zoom_bounds_from_expression(expr: &Value) -> (Option<f64>, Option<f64>) {
                     (acc_low, acc_high)
                 }
                 Some("any") => {
-                    // Conservative: OR does not give a shared tightening without more analysis.
-                    (None, None)
+                    // Pass 8: union of all branch bounds.
+                    // A bound is only valid if ALL branches contribute that bound direction
+                    // (if any branch has no restriction, the `any` has no restriction).
+                    let mut acc_low: Option<f64> = None;
+                    let mut acc_high: Option<f64> = None;
+                    let mut all_have_low = true;
+                    let mut all_have_high = true;
+
+                    for child in arr.iter().skip(1) {
+                        let (cl, ch) = zoom_bounds_from_expression(child);
+                        if cl.is_none() {
+                            all_have_low = false;
+                        }
+                        if ch.is_none() {
+                            all_have_high = false;
+                        }
+                        acc_low = match (acc_low, cl) {
+                            (None, v) => v,
+                            (Some(a), Some(b)) => Some(a.min(b)), // union → minimum
+                            (Some(a), None) => Some(a),
+                        };
+                        acc_high = match (acc_high, ch) {
+                            (None, v) => v,
+                            (Some(a), Some(b)) => Some(a.max(b)), // union → maximum
+                            (Some(a), None) => Some(a),
+                        };
+                    }
+
+                    (
+                        if all_have_low { acc_low } else { None },
+                        if all_have_high { acc_high } else { None },
+                    )
                 }
                 _ => zoom_bounds_from_compare(arr),
             }
@@ -149,4 +189,84 @@ fn next_zoom(n: f64) -> f64 {
 
 fn prev_zoom(n: f64) -> f64 {
     n.ceil() - 1.0
+}
+
+// ── Pass 7: Remove consumed zoom predicates ────────────────────────────────────
+
+/// Remove zoom predicates from an `["all", ...]` filter that were exactly captured
+/// by the layer's minzoom/maxzoom.
+///
+/// Only removes `[">=", ["zoom"], N]` / `["<=", ["zoom"], N]` (and their reversed forms)
+/// where N is an integer that exactly matches the adopted bound.
+fn remove_consumed_zoom_predicates(
+    filter: &mut Value,
+    adopted_min: Option<f64>,
+    adopted_max: Option<f64>,
+) {
+    let Value::Array(arr) = &*filter else {
+        return;
+    };
+    if arr.first().and_then(Value::as_str) != Some("all") {
+        return;
+    }
+
+    let kept: Vec<Value> = std::iter::once(Value::String("all".to_string()))
+        .chain(
+            arr[1..]
+                .iter()
+                .filter(|child| !is_exact_zoom_predicate_consumed(child, adopted_min, adopted_max))
+                .cloned(),
+        )
+        .collect();
+
+    if kept.len() == arr.len() {
+        return; // nothing removed
+    }
+
+    *filter = match kept.len() {
+        1 => serde_json::json!(["literal", true]),
+        2 => kept[1].clone(),
+        _ => Value::Array(kept),
+    };
+}
+
+/// Return true if `pred` is a simple `[>=/<= , ["zoom"], N]` predicate with integer N
+/// whose bound is exactly the adopted minzoom or maxzoom.
+fn is_exact_zoom_predicate_consumed(
+    pred: &Value,
+    adopted_min: Option<f64>,
+    adopted_max: Option<f64>,
+) -> bool {
+    let Value::Array(arr) = pred else {
+        return false;
+    };
+    if arr.len() != 3 {
+        return false;
+    }
+    let Some(op) = arr[0].as_str() else {
+        return false;
+    };
+
+    let (zoom_first, other) = if is_zoom_expr(&arr[1]) {
+        (true, &arr[2])
+    } else if is_zoom_expr(&arr[2]) {
+        (false, &arr[1])
+    } else {
+        return false;
+    };
+
+    let Some(n) = extract_json_literal(other).and_then(|v| v.as_f64()) else {
+        return false;
+    };
+    if n.fract() != 0.0 {
+        return false; // only integer bounds are safe to remove
+    }
+
+    match (op, zoom_first) {
+        // zoom >= N  or  N <= zoom  → lower bound N, must match adopted_min
+        (">=", true) | ("<=", false) => adopted_min.is_some_and(|m| (m - n).abs() < f64::EPSILON),
+        // zoom <= N  or  N >= zoom  → upper bound N, must match adopted_max
+        ("<=", true) | (">=", false) => adopted_max.is_some_and(|m| (m - n).abs() < f64::EPSILON),
+        _ => false,
+    }
 }

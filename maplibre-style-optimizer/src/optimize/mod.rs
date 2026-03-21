@@ -1,15 +1,20 @@
 //! Style JSON rewrite pipeline: expression normalisation, dead-code removal, metadata, reordering.
 
 mod dead;
+mod defaults;
 mod expr;
 mod metadata;
+mod source_util;
+mod strip;
 mod walk;
 
 use dead::DeadEliminationVisitor;
+use defaults::StripDefaultsVisitor;
 use expr::{NormalizeFoldVisitor, ReorderSelectivityVisitor};
 use maplibre_style_spec::mir::IntermediateSpec;
 use metadata::MetadataRefinementVisitor;
 use serde_json::Value;
+use strip::{CleanupVisitor, StripMetadataVisitor};
 use walk::walk_style_mut;
 
 const NORMALIZE_FOLD_FIXPOINT_CAP: usize = 8;
@@ -22,30 +27,79 @@ pub struct OptPasses {
     pub simplify_unary: bool,
     /// `["!", ["==", a, b]]` → `["!=", a, b]` and similar (requires MIR operators).
     pub expression_kind: bool,
-    /// Constant folding for comparisons, boolean `any`/`all`, and `!` on literals (style-static only).
+    /// Constant folding for comparisons, boolean `any`/`all`/`!`, arithmetic, strings, and colors.
     pub constant_fold: bool,
     /// Drop layers with always-false filters and remove unused `sources` entries.
     pub dead_elimination: bool,
-    /// Raise `minzoom` / tighten `maxzoom` from `["zoom"]` comparisons inside `filter` (`all` only).
+    /// Raise `minzoom` / tighten `maxzoom` from `["zoom"]` comparisons inside `filter`.
+    /// Also removes zoom predicates that are fully captured by the extracted bounds.
     pub metadata_refinement: bool,
     /// Static selectivity reordering of `any` / `all` operands (literals first/last for short-circuit hints).
     pub selectivity_reorder: bool,
+    /// Remove `metadata` keys from root and layers.
+    pub strip_metadata: bool,
+    /// Remove paint/layout properties equal to their spec-defined defaults.
+    pub strip_defaults: bool,
+    /// Simplify `interpolate`/`step` with identical stops and deduplicate `match` arms.
+    pub simplify_expressions: bool,
+    /// Remove empty `paint`/`layout` objects, `visibility:none` layers, and zero-opacity layers.
+    pub cleanup: bool,
+}
+
+impl OptPasses {
+    /// Enable all optimization passes.
+    #[must_use]
+    pub fn all() -> Self {
+        Self {
+            simplify_unary: true,
+            expression_kind: true,
+            constant_fold: true,
+            dead_elimination: true,
+            metadata_refinement: true,
+            selectivity_reorder: true,
+            strip_metadata: true,
+            strip_defaults: true,
+            simplify_expressions: true,
+            cleanup: true,
+        }
+    }
 }
 
 fn wants_normalize_fold(passes: &OptPasses) -> bool {
-    passes.simplify_unary || passes.expression_kind || passes.constant_fold
+    passes.simplify_unary
+        || passes.expression_kind
+        || passes.constant_fold
+        || passes.simplify_expressions
 }
 
 /// Apply enabled passes in pipeline order with a fixpoint on normalisation + folding.
+///
+/// Pipeline order:
+/// 1. `strip_metadata` — remove noise before analysis
+/// 2. Fixpoint loop (`simplify_unary`, `expression_kind`, `constant_fold`, `simplify_expressions`)
+/// 3. `dead_elimination` — remove always-false layers, unused sources
+/// 4. `metadata_refinement` — extract zoom bounds (+ remove redundant zoom predicates)
+/// 5. `strip_defaults` — remove default-valued properties
+/// 6. `selectivity_reorder` — reorder for short-circuit after folding removes literals
+/// 7. `cleanup` — remove empty objects, invisible layers, re-run source cleanup
 pub fn optimize_style_json_value(v: &mut Value, mir: &IntermediateSpec, passes: &OptPasses) {
-    if !wants_normalize_fold(passes)
+    if !passes.strip_metadata
+        && !wants_normalize_fold(passes)
         && !passes.dead_elimination
         && !passes.metadata_refinement
+        && !passes.strip_defaults
         && !passes.selectivity_reorder
+        && !passes.cleanup
     {
         return;
     }
 
+    // 1. Strip metadata early (before analysis).
+    if passes.strip_metadata {
+        walk_style_mut(v, mir, &mut StripMetadataVisitor);
+    }
+
+    // 2. Normalize / fold fixpoint.
     if wants_normalize_fold(passes) {
         for _ in 0..NORMALIZE_FOLD_FIXPOINT_CAP {
             let mut visitor = NormalizeFoldVisitor {
@@ -60,16 +114,29 @@ pub fn optimize_style_json_value(v: &mut Value, mir: &IntermediateSpec, passes: 
         }
     }
 
+    // 3. Dead elimination.
     if passes.dead_elimination {
         walk_style_mut(v, mir, &mut DeadEliminationVisitor);
     }
 
+    // 4. Metadata refinement.
     if passes.metadata_refinement {
         walk_style_mut(v, mir, &mut MetadataRefinementVisitor);
     }
 
+    // 5. Strip defaults.
+    if passes.strip_defaults {
+        walk_style_mut(v, mir, &mut StripDefaultsVisitor { mir });
+    }
+
+    // 6. Selectivity reorder.
     if passes.selectivity_reorder {
         walk_style_mut(v, mir, &mut ReorderSelectivityVisitor { mir });
+    }
+
+    // 7. Cleanup.
+    if passes.cleanup {
+        walk_style_mut(v, mir, &mut CleanupVisitor);
     }
 }
 
@@ -302,5 +369,236 @@ mod tests {
         );
         let arr = v["layers"][0]["filter"].as_array().unwrap();
         assert_eq!(arr[1], serde_json::json!(["literal", true]));
+    }
+
+    #[test]
+    fn arithmetic_fold_addition() {
+        let mir = sample_mir();
+        let mut v = serde_json::json!({
+            "layers": [{ "id": "x", "type": "fill", "filter": ["+", 1, 2] }]
+        });
+        optimize_style_json_value(
+            &mut v,
+            &mir,
+            &OptPasses {
+                constant_fold: true,
+                ..Default::default()
+            },
+        );
+        assert_eq!(
+            v["layers"][0]["filter"],
+            serde_json::json!(["literal", 3.0])
+        );
+    }
+
+    #[test]
+    fn string_fold_concat() {
+        let mir = sample_mir();
+        let mut v = serde_json::json!({
+            "layers": [{ "id": "x", "type": "fill", "filter": ["concat", "hello", " ", "world"] }]
+        });
+        optimize_style_json_value(
+            &mut v,
+            &mir,
+            &OptPasses {
+                constant_fold: true,
+                ..Default::default()
+            },
+        );
+        assert_eq!(
+            v["layers"][0]["filter"],
+            serde_json::json!(["literal", "hello world"])
+        );
+    }
+
+    #[test]
+    fn interpolate_all_same_stops_collapsed() {
+        let mir = sample_mir();
+        let mut v = serde_json::json!({
+            "layers": [{ "id": "x", "type": "fill", "paint": {
+                "fill-opacity": ["interpolate", ["linear"], ["zoom"], 5, 0.5, 10, 0.5, 15, 0.5]
+            }}]
+        });
+        optimize_style_json_value(
+            &mut v,
+            &mir,
+            &OptPasses {
+                simplify_expressions: true,
+                ..Default::default()
+            },
+        );
+        assert_eq!(
+            v["layers"][0]["paint"]["fill-opacity"],
+            serde_json::json!(["literal", 0.5])
+        );
+    }
+
+    #[test]
+    fn step_all_same_outputs_collapsed() {
+        let mir = sample_mir();
+        let mut v = serde_json::json!({
+            "layers": [{ "id": "x", "type": "line", "paint": {
+                "line-width": ["step", ["zoom"], 2, 10, 2, 15, 2]
+            }}]
+        });
+        optimize_style_json_value(
+            &mut v,
+            &mir,
+            &OptPasses {
+                simplify_expressions: true,
+                ..Default::default()
+            },
+        );
+        assert_eq!(
+            v["layers"][0]["paint"]["line-width"],
+            serde_json::json!(["literal", 2])
+        );
+    }
+
+    #[test]
+    fn match_arms_deduplicated() {
+        let mir = sample_mir();
+        let mut v = serde_json::json!({
+            "layers": [{ "id": "x", "type": "line", "paint": {
+                "line-color": ["match", ["get", "class"],
+                    "motorway", "#ff0000",
+                    "trunk", "#ff0000",
+                    "primary", "#ff6600",
+                    "#cccccc"
+                ]
+            }}]
+        });
+        optimize_style_json_value(
+            &mut v,
+            &mir,
+            &OptPasses {
+                simplify_expressions: true,
+                ..Default::default()
+            },
+        );
+        let color = &v["layers"][0]["paint"]["line-color"];
+        let arr = color.as_array().unwrap();
+        assert_eq!(arr[0], serde_json::json!("match"));
+        // motorway and trunk should now be grouped
+        assert_eq!(arr[2], serde_json::json!(["motorway", "trunk"]));
+        assert_eq!(arr[3], serde_json::json!("#ff0000"));
+    }
+
+    #[test]
+    fn strip_metadata_removes_noise() {
+        let mir = sample_mir();
+        let mut v = serde_json::json!({
+            "metadata": { "maputnik:renderer": "mbgljs" },
+            "layers": [{ "id": "x", "type": "fill", "metadata": { "group": "water" } }]
+        });
+        optimize_style_json_value(
+            &mut v,
+            &mir,
+            &OptPasses {
+                strip_metadata: true,
+                ..Default::default()
+            },
+        );
+        assert!(v.get("metadata").is_none());
+        assert!(v["layers"][0].get("metadata").is_none());
+    }
+
+    #[test]
+    fn strip_defaults_removes_fill_opacity_one() {
+        let mir = sample_mir();
+        let mut v = serde_json::json!({
+            "layers": [{ "id": "x", "type": "fill", "paint": { "fill-opacity": 1, "fill-color": "#f00" } }]
+        });
+        optimize_style_json_value(
+            &mut v,
+            &mir,
+            &OptPasses {
+                strip_defaults: true,
+                ..Default::default()
+            },
+        );
+        assert!(v["layers"][0]["paint"].get("fill-opacity").is_none());
+        assert!(v["layers"][0]["paint"].get("fill-color").is_some());
+    }
+
+    #[test]
+    fn cleanup_removes_invisible_layer() {
+        let mir = sample_mir();
+        let mut v = serde_json::json!({
+            "version": 8,
+            "sources": { "s": { "type": "vector", "url": "x" } },
+            "layers": [{ "id": "x", "type": "fill", "source": "s", "source-layer": "l",
+                "layout": { "visibility": "none" } }]
+        });
+        optimize_style_json_value(
+            &mut v,
+            &mir,
+            &OptPasses {
+                cleanup: true,
+                ..Default::default()
+            },
+        );
+        assert_eq!(v["layers"].as_array().unwrap().len(), 0);
+    }
+
+    #[test]
+    fn all_passes_enabled_does_not_panic() {
+        let mir = sample_mir();
+        let mut v = serde_json::json!({
+            "version": 8,
+            "metadata": { "editor": "maputnik" },
+            "sources": {
+                "openmaptiles": { "type": "vector", "url": "https://example/tiles.json" }
+            },
+            "layers": [
+                {
+                    "id": "background",
+                    "type": "background",
+                    "paint": { "background-color": "#f8f4f0", "background-opacity": 1 }
+                },
+                {
+                    "id": "water",
+                    "type": "fill",
+                    "source": "openmaptiles",
+                    "source-layer": "water",
+                    "filter": ["all", [">=", ["zoom"], 5], ["==", ["geometry-type"], "Polygon"]],
+                    "paint": { "fill-color": "#a0c8f0", "fill-opacity": 1 }
+                }
+            ]
+        });
+        let passes = OptPasses::all();
+        optimize_style_json_value(&mut v, &mir, &passes);
+        // Running again must be a no-op (idempotency).
+        let mut again = v.clone();
+        optimize_style_json_value(&mut again, &mir, &passes);
+        assert_eq!(v, again);
+    }
+
+    #[test]
+    #[allow(clippy::float_cmp)]
+    fn zoom_predicate_removed_after_metadata_extraction() {
+        let mir = sample_mir();
+        let mut v = serde_json::json!({
+            "layers": [{
+                "id": "x",
+                "type": "fill",
+                "filter": ["all", [">=", ["zoom"], 7], ["==", ["get", "class"], "river"]]
+            }]
+        });
+        optimize_style_json_value(
+            &mut v,
+            &mir,
+            &OptPasses {
+                metadata_refinement: true,
+                ..Default::default()
+            },
+        );
+        // minzoom extracted
+        assert_eq!(v["layers"][0]["minzoom"].as_f64().unwrap(), 7.0);
+        // zoom predicate removed from filter, leaving just the class check
+        assert_eq!(
+            v["layers"][0]["filter"],
+            serde_json::json!(["==", ["get", "class"], "river"])
+        );
     }
 }
