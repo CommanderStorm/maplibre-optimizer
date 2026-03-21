@@ -83,12 +83,13 @@ pub enum ExprOrLiteral {
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum Any {
     /// Binds expressions to named variables.
-    Let((Vec<(StringLiteral,ExprOrLiteral)>,ExprOrLiteral)),
+    Let((Vec<(StringLiteral, ExprOrLiteral)>, ExprOrLiteral)),
 }
 
 impl<'de> serde::Deserialize<'de> for Any {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where D: serde::Deserializer<'de>,
+    where
+        D: serde::Deserializer<'de>,
     {
         deserializer.deserialize_seq(AnyVisitor)
     }
@@ -108,33 +109,52 @@ impl<'de> serde::de::Visitor<'de> for AnyVisitor {
         /// Reads the next element from the sequence or reports a missing field error.
         #[allow(dead_code)]
         fn visit_seq_field<'de, A, T>(seq: &mut A, name: &'static str) -> Result<T, A::Error>
-        where A: serde::de::SeqAccess<'de>, T: serde::Deserialize<'de> {
-        seq.next_element()?.ok_or_else(|| serde::de::Error::missing_field(name))
+        where
+            A: serde::de::SeqAccess<'de>,
+            T: serde::Deserialize<'de>,
+        {
+            seq.next_element()?
+                .ok_or_else(|| serde::de::Error::missing_field(name))
         }
 
         // First element: operator string
-        let op: std::string::String = seq.next_element()?.ok_or_else(|| serde::de::Error::custom("missing operator"))?;
+        let op: std::string::String = seq
+            .next_element()?
+            .ok_or_else(|| serde::de::Error::custom("missing operator"))?;
         match op.as_str() {
-        "let" => {
-        let mut inputs = Vec::new();
-        let mut rest: Vec<serde_json::Value> = Vec::new();
-        while let Some(v) = seq.next_element()? { rest.push(v); }
-        if rest.len() < 2 + 1 { return Err(serde::de::Error::custom("Any::Let: too few arguments")); }
-        if !(rest.len() - 1).is_multiple_of(2) { return Err(serde::de::Error::custom("Any::Let: malformed template/suffix layout")); }
-        let inputs_len = (rest.len() - 1) / 2;
-        for i in 0..inputs_len {
-        let var_name_i = serde_json::from_value(rest[i * 2].clone()).map_err(serde::de::Error::custom)?;
-        let var_value_i = serde_json::from_value(rest[i * 2 + 1].clone()).map_err(serde::de::Error::custom)?;
-        let element = (var_name_i,var_value_i);
-        inputs.push(element);
-        }
-        if inputs.is_empty() {
-        return Err(serde::de::Error::custom("Any::Let requires at least one argument"));
-        }
-        let expression = serde_json::from_value(rest[inputs_len * 2].clone()).map_err(serde::de::Error::custom)?;
-        Ok(Any::Let((inputs, expression)))
-        },
-        _ => Err(serde::de::Error::unknown_variant(&op, &["let"]))
+            "let" => {
+                let mut inputs = Vec::new();
+                let mut rest: Vec<serde_json::Value> = Vec::new();
+                while let Some(v) = seq.next_element()? {
+                    rest.push(v);
+                }
+                if rest.len() < 2 + 1 {
+                    return Err(serde::de::Error::custom("Any::Let: too few arguments"));
+                }
+                if !(rest.len() - 1).is_multiple_of(2) {
+                    return Err(serde::de::Error::custom(
+                        "Any::Let: malformed template/suffix layout",
+                    ));
+                }
+                let inputs_len = (rest.len() - 1) / 2;
+                for i in 0..inputs_len {
+                    let var_name_i = serde_json::from_value(rest[i * 2].clone())
+                        .map_err(serde::de::Error::custom)?;
+                    let var_value_i = serde_json::from_value(rest[i * 2 + 1].clone())
+                        .map_err(serde::de::Error::custom)?;
+                    let element = (var_name_i, var_value_i);
+                    inputs.push(element);
+                }
+                if inputs.is_empty() {
+                    return Err(serde::de::Error::custom(
+                        "Any::Let requires at least one argument",
+                    ));
+                }
+                let expression = serde_json::from_value(rest[inputs_len * 2].clone())
+                    .map_err(serde::de::Error::custom)?;
+                Ok(Any::Let((inputs, expression)))
+            }
+            _ => Err(serde::de::Error::unknown_variant(&op, &["let"])),
         }
     }
 }

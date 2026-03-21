@@ -59,7 +59,7 @@ mod tests {
             ),
             Many(
                 #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_vec_json_number))]
-                Vec<serde_json::Number>,
+                 Vec<serde_json::Number>,
             ),
         }
         "#)

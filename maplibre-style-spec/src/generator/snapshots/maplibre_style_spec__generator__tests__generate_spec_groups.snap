@@ -58,6 +58,7 @@ pub struct MaplibreStyleSpecification;
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct Names {
     /// A number between 0 and 10.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub name_one: Option<NamesNameOne>,
 }
 
@@ -71,7 +72,10 @@ pub struct NamesNameOne(
 
 impl Default for NamesNameOne {
     fn default() -> Self {
-        Self(serde_json::Number::from_f64(1.0).expect("the number is serialised from a number and is thus always valid"))
+        Self(
+            serde_json::Number::from_f64(1.0)
+                .expect("the number is serialised from a number and is thus always valid"),
+        )
     }
 }
 
@@ -102,5 +106,4 @@ pub enum ExprOrLiteral {
 #[cfg(test)]
 mod test {
     use super::*;
-
 }

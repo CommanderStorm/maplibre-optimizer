@@ -59,13 +59,13 @@ pub struct MaplibreStyleSpecification;
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum ColorSpace {
     /// Use the HCL color space to interpolate color values, interpolating the Hue, Chroma, and Luminance channels individually.
-    #[serde(rename="hcl")]
+    #[serde(rename = "hcl")]
     Hcl,
     /// Use the LAB color space to interpolate color values.
-    #[serde(rename="lab")]
+    #[serde(rename = "lab")]
     Lab,
     /// Use the RGB color space to interpolate color values
-    #[serde(rename="rgb")]
+    #[serde(rename = "rgb")]
     #[default]
     Rgb,
 }
@@ -97,5 +97,4 @@ pub enum ExprOrLiteral {
 #[cfg(test)]
 mod test {
     use super::*;
-
 }

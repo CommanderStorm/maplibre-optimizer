@@ -64,7 +64,8 @@ pub enum InterpolationName {
 
 impl<'de> serde::Deserialize<'de> for InterpolationName {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where D: serde::Deserializer<'de>,
+    where
+        D: serde::Deserializer<'de>,
     {
         deserializer.deserialize_seq(InterpolationNameVisitor)
     }
@@ -84,17 +85,21 @@ impl<'de> serde::de::Visitor<'de> for InterpolationNameVisitor {
         /// Reads the next element from the sequence or reports a missing field error.
         #[allow(dead_code)]
         fn visit_seq_field<'de, A, T>(seq: &mut A, name: &'static str) -> Result<T, A::Error>
-        where A: serde::de::SeqAccess<'de>, T: serde::Deserialize<'de> {
-        seq.next_element()?.ok_or_else(|| serde::de::Error::missing_field(name))
+        where
+            A: serde::de::SeqAccess<'de>,
+            T: serde::Deserialize<'de>,
+        {
+            seq.next_element()?
+                .ok_or_else(|| serde::de::Error::missing_field(name))
         }
 
         // First element: operator string
-        let op: std::string::String = seq.next_element()?.ok_or_else(|| serde::de::Error::custom("missing operator"))?;
+        let op: std::string::String = seq
+            .next_element()?
+            .ok_or_else(|| serde::de::Error::custom("missing operator"))?;
         match op.as_str() {
-        "linear" => {
-        Ok(InterpolationName::Linear)
-        },
-        _ => Err(serde::de::Error::unknown_variant(&op, &["linear"]))
+            "linear" => Ok(InterpolationName::Linear),
+            _ => Err(serde::de::Error::unknown_variant(&op, &["linear"])),
         }
     }
 }
@@ -106,7 +111,8 @@ mod test {
     #[rstest::rstest]
     #[case::t_linear(serde_json::json!(["linear"]))]
     fn test_example_interpolation_name_decodes(#[case] example: serde_json::Value) {
-        let _ = serde_json::from_value::<InterpolationName>(example).expect("example should decode");
+        let _ =
+            serde_json::from_value::<InterpolationName>(example).expect("example should decode");
     }
 }
 

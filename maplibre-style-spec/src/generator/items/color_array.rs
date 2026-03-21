@@ -54,12 +54,12 @@ mod tests {
             /// A color
             One(
                 #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_dynamic_color))]
-                color::DynamicColor,
+                 color::DynamicColor,
             ),
             /// A set of colors
             Multiple(
                 #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_vec_dynamic_color))]
-                Vec<color::DynamicColor>,
+                 Vec<color::DynamicColor>,
             ),
         }
         "#)

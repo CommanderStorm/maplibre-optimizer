@@ -90,22 +90,22 @@ mod tests {
             /// A single value applies to all four sides
             One(
                 #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_box_1_json_number))]
-                Box<[serde_json::Number; 1]>,
+                 Box<[serde_json::Number; 1]>,
             ),
             /// two values apply to `[top/bottom, left/right]`
             Two(
                 #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_box_2_json_number))]
-                Box<[serde_json::Number; 2]>,
+                 Box<[serde_json::Number; 2]>,
             ),
             /// three values apply to `[top, left/right, bottom]`
             Three(
                 #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_box_3_json_number))]
-                Box<[serde_json::Number; 3]>,
+                 Box<[serde_json::Number; 3]>,
             ),
             /// four values apply to `[top, right, bottom, left]`
             Four(
                 #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_box_4_json_number))]
-                Box<[serde_json::Number; 4]>,
+                 Box<[serde_json::Number; 4]>,
             ),
         }
 

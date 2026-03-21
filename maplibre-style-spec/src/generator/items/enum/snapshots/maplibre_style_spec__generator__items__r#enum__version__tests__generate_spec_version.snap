@@ -58,7 +58,9 @@ pub struct MaplibreStyleSpecification {
 }
 
 /// Style specification version number. Must be 8.
-#[derive(serde_repr::Serialize_repr, serde_repr::Deserialize_repr, PartialEq, Eq, Debug, Clone, Copy)]
+#[derive(
+    serde_repr::Serialize_repr, serde_repr::Deserialize_repr, PartialEq, Eq, Debug, Clone, Copy,
+)]
 #[repr(u8)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum RootVersion {

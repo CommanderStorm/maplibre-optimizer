@@ -339,12 +339,19 @@ mod tests {
         #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
         pub struct Position(
             #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_box_3_json_number))]
-            Box<[serde_json::Number; 3]>,
+             Box<[serde_json::Number; 3]>,
         );
 
         impl Default for Position {
             fn default() -> Self {
-                Self(Box::new([serde_json::Number::from_f64(1.15).expect("the number is serialised from a number and is thus always valid"), serde_json::Number::from_i128(210).expect("the number is serialised from a number and is thus always valid"), serde_json::Number::from_i128(30).expect("the number is serialised from a number and is thus always valid")]))
+                Self(Box::new([
+                    serde_json::Number::from_f64(1.15)
+                        .expect("the number is serialised from a number and is thus always valid"),
+                    serde_json::Number::from_i128(210)
+                        .expect("the number is serialised from a number and is thus always valid"),
+                    serde_json::Number::from_i128(30)
+                        .expect("the number is serialised from a number and is thus always valid"),
+                ]))
             }
         }
 
@@ -354,7 +361,7 @@ mod tests {
 
             #[test]
             fn test_example_position_decodes() {
-                let example = serde_json::json!([1.5,90,80]);
+                let example = serde_json::json!([1.5, 90, 80]);
                 let _ = serde_json::from_value::<Position>(example).expect("example should decode");
             }
         }
@@ -606,7 +613,6 @@ mod tests {
         #[cfg(test)]
         mod test {
             use super::*;
-
         }
         "#);
     }

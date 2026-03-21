@@ -4,13 +4,6 @@ expression: layers
 ---
 {
   "common_fields": {
-    "filter": {
-      "type": "String",
-      "default": null,
-      "doc": "A expression specifying conditions on source features. Only features that match the filter are displayed. Zoom expressions in filters are only evaluated at integer zoom levels. The `feature-state` expression is not supported in filter expressions.",
-      "required": false,
-      "expression": null
-    },
     "id": {
       "type": "String",
       "default": null,

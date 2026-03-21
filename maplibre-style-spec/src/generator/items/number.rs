@@ -153,7 +153,10 @@ mod tests {
 
         impl Default for Foo {
             fn default() -> Self {
-                Self(serde_json::Number::from_i128(42).expect("the number is serialised from a number and is thus always valid"))
+                Self(
+                    serde_json::Number::from_i128(42)
+                        .expect("the number is serialised from a number and is thus always valid"),
+                )
             }
         }
         "#)

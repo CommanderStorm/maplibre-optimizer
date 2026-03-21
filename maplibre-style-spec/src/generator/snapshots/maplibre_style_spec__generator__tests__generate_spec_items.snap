@@ -64,7 +64,10 @@ pub struct NumberOne(
 
 impl Default for NumberOne {
     fn default() -> Self {
-        Self(serde_json::Number::from_i128(0).expect("the number is serialised from a number and is thus always valid"))
+        Self(
+            serde_json::Number::from_i128(0)
+                .expect("the number is serialised from a number and is thus always valid"),
+        )
     }
 }
 
@@ -95,5 +98,4 @@ pub enum ExprOrLiteral {
 #[cfg(test)]
 mod test {
     use super::*;
-
 }
