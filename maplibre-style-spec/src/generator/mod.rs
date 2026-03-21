@@ -283,6 +283,9 @@ fn generate_oneof(scope: &mut Scope, name: &str, one_of: &IntermediateOneOf) {
 // ── Expression types ──────────────────────────────────────────────────────────
 
 fn generate_expression_types(scope: &mut Scope, expressions: &Expressions) {
+    // ExprOrLiteral must be defined exactly once per codegen scope, before any
+    // expression enum is emitted (both in the monolith and in the split-module case).
+    items::r#enum::syntax::ensure_expr_or_literal_type(scope);
     for (output_type_name, group) in &expressions.by_output_type {
         items::r#enum::syntax::generate_syntax_enum(
             scope,

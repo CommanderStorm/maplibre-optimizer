@@ -51,7 +51,9 @@ fn main() {
     let mut code_lines_cnt = 0usize;
     for (domain_name, module) in generated_scope.modules() {
         let body = module.body_to_string();
-        let content = format!("#[allow(unused_imports)]\nuse super::*;\n\n{body}\n");
+        let content = format!(
+            "#![allow(clippy::large_enum_variant)]\n#[allow(unused_imports)]\nuse super::*;\n\n{body}\n"
+        );
         let out_path = spec_dir.join(format!("{domain_name}.rs"));
         println!("Generating spec module {domain_name} at {out_path:?}");
         code_bytes_cnt += content.len();

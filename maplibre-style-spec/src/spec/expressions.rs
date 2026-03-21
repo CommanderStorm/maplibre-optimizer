@@ -1,3 +1,4 @@
+#![allow(clippy::large_enum_variant)]
 #[allow(unused_imports)]
 use super::*;
 
@@ -46,6 +47,16 @@ pub enum NumberLiteralOrNumberOrAnyAsUnion {
     Any(Box<Any>),
 }
 
+/// Either of the below variants
+#[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+#[serde(untagged)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+pub enum StringLiteralOrStringOrAnyAsUnion {
+    StringLiteral(StringLiteral),
+    String(Box<String>),
+    Any(Box<Any>),
+}
+
 /// "Any"
 #[derive(serde::Serialize, PartialEq, Debug, Clone)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
@@ -53,7 +64,7 @@ pub enum Any {
     /// Gets the value of a cluster property accumulated so far. Can only be used in the `clusterProperties` option of a clustered GeoJSON source.
     Accumulated,
     /// Retrieves an item from an array.
-    At(NumberLiteralOrNumberOrAnyAsUnion, Array),
+    At(NumberLiteralOrNumberOrAnyAsUnion, ExprOrLiteral),
     /// Selects the first output whose corresponding test condition evaluates to true, or the fallback value otherwise.
     ///
     ///  - [Create a hover effect](https://maplibre.org/maplibre-gl-js/docs/examples/create-a-hover-effect/)
@@ -67,7 +78,7 @@ pub enum Any {
     /// Retrieves a property value from the current feature's state. Returns null if the requested property is not present on the feature's state. A feature's state is not part of the GeoJSON or vector tile data, and must be set programmatically on each feature. When `source.promoteId` is not provided, features are identified by their `id` attribute, which must be an integer or a string that can be cast to an integer. When `source.promoteId` is provided, features are identified by their `promoteId` property, which may be a number, string, or any primitive data type. Note that ["feature-state"] can only be used with paint properties that support data-driven styling.
     ///
     ///  - [Create a hover effect](https://maplibre.org/maplibre-gl-js/docs/examples/create-a-hover-effect/)
-    FeatureState(String),
+    FeatureState(StringLiteralOrStringOrAnyAsUnion),
     /// Retrieves a property value from the current feature's properties, or from another object if a second argument is provided. Returns null if the requested property is missing.
     ///
     ///  - [Change the case of labels](https://maplibre.org/maplibre-gl-js/docs/examples/change-case-of-labels/)
@@ -75,7 +86,7 @@ pub enum Any {
     ///  - [Display HTML clusters with custom properties](https://maplibre.org/maplibre-gl-js/docs/examples/display-html-clusters-with-custom-properties/)
     ///
     ///  - [Extrude polygons for 3D indoor mapping](https://maplibre.org/maplibre-gl-js/docs/examples/extrude-polygons-for-3d-indoor-mapping/)
-    Get(String, Option<Object>),
+    Get(StringLiteralOrStringOrAnyAsUnion, Option<Object>),
     /// Retrieves a property value from global state that can be set with platform-specific APIs. Defaults can be provided using the [`state`](https://maplibre.org/maplibre-style-spec/root/#state) root property. Returns `null` if no value nor default value is set for the retrieved property.
     GlobalState(StringLiteral),
     /// Gets the feature's id, if it has one.
@@ -489,6 +500,15 @@ mod test {
     }
 }
 
+/// Either of the below variants
+#[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+#[serde(untagged)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+pub enum StringLiteralOrColorAsUnion {
+    StringLiteral(StringLiteral),
+    Color(Color),
+}
+
 /// "Array"
 #[derive(serde::Serialize, PartialEq, Debug, Clone)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
@@ -501,12 +521,12 @@ pub enum Array {
     Literal(JSONArrayLiteral),
     /// Returns a subarray from an array or a substring from a string from a specified start index, or between a start index and an end index if set. The return value is inclusive of the start index but not of the end index. In a string, a UTF-16 surrogate pair counts as a single position.
     Slice(
-        Box<Array>,
+        ExprOrLiteral,
         NumberLiteralOrNumberOrAnyAsUnion,
         Option<NumberLiteralOrNumberOrAnyAsUnion>,
     ),
     /// Returns a four-element array containing the input color's red, green, blue, and alpha components, in that order.
-    ToRgba(Color),
+    ToRgba(StringLiteralOrColorAsUnion),
 }
 
 impl<'de> serde::Deserialize<'de> for Array {
@@ -571,13 +591,18 @@ impl<'de> serde::de::Visitor<'de> for ArrayVisitor {
     }
 }
 
-/// Either of the below variants
+/// One of the valid type-assertion string names.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum StringOrNumberOrBooleanAsUnion {
-    String(String),
-    Number(Number),
-    Boolean(Boolean),
+pub enum StringOrNumberOrBooleanOrColorAsEnum {
+    #[serde(rename = "string")]
+    String,
+    #[serde(rename = "number")]
+    Number,
+    #[serde(rename = "boolean")]
+    Boolean,
+    #[serde(rename = "color")]
+    Color,
 }
 
 /// "ArrayLessTypeLengthGreater"
@@ -585,7 +610,11 @@ pub enum StringOrNumberOrBooleanAsUnion {
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum ArrayLessTypeLengthGreater {
     /// Asserts that the input is an array (optionally with a specific item type and length). If, when the input expression is evaluated, it is not of the asserted type or length, then this assertion will cause the whole expression to be aborted.
-    Array(StringOrNumberOrBooleanAsUnion, NumberLiteral, ExprOrLiteral),
+    Array(
+        StringOrNumberOrBooleanOrColorAsEnum,
+        NumberLiteral,
+        ExprOrLiteral,
+    ),
 }
 
 impl<'de> serde::Deserialize<'de> for ArrayLessTypeLengthGreater {
@@ -640,7 +669,7 @@ impl<'de> serde::de::Visitor<'de> for ArrayLessTypeLengthGreaterVisitor {
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum ArrayOfType {
     /// Asserts that the input is an array (optionally with a specific item type and length). If, when the input expression is evaluated, it is not of the asserted type or length, then this assertion will cause the whole expression to be aborted.
-    Array(StringOrNumberOrBooleanAsUnion, ExprOrLiteral),
+    Array(StringOrNumberOrBooleanOrColorAsEnum, ExprOrLiteral),
 }
 
 impl<'de> serde::Deserialize<'de> for ArrayOfType {
@@ -736,13 +765,13 @@ pub enum Boolean {
     /// Tests for the presence of a property value in the current feature's properties, or from another object if a second argument is provided.
     ///
     ///  - [Create and style clusters](https://maplibre.org/maplibre-gl-js/docs/examples/create-and-style-clusters/)
-    Has(String, Option<Object>),
+    Has(StringLiteralOrStringOrAnyAsUnion, Option<Object>),
     /// Determines whether an item exists in an array or a substring exists in a string.
     ///
     ///  - [Measure distances](https://maplibre.org/maplibre-gl-js/docs/examples/measure-distances/)
     In(InOptions),
     /// Returns `true` if the input string is expected to render legibly. Returns `false` if the input string contains sections that cannot be rendered without potential loss of meaning (e.g. Indic scripts that require complex text shaping, or right-to-left scripts if the `mapbox-gl-rtl-text` plugin is not in use in MapLibre GL JS).
-    IsSupportedScript(String),
+    IsSupportedScript(StringLiteralOrStringOrAnyAsUnion),
     /// Converts the input value to a boolean. The result is `false` when the input is an empty string, 0, `false`, `null`, or `NaN`; otherwise it is `true`.
     To(ExprOrLiteral),
     /// Returns `true` if the evaluated feature is fully contained inside a boundary of the input geometry, `false` otherwise. The input value can be a valid GeoJSON of type `Polygon`, `MultiPolygon`, `Feature`, or `FeatureCollection`. Supported features for evaluation:
@@ -807,7 +836,10 @@ pub enum GreaterEqualOptions {
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum InOptions {
     Item(ExprOrLiteral, ExprOrLiteral),
-    Substring(String, String),
+    Substring(
+        StringLiteralOrStringOrAnyAsUnion,
+        StringLiteralOrStringOrAnyAsUnion,
+    ),
 }
 
 impl<'de> serde::Deserialize<'de> for Boolean {
@@ -1255,7 +1287,7 @@ impl<'de> serde::de::Visitor<'de> for ColorOrArrayOfColorVisitor {
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum StringLiteralOrStringOrImageOrAnyAsUnion {
     StringLiteral(StringLiteral),
-    String(String),
+    String(Box<String>),
     Image(Image),
     Any(Box<Any>),
 }
@@ -1343,7 +1375,7 @@ pub enum Image {
     /// Returns an `image` type for use in `icon-image`, `*-pattern` entries and as a section in the `format` expression. If set, the `image` argument will check that the requested image exists in the style and will return either the resolved image name or `null`, depending on whether or not the image is currently in the style. This validation process is synchronous and requires the image to have been added to the style before requesting it in the `image` argument.
     ///
     ///  - [Use a fallback image](https://maplibre.org/maplibre-gl-js/docs/examples/use-a-fallback-image/)
-    Op(String),
+    Op(StringLiteralOrStringOrAnyAsUnion),
 }
 
 impl<'de> serde::Deserialize<'de> for Image {
@@ -1393,10 +1425,13 @@ impl<'de> serde::de::Visitor<'de> for ImageVisitor {
 
 /// Either of the below variants
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+#[serde(untagged)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum ArrayOrStringAsUnion {
+pub enum StringLiteralOrArrayOrStringOrAnyAsUnion {
+    StringLiteral(StringLiteral),
     Array(Array),
-    String(String),
+    String(Box<String>),
+    Any(Box<Any>),
 }
 
 /// "Number"
@@ -1451,7 +1486,7 @@ pub enum Number {
     /// Returns the first position at which an item can be found in an array or a substring can be found in a string, or `-1` if the input cannot be found. Accepts an optional index from where to begin the search. In a string, a UTF-16 surrogate pair counts as a single position.
     IndexOf(IndexOfOptions),
     /// Gets the length of an array or string. In a string, a UTF-16 surrogate pair counts as a single position.
-    Length(ArrayOrStringAsUnion),
+    Length(StringLiteralOrArrayOrStringOrAnyAsUnion),
     /// Gets the progress along a gradient line. Can only be used in the `line-gradient` property.
     LineProgress,
     /// Returns the natural logarithm of the input.
@@ -1506,7 +1541,11 @@ pub enum IndexOfOptions {
         ExprOrLiteral,
         #[serde(default)] Option<serde_json::Value>,
     ),
-    Substring(String, String, #[serde(default)] Option<serde_json::Value>),
+    Substring(
+        StringLiteralOrStringOrAnyAsUnion,
+        StringLiteralOrStringOrAnyAsUnion,
+        #[serde(default)] Option<serde_json::Value>,
+    ),
 }
 
 impl<'de> serde::Deserialize<'de> for Number {
@@ -1977,7 +2016,7 @@ pub enum String {
     /// Returns the input string converted to lowercase. Follows the Unicode Default Case Conversion algorithm and the locale-insensitive case mappings in the Unicode Character Database.
     ///
     ///  - [Change the case of labels](https://maplibre.org/maplibre-gl-js/docs/examples/change-case-of-labels/)
-    Downcase(Box<String>),
+    Downcase(StringLiteralOrStringOrAnyAsUnion),
     /// Returns the feature's simple geometry type: `Point`, `LineString`, or `Polygon`. `MultiPoint`, `MultiLineString`, and `MultiPolygon` are returned as `Point`, `LineString`, and `Polygon`, respectively.
     GeometryType,
     /// Converts the input number into a string representation using the provided format_options.
@@ -1992,7 +2031,7 @@ pub enum String {
     ResolvedLocale(Collator),
     /// Returns a subarray from an array or a substring from a string from a specified start index, or between a start index and an end index if set. The return value is inclusive of the start index but not of the end index. In a string, a UTF-16 surrogate pair counts as a single position.
     Slice(
-        Box<String>,
+        StringLiteralOrStringOrAnyAsUnion,
         NumberLiteralOrNumberOrAnyAsUnion,
         Option<NumberLiteralOrNumberOrAnyAsUnion>,
     ),
@@ -2007,7 +2046,7 @@ pub enum String {
     /// Returns the input string converted to uppercase. Follows the Unicode Default Case Conversion algorithm and the locale-insensitive case mappings in the Unicode Character Database.
     ///
     ///  - [Change the case of labels](https://maplibre.org/maplibre-gl-js/docs/examples/change-case-of-labels/)
-    Upcase(Box<String>),
+    Upcase(StringLiteralOrStringOrAnyAsUnion),
 }
 
 impl<'de> serde::Deserialize<'de> for String {

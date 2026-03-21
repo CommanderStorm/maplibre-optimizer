@@ -54,30 +54,6 @@ pub struct ArrayOfNumberLiteral(Vec<NumberLiteral>);
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct MaplibreStyleSpecification;
 
-/// An expression node or a literal JSON value in expression positions.
-#[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-#[serde(untagged)]
-pub enum ExprOrLiteral {
-    Null,
-    Bool(bool),
-    NumberLiteral(NumberLiteral),
-    StringLiteral(StringLiteral),
-    GeoJSONObjectLiteral(GeoJSONObjectLiteral),
-    JSONObjectLiteral(JSONObjectLiteral),
-    JSONArrayLiteral(JSONArrayLiteral),
-    AnyExpr(Box<Any>),
-    ArrayExpr(Box<Array>),
-    BooleanExpr(Box<Boolean>),
-    CollatorExpr(Box<Collator>),
-    ColorExpr(Box<Color>),
-    FormattedExpr(Box<Formatted>),
-    ImageExpr(Box<Image>),
-    NumberExpr(Box<Number>),
-    ObjectExpr(Box<Object>),
-    StringExpr(Box<String>),
-}
-
 /// First element in an interpolation array. May be followed by a number of arguments.
 #[derive(serde::Serialize, PartialEq, Debug, Clone)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
@@ -132,4 +108,28 @@ mod test {
     fn test_example_interpolation_name_decodes(#[case] example: serde_json::Value) {
         let _ = serde_json::from_value::<InterpolationName>(example).expect("example should decode");
     }
+}
+
+/// An expression node or a literal JSON value in expression positions.
+#[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[serde(untagged)]
+pub enum ExprOrLiteral {
+    Null,
+    Bool(bool),
+    NumberLiteral(NumberLiteral),
+    StringLiteral(StringLiteral),
+    GeoJSONObjectLiteral(GeoJSONObjectLiteral),
+    JSONObjectLiteral(JSONObjectLiteral),
+    JSONArrayLiteral(JSONArrayLiteral),
+    AnyExpr(Box<Any>),
+    ArrayExpr(Box<Array>),
+    BooleanExpr(Box<Boolean>),
+    CollatorExpr(Box<Collator>),
+    ColorExpr(Box<Color>),
+    FormattedExpr(Box<Formatted>),
+    ImageExpr(Box<Image>),
+    NumberExpr(Box<Number>),
+    ObjectExpr(Box<Object>),
+    StringExpr(Box<String>),
 }

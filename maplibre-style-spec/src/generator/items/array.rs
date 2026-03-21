@@ -358,6 +358,30 @@ mod tests {
                 let _ = serde_json::from_value::<Position>(example).expect("example should decode");
             }
         }
+
+        /// An expression node or a literal JSON value in expression positions.
+        #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+        #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+        #[serde(untagged)]
+        pub enum ExprOrLiteral {
+            Null,
+            Bool(bool),
+            NumberLiteral(NumberLiteral),
+            StringLiteral(StringLiteral),
+            GeoJSONObjectLiteral(GeoJSONObjectLiteral),
+            JSONObjectLiteral(JSONObjectLiteral),
+            JSONArrayLiteral(JSONArrayLiteral),
+            AnyExpr(Box<Any>),
+            ArrayExpr(Box<Array>),
+            BooleanExpr(Box<Boolean>),
+            CollatorExpr(Box<Collator>),
+            ColorExpr(Box<Color>),
+            FormattedExpr(Box<Formatted>),
+            ImageExpr(Box<Image>),
+            NumberExpr(Box<Number>),
+            ObjectExpr(Box<Object>),
+            StringExpr(Box<String>),
+        }
         "#);
     }
 
@@ -454,6 +478,30 @@ mod tests {
                 let _ = serde_json::from_value::<Layers>(example).expect("example should decode");
             }
         }
+
+        /// An expression node or a literal JSON value in expression positions.
+        #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+        #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+        #[serde(untagged)]
+        pub enum ExprOrLiteral {
+            Null,
+            Bool(bool),
+            NumberLiteral(NumberLiteral),
+            StringLiteral(StringLiteral),
+            GeoJSONObjectLiteral(GeoJSONObjectLiteral),
+            JSONObjectLiteral(JSONObjectLiteral),
+            JSONArrayLiteral(JSONArrayLiteral),
+            AnyExpr(Box<Any>),
+            ArrayExpr(Box<Array>),
+            BooleanExpr(Box<Boolean>),
+            CollatorExpr(Box<Collator>),
+            ColorExpr(Box<Color>),
+            FormattedExpr(Box<Formatted>),
+            ImageExpr(Box<Image>),
+            NumberExpr(Box<Number>),
+            ObjectExpr(Box<Object>),
+            StringExpr(Box<String>),
+        }
         "##);
     }
 
@@ -530,6 +578,30 @@ mod tests {
         #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
         #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
         pub struct Interpolation(InterpolationName);
+
+        /// An expression node or a literal JSON value in expression positions.
+        #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+        #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+        #[serde(untagged)]
+        pub enum ExprOrLiteral {
+            Null,
+            Bool(bool),
+            NumberLiteral(NumberLiteral),
+            StringLiteral(StringLiteral),
+            GeoJSONObjectLiteral(GeoJSONObjectLiteral),
+            JSONObjectLiteral(JSONObjectLiteral),
+            JSONArrayLiteral(JSONArrayLiteral),
+            AnyExpr(Box<Any>),
+            ArrayExpr(Box<Array>),
+            BooleanExpr(Box<Boolean>),
+            CollatorExpr(Box<Collator>),
+            ColorExpr(Box<Color>),
+            FormattedExpr(Box<Formatted>),
+            ImageExpr(Box<Image>),
+            NumberExpr(Box<Number>),
+            ObjectExpr(Box<Object>),
+            StringExpr(Box<String>),
+        }
 
         #[cfg(test)]
         mod test {

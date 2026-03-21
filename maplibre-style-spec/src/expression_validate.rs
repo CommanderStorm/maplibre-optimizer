@@ -758,7 +758,7 @@ fn validate_interpolate_operator_specifics(
     if args.len() < 4 {
         return Ok(());
     }
-    if (args.len() - 2) % 2 != 0 {
+    if !(args.len() - 2).is_multiple_of(2) {
         // Arity issues are handled elsewhere by overload matching.
         return Ok(());
     }
@@ -779,13 +779,13 @@ fn validate_interpolate_operator_specifics(
             }
         };
 
-        if let Some(p) = prev {
-            if x <= p {
-                return Err(
-                    "interpolate stop input literals must be arranged in strictly ascending order"
-                        .into(),
-                );
-            }
+        if let Some(p) = prev
+            && x <= p
+        {
+            return Err(
+                "interpolate stop input literals must be arranged in strictly ascending order"
+                    .into(),
+            );
         }
         prev = Some(x);
     }
@@ -799,7 +799,7 @@ fn validate_interpolate_operator_specifics(
     // resulting type is `array<number>` with unknown length.
     if op == "interpolate"
         && matches!(
-            args.get(0),
+            args.first(),
             Some(Value::Array(a)) if a.first().and_then(|v| v.as_str()) == Some("exponential")
         )
         && all_inputs_are_literals
@@ -1262,27 +1262,27 @@ fn normalize_serialized_expr_value(v: Value) -> Result<Value, String> {
         Value::Object(map) => {
             // Heuristic: expression-operator enums serialize as `{ "VariantName": data }`.
             // JSON literal objects usually have multiple keys and often start with lowercase.
-            if map.len() == 1 {
-                if let Some((k, data)) = map.iter().next() {
-                    let first = k.chars().next();
-                    if first.is_some_and(|c| c.is_uppercase()) {
-                        let op = camel_to_kebab(k);
-                        let args = match data {
-                            Value::Array(a) => {
-                                let mut out = Vec::with_capacity(a.len());
-                                for x in a {
-                                    out.push(normalize_serialized_expr_value(x.clone())?);
-                                }
-                                out
+            if map.len() == 1
+                && let Some((k, data)) = map.iter().next()
+            {
+                let first = k.chars().next();
+                if first.is_some_and(|c| c.is_uppercase()) {
+                    let op = camel_to_kebab(k);
+                    let args = match data {
+                        Value::Array(a) => {
+                            let mut out = Vec::with_capacity(a.len());
+                            for x in a {
+                                out.push(normalize_serialized_expr_value(x.clone())?);
                             }
-                            Value::Null => Vec::new(),
-                            other => vec![normalize_serialized_expr_value(other.clone())?],
-                        };
-                        let mut out = Vec::with_capacity(1 + args.len());
-                        out.push(Value::String(op));
-                        out.extend(args);
-                        return Ok(Value::Array(out));
-                    }
+                            out
+                        }
+                        Value::Null => Vec::new(),
+                        other => vec![normalize_serialized_expr_value(other.clone())?],
+                    };
+                    let mut out = Vec::with_capacity(1 + args.len());
+                    out.push(Value::String(op));
+                    out.extend(args);
+                    return Ok(Value::Array(out));
                 }
             }
 

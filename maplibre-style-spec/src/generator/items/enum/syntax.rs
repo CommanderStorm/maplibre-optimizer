@@ -28,7 +28,7 @@ fn emit_tuple_slot(v: &mut Variant, rust_ty: &str) {
 /// - expression nodes (nested operators), via the generated output-type syntax enums
 /// - literal primitives, via literal newtypes (and primitive `bool`)
 /// - object/array literal containers, via `spec::literals::{JSONObjectLiteral, JSONArrayLiteral}`
-fn ensure_expr_or_literal_type(scope: &mut Scope) {
+pub(crate) fn ensure_expr_or_literal_type(scope: &mut Scope) {
     if scope.get_enum_mut("ExprOrLiteral").is_some() {
         return;
     }
@@ -74,7 +74,6 @@ pub fn generate_syntax_enum(
     doc: &str,
     values: &BTreeMap<String, SyntaxVariantDef>,
 ) {
-    ensure_expr_or_literal_type(scope);
     pregenerate_all_operator_parameter_types(scope, values);
     // pass 1: populate enum variants
     let variadic_row_struct_names = generate_syntax_enum_body(scope, name, doc, values);
@@ -185,6 +184,9 @@ fn pregenerate_parameter_type(scope: &mut Scope, param: &ParameterType) {
         ParameterType::Expression(inner) => {
             pregenerate_mir_expression(scope, inner.as_ref());
         }
+        ParameterType::StringEnum(values) => {
+            generate_string_enum(scope, values);
+        }
         _ => {}
     }
 }
@@ -248,6 +250,8 @@ fn expression_union_needs_untagged(types: &[ParameterType]) -> bool {
     for p in types {
         match p {
             ParameterType::Literal(_) | ParameterType::LiteralAnyOf(_) => has_literal = true,
+            // A string enum is always a plain string — treat it as a literal for untagged purposes.
+            ParameterType::StringEnum(_) => has_literal = true,
             ParameterType::Object(_) => has_non_literal = true,
             ParameterType::Expression(_)
             | ParameterType::ExpressionAnyOf(_)
@@ -304,6 +308,14 @@ fn generate_expression_any_of(scope: &mut Scope, types: &[ParameterType]) -> Str
             {
                 // Needs indirection: `Number` contains this union recursively (`+`, `*`, …).
                 "Box<Number>".to_string()
+            } else if string_literal_with_string_expr
+                && matches!(
+                    p,
+                    ParameterType::Expression(e) if matches!(e.as_ref(), MirExpression::String)
+                )
+            {
+                // Needs indirection: `String` contains this union recursively (`downcase`, `upcase`, `slice`).
+                "Box<String>".to_string()
             } else {
                 normalize_expression_union_component_type(&label)
             };
@@ -1001,9 +1013,35 @@ fn generate_parameter_variant(scope: &mut Scope, param: &ParameterType) -> Strin
                     ParameterType::Expression(Box::new(MirExpression::Number)),
                 ],
             ),
+            // `"string"` in the style spec means "a string value or expression", so plain
+            // string literals (e.g. `"hover"`, `"myProp"`) must also be accepted.
+            MirExpression::String => generate_expression_any_of(
+                scope,
+                &[
+                    ParameterType::Literal(Literal::String),
+                    ParameterType::Expression(Box::new(MirExpression::String)),
+                ],
+            ),
+            // `"color"` can be a CSS color string literal (e.g. `"#ff0000"`) or a Color expression.
+            MirExpression::Color => generate_expression_any_of(
+                scope,
+                &[
+                    ParameterType::Literal(Literal::String),
+                    ParameterType::Expression(Box::new(MirExpression::Color)),
+                ],
+            ),
+            // `array<T>` with a type variable means any expression that evaluates to an array is valid.
+            MirExpression::Array { r#type, .. }
+                if r#type
+                    .as_ref()
+                    .is_some_and(|t| matches!(t, ParameterType::Reference(r) if r == "T")) =>
+            {
+                "ExprOrLiteral".to_string()
+            }
             _ => e.to_upper_camel_case().to_string(),
         },
         ParameterType::ExpressionAnyOf(es) => generate_expression_any_of(scope, es),
+        ParameterType::StringEnum(values) => generate_string_enum(scope, values),
         ParameterType::Object(_) => {
             "serde_json::Map<std::string::String, serde_json::Value>".to_string()
         }
@@ -1040,6 +1078,29 @@ fn generate_any_of(scope: &mut Scope, any_of: &[Literal]) -> String {
         }
     }
     any_of_type
+}
+
+/// Generate a unit-variant enum for a closed set of valid plain string values.
+///
+/// Each value (e.g. `"string"`, `"number"`, `"boolean"`) becomes a unit variant with a
+/// `#[serde(rename = "...")]` attribute so that serde accepts only the exact strings.
+fn generate_string_enum(scope: &mut Scope, values: &[String]) -> String {
+    let variant_names: Vec<String> = values.iter().map(to_upper_camel_case).collect();
+    // `AsEnum` suffix distinguishes these from untagged `AsUnion` enums.
+    let type_name = format!("{}AsEnum", variant_names.join("Or"));
+    if scope.get_enum_mut(&type_name).is_none() {
+        let enu = scope
+            .new_enum(&type_name)
+            .doc("One of the valid type-assertion string names.")
+            .vis("pub")
+            .derive("serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone")
+            .attr(fuzz::CFG_DERIVE_ARBITRARY);
+        for (value, name) in values.iter().zip(&variant_names) {
+            enu.new_variant(name)
+                .annotation(format!(r#"#[serde(rename = "{value}")]"#));
+        }
+    }
+    type_name
 }
 
 fn overload_uses_interpolate_style_variadic(overload: &Overload) -> bool {

@@ -275,6 +275,38 @@ impl MirSyntax {
                 }
             }
         }
+        if operator == "array" {
+            for p in parameters.iter_mut() {
+                if p.name == "type" {
+                    p.r#type = MirParameterType::StringEnum(vec![
+                        "string".to_string(),
+                        "number".to_string(),
+                        "boolean".to_string(),
+                        "color".to_string(),
+                    ]);
+                }
+            }
+        }
+        if operator == "length" {
+            for p in parameters.iter_mut() {
+                if p.name == "array_or_string" {
+                    // `length` accepts string literals ("hello"), string expressions, array expressions,
+                    // and general expressions like `["get","prop"]` that may return either at runtime.
+                    // Including Literal::String triggers the string_literal_with_string_expr flag in
+                    // the generator, which automatically adds an Any(Box<Any>) fallback arm and
+                    // #[serde(untagged)] — the Any syntax enum only accepts expression arrays, so bare
+                    // scalars (e.g. the number 2) are still correctly rejected.
+                    p.r#type = MirParameterType::ExpressionAnyOf(vec![
+                        MirParameterType::Literal(MirLiteral::String),
+                        MirParameterType::Expression(Box::new(MirExpression::Array {
+                            r#type: None,
+                            length: None,
+                        })),
+                        MirParameterType::Expression(Box::new(MirExpression::String)),
+                    ]);
+                }
+            }
+        }
     }
 
     /// Lower decoded reference syntax into MIR, applying fixes where the JSON schema is too narrow.
@@ -342,6 +374,9 @@ pub enum MirParameterType {
     ExpressionAnyOf(Vec<MirParameterType>),
     Object(BTreeMap<String, ParsedItem>),
     Reference(String),
+    /// A closed set of valid plain string values (e.g. `"string"`, `"number"`, `"boolean"`).
+    /// Generates a unit-variant enum with `#[serde(rename = "...")]` on each arm.
+    StringEnum(Vec<String>),
 }
 
 impl MirParameterType {
@@ -362,6 +397,11 @@ impl MirParameterType {
             MirParameterType::Object(_) => "Object".to_string(),
             MirParameterType::Reference(r) if r == "T" => "Any".to_string(),
             MirParameterType::Reference(r) => to_upper_camel_case(r),
+            MirParameterType::StringEnum(values) => values
+                .iter()
+                .map(to_upper_camel_case)
+                .collect::<Vec<_>>()
+                .join("Or"),
         }
     }
 }
