@@ -1,3 +1,6 @@
 [submodule "upstream"]
 	path = upstream
 	url = https://github.com/maplibre/maplibre-style-spec.git
+[submodule "tests/maplibre-gl-js"]
+	path = tests/maplibre-gl-js
+	url = https://github.com/maplibre/maplibre-gl-js.git

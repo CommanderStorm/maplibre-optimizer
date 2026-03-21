@@ -1,0 +1,17 @@
+{
+  "name": "maplibre-optimizer-bench",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "bench": "tsx run.ts",
+    "bench:debug": "tsx run.ts --debug"
+  },
+  "dependencies": {
+    "maplibre-gl": "^5.19.0",
+    "puppeteer": "^24.0.0"
+  },
+  "devDependencies": {
+    "tsx": "^4.0.0",
+    "@types/node": "^22.0.0"
+  }
+}

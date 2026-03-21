@@ -1,0 +1,22 @@
+{
+  "name": "maplibre-optimizer-render-tests",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "tsx run.ts",
+    "test:debug": "tsx run.ts --debug"
+  },
+  "dependencies": {
+    "maplibre-gl": "^5.19.0",
+    "pixelmatch": "^7.1.0",
+    "pngjs": "^7.0.0",
+    "puppeteer": "^24.0.0",
+    "glob": "^11.0.0",
+    "st": "^3.0.0"
+  },
+  "devDependencies": {
+    "tsx": "^4.0.0",
+    "@types/node": "^22.0.0",
+    "@types/pngjs": "^6.0.0"
+  }
+}
