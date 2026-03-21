@@ -2,13 +2,13 @@ use std::fmt::{self, Display, Write};
 
 use crate::docs::Docs;
 use crate::r#enum::Enum;
-use crate::util::write_block;
 use crate::function::Function;
 use crate::r#impl::Impl;
 use crate::scope::Scope;
 use crate::r#struct::Struct;
 use crate::r#trait::Trait;
 use crate::type_alias::TypeAlias;
+use crate::util::write_block;
 
 /// Defines a module.
 #[derive(Debug, Clone)]

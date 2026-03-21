@@ -2,9 +2,9 @@ use std::fmt::{self, Write};
 
 use crate::bound::Bound;
 use crate::field::Field;
-use crate::util::{fmt_bounds, fmt_generics, write_block};
 use crate::function::Function;
 use crate::r#type::Type;
+use crate::util::{fmt_bounds, fmt_generics, write_block};
 
 /// Defines an impl block.
 #[derive(Debug, Clone)]

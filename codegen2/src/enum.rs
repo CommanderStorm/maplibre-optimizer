@@ -1,8 +1,8 @@
 use std::fmt;
 
-use crate::util::write_block;
 use crate::r#type::Type;
 use crate::type_def::TypeDef;
+use crate::util::write_block;
 use crate::variant::Variant;
 
 /// Defines an enumeration.

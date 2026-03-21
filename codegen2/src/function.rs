@@ -5,8 +5,8 @@ use crate::body::Body;
 use crate::bound::Bound;
 use crate::docs::Docs;
 use crate::field::Field;
-use crate::util::{fmt_bounds, fmt_generics, write_block};
 use crate::r#type::Type;
+use crate::util::{fmt_bounds, fmt_generics, write_block};
 
 /// Defines a function.
 #[derive(Debug, Clone)]

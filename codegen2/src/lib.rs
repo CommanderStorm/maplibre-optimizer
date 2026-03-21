@@ -31,13 +31,13 @@ mod bound;
 mod docs;
 mod field;
 mod fields;
-mod util;
 mod function;
 mod import;
 mod item;
 mod module;
 mod scope;
 mod type_def;
+mod util;
 mod variant;
 
 mod r#enum;

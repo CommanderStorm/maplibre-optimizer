@@ -1,8 +1,8 @@
 use core::fmt;
 use std::fmt::Write;
 
-use crate::type_def::TypeDef;
 use crate::Type;
+use crate::type_def::TypeDef;
 
 /// https://rust-lang.github.io/chalk/book/types/rust_types/alias.html#alias-types
 #[derive(Debug, Clone)]

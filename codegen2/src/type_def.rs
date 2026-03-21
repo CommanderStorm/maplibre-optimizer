@@ -2,8 +2,8 @@ use std::fmt::{self, Write};
 
 use crate::bound::Bound;
 use crate::docs::Docs;
-use crate::util::fmt_bounds;
 use crate::r#type::Type;
+use crate::util::fmt_bounds;
 
 /// Defines a type definition.
 #[derive(Debug, Clone)]
@@ -73,12 +73,7 @@ impl TypeDef {
         self.repr = Some(repr.to_string());
     }
 
-    pub fn fmt_head(
-        &self,
-        keyword: &str,
-        parents: &[Type],
-        dst: &mut String,
-    ) -> fmt::Result {
+    pub fn fmt_head(&self, keyword: &str, parents: &[Type], dst: &mut String) -> fmt::Result {
         if let Some(ref docs) = self.docs {
             docs.fmt(dst)?;
         }

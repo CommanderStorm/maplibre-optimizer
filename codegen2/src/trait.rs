@@ -3,10 +3,10 @@ use std::fmt::{self, Write};
 use crate::associated_const::AssociatedConst;
 use crate::associated_type::AssociatedType;
 use crate::bound::Bound;
-use crate::util::{fmt_bound_rhs, write_block};
 use crate::function::Function;
 use crate::r#type::Type;
 use crate::type_def::TypeDef;
+use crate::util::{fmt_bound_rhs, write_block};
 
 /// Define a trait.
 #[derive(Debug, Clone)]
