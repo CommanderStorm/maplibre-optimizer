@@ -14,8 +14,6 @@
 import http from "node:http";
 import fs from "node:fs";
 import path from "node:path";
-import crypto from "node:crypto";
-
 const __dirname = import.meta.dirname!;
 const CACHE_DIR = path.join(__dirname, "results", "_tile_cache");
 const UPSTREAM = "https://tiles.openfreemap.org";
@@ -25,10 +23,6 @@ const portIdx = argv.findIndex((a) => a === "--port");
 const PORT = portIdx >= 0 ? parseInt(argv[portIdx + 1], 10) : 8765;
 
 fs.mkdirSync(CACHE_DIR, { recursive: true });
-
-function cacheKey(url: string): string {
-  return crypto.createHash("sha256").update(url).digest("hex");
-}
 
 function cachePath(key: string): string {
   // Use 2-level directory structure to avoid too many files in one dir
@@ -61,7 +55,10 @@ const server = http.createServer(async (req, res) => {
   misses++;
   try {
     const upstream = await fetch(upstreamUrl, {
-      headers: { "User-Agent": "maplibre-optimizer-bench" },
+      headers: {
+        "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/131 Safari/537.36",
+        "Accept": req.headers.accept ?? "*/*",
+      },
     });
     const respBody = Buffer.from(await upstream.arrayBuffer());
     const headers: Record<string, string> = {};
