@@ -114,7 +114,7 @@ pub enum PropertyStats {
 
 impl PropertyStats {
     /// Number of features that have this property set.
-    #[must_use] 
+    #[must_use]
     pub fn present_count(&self) -> u64 {
         match self {
             Self::Bool { present_count, .. }
@@ -129,7 +129,7 @@ impl PropertyStats {
 
 impl TileStatistics {
     /// Look up stats for a given source and source-layer.
-    #[must_use] 
+    #[must_use]
     pub fn layer_stats(&self, source: &str, source_layer: &str) -> Option<&LayerStats> {
         self.sources.get(source)?.layers.get(source_layer)
     }

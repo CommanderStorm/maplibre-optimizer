@@ -52,9 +52,10 @@ fn eliminate_dead_sources_and_layers(
         }
         // Stats-driven: geometry type mismatch.
         if let Some(stats) = stats
-            && is_dead_by_geometry(i, layer, stats, layer_info) {
-                to_drop.push(i);
-            }
+            && is_dead_by_geometry(i, layer, stats, layer_info)
+        {
+            to_drop.push(i);
+        }
     }
 
     if !to_drop.is_empty() {

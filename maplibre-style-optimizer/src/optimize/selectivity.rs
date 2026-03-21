@@ -2,9 +2,8 @@
 
 use serde_json::Value;
 
-use crate::stats::{LayerStats, PropertyStats, TileStatistics};
-
 use super::expr::extract_json_literal;
+use crate::stats::{LayerStats, PropertyStats, TileStatistics};
 
 /// Estimate the selectivity (fraction of features matching) for a predicate expression,
 /// given tile statistics for the layer's source and source-layer.
@@ -115,12 +114,7 @@ fn estimate_eq(lhs: &Value, rhs: &Value, stats: &LayerStats, total: f64) -> Opti
 }
 
 #[allow(clippy::cast_precision_loss)]
-fn estimate_eq_for_prop(
-    prop: &str,
-    lit: &Value,
-    stats: &LayerStats,
-    total: f64,
-) -> Option<f64> {
+fn estimate_eq_for_prop(prop: &str, lit: &Value, stats: &LayerStats, total: f64) -> Option<f64> {
     let ps = stats.properties.get(prop)?;
     match ps {
         PropertyStats::Bool {
@@ -135,7 +129,12 @@ fn estimate_eq_for_prop(
             };
             Some(count as f64 / total)
         }
-        PropertyStats::Integer { value_counts, present_count, cardinality, .. } => {
+        PropertyStats::Integer {
+            value_counts,
+            present_count,
+            cardinality,
+            ..
+        } => {
             if let Some(vc) = value_counts {
                 let n = json_as_i64(lit)?;
                 let count = vc.get(&n).copied().unwrap_or(0);
@@ -146,7 +145,12 @@ fn estimate_eq_for_prop(
                 None
             }
         }
-        PropertyStats::UnsignedInteger { value_counts, present_count, cardinality, .. } => {
+        PropertyStats::UnsignedInteger {
+            value_counts,
+            present_count,
+            cardinality,
+            ..
+        } => {
             if let Some(vc) = value_counts {
                 let n = json_as_u64(lit)?;
                 let count = vc.get(&n).copied().unwrap_or(0);
@@ -157,7 +161,12 @@ fn estimate_eq_for_prop(
                 None
             }
         }
-        PropertyStats::String { value_counts, present_count, cardinality, .. } => {
+        PropertyStats::String {
+            value_counts,
+            present_count,
+            cardinality,
+            ..
+        } => {
             if let Some(vc) = value_counts {
                 let s = lit.as_str()?;
                 let count = vc.get(s).copied().unwrap_or(0);
@@ -199,7 +208,10 @@ fn estimate_range_lt(
     let ps = stats.properties.get(prop)?;
 
     match ps {
-        PropertyStats::Integer { value_counts: Some(vc), .. } => {
+        PropertyStats::Integer {
+            value_counts: Some(vc),
+            ..
+        } => {
             let n = json_as_i64(&lit)?;
             let count: u64 = if is_get_first {
                 // ["<", ["get", prop], n] or ["<=", ["get", prop], n]
@@ -221,7 +233,8 @@ fn estimate_range_lt(
         }
         PropertyStats::Integer { min, max, .. } => {
             let n = json_as_i64(&lit)?;
-            if (is_get_first && !inclusive && n <= *min) || (is_get_first && inclusive && n < *min) {
+            if (is_get_first && !inclusive && n <= *min) || (is_get_first && inclusive && n < *min)
+            {
                 Some(0.0)
             } else if (is_get_first && !inclusive && n > *max)
                 || (is_get_first && inclusive && n >= *max)
@@ -391,10 +404,7 @@ mod tests {
         );
 
         let mut sources = BTreeMap::new();
-        sources.insert(
-            "openmaptiles".to_string(),
-            SourceStats { layers },
-        );
+        sources.insert("openmaptiles".to_string(), SourceStats { layers });
 
         TileStatistics { sources }
     }
@@ -459,7 +469,11 @@ mod tests {
     #[test]
     fn all_compound_selectivity() {
         let stats = sample_stats();
-        let pred = json!(["all", ["==", ["get", "class"], "motorway"], ["has", "class"]]);
+        let pred = json!([
+            "all",
+            ["==", ["get", "class"], "motorway"],
+            ["has", "class"]
+        ]);
         let s = estimate_selectivity(&pred, "openmaptiles", "transportation", &stats);
         // 0.05 * 1.0 = 0.05
         assert!((s.unwrap() - 0.05).abs() < 1e-9);

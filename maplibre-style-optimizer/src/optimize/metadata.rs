@@ -1,127 +1,12 @@
-//! Tighten layer `minzoom` / `maxzoom` from zoom predicates in `filter`.
+//! Zoom-bound extraction from filter expressions.
+//!
+//! Shared helpers used by [`super::typed_passes::metadata_refinement_typed`].
 
 use serde_json::Value;
 
 use super::expr::extract_json_literal;
-use super::source_util::VectorLayerInfo;
-use super::walk::StyleVisitor;
-use crate::stats::TileStatistics;
 
-// ── Visitor ───────────────────────────────────────────────────────────────────
-
-pub(crate) struct MetadataRefinementVisitor<'a> {
-    pub stats: Option<&'a TileStatistics>,
-    pub layer_info: Option<&'a [Option<VectorLayerInfo>]>,
-}
-
-impl StyleVisitor for MetadataRefinementVisitor<'_> {
-    fn visit_layer(&mut self, layer_index: usize, _: &str, layer: &mut Value) {
-        refine_layer_zoom_metadata(layer, layer_index, self.stats, self.layer_info);
-    }
-}
-
-// ── Implementation ────────────────────────────────────────────────────────────
-
-fn refine_layer_zoom_metadata(
-    layer: &mut Value,
-    layer_index: usize,
-    stats: Option<&TileStatistics>,
-    layer_info: Option<&[Option<VectorLayerInfo>]>,
-) {
-    let Some(obj) = layer.as_object_mut() else {
-        return;
-    };
-
-    // Filter-based zoom extraction (existing behavior).
-    if let Some(filter) = obj.get("filter").cloned() {
-        let (lb_raw, ub_raw) = zoom_bounds_from_expression(&filter);
-        let lb = lb_raw.map(zoom_lower_to_min_zoom);
-        let ub = ub_raw.map(zoom_upper_to_max_zoom);
-
-        if let Some(bound) = lb {
-            match obj.get("minzoom").and_then(Value::as_f64) {
-                Some(cur) => {
-                    if bound > cur {
-                        obj.insert("minzoom".to_string(), json_number(bound));
-                    }
-                }
-                None => {
-                    obj.insert("minzoom".to_string(), json_number(bound));
-                }
-            }
-        }
-
-        if let Some(bound) = ub {
-            match obj.get("maxzoom").and_then(Value::as_f64) {
-                Some(cur) => {
-                    let tightened = cur.min(bound);
-                    obj.insert("maxzoom".to_string(), json_number(tightened));
-                }
-                None => {
-                    obj.insert("maxzoom".to_string(), json_number(bound));
-                }
-            }
-        }
-
-        // Remove zoom predicates from the filter that were fully captured.
-        let adopted_min = obj.get("minzoom").and_then(Value::as_f64);
-        let adopted_max = obj.get("maxzoom").and_then(Value::as_f64);
-        if (adopted_min.is_some() || adopted_max.is_some())
-            && let Some(filter_mut) = obj.get_mut("filter")
-        {
-            remove_consumed_zoom_predicates(filter_mut, adopted_min, adopted_max);
-        }
-    }
-
-    // Stats-driven zoom tightening.
-    if let Some(stats) = stats
-        && let Some(infos) = layer_info
-        && let Some(Some(info)) = infos.get(layer_index)
-        && let Some(layer_stats) = stats.layer_stats(&info.source, &info.source_layer)
-        && !layer_stats.features_by_zoom.is_empty()
-    {
-        let data_min = f64::from(*layer_stats.features_by_zoom.keys().next().unwrap());
-        let data_max = f64::from(*layer_stats.features_by_zoom.keys().next_back().unwrap());
-
-        // Only raise minzoom.
-        match obj.get("minzoom").and_then(Value::as_f64) {
-            Some(cur) => {
-                if data_min > cur {
-                    obj.insert("minzoom".to_string(), json_number(data_min));
-                }
-            }
-            None => {
-                obj.insert("minzoom".to_string(), json_number(data_min));
-            }
-        }
-
-        // Only lower maxzoom.
-        match obj.get("maxzoom").and_then(Value::as_f64) {
-            Some(cur) => {
-                if data_max < cur {
-                    obj.insert("maxzoom".to_string(), json_number(data_max));
-                }
-            }
-            None => {
-                obj.insert("maxzoom".to_string(), json_number(data_max));
-            }
-        }
-    }
-}
-
-fn json_number(n: f64) -> Value {
-    serde_json::Number::from_f64(n).map_or(Value::from(0), Value::Number)
-}
-
-/// MapLibre minzoom is an integer; ceil ensures `zoom >= 2.5` becomes minzoom 3.
-fn zoom_lower_to_min_zoom(n: f64) -> f64 {
-    n.ceil()
-}
-
-/// MapLibre maxzoom is an integer; floor ensures `zoom <= 14.5` becomes maxzoom 14.
-fn zoom_upper_to_max_zoom(n: f64) -> f64 {
-    n.floor()
-}
+// ── Zoom-bound extraction ────────────────────────────────────────────────────
 
 fn is_zoom_expr(val: &Value) -> bool {
     matches!(
@@ -130,7 +15,7 @@ fn is_zoom_expr(val: &Value) -> bool {
     )
 }
 
-fn zoom_bounds_from_expression(expr: &Value) -> (Option<f64>, Option<f64>) {
+pub(super) fn zoom_bounds_from_expression(expr: &Value) -> (Option<f64>, Option<f64>) {
     match expr {
         Value::Array(arr) if !arr.is_empty() => {
             let head = arr[0].as_str();
@@ -232,7 +117,7 @@ fn prev_zoom(n: f64) -> f64 {
 
 // ── Remove consumed zoom predicates ────────────────────────────────────────
 
-fn remove_consumed_zoom_predicates(
+pub(super) fn remove_consumed_zoom_predicates(
     filter: &mut Value,
     adopted_min: Option<f64>,
     adopted_max: Option<f64>,

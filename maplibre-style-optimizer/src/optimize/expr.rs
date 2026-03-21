@@ -42,7 +42,9 @@ fn should_fold_id(
     layer_index: usize,
 ) -> bool {
     let Some(stats) = stats else { return false };
-    let Some(infos) = layer_info else { return false };
+    let Some(infos) = layer_info else {
+        return false;
+    };
     let Some(Some(info)) = infos.get(layer_index) else {
         return false;
     };
@@ -1195,8 +1197,7 @@ fn maybe_reorder_any_all(
         let mut with_sel: Vec<(Value, Option<f64>)> = ops
             .into_iter()
             .map(|v| {
-                let sel =
-                    estimate_selectivity(&v, ctx.source, ctx.source_layer, stats);
+                let sel = estimate_selectivity(&v, ctx.source, ctx.source_layer, stats);
                 (v, sel)
             })
             .collect();
@@ -1210,10 +1211,18 @@ fn maybe_reorder_any_all(
             let (b_tier, b_val) = key(b);
             if op == "all" {
                 // ascending selectivity
-                a_tier.cmp(&b_tier).then(a_val.partial_cmp(&b_val).unwrap_or(std::cmp::Ordering::Equal))
+                a_tier.cmp(&b_tier).then(
+                    a_val
+                        .partial_cmp(&b_val)
+                        .unwrap_or(std::cmp::Ordering::Equal),
+                )
             } else {
                 // descending selectivity
-                b_tier.cmp(&a_tier).then(b_val.partial_cmp(&a_val).unwrap_or(std::cmp::Ordering::Equal))
+                b_tier.cmp(&a_tier).then(
+                    b_val
+                        .partial_cmp(&a_val)
+                        .unwrap_or(std::cmp::Ordering::Equal),
+                )
             }
         });
 

@@ -88,10 +88,7 @@ fn is_invisible_layer(layer: &Value) -> bool {
     let layer_type = obj.get("type").and_then(Value::as_str).unwrap_or("");
     let paint = obj.get("paint").and_then(Value::as_object);
     if let Some(prop) = primary_opacity_prop(layer_type)
-        && paint
-            .and_then(|p| p.get(prop))
-            .and_then(Value::as_f64)
-            == Some(0.0)
+        && paint.and_then(|p| p.get(prop)).and_then(Value::as_f64) == Some(0.0)
     {
         // Circle stroke renders independently of fill opacity.
         if layer_type == "circle" {
