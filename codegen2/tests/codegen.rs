@@ -836,3 +836,841 @@ fn get_mut_fn() {
     }
     ");
 }
+
+#[test]
+fn type_with_generic() {
+    let mut scope = Scope::new();
+    let mut ty = Type::new("Vec");
+    ty.generic("String");
+    scope.new_fn("f").ret(ty).line("vec![]");
+
+    insta::assert_snapshot!(scope.to_string(), @r#"
+    fn f() -> Vec<String> {
+        vec![]
+    }
+    "#);
+}
+
+#[test]
+fn type_with_nested_generics() {
+    let mut scope = Scope::new();
+    let mut inner = Type::new("Option");
+    inner.generic("T");
+    let mut outer = Type::new("Vec");
+    outer.generic(inner);
+    scope.new_fn("f").ret(outer).line("vec![]");
+
+    insta::assert_snapshot!(scope.to_string(), @r#"
+    fn f() -> Vec<Option<T>> {
+        vec![]
+    }
+    "#);
+}
+
+#[test]
+fn type_path() {
+    let ty = Type::new("HashMap");
+    let qualified = ty.path("std::collections");
+    let mut scope = Scope::new();
+    scope
+        .new_fn("f")
+        .ret(qualified)
+        .line("std::collections::HashMap::new()");
+
+    insta::assert_snapshot!(scope.to_string(), @r"
+    fn f() -> std::collections::HashMap {
+        std::collections::HashMap::new()
+    }
+    ");
+}
+
+#[test]
+fn type_path_preserves_generics() {
+    let mut ty = Type::new("HashMap");
+    ty.generic("K");
+    ty.generic("V");
+    let qualified = ty.path("std::collections");
+    let mut scope = Scope::new();
+    scope
+        .new_fn("f")
+        .ret(qualified)
+        .line("std::collections::HashMap::new()");
+
+    insta::assert_snapshot!(scope.to_string(), @r"
+    fn f() -> std::collections::HashMap<K, V> {
+        std::collections::HashMap::new()
+    }
+    ");
+}
+
+#[test]
+#[should_panic(expected = "type name already contains a path separator")]
+fn type_path_panics_on_qualified_name() {
+    let ty = Type::new("std::HashMap");
+    ty.path("collections");
+}
+
+#[test]
+#[should_panic(expected = "type name already includes generics")]
+fn type_generic_panics_when_name_contains_angle_brackets() {
+    let mut ty = Type::new("Vec<String>");
+    ty.generic("T");
+}
+
+#[test]
+fn function_with_block() {
+    let mut scope = Scope::new();
+    let f = scope.new_fn("process");
+    let mut blk = Block::new("for item in items");
+    blk.line("println!(\"{}\", item);");
+    f.push_block(blk);
+
+    insta::assert_snapshot!(scope.to_string(), @r#"
+    fn process() {
+        for item in items {
+            println!("{}", item);
+        }
+    }
+    "#);
+}
+
+#[test]
+fn nested_blocks() {
+    let mut scope = Scope::new();
+    let f = scope.new_fn("nested");
+    let mut outer = Block::new("for i in 0..10");
+    let mut inner = Block::new("if i > 5");
+    inner.line("println!(\"{}\", i);");
+    outer.push_block(inner);
+    f.push_block(outer);
+
+    insta::assert_snapshot!(scope.to_string(), @r#"
+    fn nested() {
+        for i in 0..10 {
+            if i > 5 {
+                println!("{}", i);
+            }
+        }
+    }
+    "#);
+}
+
+#[test]
+fn block_with_after() {
+    let mut scope = Scope::new();
+    let f = scope.new_fn("with_else");
+    let mut if_blk = Block::new("if condition");
+    if_blk.line("a();");
+    if_blk.after(" else { b(); }");
+    f.push_block(if_blk);
+
+    insta::assert_snapshot!(scope.to_string(), @r"
+    fn with_else() {
+        if condition {
+            a();
+        } else {
+            b();
+        }
+    }
+    ");
+}
+
+
+#[test]
+fn function_with_ref_self() {
+    let mut scope = Scope::new();
+    let imp = scope.new_impl("Foo");
+    imp.new_fn("bar")
+        .arg_ref_self()
+        .ret("usize")
+        .line("self.x");
+
+    insta::assert_snapshot!(scope.to_string(), @r"
+    impl Foo {
+        fn bar(&self) -> usize {
+            self.x
+        }
+    }
+    ");
+}
+
+#[test]
+fn function_with_mut_self() {
+    let mut scope = Scope::new();
+    let imp = scope.new_impl("Foo");
+    imp.new_fn("set").arg_mut_self().arg("val", "usize").line("self.x = val;");
+
+    insta::assert_snapshot!(scope.to_string(), @r"
+    impl Foo {
+        fn set(&mut self, val: usize) {
+            self.x = val;
+        }
+    }
+    ");
+}
+
+#[test]
+fn function_with_self() {
+    let mut scope = Scope::new();
+    let imp = scope.new_impl("Foo");
+    imp.new_fn("into_inner").arg_self().ret("usize").line("self.x");
+
+    insta::assert_snapshot!(scope.to_string(), @r"
+    impl Foo {
+        fn into_inner(self) -> usize {
+            self.x
+        }
+    }
+    ");
+}
+
+#[test]
+fn function_with_generics_and_bounds() {
+    let mut scope = Scope::new();
+    scope
+        .new_fn("serialize")
+        .generic("T")
+        .arg("value", "T")
+        .ret("String")
+        .bound("T", "Display")
+        .line("value.to_string()");
+
+    insta::assert_snapshot!(scope.to_string(), @r"
+    fn serialize<T>(value: T) -> String
+    where
+        T: Display,
+    {
+        value.to_string()
+    }
+    ");
+}
+
+#[test]
+fn function_with_allow() {
+    let mut scope = Scope::new();
+    scope
+        .new_fn("unused")
+        .allow("dead_code")
+        .line("let _ = 1;");
+
+    insta::assert_snapshot!(scope.to_string(), @r"
+    #[allow(dead_code)]
+    fn unused() {
+        let _ = 1;
+    }
+    ");
+}
+
+#[test]
+fn function_with_attr() {
+    let mut scope = Scope::new();
+    scope
+        .new_fn("my_test")
+        .attr("test")
+        .line("assert!(true);");
+
+    insta::assert_snapshot!(scope.to_string(), @r"
+    #[test]
+    fn my_test() {
+        assert!(true);
+    }
+    ");
+}
+
+#[test]
+fn function_with_extern_abi() {
+    let mut scope = Scope::new();
+    scope
+        .new_fn("extern_fn")
+        .extern_abi("C")
+        .arg("x", "i32")
+        .ret("i32")
+        .line("x + 1");
+
+    insta::assert_snapshot!(scope.to_string(), @r#"
+    extern "C" fn extern_fn(x: i32) -> i32 {
+        x + 1
+    }
+    "#);
+}
+
+#[test]
+fn function_with_multiple_attrs() {
+    let mut scope = Scope::new();
+    scope
+        .new_fn("handler")
+        .attr("inline")
+        .attr("must_use")
+        .ret("bool")
+        .line("true");
+
+    insta::assert_snapshot!(scope.to_string(), @r"
+    #[inline]
+    #[must_use]
+    fn handler() -> bool {
+        true
+    }
+    ");
+}
+
+#[test]
+fn trait_with_vis() {
+    let mut scope = Scope::new();
+    scope.new_trait("MyTrait").vis("pub");
+
+    insta::assert_snapshot!(scope.to_string(), @"pub trait MyTrait {}");
+}
+
+#[test]
+fn trait_with_doc() {
+    let mut scope = Scope::new();
+    scope
+        .new_trait("MyTrait")
+        .doc("A documented trait.\nWith two lines.");
+
+    insta::assert_snapshot!(scope.to_string(), @r"
+    /// A documented trait.
+    /// With two lines.
+    trait MyTrait {}
+    ");
+}
+
+#[test]
+fn trait_with_generics_and_bounds() {
+    let mut scope = Scope::new();
+    scope
+        .new_trait("Convert")
+        .generic("T")
+        .bound("T", "Clone")
+        .new_fn("convert")
+        .arg("input", "T")
+        .ret("Self");
+
+    insta::assert_snapshot!(scope.to_string(), @r"
+    trait Convert<T>
+    where
+        T: Clone,
+    {
+        fn convert(input: T) -> Self;
+    }
+    ");
+}
+
+#[test]
+fn trait_with_parent() {
+    let mut scope = Scope::new();
+    scope
+        .new_trait("ChildTrait")
+        .parent("ParentTrait")
+        .parent("Debug");
+
+    insta::assert_snapshot!(scope.to_string(), @"trait ChildTrait: ParentTrait + Debug {}");
+}
+
+#[test]
+fn trait_with_associated_type() {
+    let mut scope = Scope::new();
+    let trt = scope.new_trait("Iterator");
+    trt.associated_type("Item");
+    trt.new_fn("next")
+        .arg_mut_self()
+        .ret("Option<Self::Item>");
+
+    insta::assert_snapshot!(scope.to_string(), @r"
+    trait Iterator {
+        type Item;
+
+        fn next(&mut self) -> Option<Self::Item>;
+    }
+    ");
+}
+
+#[test]
+fn trait_with_associated_type_bound() {
+    let mut scope = Scope::new();
+    let trt = scope.new_trait("Foo");
+    trt.associated_type("Bar").bound("Clone").bound("Send");
+
+    insta::assert_snapshot!(scope.to_string(), @r"
+    trait Foo {
+        type Bar: Clone + Send;
+    }
+    ");
+}
+
+#[test]
+fn trait_with_attr() {
+    let mut scope = Scope::new();
+    scope
+        .new_trait("Foo")
+        .attr("deprecated");
+
+    insta::assert_snapshot!(scope.to_string(), @r"
+    #[deprecated]
+    trait Foo {}
+    ");
+}
+
+#[test]
+fn trait_fn_without_body() {
+    let mut scope = Scope::new();
+    let trt = scope.new_trait("Foo");
+    trt.new_fn("bar").arg_ref_self().ret("usize");
+
+    insta::assert_snapshot!(scope.to_string(), @r"
+    trait Foo {
+        fn bar(&self) -> usize;
+    }
+    ");
+}
+
+#[test]
+fn trait_fn_with_default_body() {
+    let mut scope = Scope::new();
+    let trt = scope.new_trait("Foo");
+    let f = trt.new_fn("bar");
+    f.arg_ref_self().ret("usize");
+    f.body = Some(vec![]);
+    f.line("42");
+
+    insta::assert_snapshot!(scope.to_string(), @r"
+    trait Foo {
+        fn bar(&self) -> usize {
+            42
+        }
+    }
+    ");
+}
+
+// ── Impl ──────────────────────────────────────────────────────────────
+
+#[test]
+fn impl_without_trait() {
+    let mut scope = Scope::new();
+    scope.new_struct("Foo").field("x", "usize");
+    let imp = scope.new_impl("Foo");
+    imp.new_fn("new").ret("Self").line("Foo { x: 0 }");
+
+    insta::assert_snapshot!(scope.to_string(), @r"
+    struct Foo {
+        x: usize,
+    }
+
+    impl Foo {
+        fn new() -> Self {
+            Foo { x: 0 }
+        }
+    }
+    ");
+}
+
+#[test]
+fn impl_with_generics_and_bounds() {
+    let mut scope = Scope::new();
+    let imp = scope.new_impl("Wrapper");
+    imp.generic("T");
+    imp.target_generic("T");
+    imp.impl_trait("Display");
+    imp.bound("T", "Display");
+    imp.new_fn("fmt")
+        .arg_ref_self()
+        .arg("f", "&mut fmt::Formatter<'_>")
+        .ret("fmt::Result")
+        .line("write!(f, \"{}\", self.0)");
+
+    insta::assert_snapshot!(scope.to_string(), @r#"
+    impl<T> Display for Wrapper<T>
+    where
+        T: Display,
+    {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            write!(f, "{}", self.0)
+        }
+    }
+    "#);
+}
+
+#[test]
+fn impl_with_associated_type() {
+    let mut scope = Scope::new();
+    let imp = scope.new_impl("MyIter");
+    imp.impl_trait("Iterator");
+    imp.associate_type("Item", "u32");
+    imp.new_fn("next")
+        .arg_mut_self()
+        .ret("Option<Self::Item>")
+        .line("None");
+
+    insta::assert_snapshot!(scope.to_string(), @r"
+    impl Iterator for MyIter {
+        type Item = u32;
+
+        fn next(&mut self) -> Option<Self::Item> {
+            None
+        }
+    }
+    ");
+}
+
+#[test]
+fn enum_with_vis() {
+    let mut scope = Scope::new();
+    scope
+        .new_enum("Color")
+        .vis("pub")
+        .push_variant(Variant::new("Red"))
+        .push_variant(Variant::new("Blue"));
+
+    insta::assert_snapshot!(scope.to_string(), @r"
+    pub enum Color {
+        Red,
+        Blue,
+    }
+    ");
+}
+
+#[test]
+fn enum_with_generics_and_bounds() {
+    let mut scope = Scope::new();
+    let enu = scope.new_enum("MyResult");
+    enu.generic("T").generic("E").bound("E", "Debug");
+    enu.new_variant("Ok").tuple("T");
+    enu.new_variant("Err").tuple("E");
+
+    insta::assert_snapshot!(scope.to_string(), @r"
+    enum MyResult<T, E>
+    where
+        E: Debug,
+    {
+        Ok(T),
+        Err(E),
+    }
+    ");
+}
+
+#[test]
+fn enum_with_doc() {
+    let mut scope = Scope::new();
+    scope
+        .new_enum("Dir")
+        .doc("Cardinal directions.")
+        .push_variant(Variant::new("North"))
+        .push_variant(Variant::new("South"));
+
+    insta::assert_snapshot!(scope.to_string(), @r"
+    /// Cardinal directions.
+    enum Dir {
+        North,
+        South,
+    }
+    ");
+}
+
+#[test]
+fn enum_with_macro() {
+    let mut scope = Scope::new();
+    scope
+        .new_enum("Msg")
+        .r#macro("#[serde(tag = \"type\")]")
+        .push_variant(Variant::new("Ping"))
+        .push_variant(Variant::new("Pong"));
+
+    insta::assert_snapshot!(scope.to_string(), @r#"
+    #[serde(tag = "type")]
+    enum Msg {
+        Ping,
+        Pong,
+    }
+    "#);
+}
+
+// ── Variant extras ────────────────────────────────────────────────────
+
+#[test]
+fn variant_with_annotation() {
+    let mut scope = Scope::new();
+    let enu = scope.new_enum("Foo");
+    enu.new_variant("Bar")
+        .annotation("#[serde(rename = \"bar\")]");
+    enu.new_variant("Baz")
+        .annotation("#[deprecated]")
+        .annotation("#[doc(hidden)]");
+
+    insta::assert_snapshot!(scope.to_string(), @r#"
+    enum Foo {
+        #[serde(rename = "bar")]
+        Bar,
+        #[deprecated]
+        #[doc(hidden)]
+        Baz,
+    }
+    "#);
+}
+
+#[test]
+fn variant_with_named_fields() {
+    let mut scope = Scope::new();
+    let enu = scope.new_enum("Shape");
+    enu.new_variant("Circle").named("radius", "f64");
+    enu.new_variant("Rect")
+        .named("width", "f64")
+        .named("height", "f64");
+
+    insta::assert_snapshot!(scope.to_string(), @r"
+    enum Shape {
+        Circle { radius: f64 },
+        Rect { width: f64, height: f64 },
+    }
+    ");
+}
+
+#[test]
+fn variant_push_named_field() {
+    let mut scope = Scope::new();
+    let enu = scope.new_enum("Ev");
+    let v = enu.new_variant("Click");
+    let mut field = Field::new("x", "i32");
+    field.doc("X coordinate");
+    v.push_named(field);
+
+    insta::assert_snapshot!(scope.to_string(), @r"
+    enum Ev {
+        Click {
+            /// X coordinate
+            x: i32,
+        },
+    }
+    ");
+}
+
+#[test]
+fn variant_with_multiple_tuple_fields() {
+    let mut scope = Scope::new();
+    let enu = scope.new_enum("Pair");
+    enu.new_variant("Both").tuple("A").tuple("B");
+
+    insta::assert_snapshot!(scope.to_string(), @r"
+    enum Pair {
+        Both(A, B),
+    }
+    ");
+}
+
+#[test]
+fn variant_tuple_with_attrs() {
+    let mut scope = Scope::new();
+    let enu = scope.new_enum("Wrapper");
+    enu.new_variant("Inner")
+        .tuple_with_attrs(["#[serde(transparent)]"], "String");
+
+    insta::assert_snapshot!(scope.to_string(), @r#"
+    enum Wrapper {
+        Inner(#[serde(transparent)] String),
+    }
+    "#);
+}
+
+#[test]
+fn struct_with_vis() {
+    let mut scope = Scope::new();
+    scope
+        .new_struct("Foo")
+        .vis("pub")
+        .field("x", "usize");
+
+    insta::assert_snapshot!(scope.to_string(), @r"
+    pub struct Foo {
+        x: usize,
+    }
+    ");
+}
+
+#[test]
+fn struct_with_macro() {
+    let mut scope = Scope::new();
+    scope
+        .new_struct("Foo")
+        .r#macro("#[serde(rename_all = \"camelCase\")]")
+        .field("my_field", "String");
+
+    insta::assert_snapshot!(scope.to_string(), @r#"
+    #[serde(rename_all = "camelCase")]
+    struct Foo {
+        my_field: String,
+    }
+    "#);
+}
+
+#[test]
+fn struct_with_attr() {
+    let mut scope = Scope::new();
+    scope
+        .new_struct("Foo")
+        .attr("non_exhaustive")
+        .field("x", "u32");
+
+    insta::assert_snapshot!(scope.to_string(), @r"
+    #[non_exhaustive]
+    struct Foo {
+        x: u32,
+    }
+    ");
+}
+
+#[test]
+fn struct_with_tuple_fields() {
+    let mut scope = Scope::new();
+    scope
+        .new_struct("Pair")
+        .tuple_field("u32")
+        .tuple_field("String");
+
+    insta::assert_snapshot!(scope.to_string(), @"struct Pair(u32, String);");
+}
+
+#[test]
+fn struct_new_field_returns_mutable_ref() {
+    let mut scope = Scope::new();
+    let s = scope.new_struct("Foo");
+    s.new_field("x", "u32").vis("pub").doc("The x value");
+    s.field("y", "u32");
+
+    insta::assert_snapshot!(scope.to_string(), @r"
+    struct Foo {
+        /// The x value
+        pub x: u32,
+        y: u32,
+    }
+    ");
+}
+
+#[test]
+fn scope_raw() {
+    let mut scope = Scope::new();
+    scope.raw("// This is a raw comment");
+    scope.new_struct("Foo");
+
+    insta::assert_snapshot!(scope.to_string(), @r"
+    // This is a raw comment
+
+    struct Foo;
+    ");
+}
+
+#[test]
+fn scope_import_with_vis() {
+    let mut scope = Scope::new();
+    scope.import("std::collections", "HashMap").vis("pub");
+    scope.new_struct("Foo").field("map", "HashMap<String, String>");
+
+    insta::assert_snapshot!(scope.to_string(), @r"
+    pub use std::collections::HashMap;
+
+    struct Foo {
+        map: HashMap<String, String>,
+    }
+    ");
+}
+
+#[test]
+fn scope_modules_iterator() {
+    let mut scope = Scope::new();
+    scope.new_module("alpha");
+    scope.new_struct("NotAModule");
+    scope.new_module("beta");
+
+    let names: Vec<&str> = scope.modules().map(|(name, _)| name).collect();
+    assert_eq!(names, vec!["alpha", "beta"]);
+}
+
+// ── Module extras ─────────────────────────────────────────────────────
+
+#[test]
+fn module_with_vis() {
+    let mut scope = Scope::new();
+    scope.new_module("inner").vis("pub").new_struct("Foo");
+
+    insta::assert_snapshot!(scope.to_string(), @r"
+    pub mod inner {
+        struct Foo;
+    }
+    ");
+}
+
+#[test]
+fn module_with_attr() {
+    let mut scope = Scope::new();
+    scope
+        .new_module("tests")
+        .attr("cfg(test)")
+        .new_fn("it_works")
+        .attr("test")
+        .line("assert!(true);");
+
+    insta::assert_snapshot!(scope.to_string(), @r"
+    #[cfg(test)]
+    mod tests {
+        #[test]
+        fn it_works() {
+            assert!(true);
+        }
+    }
+    ");
+}
+
+#[test]
+fn nested_modules() {
+    let mut scope = Scope::new();
+    let outer = scope.new_module("outer");
+    outer.new_module("inner").new_struct("Deep");
+
+    insta::assert_snapshot!(scope.to_string(), @r"
+    mod outer {
+        mod inner {
+            struct Deep;
+        }
+    }
+    ");
+}
+
+#[test]
+fn module_body_to_string() {
+    let mut scope = Scope::new();
+    let m = scope.new_module("my_mod");
+    m.new_struct("Foo").field("x", "u32");
+
+    let body = m.body_to_string();
+    assert!(body.contains("struct Foo"));
+    assert!(!body.contains("mod my_mod"));
+}
+
+#[test]
+fn module_scope_access() {
+    let mut scope = Scope::new();
+    let m = scope.new_module("my_mod");
+    m.scope().new_struct("ViaScope").field("a", "bool");
+
+    insta::assert_snapshot!(scope.to_string(), @r"
+    mod my_mod {
+        struct ViaScope {
+            a: bool,
+        }
+    }
+    ");
+}
+
+#[test]
+fn module_import_with_vis() {
+    let mut scope = Scope::new();
+    let m = scope.new_module("reexport");
+    m.scope().import("std::fmt", "Display").vis("pub");
+    m.new_struct("Foo");
+
+    insta::assert_snapshot!(scope.to_string(), @r"
+    mod reexport {
+        pub use std::fmt::Display;
+
+        struct Foo;
+    }
+    ");
+}
