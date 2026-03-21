@@ -23,7 +23,6 @@ impl Type {
     where
         T: Into<Type>,
     {
-        // Make sure that the name doesn't already include generics
         assert!(
             !self.name.contains("<"),
             "type name already includes generics"

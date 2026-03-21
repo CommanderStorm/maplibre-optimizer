@@ -137,9 +137,7 @@ impl Function {
         self.args.push(Field {
             name: name.to_string(),
             ty: ty.into(),
-            // While a `Field` is used here, both `documentation`, `visibility`
-            // and `annotation` does not make sense for function arguments.
-            // Simply use empty strings.
+            // Reusing Field for args; only name/ty are meaningful here.
             documentation: String::new(),
             annotation: Vec::new(),
             value: String::new(),

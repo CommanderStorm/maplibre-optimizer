@@ -100,9 +100,8 @@ fn unify_types(actual: &ExprType, expected: &ExprType, env: &mut TypeEnv) -> Res
                         ExprParamType::Expression(a_ty),
                     ) = (e, a)
                     {
-                        // Propagate scalar coercions down into array element constraints.
-                        // Example: `interpolate-*-color-array` passes `["literal", ["white", "black"]]`,
-                        // which we infer as `array<string>` but needs to unify with `array<color>`.
+                        // String → Color/Formatted coercion for array elements (e.g. color arrays
+                        // passed as `["literal", ["white", "black"]]`).
                         match (a_ty, e_ty) {
                             (ExprType::String, ExprType::Color) => Ok(()),
                             (ExprType::String, ExprType::Formatted) => Ok(()),
@@ -204,17 +203,16 @@ fn validate_param_type_value(
             let Value::Object(map) = v else {
                 return Err("inline object must be a JSON object".into());
             };
-            // Be tolerant of missing fields (defaults) and extra keys (upstream doesn't reject them).
+            // Match upstream tolerance: missing fields use defaults, extra keys are ignored.
             for (k, field_pt) in schema {
                 if let Some(field_val) = map.get(k) {
-                    // Upstream `format` treats `text-font` as an array-of-strings font stack,
-                    // but v8.json (and thus MIR) models it as a plain `string` override.
-                    // Accept literal arrays of strings here to match upstream's compile-time behavior.
+                    // v8.json models text-font as `string`, but upstream accepts array-of-strings
+                    // font stacks at compile time.
                     if k == "text-font"
                         && matches!(field_pt, ExprParamType::Expression(ExprType::String))
                         && matches!(field_val, Value::Array(_))
                     {
-                        // If it's the typical `["literal", [...]]` shape, validate element kinds.
+                        // Validate elements inside `["literal", [...]]` font stacks.
                         if let Value::Array(parts) = field_val {
                             let is_literal_call = parts.len() == 2
                                 && parts[0].as_str().is_some_and(|op| op == "literal");
@@ -257,7 +255,7 @@ fn validate_array_literal_of_typed_values(
         return Err("internal error: validate_array_literal_of_typed_values called without element constraint".into());
     };
 
-    // Only treat arrays as literal values in contexts where v8.json declared `array<... literal>`.
+    // Restrict to `array<... literal>` contexts to avoid treating expression arrays as literal values.
     match element.as_ref() {
         ExprParamType::Literal(_) | ExprParamType::LiteralAnyOf(_) => {}
         _ => return Err("array literal allowed only for array<... literal> contexts".into()),
@@ -354,8 +352,7 @@ fn validate_literal_operator(
         Value::Number(_) => ExprType::Number,
         Value::String(_) => ExprType::String,
         Value::Array(a) => {
-            // Infer element type for literal array values so generic operators like
-            // `at` can propagate the right type variable.
+            // Infer element type so downstream operators (e.g. `at`) propagate correct types.
             let element = if a.is_empty() {
                 match resolve_type(expected, env) {
                     ExprType::Array { element, .. } => element,
@@ -536,9 +533,6 @@ fn validate_comparison_operator_specifics(
     let is_equality = op == "==" || op == "!=";
     let is_ordering = !is_equality;
 
-    // Our `args` excludes the operator name:
-    // - ["==", lhs, rhs]        => args.len() == 2
-    // - ["==", lhs, rhs, col]  => args.len() == 3
     if args.len() < 2 || args.len() > 3 {
         return Ok(());
     }
@@ -562,7 +556,7 @@ fn validate_comparison_operator_specifics(
             return Ok(ComparisonKind::String);
         }
         if let Value::Array(arr) = v {
-            // Array literals like `[1,2]` must not be treated as operator calls.
+            // Distinguish plain array literals `[1,2]` from expression calls `["get", "x"]`.
             if arr.first().and_then(|x| x.as_str()).is_none() {
                 return Ok(ComparisonKind::Other);
             }
@@ -582,7 +576,7 @@ fn validate_comparison_operator_specifics(
     let lhs_kind = classify(lhs)?;
     let rhs_kind = classify(rhs)?;
 
-    // Mirror `isComparableType` from upstream comparison.ts.
+    // Mirrors `isComparableType` in GL JS comparison.ts.
     let comparable_lhs = if is_equality {
         matches!(
             lhs_kind,
@@ -621,8 +615,7 @@ fn validate_comparison_operator_specifics(
         ));
     }
 
-    // Mirror the type mismatch rule from comparison.ts parse():
-    // if lhs.kind != rhs.kind and neither is `value` (untyped), reject.
+    // Upstream rejects mixed concrete types (e.g. string vs number).
     if lhs_kind != rhs_kind
         && lhs_kind != ComparisonKind::Value
         && rhs_kind != ComparisonKind::Value
@@ -633,8 +626,7 @@ fn validate_comparison_operator_specifics(
         ));
     }
 
-    // Mirror collator usage rule:
-    // upstream rejects when collator is present and both operands are neither string nor value.
+    // Upstream rejects collators on non-string/non-value operands.
     if collator_present {
         let lhs_allows = lhs_kind == ComparisonKind::String || lhs_kind == ComparisonKind::Value;
         let rhs_allows = rhs_kind == ComparisonKind::String || rhs_kind == ComparisonKind::Value;
@@ -644,7 +636,7 @@ fn validate_comparison_operator_specifics(
     }
 
     if is_ordering {
-        // ordering operators also reject `null` (upstream type kind "null" isn't comparable for ordering)
+        // Upstream rejects null for ordering operators.
         if lhs_kind == ComparisonKind::Null || rhs_kind == ComparisonKind::Null {
             return Err(format!("\"{op}\" comparisons are not supported for null"));
         }
@@ -662,8 +654,7 @@ fn validate_coalesce_operator_specifics(
     expected: &ExprType,
     spec: &IntermediateSpec,
 ) -> Result<(), String> {
-    // For `value`-expected contexts, upstream can’t reliably reject argument
-    // types at compile-time.
+    // Upstream can only reject args for concrete expected types, not `value`.
     if matches!(expected, ExprType::Any | ExprType::TypeVar(_)) {
         return Ok(());
     }
@@ -673,9 +664,7 @@ fn validate_coalesce_operator_specifics(
             return Err("coalesce does not accept null for a concrete expected type".into());
         }
 
-        // Validate each argument against the coalesce output type.
-        // This rejects e.g. `coalesce(get(...), 5)` when the expected output
-        // type is `string`.
+        // Each arg must match the output type (e.g. reject number in string context).
         let mut tmp_env = TypeEnv::default();
         validate_expression_with_mir(a, expected, spec, &mut tmp_env)?;
     }
@@ -700,8 +689,7 @@ fn validate_in_indexof_operator_specifics(
     let mut tmp_env = TypeEnv::default();
     let needle_ty = validate_expression_with_mir(needle, &ExprType::Any, spec, &mut tmp_env)?;
 
-    // `in` / `index-of` accept scalar needle kinds (boolean/string/number/null).
-    // Reject array-typed needles.
+    // Upstream rejects array-typed needles.
     if matches!(needle_ty, ExprType::Array { .. }) {
         return Err("`in`/`index-of` needle cannot be an array".into());
     }
@@ -710,8 +698,7 @@ fn validate_in_indexof_operator_specifics(
 }
 
 fn is_literal_expression_value(v: &Value) -> bool {
-    // We treat the `["literal", <any>]` form as a compile-time literal wrapper.
-    // Otherwise, only JSON primitives qualify.
+    // Primitives and `["literal", ...]` wrappers are compile-time values.
     if v.is_null() || v.is_boolean() || v.is_number() || v.is_string() {
         return true;
     }
@@ -722,8 +709,7 @@ fn is_literal_expression_value(v: &Value) -> bool {
 }
 
 fn is_interpolate_output_interpolatable(op: &str, expected: &ExprType) -> bool {
-    // For semantic checks we only care about the *expected output type*.
-    // `expected` is already derived from the fixture's propertySpec.
+    // Interpolation only makes sense for numeric / color types.
     match op {
         "interpolate" => match expected {
             ExprType::Number | ExprType::Color => true,
@@ -753,8 +739,6 @@ fn validate_interpolate_operator_specifics(
     _spec: &IntermediateSpec,
     _actual_output: &ExprType,
 ) -> Result<(), String> {
-    // args excludes the operator name:
-    // ["interpolate", interpolation_type, input, stop_input_1, stop_output_1, ...]
     if args.len() < 4 {
         return Ok(());
     }

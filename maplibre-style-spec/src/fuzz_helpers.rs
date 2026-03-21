@@ -86,12 +86,8 @@ fn arbitrary_json_value_inner(u: &mut Unstructured<'_>, depth: u8) -> arbitrary:
     }
 
     let arm: u8 = u.arbitrary()?;
-    // Important: avoid `Value::Null`.
-    //
-    // When a `serde_json::Value` (or a newtype around it) is nested inside an `Option<T>`,
-    // `serde_json` treats JSON `null` as `Option::None`, which means
-    // `Some(Value::Null)` will not round-trip back to `Some(Value::Null)`.
-    // Since our fuzz target asserts full round-trip equality, we keep generated JSON values non-null.
+    // Avoid `Value::Null`: serde_json conflates `Some(Value::Null)` with `None`
+    // inside `Option<T>`, breaking round-trip equality assertions.
     match arm % 6 {
         0 => Ok(Value::Bool(bool::arbitrary(u)?)),
         1 => arbitrary_json_number(u).map(Value::Number),

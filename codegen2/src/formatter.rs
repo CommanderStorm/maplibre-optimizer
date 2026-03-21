@@ -84,7 +84,6 @@ impl<'a> fmt::Write for Formatter<'a> {
                 self.push_spaces();
             }
 
-            // If this loops again, then we just wrote a new line
             should_indent = true;
 
             self.dst.push_str(line);

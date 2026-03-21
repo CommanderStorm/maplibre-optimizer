@@ -57,8 +57,7 @@ impl Scope {
     /// This results in a new `use` statement being added to the beginning of
     /// the scope.
     pub fn import(&mut self, path: impl ToString, ty: impl ToString) -> &mut Import {
-        // handle cases where the caller wants to refer to a type namespaced
-        // within the containing namespace, like "a::B".
+        // Only import the root segment when given a qualified path like "a::B".
         let ty = ty.to_string();
         let ty = ty.split("::").next().unwrap_or(ty.as_str());
         self.imports
@@ -307,7 +306,6 @@ impl Scope {
 
         self.fmt(&mut Formatter::new(&mut ret)).unwrap();
 
-        // Remove the trailing newline
         if let Some(b'\n') = ret.as_bytes().last() {
             ret.pop();
         }
@@ -350,7 +348,6 @@ impl Scope {
     }
 
     fn fmt_imports(&self, fmt: &mut Formatter<'_>) -> fmt::Result {
-        // First, collect all visibilities
         let mut visibilities = vec![];
 
         for (_, imports) in &self.imports {
@@ -363,7 +360,7 @@ impl Scope {
 
         let mut tys = vec![];
 
-        // Loop over all visibilities and format the associated imports
+        // Group imports by visibility so each `use` statement has a single vis prefix.
         for vis in &visibilities {
             for (path, imports) in &self.imports {
                 tys.clear();
