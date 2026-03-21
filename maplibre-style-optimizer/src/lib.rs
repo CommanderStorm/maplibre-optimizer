@@ -3,6 +3,7 @@
 //! Operates on [`serde_json::Value`] so root keys not yet in generated `spec.rs` are preserved.
 
 mod optimize;
+pub mod stats;
 
 use std::fs;
 use std::path::Path;
@@ -10,7 +11,8 @@ use std::path::Path;
 use anyhow::Context;
 use maplibre_style_spec::decoder::StyleReference;
 use maplibre_style_spec::mir::IntermediateSpec;
-pub use optimize::{OptPasses, optimize_style_json_value};
+pub use optimize::{OptPasses, optimize_style_json_value, optimize_style_json_value_with_stats};
+pub use stats::TileStatistics;
 
 /// Load MIR from a `MapLibre` style reference `v8.json` on disk.
 pub fn load_intermediate_spec_from_v8_path(path: &Path) -> anyhow::Result<IntermediateSpec> {

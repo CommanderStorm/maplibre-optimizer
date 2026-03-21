@@ -4,18 +4,30 @@ use maplibre_style_spec::mir::{ExpressionOperator, IntermediateSpec};
 use serde_json::Value;
 
 use super::OptPasses;
+use super::selectivity::estimate_selectivity;
+use super::source_util::VectorLayerInfo;
 use super::walk::{PropertyContext, StyleVisitor};
+use crate::stats::TileStatistics;
 
 // ── Visitors ──────────────────────────────────────────────────────────────────
 
 pub(crate) struct NormalizeFoldVisitor<'a> {
     pub mir: &'a IntermediateSpec,
     pub passes: &'a OptPasses,
+    pub stats: Option<&'a TileStatistics>,
+    pub layer_info: Option<&'a [Option<VectorLayerInfo>]>,
     pub changed: bool,
 }
 
 impl StyleVisitor for NormalizeFoldVisitor<'_> {
-    fn visit_filter(&mut self, _: usize, _: &str, filter: &mut Value) {
+    fn visit_filter(&mut self, layer_index: usize, _: &str, filter: &mut Value) {
+        // Stats-driven: fold ["id"] → ["literal", null] when no feature IDs.
+        if self.passes.constant_fold
+            && should_fold_id(self.stats, self.layer_info, layer_index)
+            && fold_id_to_null(filter)
+        {
+            self.changed = true;
+        }
         normalize_and_fold(filter, self.mir, self.passes, &mut self.changed);
     }
 
@@ -24,17 +36,70 @@ impl StyleVisitor for NormalizeFoldVisitor<'_> {
     }
 }
 
+fn should_fold_id(
+    stats: Option<&TileStatistics>,
+    layer_info: Option<&[Option<VectorLayerInfo>]>,
+    layer_index: usize,
+) -> bool {
+    let Some(stats) = stats else { return false };
+    let Some(infos) = layer_info else { return false };
+    let Some(Some(info)) = infos.get(layer_index) else {
+        return false;
+    };
+    stats
+        .layer_stats(&info.source, &info.source_layer)
+        .is_some_and(|ls| !ls.has_feature_ids)
+}
+
+/// Recursively replace `["id"]` with `["literal", null]`.
+fn fold_id_to_null(v: &mut Value) -> bool {
+    let Value::Array(arr) = v else {
+        return false;
+    };
+    if arr.len() == 1 && arr[0].as_str() == Some("id") {
+        *arr = vec![Value::String("literal".to_string()), Value::Null];
+        return true;
+    }
+    let mut changed = false;
+    for child in arr.iter_mut() {
+        changed |= fold_id_to_null(child);
+    }
+    changed
+}
+
 pub(crate) struct ReorderSelectivityVisitor<'a> {
     pub mir: &'a IntermediateSpec,
+    pub stats: Option<&'a TileStatistics>,
+    pub layer_info: Option<&'a [Option<VectorLayerInfo>]>,
+}
+
+struct LayerContext<'a> {
+    source: &'a str,
+    source_layer: &'a str,
+}
+
+impl ReorderSelectivityVisitor<'_> {
+    fn layer_context(&self, layer_index: usize) -> Option<LayerContext<'_>> {
+        let stats = self.stats?;
+        let info = self.layer_info?.get(layer_index)?.as_ref()?;
+        // Verify stats exist for this layer.
+        stats.layer_stats(&info.source, &info.source_layer)?;
+        Some(LayerContext {
+            source: &info.source,
+            source_layer: &info.source_layer,
+        })
+    }
 }
 
 impl StyleVisitor for ReorderSelectivityVisitor<'_> {
-    fn visit_filter(&mut self, _: usize, _: &str, filter: &mut Value) {
-        reorder_selectivity(filter, self.mir);
+    fn visit_filter(&mut self, layer_index: usize, _: &str, filter: &mut Value) {
+        let ctx = self.layer_context(layer_index);
+        reorder_selectivity(filter, self.mir, self.stats, ctx.as_ref());
     }
 
-    fn visit_property(&mut self, _: &PropertyContext<'_>, value: &mut Value) {
-        reorder_selectivity(value, self.mir);
+    fn visit_property(&mut self, ctx: &PropertyContext<'_>, value: &mut Value) {
+        let lctx = self.layer_context(ctx.layer_index);
+        reorder_selectivity(value, self.mir, self.stats, lctx.as_ref());
     }
 }
 
@@ -90,17 +155,22 @@ fn normalize_and_fold(
     }
 }
 
-fn reorder_selectivity(v: &mut Value, mir: &IntermediateSpec) {
+fn reorder_selectivity(
+    v: &mut Value,
+    mir: &IntermediateSpec,
+    stats: Option<&TileStatistics>,
+    ctx: Option<&LayerContext<'_>>,
+) {
     match v {
         Value::Array(arr) => {
             for x in arr.iter_mut() {
-                reorder_selectivity(x, mir);
+                reorder_selectivity(x, mir, stats, ctx);
             }
-            maybe_reorder_any_all(arr, mir);
+            maybe_reorder_any_all(arr, mir, stats, ctx);
         }
         Value::Object(map) => {
             for x in map.values_mut() {
-                reorder_selectivity(x, mir);
+                reorder_selectivity(x, mir, stats, ctx);
             }
         }
         _ => {}
@@ -262,17 +332,23 @@ fn try_fold_comparison(arr: &mut Vec<Value>) -> bool {
     let Some(y) = extract_json_literal(&arr[2]) else {
         return false;
     };
-    let Some(ord) = compare_json_values(&x, &y) else {
-        return false;
-    };
-    let result = match op {
-        "==" => ord == std::cmp::Ordering::Equal,
-        "!=" => ord != std::cmp::Ordering::Equal,
-        "<" => ord == std::cmp::Ordering::Less,
-        "<=" => ord != std::cmp::Ordering::Greater,
-        ">" => ord == std::cmp::Ordering::Greater,
-        ">=" => ord != std::cmp::Ordering::Less,
-        _ => return false,
+    let result = if let Some(ord) = compare_json_values(&x, &y) {
+        match op {
+            "==" => ord == std::cmp::Ordering::Equal,
+            "!=" => ord != std::cmp::Ordering::Equal,
+            "<" => ord == std::cmp::Ordering::Less,
+            "<=" => ord != std::cmp::Ordering::Greater,
+            ">" => ord == std::cmp::Ordering::Greater,
+            ">=" => ord != std::cmp::Ordering::Less,
+            _ => return false,
+        }
+    } else {
+        // Different types: == is false, != is true; relational ops can't be folded.
+        match op {
+            "==" => false,
+            "!=" => true,
+            _ => return false,
+        }
     };
     *arr = vec![Value::String("literal".to_string()), Value::Bool(result)];
     true
@@ -631,8 +707,6 @@ fn try_simplify_interpolate_or_step(arr: &mut Vec<Value>) -> bool {
 
     match op {
         "interpolate" | "interpolate-hcl" | "interpolate-lab" => {
-            // Structure: ["interpolate", method, input, stop1, val1, stop2, val2, ...]
-            // Minimum: 5 elements (one stop/val pair)
             if arr.len() < 5 {
                 return false;
             }
@@ -640,7 +714,6 @@ fn try_simplify_interpolate_or_step(arr: &mut Vec<Value>) -> bool {
             if !pairs_after_header.is_multiple_of(2) {
                 return false; // malformed
             }
-            // Output values are at indices 4, 6, 8, ... (every other element starting at 4)
             let first = &arr[4];
             if arr[4..].iter().step_by(2).all(|v| v == first) {
                 let val = first.clone();
@@ -650,13 +723,10 @@ fn try_simplify_interpolate_or_step(arr: &mut Vec<Value>) -> bool {
             false
         }
         "step" => {
-            // Structure: ["step", input, default, stop1, val1, stop2, val2, ...]
-            // Minimum: 3 elements (just default, no stops)
             if arr.len() < 3 {
                 return false;
             }
             if arr.len() == 3 {
-                // Only a default value, no stops — collapse immediately.
                 let val = arr[2].clone();
                 *arr = vec![Value::String("literal".to_string()), val];
                 return true;
@@ -665,7 +735,6 @@ fn try_simplify_interpolate_or_step(arr: &mut Vec<Value>) -> bool {
             if !pairs_after_default.is_multiple_of(2) {
                 return false; // malformed
             }
-            // Output values: default at index 2, then at indices 4, 6, 8, ...
             let default_val = &arr[2];
             if arr[4..].iter().step_by(2).all(|v| v == default_val) {
                 let val = default_val.clone();
@@ -689,12 +758,10 @@ fn try_simplify_match(arr: &mut Vec<Value>) -> bool {
     if arr.first().and_then(Value::as_str) != Some("match") {
         return false;
     }
-    // ["match", input, label1, out1, label2, out2, ..., fallback]
-    // Minimum: ["match", input, label, out, fallback] = 5 elements
+    // Match layout: ["match", input, label1, out1, ..., fallback] — always odd length ≥ 5.
     if arr.len() < 5 {
         return false;
     }
-    // Even number of elements total means something is off (must be odd ≥ 5).
     if arr.len().is_multiple_of(2) {
         return false;
     }
@@ -702,14 +769,11 @@ fn try_simplify_match(arr: &mut Vec<Value>) -> bool {
     let input = arr[1].clone();
     let fallback = arr.last().unwrap().clone();
 
-    // Parse arms: pairs (label, output) between index 2 and the last element.
-    // Labels may already be arrays (grouped labels).
     let arm_count = (arr.len() - 3) / 2;
     let mut arms: Vec<(Vec<Value>, Value)> = Vec::with_capacity(arm_count);
     for i in 0..arm_count {
         let label_val = arr[2 + i * 2].clone();
         let output = arr[3 + i * 2].clone();
-        // Normalize label to a Vec<Value> (unwrap existing arrays).
         let labels = match label_val {
             Value::Array(labels) => labels,
             single => vec![single],
@@ -717,19 +781,17 @@ fn try_simplify_match(arr: &mut Vec<Value>) -> bool {
         arms.push((labels, output));
     }
 
-    // Check: all arms + fallback produce the same value → collapse.
     let all_same_as_fallback = arms.iter().all(|(_, out)| *out == fallback);
     if all_same_as_fallback {
         *arr = vec![Value::String("literal".to_string()), fallback];
         return true;
     }
 
-    // Remove arms whose output matches the fallback (they're redundant).
+    // Fallback-matching arms are redundant.
     let before = arms.len();
     arms.retain(|(_, out)| *out != fallback);
     let removed_fallback_arms = arms.len() < before;
 
-    // Group labels by structurally equal output.
     let mut grouped: Vec<(Vec<Value>, Value)> = Vec::new();
     'arm: for (labels, output) in arms {
         for (existing_labels, existing_out) in &mut grouped {
@@ -741,7 +803,6 @@ fn try_simplify_match(arr: &mut Vec<Value>) -> bool {
         grouped.push((labels, output));
     }
 
-    // Check if anything changed.
     let same_structure = !removed_fallback_arms
         && grouped.len() == arm_count
         && grouped
@@ -758,7 +819,6 @@ fn try_simplify_match(arr: &mut Vec<Value>) -> bool {
         return false;
     }
 
-    // Rebuild the match expression.
     let mut new_arr = vec![Value::String("match".to_string()), input];
     for (labels, output) in grouped {
         let label_val = if labels.len() == 1 {
@@ -771,7 +831,7 @@ fn try_simplify_match(arr: &mut Vec<Value>) -> bool {
     }
     new_arr.push(fallback);
 
-    // Sanity: if we ended up with no arms, just return the fallback.
+    // All arms were merged away — collapse to fallback.
     if new_arr.len() == 3 {
         *arr = vec![Value::String("literal".to_string()), new_arr.remove(2)];
     } else {
@@ -782,16 +842,10 @@ fn try_simplify_match(arr: &mut Vec<Value>) -> bool {
 
 // ── Algebraic identity simplification ─────────────────────────────────────────
 
-/// Simplify binary arithmetic using identity elements.
+/// Eliminate identity-element operands in binary arithmetic (e.g. `x * 1 → x`).
 ///
-/// - `["*", x, 1]` / `["*", 1, x]` → `x`
-/// - `["+", x, 0]` / `["+", 0, x]` → `x`
-/// - `["-", x, 0]` → `x`
-/// - `["/", x, 1]` → `x`
-/// - `["^", x, 1]` → `x`
-///
-/// Only applies to the binary form (exactly 3 elements). `try_fold_pure_operator` handles
-/// the all-literal case; this handles the mixed case where one operand is a variable.
+/// Complements `try_fold_pure_operator` which handles all-literal expressions;
+/// this covers the mixed literal+variable case.
 fn try_algebraic_simplify(arr: &mut Vec<Value>) -> bool {
     if arr.len() != 3 {
         return false;
@@ -845,13 +899,7 @@ fn try_algebraic_simplify(arr: &mut Vec<Value>) -> bool {
 
 // ── Dead branch elimination: case ─────────────────────────────────────────────
 
-/// Resolve `case` expressions with literal boolean conditions.
-///
-/// - `["case", true, out, ...]` → `out`
-/// - `["case", false, out, rest..., fallback]` → `["case", rest..., fallback]`
-/// - `["case", fallback]` → `fallback` (no arms)
-///
-/// `case` always has even total length: `["case"] + n*(cond, out) + fallback`.
+/// Resolve `case` arms with known-at-compile-time boolean conditions.
 fn try_dead_branch_case(arr: &mut Vec<Value>) -> bool {
     if arr.first().and_then(Value::as_str) != Some("case") {
         return false;
@@ -859,7 +907,6 @@ fn try_dead_branch_case(arr: &mut Vec<Value>) -> bool {
     if arr.len() < 2 || !arr.len().is_multiple_of(2) {
         return false;
     }
-    // ["case", fallback] — no arms, collapse immediately.
     if arr.len() == 2 {
         let fallback = arr[1].clone();
         replace_arr_with_value(arr, fallback);
@@ -876,7 +923,7 @@ fn try_dead_branch_case(arr: &mut Vec<Value>) -> bool {
                 return true;
             }
             Some(false) => {
-                // Remove arm (higher index first to keep lower index valid).
+                // Higher index first so lower index stays valid.
                 arr.remove(out_idx);
                 arr.remove(cond_idx);
                 return true;
@@ -897,7 +944,6 @@ fn try_dead_branch_match_literal(arr: &mut Vec<Value>) -> bool {
     if arr.first().and_then(Value::as_str) != Some("match") {
         return false;
     }
-    // ["match", input, label, out, fallback] = 5 elements minimum, always odd.
     if arr.len() < 5 || arr.len().is_multiple_of(2) {
         return false;
     }
@@ -918,18 +964,13 @@ fn try_dead_branch_match_literal(arr: &mut Vec<Value>) -> bool {
             return true;
         }
     }
-    // No arm matched — use fallback.
     replace_arr_with_value(arr, fallback);
     true
 }
 
 // ── Filter contradiction detection ────────────────────────────────────────────
 
-/// Detect contradictory predicates inside `["all", ...]` and fold to `["literal", false]`.
-///
-/// Detects:
-/// - `["==", x, a]` and `["==", x, b]` with `a != b` (same LHS, different literal RHS)
-/// - `["==", x, a]` and `["!=", x, a]` (direct contradiction)
+/// Detect contradictory `==`/`!=` predicates inside `["all", ...]` and fold to false.
 fn try_filter_contradiction(arr: &mut Vec<Value>) -> bool {
     if arr.first().and_then(Value::as_str) != Some("all") {
         return false;
@@ -955,11 +996,9 @@ fn predicates_contradict(a: &Value, b: &Value) -> bool {
     if a_lhs != b_lhs {
         return false;
     }
-    // ["==", x, a] and ["==", x, b] where a != b
     if a_op == "==" && b_op == "==" && a_rhs != b_rhs {
         return true;
     }
-    // ["==", x, a] and ["!=", x, a]
     if ((a_op == "==" && b_op == "!=") || (a_op == "!=" && b_op == "==")) && a_rhs == b_rhs {
         return true;
     }
@@ -1001,7 +1040,6 @@ fn try_rewrite_any_to_in(arr: &mut Vec<Value>) -> bool {
     if arr.first().and_then(Value::as_str) != Some("any") {
         return false;
     }
-    // Need at least ["any", eq1, eq2] = 3 elements.
     if arr.len() < 3 {
         return false;
     }
@@ -1060,18 +1098,16 @@ fn try_simplify_case(arr: &mut Vec<Value>) -> bool {
     if arr.first().and_then(Value::as_str) != Some("case") {
         return false;
     }
-    // case: even length, minimum 4 (one arm + fallback).
     if arr.len() < 4 || !arr.len().is_multiple_of(2) {
         return false;
     }
     let fallback = arr.last().unwrap().clone();
     let n_arms = (arr.len() - 2) / 2;
-    // All outputs same as fallback → collapse.
     if (0..n_arms).all(|i| arr[2 + 2 * i] == fallback) {
         replace_arr_with_value(arr, fallback);
         return true;
     }
-    // Count how many trailing arms produce the fallback value.
+    // Only trailing arms can be trimmed; removing middle arms changes eval order.
     let trim_count = (0..n_arms)
         .rev()
         .take_while(|&i| arr[2 + 2 * i] == fallback)
@@ -1099,13 +1135,11 @@ fn try_simplify_coalesce(arr: &mut Vec<Value>) -> bool {
     if arr.len() < 2 {
         return false;
     }
-    // Single arg: unwrap.
     if arr.len() == 2 {
         let x = arr[1].clone();
         replace_arr_with_value(arr, x);
         return true;
     }
-    // Scan args for literals.
     let mut i = 1;
     while i < arr.len() {
         match extract_json_literal(&arr[i]) {
@@ -1114,7 +1148,7 @@ fn try_simplify_coalesce(arr: &mut Vec<Value>) -> bool {
                 return true;
             }
             Some(_) => {
-                // Non-null literal: everything after is unreachable.
+                // coalesce short-circuits on first non-null.
                 if i + 1 < arr.len() {
                     arr.truncate(i + 1);
                     return true;
@@ -1131,7 +1165,12 @@ fn try_simplify_coalesce(arr: &mut Vec<Value>) -> bool {
 
 // ── Selectivity reordering ────────────────────────────────────────────────────
 
-fn maybe_reorder_any_all(arr: &mut Vec<Value>, mir: &IntermediateSpec) {
+fn maybe_reorder_any_all(
+    arr: &mut Vec<Value>,
+    mir: &IntermediateSpec,
+    stats: Option<&TileStatistics>,
+    ctx: Option<&LayerContext<'_>>,
+) {
     let op = match arr.first().and_then(Value::as_str) {
         Some("any") => "any",
         Some("all") => "all",
@@ -1142,20 +1181,73 @@ fn maybe_reorder_any_all(arr: &mut Vec<Value>, mir: &IntermediateSpec) {
     }
     let head = arr[0].clone();
     let mut ops: Vec<Value> = arr.iter().skip(1).cloned().collect();
-    if op == "any" {
-        ops.sort_by_key(|v| match bool_literal(v) {
-            Some(true) => 0,
-            None => 1,
-            Some(false) => 2,
+
+    // Check if we have data-driven selectivity available.
+    let has_stats = stats.is_some() && ctx.is_some();
+
+    if has_stats {
+        let stats = stats.unwrap();
+        let ctx = ctx.unwrap();
+        // Data-driven: sort by estimated selectivity.
+        // For "all": ascending (lowest selectivity = most likely false = best short-circuit).
+        // For "any": descending (highest selectivity = most likely true = best short-circuit).
+        // Unknown selectivity operands go in the middle.
+        let mut with_sel: Vec<(Value, Option<f64>)> = ops
+            .into_iter()
+            .map(|v| {
+                let sel =
+                    estimate_selectivity(&v, ctx.source, ctx.source_layer, stats);
+                (v, sel)
+            })
+            .collect();
+
+        with_sel.sort_by(|(_, a), (_, b)| {
+            let key = |s: &Option<f64>| match s {
+                Some(v) => (1, ordered_float(*v)),
+                None => (1, ordered_float(0.5)), // middle
+            };
+            let (a_tier, a_val) = key(a);
+            let (b_tier, b_val) = key(b);
+            if op == "all" {
+                // ascending selectivity
+                a_tier.cmp(&b_tier).then(a_val.partial_cmp(&b_val).unwrap_or(std::cmp::Ordering::Equal))
+            } else {
+                // descending selectivity
+                b_tier.cmp(&a_tier).then(b_val.partial_cmp(&a_val).unwrap_or(std::cmp::Ordering::Equal))
+            }
         });
+
+        // Also honor literal placement: true first in any, false first in all.
+        with_sel.sort_by_key(|(v, _)| match (op, bool_literal(v)) {
+            ("any", Some(true)) | ("all", Some(false)) => 0,
+            ("any", Some(false)) | ("all", Some(true)) => 2,
+            _ => 1,
+        });
+
+        ops = with_sel.into_iter().map(|(v, _)| v).collect();
     } else {
-        ops.sort_by_key(|v| match bool_literal(v) {
-            Some(false) => 0,
-            None => 1,
-            Some(true) => 2,
-        });
+        // Static reordering: only move literals.
+        if op == "any" {
+            ops.sort_by_key(|v| match bool_literal(v) {
+                Some(true) => 0,
+                None => 1,
+                Some(false) => 2,
+            });
+        } else {
+            ops.sort_by_key(|v| match bool_literal(v) {
+                Some(false) => 0,
+                None => 1,
+                Some(true) => 2,
+            });
+        }
     }
+
     let mut out = vec![head];
     out.extend(ops);
     *arr = out;
+}
+
+/// Wrapper for f64 ordering that handles NaN.
+fn ordered_float(f: f64) -> f64 {
+    if f.is_nan() { 0.5 } else { f }
 }

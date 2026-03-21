@@ -4,8 +4,8 @@ use std::path::PathBuf;
 use anyhow::Context;
 use clap::Parser;
 use maplibre_style_optimizer::{
-    OptPasses, ensure_expression_operator, load_intermediate_spec_from_v8_path,
-    optimize_style_json_value,
+    OptPasses, TileStatistics, ensure_expression_operator, load_intermediate_spec_from_v8_path,
+    optimize_style_json_value_with_stats,
 };
 use maplibre_style_spec::validate::validate_style_value;
 
@@ -25,6 +25,14 @@ struct Cli {
     /// Path to `v8.json` style reference (defaults to repo `upstream/src/reference/v8.json`).
     #[arg(long)]
     reference: Option<PathBuf>,
+
+    /// Load pre-computed `TileStatistics` JSON and enable data-driven passes.
+    ///
+    /// The stats file must use the same source key names as the style's `"sources"` map.
+    /// This does not enable any new pass flags; it enriches the behavior of existing
+    /// passes that already have their flags set.
+    #[arg(long)]
+    stats: Option<PathBuf>,
 
     /// Enable all optimization passes (overrides individual flags).
     #[arg(long)]
@@ -98,6 +106,17 @@ fn main() -> anyhow::Result<()> {
     let mut value: serde_json::Value = serde_json::from_str(&json_text)
         .with_context(|| format!("parse style JSON {}", cli.input.display()))?;
 
+    let tile_stats = cli
+        .stats
+        .map(|path| {
+            let text = fs::read_to_string(&path)
+                .with_context(|| format!("read stats {}", path.display()))?;
+            let stats: TileStatistics = serde_json::from_str(&text)
+                .with_context(|| format!("parse stats JSON {}", path.display()))?;
+            Ok::<_, anyhow::Error>(stats)
+        })
+        .transpose()?;
+
     let passes = if cli.all {
         OptPasses::all()
     } else {
@@ -114,7 +133,7 @@ fn main() -> anyhow::Result<()> {
             cleanup: cli.cleanup,
         }
     };
-    optimize_style_json_value(&mut value, &mir, &passes);
+    optimize_style_json_value_with_stats(&mut value, &mir, &passes, tile_stats.as_ref());
 
     if cli.validate {
         validate_style_value(&value).map_err(anyhow::Error::msg)?;

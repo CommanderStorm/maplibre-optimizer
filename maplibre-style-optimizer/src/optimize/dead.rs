@@ -3,22 +3,30 @@
 use serde_json::Value;
 
 use super::expr::bool_literal;
-use super::source_util::{build_layer_index, collect_used_sources};
+use super::source_util::{VectorLayerInfo, build_layer_index, collect_used_sources};
 use super::walk::StyleVisitor;
+use crate::stats::TileStatistics;
 
 // ── Visitor ───────────────────────────────────────────────────────────────────
 
-pub(crate) struct DeadEliminationVisitor;
+pub(crate) struct DeadEliminationVisitor<'a> {
+    pub stats: Option<&'a TileStatistics>,
+    pub layer_info: Option<&'a [Option<VectorLayerInfo>]>,
+}
 
-impl StyleVisitor for DeadEliminationVisitor {
+impl StyleVisitor for DeadEliminationVisitor<'_> {
     fn visit_root(&mut self, root: &mut Value) {
-        eliminate_dead_sources_and_layers(root);
+        eliminate_dead_sources_and_layers(root, self.stats, self.layer_info);
     }
 }
 
 // ── Implementation ────────────────────────────────────────────────────────────
 
-fn eliminate_dead_sources_and_layers(v: &mut Value) {
+fn eliminate_dead_sources_and_layers(
+    v: &mut Value,
+    stats: Option<&TileStatistics>,
+    layer_info: Option<&[Option<VectorLayerInfo>]>,
+) {
     let Some(root) = v.as_object_mut() else {
         return;
     };
@@ -35,11 +43,18 @@ fn eliminate_dead_sources_and_layers(v: &mut Value) {
         let Some(obj) = layer.as_object() else {
             continue;
         };
+        // Original: filter is always false.
         if let Some(filt) = obj.get("filter")
             && filter_is_always_false(filt)
         {
             to_drop.push(i);
+            continue;
         }
+        // Stats-driven: geometry type mismatch.
+        if let Some(stats) = stats
+            && is_dead_by_geometry(i, layer, stats, layer_info) {
+                to_drop.push(i);
+            }
     }
 
     if !to_drop.is_empty() {
@@ -60,4 +75,37 @@ fn eliminate_dead_sources_and_layers(v: &mut Value) {
 
 fn filter_is_always_false(f: &Value) -> bool {
     bool_literal(f) == Some(false)
+}
+
+/// Check if a layer is dead because its geometry type requirement cannot be satisfied
+/// by the source-layer's actual geometry types.
+fn is_dead_by_geometry(
+    layer_index: usize,
+    layer: &Value,
+    stats: &TileStatistics,
+    layer_info: Option<&[Option<VectorLayerInfo>]>,
+) -> bool {
+    let Some(infos) = layer_info else {
+        return false;
+    };
+    let Some(Some(info)) = infos.get(layer_index) else {
+        return false;
+    };
+    let Some(layer_stats) = stats.layer_stats(&info.source, &info.source_layer) else {
+        return false;
+    };
+    let layer_type = layer
+        .as_object()
+        .and_then(|o| o.get("type"))
+        .and_then(Value::as_str)
+        .unwrap_or("");
+
+    let gt = &layer_stats.geometry_types;
+    match layer_type {
+        "fill" | "fill-extrusion" => gt.polygon == 0,
+        "circle" | "heatmap" => gt.point == 0,
+        "line" => gt.linestring == 0 && gt.polygon == 0,
+        "symbol" => gt.point == 0 && gt.linestring == 0,
+        _ => false,
+    }
 }

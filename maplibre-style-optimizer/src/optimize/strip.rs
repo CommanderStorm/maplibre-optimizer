@@ -63,7 +63,7 @@ fn primary_opacity_prop(layer_type: &str) -> Option<&'static str> {
         "fill-extrusion" => Some("fill-extrusion-opacity"),
         "raster" => Some("raster-opacity"),
         "heatmap" => Some("heatmap-opacity"),
-        // symbol has both icon-opacity and text-opacity; skip for safety
+        // symbol has separate icon-opacity and text-opacity — no single property suffices.
         _ => None,
     }
 }
@@ -73,7 +73,7 @@ fn is_invisible_layer(layer: &Value) -> bool {
         return false;
     };
 
-    // visibility: "none" in layout (plain string, not expression)
+    // Only match plain strings; expression-based visibility is data-dependent.
     if obj
         .get("layout")
         .and_then(Value::as_object)
@@ -84,16 +84,29 @@ fn is_invisible_layer(layer: &Value) -> bool {
         return true;
     }
 
-    // Primary opacity property is plain 0 (not an expression)
+    // Skip expression-valued opacities — they may vary by zoom/feature.
     let layer_type = obj.get("type").and_then(Value::as_str).unwrap_or("");
+    let paint = obj.get("paint").and_then(Value::as_object);
     if let Some(prop) = primary_opacity_prop(layer_type)
-        && obj
-            .get("paint")
-            .and_then(Value::as_object)
+        && paint
             .and_then(|p| p.get(prop))
             .and_then(Value::as_f64)
             == Some(0.0)
     {
+        // Circle stroke renders independently of fill opacity.
+        if layer_type == "circle" {
+            let stroke_opacity = paint
+                .and_then(|p| p.get("circle-stroke-opacity"))
+                .and_then(Value::as_f64)
+                .unwrap_or(1.0); // spec default
+            let stroke_width = paint
+                .and_then(|p| p.get("circle-stroke-width"))
+                .and_then(Value::as_f64)
+                .unwrap_or(0.0); // spec default
+            if stroke_opacity != 0.0 && stroke_width != 0.0 {
+                return false;
+            }
+        }
         return true;
     }
 
@@ -109,7 +122,6 @@ fn remove_invisible_layers(root: &mut Value) {
         return;
     };
 
-    // Single pass: collect referenced IDs and invisible indices simultaneously.
     let referenced_ids: std::collections::HashSet<&str> = layers_arr
         .iter()
         .filter_map(|l| l.as_object()?.get("ref")?.as_str())
@@ -141,7 +153,7 @@ fn remove_invisible_layers(root: &mut Value) {
         }
     }
 
-    // Re-run source cleanup after dropping invisible layers.
+    // Dropped layers may have been the only users of some sources.
     let Some(layers) = obj.get("layers").and_then(Value::as_array) else {
         return;
     };
@@ -244,6 +256,42 @@ mod tests {
             }]
         });
         walk_style_mut(&mut v, &mir, &mut CleanupVisitor);
+        assert_eq!(v["layers"].as_array().unwrap().len(), 0);
+    }
+
+    #[test]
+    fn cleanup_preserves_circle_with_visible_stroke() {
+        let mir = dummy_mir();
+        let mut v = json!({
+            "version": 8,
+            "sources": { "s": { "type": "geojson", "data": { "type": "Point", "coordinates": [0, 0] } } },
+            "layers": [{
+                "id": "x",
+                "type": "circle",
+                "source": "s",
+                "paint": { "circle-opacity": 0, "circle-stroke-width": 5 }
+            }]
+        });
+        walk_style_mut(&mut v, &mir, &mut CleanupVisitor);
+        // stroke is visible → layer must be kept
+        assert_eq!(v["layers"].as_array().unwrap().len(), 1);
+    }
+
+    #[test]
+    fn cleanup_removes_circle_with_zero_opacity_and_no_stroke() {
+        let mir = dummy_mir();
+        let mut v = json!({
+            "version": 8,
+            "sources": { "s": { "type": "geojson", "data": { "type": "Point", "coordinates": [0, 0] } } },
+            "layers": [{
+                "id": "x",
+                "type": "circle",
+                "source": "s",
+                "paint": { "circle-opacity": 0 }
+            }]
+        });
+        walk_style_mut(&mut v, &mir, &mut CleanupVisitor);
+        // no stroke (default width=0) → layer is invisible → removed
         assert_eq!(v["layers"].as_array().unwrap().len(), 0);
     }
 

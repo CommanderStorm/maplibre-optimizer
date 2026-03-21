@@ -49,6 +49,7 @@ serde_with = "3.16"
 thiserror = "2.0"
 url = "2.5"
 geojson = "0.24.2"
+indexmap = { version = "2", features = ["serde"] }
 
 [profile.dev.package]
 # See https://docs.rs/insta/latest/insta/#optional-faster-runs

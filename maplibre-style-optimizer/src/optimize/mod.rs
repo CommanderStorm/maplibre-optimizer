@@ -4,16 +4,19 @@ mod dead;
 mod defaults;
 mod expr;
 mod metadata;
+mod selectivity;
 mod source_util;
 mod strip;
 mod walk;
 
+use crate::stats::TileStatistics;
 use dead::DeadEliminationVisitor;
 use defaults::StripDefaultsVisitor;
 use expr::{NormalizeFoldVisitor, ReorderSelectivityVisitor};
 use maplibre_style_spec::mir::IntermediateSpec;
 use metadata::MetadataRefinementVisitor;
 use serde_json::Value;
+use source_util::precompute_vector_layer_info;
 use strip::{CleanupVisitor, StripMetadataVisitor};
 use walk::walk_style_mut;
 
@@ -72,7 +75,7 @@ fn wants_normalize_fold(passes: &OptPasses) -> bool {
         || passes.simplify_expressions
 }
 
-/// Apply enabled passes in pipeline order with a fixpoint on normalisation + folding.
+/// Apply enabled passes in pipeline order (backward-compatible, no stats).
 ///
 /// Pipeline order:
 /// 1. `strip_metadata` — remove noise before analysis
@@ -83,6 +86,16 @@ fn wants_normalize_fold(passes: &OptPasses) -> bool {
 /// 6. `selectivity_reorder` — reorder for short-circuit after folding removes literals
 /// 7. `cleanup` — remove empty objects, invisible layers, re-run source cleanup
 pub fn optimize_style_json_value(v: &mut Value, mir: &IntermediateSpec, passes: &OptPasses) {
+    optimize_style_json_value_with_stats(v, mir, passes, None);
+}
+
+/// Apply enabled passes with optional data-driven statistics.
+pub fn optimize_style_json_value_with_stats(
+    v: &mut Value,
+    mir: &IntermediateSpec,
+    passes: &OptPasses,
+    stats: Option<&TileStatistics>,
+) {
     if !passes.strip_metadata
         && !wants_normalize_fold(passes)
         && !passes.dead_elimination
@@ -99,12 +112,17 @@ pub fn optimize_style_json_value(v: &mut Value, mir: &IntermediateSpec, passes: 
         walk_style_mut(v, mir, &mut StripMetadataVisitor);
     }
 
+    // Pre-compute vector layer info for stats-driven passes.
+    let layer_info = stats.map(|_| precompute_vector_layer_info(v));
+
     // 2. Normalize / fold fixpoint.
     if wants_normalize_fold(passes) {
         for _ in 0..NORMALIZE_FOLD_FIXPOINT_CAP {
             let mut visitor = NormalizeFoldVisitor {
                 mir,
                 passes,
+                stats,
+                layer_info: layer_info.as_deref(),
                 changed: false,
             };
             walk_style_mut(v, mir, &mut visitor);
@@ -114,14 +132,30 @@ pub fn optimize_style_json_value(v: &mut Value, mir: &IntermediateSpec, passes: 
         }
     }
 
-    // 3. Dead elimination.
+    // 3. Dead elimination (recompute layer info since folding may have changed layers).
     if passes.dead_elimination {
-        walk_style_mut(v, mir, &mut DeadEliminationVisitor);
+        let layer_info = stats.map(|_| precompute_vector_layer_info(v));
+        walk_style_mut(
+            v,
+            mir,
+            &mut DeadEliminationVisitor {
+                stats,
+                layer_info: layer_info.as_deref(),
+            },
+        );
     }
 
-    // 4. Metadata refinement.
+    // 4. Metadata refinement (recompute after dead elimination).
     if passes.metadata_refinement {
-        walk_style_mut(v, mir, &mut MetadataRefinementVisitor);
+        let layer_info = stats.map(|_| precompute_vector_layer_info(v));
+        walk_style_mut(
+            v,
+            mir,
+            &mut MetadataRefinementVisitor {
+                stats,
+                layer_info: layer_info.as_deref(),
+            },
+        );
     }
 
     // 5. Strip defaults.
@@ -129,9 +163,18 @@ pub fn optimize_style_json_value(v: &mut Value, mir: &IntermediateSpec, passes: 
         walk_style_mut(v, mir, &mut StripDefaultsVisitor { mir });
     }
 
-    // 6. Selectivity reorder.
+    // 6. Selectivity reorder (recompute after all mutations).
     if passes.selectivity_reorder {
-        walk_style_mut(v, mir, &mut ReorderSelectivityVisitor { mir });
+        let layer_info = stats.map(|_| precompute_vector_layer_info(v));
+        walk_style_mut(
+            v,
+            mir,
+            &mut ReorderSelectivityVisitor {
+                mir,
+                stats,
+                layer_info: layer_info.as_deref(),
+            },
+        );
     }
 
     // 7. Cleanup.
@@ -599,6 +642,174 @@ mod tests {
         assert_eq!(
             v["layers"][0]["filter"],
             serde_json::json!(["==", ["get", "class"], "river"])
+        );
+    }
+
+    // ── Stats-driven tests ──────────────────────────────────────────────────────
+
+    use crate::stats::{GeometryTypeStats, LayerStats, SourceStats};
+    use std::collections::BTreeMap;
+
+    fn make_stats(layer_name: &str, layer_stats: LayerStats) -> TileStatistics {
+        let mut layers = BTreeMap::new();
+        layers.insert(layer_name.to_string(), layer_stats);
+        let mut sources = BTreeMap::new();
+        sources.insert(
+            "openmaptiles".to_string(),
+            SourceStats { layers },
+        );
+        TileStatistics { sources }
+    }
+
+    #[test]
+    fn dead_elim_geometry_type_mismatch() {
+        let mir = sample_mir();
+        let stats = make_stats(
+            "water",
+            LayerStats {
+                total_features: 1000,
+                geometry_types: GeometryTypeStats {
+                    unknown: 0,
+                    point: 1000,
+                    linestring: 0,
+                    polygon: 0,
+                },
+                ..Default::default()
+            },
+        );
+        let mut v = serde_json::json!({
+            "version": 8,
+            "sources": { "openmaptiles": { "type": "vector", "url": "x" } },
+            "layers": [{
+                "id": "water-fill",
+                "type": "fill",
+                "source": "openmaptiles",
+                "source-layer": "water"
+            }]
+        });
+        optimize_style_json_value_with_stats(
+            &mut v,
+            &mir,
+            &OptPasses {
+                dead_elimination: true,
+                ..Default::default()
+            },
+            Some(&stats),
+        );
+        assert_eq!(v["layers"].as_array().unwrap().len(), 0);
+    }
+
+    #[test]
+    fn dead_elim_geometry_type_match_preserved() {
+        let mir = sample_mir();
+        let stats = make_stats(
+            "water",
+            LayerStats {
+                total_features: 1000,
+                geometry_types: GeometryTypeStats {
+                    unknown: 0,
+                    point: 0,
+                    linestring: 0,
+                    polygon: 1000,
+                },
+                ..Default::default()
+            },
+        );
+        let mut v = serde_json::json!({
+            "version": 8,
+            "sources": { "openmaptiles": { "type": "vector", "url": "x" } },
+            "layers": [{
+                "id": "water-fill",
+                "type": "fill",
+                "source": "openmaptiles",
+                "source-layer": "water"
+            }]
+        });
+        optimize_style_json_value_with_stats(
+            &mut v,
+            &mir,
+            &OptPasses {
+                dead_elimination: true,
+                ..Default::default()
+            },
+            Some(&stats),
+        );
+        assert_eq!(v["layers"].as_array().unwrap().len(), 1);
+    }
+
+    #[test]
+    #[allow(clippy::float_cmp)]
+    fn metadata_refinement_zoom_from_stats() {
+        let mir = sample_mir();
+        let mut fbz = BTreeMap::new();
+        fbz.insert(6u8, 100u64);
+        fbz.insert(7, 500);
+        fbz.insert(14, 9000);
+        let stats = make_stats(
+            "water",
+            LayerStats {
+                total_features: 9600,
+                features_by_zoom: fbz,
+                ..Default::default()
+            },
+        );
+        let mut v = serde_json::json!({
+            "version": 8,
+            "sources": { "openmaptiles": { "type": "vector", "url": "x" } },
+            "layers": [{
+                "id": "water-fill",
+                "type": "fill",
+                "source": "openmaptiles",
+                "source-layer": "water"
+            }]
+        });
+        optimize_style_json_value_with_stats(
+            &mut v,
+            &mir,
+            &OptPasses {
+                metadata_refinement: true,
+                ..Default::default()
+            },
+            Some(&stats),
+        );
+        assert_eq!(v["layers"][0]["minzoom"].as_f64().unwrap(), 6.0);
+        assert_eq!(v["layers"][0]["maxzoom"].as_f64().unwrap(), 14.0);
+    }
+
+    #[test]
+    fn id_fold_when_no_feature_ids() {
+        let mir = sample_mir();
+        let stats = make_stats(
+            "water",
+            LayerStats {
+                total_features: 1000,
+                has_feature_ids: false,
+                ..Default::default()
+            },
+        );
+        let mut v = serde_json::json!({
+            "version": 8,
+            "sources": { "openmaptiles": { "type": "vector", "url": "x" } },
+            "layers": [{
+                "id": "water-fill",
+                "type": "fill",
+                "source": "openmaptiles",
+                "source-layer": "water",
+                "filter": ["==", ["id"], 5]
+            }]
+        });
+        optimize_style_json_value_with_stats(
+            &mut v,
+            &mir,
+            &OptPasses {
+                constant_fold: true,
+                ..Default::default()
+            },
+            Some(&stats),
+        );
+        assert_eq!(
+            v["layers"][0]["filter"],
+            serde_json::json!(["literal", false])
         );
     }
 }

@@ -824,7 +824,9 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "clap",
+ "indexmap 2.12.1",
  "maplibre-style-spec",
+ "serde",
  "serde_json",
 ]
 
