@@ -2,7 +2,6 @@ use std::fmt::{self, Write};
 
 use crate::Field;
 use crate::fields::Fields;
-use crate::formatter::Formatter;
 use crate::r#type::Type;
 
 /// Defines an enum variant.
@@ -100,22 +99,21 @@ impl Variant {
     }
 
     /// Formats the variant using the given formatter.
-    pub fn fmt(&self, fmt: &mut Formatter<'_>) -> fmt::Result {
+    pub fn fmt(&self, dst: &mut String) -> fmt::Result {
         if !self.documentation.is_empty() {
             for doc in self.documentation.lines() {
-                writeln!(fmt, "/// {}", doc)?;
+                writeln!(dst, "/// {}", doc)?;
             }
         }
         for a in &self.annotations {
-            write!(fmt, "{}", a)?;
-            writeln!(fmt)?;
+            writeln!(dst, "{}", a)?;
         }
-        write!(fmt, "{}", self.name)?;
-        self.fields.fmt(fmt)?;
+        write!(dst, "{}", self.name)?;
+        self.fields.fmt(dst)?;
         if let Some(ref discriminant) = self.discriminant {
-            write!(fmt, " = {}", discriminant)?;
+            write!(dst, " = {}", discriminant)?;
         }
-        writeln!(fmt, ",")?;
+        writeln!(dst, ",")?;
 
         Ok(())
     }

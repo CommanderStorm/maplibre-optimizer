@@ -5,7 +5,7 @@ use crate::body::Body;
 use crate::bound::Bound;
 use crate::docs::Docs;
 use crate::field::Field;
-use crate::formatter::{Formatter, fmt_bounds, fmt_generics};
+use crate::formatter::{fmt_bounds, fmt_generics, write_block};
 use crate::r#type::Type;
 
 /// Defines a function.
@@ -217,17 +217,17 @@ impl Function {
     }
 
     /// Formats the function using the given formatter.
-    pub fn fmt(&self, is_trait: bool, fmt: &mut Formatter<'_>) -> fmt::Result {
+    pub fn fmt(&self, is_trait: bool, dst: &mut String) -> fmt::Result {
         if let Some(ref docs) = self.docs {
-            docs.fmt(fmt)?;
+            docs.fmt(dst)?;
         }
 
         if let Some(ref allow) = self.allow {
-            writeln!(fmt, "#[allow({})]", allow)?;
+            writeln!(dst, "#[allow({})]", allow)?;
         }
 
         for attr in self.attributes.iter() {
-            writeln!(fmt, "#[{}]", attr)?;
+            writeln!(dst, "#[{}]", attr)?;
         }
 
         if is_trait {
@@ -242,11 +242,11 @@ impl Function {
         }
 
         if let Some(ref vis) = self.vis {
-            write!(fmt, "{} ", vis)?;
+            write!(dst, "{} ", vis)?;
         }
 
         if let Some(ref extern_abi) = self.extern_abi {
-            write!(fmt, "extern \"{extern_abi}\" ", extern_abi = extern_abi)?;
+            write!(dst, "extern \"{extern_abi}\" ", extern_abi = extern_abi)?;
         }
 
         assert!(
@@ -254,43 +254,43 @@ impl Function {
             "fns cannot be both `const` and `async`"
         );
         if self.r#async {
-            write!(fmt, "async ")?;
+            write!(dst, "async ")?;
         }
         if self.r#const {
-            write!(fmt, "const ")?;
+            write!(dst, "const ")?;
         }
 
-        write!(fmt, "fn {}", self.name)?;
-        fmt_generics(&self.generics, fmt)?;
+        write!(dst, "fn {}", self.name)?;
+        fmt_generics(&self.generics, dst)?;
 
-        write!(fmt, "(")?;
+        write!(dst, "(")?;
 
         if let Some(ref s) = self.arg_self {
-            write!(fmt, "{}", s)?;
+            write!(dst, "{}", s)?;
         }
 
         for (i, arg) in self.args.iter().enumerate() {
             if i != 0 || self.arg_self.is_some() {
-                write!(fmt, ", ")?;
+                write!(dst, ", ")?;
             }
 
-            write!(fmt, "{}: ", arg.name)?;
-            arg.ty.fmt(fmt)?;
+            write!(dst, "{}: ", arg.name)?;
+            arg.ty.fmt(dst)?;
         }
 
-        write!(fmt, ")")?;
+        write!(dst, ")")?;
 
         if let Some(ref ret) = self.ret {
-            write!(fmt, " -> ")?;
-            ret.fmt(fmt)?;
+            write!(dst, " -> ")?;
+            ret.fmt(dst)?;
         }
 
-        fmt_bounds(&self.bounds, fmt)?;
+        fmt_bounds(&self.bounds, dst)?;
 
         match self.body {
-            Some(ref body) => fmt.block(|fmt| {
+            Some(ref body) => write_block(dst, |dst| {
                 for b in body {
-                    b.fmt(fmt)?;
+                    b.fmt(dst)?;
                 }
 
                 Ok(())
@@ -300,7 +300,7 @@ impl Function {
                     panic!("impl blocks must define fn bodies");
                 }
 
-                writeln!(fmt, ";")
+                writeln!(dst, ";")
             }
         }
     }

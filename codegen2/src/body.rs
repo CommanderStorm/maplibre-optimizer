@@ -1,7 +1,6 @@
 use std::fmt::{self, Write};
 
 use crate::block::Block;
-use crate::formatter::Formatter;
 
 #[derive(Debug, Clone)]
 pub enum Body {
@@ -10,10 +9,10 @@ pub enum Body {
 }
 
 impl Body {
-    pub fn fmt(&self, fmt: &mut Formatter<'_>) -> fmt::Result {
+    pub fn fmt(&self, dst: &mut String) -> fmt::Result {
         match &self {
-            Body::String(s) => writeln!(fmt, "{}", s),
-            Body::Block(b) => b.fmt(fmt),
+            Body::String(s) => writeln!(dst, "{}", s),
+            Body::Block(b) => b.fmt(dst),
         }
     }
 }

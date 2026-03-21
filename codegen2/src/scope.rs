@@ -5,7 +5,6 @@ use indexmap::IndexMap;
 
 use crate::docs::Docs;
 use crate::r#enum::Enum;
-use crate::formatter::Formatter;
 use crate::function::Function;
 use crate::r#impl::Impl;
 use crate::import::Import;
@@ -300,58 +299,58 @@ impl Scope {
     pub fn to_string(&self) -> String {
         let mut ret = String::new();
 
-        self.fmt(&mut Formatter::new(&mut ret))
+        self.fmt(&mut ret)
             .expect("formatting to String cannot fail");
 
         rustfmt(&ret)
     }
 
-    /// Formats the scope using the given formatter.
-    pub fn fmt(&self, fmt: &mut Formatter<'_>) -> fmt::Result {
+    /// Formats the scope into the given string.
+    pub fn fmt(&self, dst: &mut String) -> fmt::Result {
         // Scope-level docs use inner doc comments (`//!`), which are valid
         // at the top of a file or module without an item following them.
         if let Some(ref docs) = self.docs {
             for line in docs.docs.lines() {
-                writeln!(fmt, "//! {line}")?;
+                writeln!(dst, "//! {line}")?;
             }
         }
 
-        self.fmt_imports(fmt)?;
+        self.fmt_imports(dst)?;
 
         if !self.imports.is_empty() {
-            writeln!(fmt)?;
+            writeln!(dst)?;
         }
 
         for (i, item) in self.items.iter().enumerate() {
             if i != 0 {
-                writeln!(fmt)?;
+                writeln!(dst)?;
             }
 
             match *item {
-                Item::Module(ref v) => v.fmt(fmt)?,
-                Item::Struct(ref v) => v.fmt(fmt)?,
-                Item::Function(ref v) => v.fmt(false, fmt)?,
-                Item::Trait(ref v) => v.fmt(fmt)?,
-                Item::Enum(ref v) => v.fmt(fmt)?,
-                Item::Impl(ref v) => v.fmt(fmt)?,
+                Item::Module(ref v) => v.fmt(dst)?,
+                Item::Struct(ref v) => v.fmt(dst)?,
+                Item::Function(ref v) => v.fmt(false, dst)?,
+                Item::Trait(ref v) => v.fmt(dst)?,
+                Item::Enum(ref v) => v.fmt(dst)?,
+                Item::Impl(ref v) => v.fmt(dst)?,
                 Item::Raw(ref v) => {
-                    writeln!(fmt, "{}", v)?;
+                    writeln!(dst, "{}", v)?;
                 }
-                Item::TypeAlias(ref v) => v.fmt(fmt)?,
+                Item::TypeAlias(ref v) => v.fmt(dst)?,
             }
         }
 
         Ok(())
     }
 
-    fn fmt_imports(&self, fmt: &mut Formatter<'_>) -> fmt::Result {
+    fn fmt_imports(&self, dst: &mut String) -> fmt::Result {
         // Emit one `use` per import; rustfmt merges and sorts them.
         for imports in self.imports.values() {
             for import in imports.values() {
                 if let Some(ref vis) = import.vis {
-                    write!(fmt, "{} ", vis)?;
+                    write!(dst, "{} ", vis)?;
                 }
-                writeln!(fmt, "use {}::{};", import.path, import.ty)?;
+                writeln!(dst, "use {}::{};", import.path, import.ty)?;
             }
         }
         Ok(())

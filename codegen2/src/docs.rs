@@ -1,7 +1,5 @@
 use std::fmt::{self, Write};
 
-use crate::formatter::Formatter;
-
 #[derive(Debug, Clone)]
 pub struct Docs {
     pub(crate) docs: String,
@@ -14,13 +12,13 @@ impl Docs {
         }
     }
 
-    pub fn fmt(&self, fmt: &mut Formatter<'_>) -> fmt::Result {
+    pub fn fmt(&self, dst: &mut String) -> fmt::Result {
         for line in self.docs.lines() {
-            write!(fmt, "///")?;
+            write!(dst, "///")?;
             if !line.is_empty() {
-                write!(fmt, " {}", line)?;
+                write!(dst, " {}", line)?;
             }
-            writeln!(fmt)?;
+            writeln!(dst)?;
         }
 
         Ok(())

@@ -1,6 +1,6 @@
 use std::fmt;
 
-use crate::formatter::Formatter;
+use crate::formatter::write_block;
 use crate::r#type::Type;
 use crate::type_def::TypeDef;
 use crate::variant::Variant;
@@ -98,12 +98,12 @@ impl Enum {
     }
 
     /// Formats the enum using the given formatter.
-    pub fn fmt(&self, fmt: &mut Formatter<'_>) -> fmt::Result {
-        self.type_def.fmt_head("enum", &[], fmt)?;
+    pub fn fmt(&self, dst: &mut String) -> fmt::Result {
+        self.type_def.fmt_head("enum", &[], dst)?;
 
-        fmt.block(|fmt| {
+        write_block(dst, |dst| {
             for variant in &self.variants {
-                variant.fmt(fmt)?;
+                variant.fmt(dst)?;
             }
 
             Ok(())

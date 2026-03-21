@@ -2,7 +2,7 @@ use std::fmt::{self, Display, Write};
 
 use crate::docs::Docs;
 use crate::r#enum::Enum;
-use crate::formatter::Formatter;
+use crate::formatter::write_block;
 use crate::function::Function;
 use crate::r#impl::Impl;
 use crate::scope::Scope;
@@ -198,21 +198,21 @@ impl Module {
     }
 
     /// Formats the module using the given formatter.
-    pub fn fmt(&self, fmt: &mut Formatter<'_>) -> fmt::Result {
+    pub fn fmt(&self, dst: &mut String) -> fmt::Result {
         if let Some(ref docs) = self.docs {
-            docs.fmt(fmt)?;
+            docs.fmt(dst)?;
         }
 
         for attr in &self.attributes {
-            writeln!(fmt, "#[{}]", attr)?;
+            writeln!(dst, "#[{}]", attr)?;
         }
 
         if let Some(ref vis) = self.vis {
-            write!(fmt, "{} ", vis)?;
+            write!(dst, "{} ", vis)?;
         }
 
-        write!(fmt, "mod {}", self.name)?;
-        fmt.block(|fmt| self.scope.fmt(fmt))
+        write!(dst, "mod {}", self.name)?;
+        write_block(dst, |dst| self.scope.fmt(dst))
     }
 
     /// Render only this module's *contents* (no `mod <name> { ... }` wrapper).

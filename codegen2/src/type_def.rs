@@ -2,7 +2,7 @@ use std::fmt::{self, Write};
 
 use crate::bound::Bound;
 use crate::docs::Docs;
-use crate::formatter::{Formatter, fmt_bounds};
+use crate::formatter::fmt_bounds;
 use crate::r#type::Type;
 
 /// Defines a type definition.
@@ -77,86 +77,86 @@ impl TypeDef {
         &self,
         keyword: &str,
         parents: &[Type],
-        fmt: &mut Formatter<'_>,
+        dst: &mut String,
     ) -> fmt::Result {
         if let Some(ref docs) = self.docs {
-            docs.fmt(fmt)?;
+            docs.fmt(dst)?;
         }
 
-        self.fmt_allow(fmt)?;
-        self.fmt_derive(fmt)?;
-        self.fmt_repr(fmt)?;
-        self.fmt_attributes(fmt)?;
-        self.fmt_macros(fmt)?;
+        self.fmt_allow(dst)?;
+        self.fmt_derive(dst)?;
+        self.fmt_repr(dst)?;
+        self.fmt_attributes(dst)?;
+        self.fmt_macros(dst)?;
 
         if let Some(ref vis) = self.vis {
-            write!(fmt, "{} ", vis)?;
+            write!(dst, "{} ", vis)?;
         }
 
-        write!(fmt, "{} ", keyword)?;
-        self.ty.fmt(fmt)?;
+        write!(dst, "{} ", keyword)?;
+        self.ty.fmt(dst)?;
 
         if !parents.is_empty() {
             for (i, ty) in parents.iter().enumerate() {
                 if i == 0 {
-                    write!(fmt, ": ")?;
+                    write!(dst, ": ")?;
                 } else {
-                    write!(fmt, " + ")?;
+                    write!(dst, " + ")?;
                 }
 
-                ty.fmt(fmt)?;
+                ty.fmt(dst)?;
             }
         }
 
-        fmt_bounds(&self.bounds, fmt)?;
+        fmt_bounds(&self.bounds, dst)?;
 
         Ok(())
     }
 
-    fn fmt_attributes(&self, fmt: &mut Formatter) -> fmt::Result {
+    fn fmt_attributes(&self, dst: &mut String) -> fmt::Result {
         for attr in &self.attributes {
-            writeln!(fmt, "#[{}]", attr)?;
+            writeln!(dst, "#[{}]", attr)?;
         }
 
         Ok(())
     }
 
-    fn fmt_allow(&self, fmt: &mut Formatter) -> fmt::Result {
+    fn fmt_allow(&self, dst: &mut String) -> fmt::Result {
         for allow in &self.allow {
-            writeln!(fmt, "#[allow({})]", allow)?;
+            writeln!(dst, "#[allow({})]", allow)?;
         }
 
         Ok(())
     }
 
-    fn fmt_repr(&self, fmt: &mut Formatter<'_>) -> fmt::Result {
+    fn fmt_repr(&self, dst: &mut String) -> fmt::Result {
         if let Some(ref repr) = self.repr {
-            writeln!(fmt, "#[repr({})]", repr)?;
+            writeln!(dst, "#[repr({})]", repr)?;
         }
 
         Ok(())
     }
 
-    fn fmt_derive(&self, fmt: &mut Formatter<'_>) -> fmt::Result {
+    fn fmt_derive(&self, dst: &mut String) -> fmt::Result {
         if !self.derive.is_empty() {
-            write!(fmt, "#[derive(")?;
+            write!(dst, "#[derive(")?;
 
             for (i, name) in self.derive.iter().enumerate() {
                 if i != 0 {
-                    write!(fmt, ", ")?
+                    write!(dst, ", ")?
                 }
-                write!(fmt, "{}", name)?;
+                write!(dst, "{}", name)?;
             }
 
-            writeln!(fmt, ")]")?;
+            writeln!(dst, ")]")?;
         }
 
         Ok(())
     }
 
-    fn fmt_macros(&self, fmt: &mut Formatter<'_>) -> fmt::Result {
+    fn fmt_macros(&self, dst: &mut String) -> fmt::Result {
         for m in self.macros.iter() {
-            writeln!(fmt, "{}", m)?;
+            writeln!(dst, "{}", m)?;
         }
         Ok(())
     }

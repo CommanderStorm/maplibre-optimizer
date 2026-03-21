@@ -53,7 +53,7 @@ pub use block::*;
 pub use r#enum::*;
 pub use field::*;
 pub use fields::TupleField;
-pub use formatter::*;
+pub use formatter::write_block;
 pub use function::*;
 pub use r#impl::*;
 pub use import::*;

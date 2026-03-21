@@ -1,7 +1,7 @@
 use std::fmt::{self, Write};
 
 use crate::field::Field;
-use crate::formatter::Formatter;
+use crate::formatter::write_block;
 use crate::r#type::Type;
 
 /// One slot in a tuple struct or tuple enum variant, optionally with outer attributes.
@@ -121,29 +121,29 @@ impl Fields {
         self.tuple_field(TupleField::with_annotations(annotations, ty))
     }
 
-    pub fn fmt(&self, fmt: &mut Formatter<'_>) -> fmt::Result {
+    pub fn fmt(&self, dst: &mut String) -> fmt::Result {
         match *self {
             Fields::Named(ref fields) => {
                 assert!(!fields.is_empty());
 
-                fmt.block(|fmt| {
+                write_block(dst, |dst| {
                     for f in fields {
                         if !f.documentation.is_empty() {
                             for doc in f.documentation.lines() {
-                                writeln!(fmt, "/// {}", doc)?;
+                                writeln!(dst, "/// {}", doc)?;
                             }
                         }
                         if !f.annotation.is_empty() {
                             for ann in &f.annotation {
-                                writeln!(fmt, "{}", ann)?;
+                                writeln!(dst, "{}", ann)?;
                             }
                         }
                         if let Some(ref visibility) = f.visibility {
-                            write!(fmt, "{} ", visibility)?;
+                            write!(dst, "{} ", visibility)?;
                         }
-                        write!(fmt, "{}: ", f.name)?;
-                        f.ty.fmt(fmt)?;
-                        writeln!(fmt, ",")?;
+                        write!(dst, "{}: ", f.name)?;
+                        f.ty.fmt(dst)?;
+                        writeln!(dst, ",")?;
                     }
 
                     Ok(())
@@ -153,17 +153,17 @@ impl Fields {
                 assert!(!slots.is_empty());
 
                 // Emit all slots inline; rustfmt handles line-breaking.
-                write!(fmt, "(")?;
+                write!(dst, "(")?;
                 for (i, slot) in slots.iter().enumerate() {
                     if i > 0 {
-                        write!(fmt, ", ")?;
+                        write!(dst, ", ")?;
                     }
                     for ann in &slot.annotations {
-                        write!(fmt, "{} ", ann)?;
+                        write!(dst, "{} ", ann)?;
                     }
-                    slot.ty.fmt(fmt)?;
+                    slot.ty.fmt(dst)?;
                 }
-                write!(fmt, ")")?;
+                write!(dst, ")")?;
             }
             Fields::Empty => {}
         }
