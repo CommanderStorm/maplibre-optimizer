@@ -75,6 +75,7 @@ interface ScenarioResult {
   original: AggregatedMetrics;
   optimized: AggregatedMetrics;
   delta: Record<keyof RunMetrics, number>;
+  scenario: Scenario;
 }
 
 interface BenchResult {
@@ -440,6 +441,12 @@ async function main(): Promise<void> {
     p.on("pageerror", (err) => console.error(`  [browser error] ${err.message}`));
   }
 
+  // Open JSONL file for streaming — append each run as it completes
+  const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
+  const jsonlPath = path.join(RESULTS_DIR, `bench-${timestamp}.jsonl`);
+  const jsonlFd = fs.openSync(jsonlPath, "w");
+  console.log(`Streaming results to ${jsonlPath}\n`);
+
   const results: ScenarioResult[] = [];
 
   for (let si = 0; si < scenarios.length; si++) {
@@ -455,13 +462,26 @@ async function main(): Promise<void> {
       const isWarmup = run < WARMUP;
       const label = isWarmup ? `warmup ${run + 1}` : `run ${run - WARMUP + 1}/${RUNS}`;
 
+      const jsonlBase = {
+        scenario: scenario.id,
+        location: scenario.location.name,
+        lng: scenario.location.center[0],
+        lat: scenario.location.center[1],
+        zoom: scenario.location.zoom,
+        animation: scenario.animationType,
+        timestamp,
+      };
+
       // Original run
       {
         const page = await browser.newPage();
         applyDebugListeners(page);
         try {
           const metrics = await runBenchmarkInBrowser(page, originalStyleJson, scenario);
-          if (!isWarmup) origRuns.push(metrics);
+          if (!isWarmup) {
+            origRuns.push(metrics);
+            fs.writeSync(jsonlFd, JSON.stringify({ ...jsonlBase, variant: "original", run: run - WARMUP + 1, ...metrics }) + "\n");
+          }
           process.stdout.write(`  ${label} orig: load=${metrics.loadMs.toFixed(0)}ms fps=${metrics.fps.toFixed(1)}`);
         } catch (err: unknown) {
           const msg = err instanceof Error ? err.message : String(err);
@@ -482,7 +502,10 @@ async function main(): Promise<void> {
         applyDebugListeners(page);
         try {
           const metrics = await runBenchmarkInBrowser(page, optimizedStyleJson, scenario);
-          if (!isWarmup) optRuns.push(metrics);
+          if (!isWarmup) {
+            optRuns.push(metrics);
+            fs.writeSync(jsonlFd, JSON.stringify({ ...jsonlBase, variant: "optimized", run: run - WARMUP + 1, ...metrics }) + "\n");
+          }
           console.log(` | opt: load=${metrics.loadMs.toFixed(0)}ms fps=${metrics.fps.toFixed(1)}`);
         } catch (err: unknown) {
           const msg = err instanceof Error ? err.message : String(err);
@@ -502,7 +525,7 @@ async function main(): Promise<void> {
       const original = aggregate(origRuns);
       const optimized = aggregate(optRuns);
       const delta = computeDeltas(original, optimized);
-      results.push({ scenarioId: scenario.id, original, optimized, delta });
+      results.push({ scenarioId: scenario.id, original, optimized, delta, scenario });
     } else {
       console.log(`  Skipping ${scenario.id} — insufficient successful runs`);
     }
@@ -532,8 +555,9 @@ async function main(): Promise<void> {
   console.log(`  Avg p95 frame delta: ${colorDelta(avgP95FrameDelta, true)}`);
   console.log(`  Style size: ${(originalSize / 1024).toFixed(1)} KB → ${(optimizedSize / 1024).toFixed(1)} KB (${((1 - optimizedSize / originalSize) * 100).toFixed(1)}% reduction)`);
 
+  fs.closeSync(jsonlFd);
+
   // Write JSON result
-  const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
   const output: BenchResult = {
     meta: {
       timestamp,
@@ -553,6 +577,7 @@ async function main(): Promise<void> {
   const outPath = path.join(RESULTS_DIR, `bench-${timestamp}.json`);
   fs.writeFileSync(outPath, JSON.stringify(output, null, 2));
   console.log(`\nResults written to ${outPath}`);
+  console.log(`JSONL written to ${jsonlPath}`);
 }
 
 main().catch((err) => {

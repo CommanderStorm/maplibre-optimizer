@@ -218,6 +218,10 @@ bench *ARGS:
 bench-debug *ARGS:
     npx tsx run.ts --debug {{ARGS}}
 
+# Plot benchmark results (uses latest JSONL by default)
+bench-plot *ARGS:
+    python tests/bench/plot.py {{ARGS}}
+
 # Install SQLX cli if not already installed.
 [private]
 install-sqlx:  (cargo-install 'cargo-sqlx' 'sqlx-cli' '--no-default-features' '--features' 'sqlite,native-tls')
