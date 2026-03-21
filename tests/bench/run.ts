@@ -6,7 +6,7 @@
  * across diverse geographic locations and camera animations using headless Chrome.
  *
  * Usage:
- *   just bench                          # run all 18 scenarios, 5 runs each
+ *   just bench                          # run all 18 scenarios, 15 runs each
  *   just bench --runs 1 munich-zigzag   # single quick scenario
  *   just bench-debug tokyo              # with browser console output
  */
@@ -34,13 +34,16 @@ const RESULTS_DIR = path.join(__dirname, "results");
 const CACHED_STYLE = path.join(RESULTS_DIR, "_cached_style.json");
 const STYLE_URL = "https://tiles.openfreemap.org/styles/liberty";
 
+const TILE_PROXY_PORT = 8765;
+const TILE_PROXY_URL = `http://localhost:${TILE_PROXY_PORT}`;
+
 // ── CLI args ─────────────────────────────────────────────────────────────────
 
 const argv = process.argv.slice(2);
 const debug = argv.includes("--debug");
 const runsArg = argv.findIndex((a) => a === "--runs");
 const warmupArg = argv.findIndex((a) => a === "--warmup");
-const RUNS = runsArg >= 0 ? parseInt(argv[runsArg + 1], 10) : 5;
+const RUNS = runsArg >= 0 ? parseInt(argv[runsArg + 1], 10) : 15;
 const WARMUP = warmupArg >= 0 ? parseInt(argv[warmupArg + 1], 10) : 1;
 const filters = argv.filter(
   (a, i) =>
@@ -235,6 +238,37 @@ window.__runBenchmark = function(styleJSON, keyframes, locationCenter, locationZ
 };
 `;
 
+// ── tile proxy ──────────────────────────────────────────────────────────────
+
+/**
+ * Check that the local nginx caching proxy is running.
+ * The proxy caches tiles from tiles.openfreemap.org on first access,
+ * then serves them from disk — eliminating network variability.
+ */
+async function checkTileProxy(): Promise<void> {
+  try {
+    const resp = await fetch(`${TILE_PROXY_URL}/styles/liberty`);
+    if (!resp.ok) throw new Error(`proxy returned ${resp.status}`);
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error(`\nTile proxy is not running at ${TILE_PROXY_URL} — ${msg}`);
+    console.error("Start it with: just bench-proxy");
+    process.exit(1);
+  }
+  console.log(`Tile proxy OK at ${TILE_PROXY_URL}`);
+}
+
+/**
+ * Rewrite a style JSON so all tile/sprite/glyph URLs point at the local
+ * caching proxy instead of remote OpenFreeMap.
+ */
+function rewriteStyleForProxy(styleJson: string): string {
+  return styleJson.replaceAll(
+    "https://tiles.openfreemap.org",
+    TILE_PROXY_URL,
+  );
+}
+
 // ── run a single benchmark in the browser ────────────────────────────────────
 
 async function runBenchmarkInBrowser(
@@ -414,10 +448,14 @@ async function main(): Promise<void> {
   buildOptimizer();
   fs.mkdirSync(RESULTS_DIR, { recursive: true });
 
-  // Fetch & optimize style
-  const originalStyleJson = await fetchStyle();
+  // Check tile proxy is running
+  await checkTileProxy();
+
+  // Fetch style and rewrite URLs to use local caching proxy
+  const remoteStyleJson = await fetchStyle();
+  const originalStyleJson = rewriteStyleForProxy(remoteStyleJson);
   const originalSize = Buffer.byteLength(originalStyleJson, "utf8");
-  console.log(`Original style: ${(originalSize / 1024).toFixed(1)} KB`);
+  console.log(`Original style: ${(originalSize / 1024).toFixed(1)} KB (URLs rewritten to local proxy)`);
 
   const optimizedStyleJson = optimizeStyle(originalStyleJson);
   const optimizedSize = Buffer.byteLength(optimizedStyleJson, "utf8");
@@ -476,6 +514,7 @@ async function main(): Promise<void> {
       {
         const page = await browser.newPage();
         applyDebugListeners(page);
+
         try {
           const metrics = await runBenchmarkInBrowser(page, originalStyleJson, scenario);
           if (!isWarmup) {
@@ -500,6 +539,7 @@ async function main(): Promise<void> {
       {
         const page = await browser.newPage();
         applyDebugListeners(page);
+
         try {
           const metrics = await runBenchmarkInBrowser(page, optimizedStyleJson, scenario);
           if (!isWarmup) {
