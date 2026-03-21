@@ -58,6 +58,12 @@ The generated `spec/` directory is checked into git but can be fully regenerated
 
 # Key Conventions
 
-- Rust edition 2024, MSRV 1.92.
-- Treat warnings as errors
-- Always use `uv` for Python tooling (benchmarks)
+- Rust edition 2024, MSRV 1.92. `unsafe` is forbidden workspace-wide.
+- Treat warnings as errors. Clippy pedantic is enabled.
+- Always use `uv` for Python tooling (benchmarks).
+- Use `#[expect(...)]` instead of `#[allow(...)]` for suppressing lints.
+- Use inline comments to explain "why", not "what". Only comment non-obvious logic.
+- Handle all edge cases. Use the type system to encode correctness constraints.
+- Prefer compile-time guarantees over runtime checks where possible.
+- Snapshot tests use `insta` — update with `just bless`.
+- Avoid `#[serde(untagged)]` for deserializers (poor error messages); write custom visitors instead.
