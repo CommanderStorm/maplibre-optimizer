@@ -292,12 +292,15 @@ fn is_num(v: &Value, expected: f64) -> bool {
 
 /// Replace an expression array `arr` with a value `v`.
 ///
-/// If `v` is a `Value::Array`, the array is used directly (it becomes the new expression).
-/// If `v` is a scalar, it is wrapped in `["literal", v]`.
+/// If `v` is a non-empty `Value::Array`, the array is used directly (it becomes the new
+/// expression).  An empty array can't be a valid expression, so it is wrapped in
+/// `["literal", []]`.  Scalars are wrapped in `["literal", scalar]`.
 fn replace_arr_with_value(arr: &mut Vec<Value>, v: Value) {
     match v {
-        Value::Array(inner) => *arr = inner,
-        scalar => *arr = vec![Value::String("literal".to_string()), scalar],
+        Value::Array(inner) if !inner.is_empty() => *arr = inner,
+        other => {
+            *arr = vec![Value::String("literal".to_string()), other];
+        }
     }
 }
 
