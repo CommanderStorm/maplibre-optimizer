@@ -11,6 +11,12 @@ pub fn generate_regular_enum(
     variants: &MirRegularEnum,
     default: Option<&serde_json::Value>,
 ) {
+    // Detect the Visibility pattern: exactly 2 variants ("none" + "visible"), default "visible".
+    if is_visibility_pattern(variants, default) {
+        scope.raw(format!("pub type {name} = Visibility;"));
+        return;
+    }
+
     let default_key = default.map(|d| d.to_string());
     let default_variant = default_key.as_ref().map(to_upper_camel_case);
     let mut enu = scope
@@ -32,6 +38,13 @@ pub fn generate_regular_enum(
             var.annotation("#[default]");
         }
     }
+}
+
+fn is_visibility_pattern(variants: &MirRegularEnum, default: Option<&serde_json::Value>) -> bool {
+    let keys: Vec<&str> = variants.variants.keys().map(String::as_str).collect();
+    let has_none_visible = keys.len() == 2 && keys.contains(&"none") && keys.contains(&"visible");
+    let default_is_visible = default.is_some_and(|d| d.as_str() == Some("visible"));
+    has_none_visible && default_is_visible
 }
 
 #[cfg(test)]

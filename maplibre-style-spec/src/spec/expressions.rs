@@ -1,6 +1,8 @@
 #![allow(clippy::large_enum_variant)]
 #[allow(unused_imports)]
 use super::*;
+#[allow(unused_imports)]
+use crate::{boolean_prop, color_prop, numeric_prop, string_prop};
 
 /// An expression node or a literal JSON value in expression positions.
 #[derive(PartialEq, Debug, Clone)]

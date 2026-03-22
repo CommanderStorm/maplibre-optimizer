@@ -1,6 +1,8 @@
 #![allow(clippy::large_enum_variant)]
 #[allow(unused_imports)]
 use super::*;
+#[allow(unused_imports)]
+use crate::{boolean_prop, color_prop, numeric_prop, string_prop};
 
 /// JSON number in an expression position
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]

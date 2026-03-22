@@ -1,60 +1,18 @@
 use codegen2::Scope;
 
+use super::escape_doc_for_macro;
 use crate::generator::autotest::generate_test_from_example_if_present;
 use crate::generator::fuzz;
-use crate::generator::untagged::{self, Variant};
 use crate::mir::types::MirBooleanField;
 
 pub fn generate(scope: &mut Scope, name: &str, field: &MirBooleanField) {
     if field.meta.expression.is_some() {
-        let expr_name = format!("{name}Expression");
-        let expr = scope
-            .new_enum(&expr_name)
-            .doc("Nested expression: [`Boolean`] operators.")
-            .vis("pub")
-            .derive("PartialEq, Debug, Clone")
-            .attr(fuzz::CFG_DERIVE_ARBITRARY);
-        expr.new_variant("Boolean").tuple("Boolean");
-        untagged::emit_untagged_serde(
-            scope,
-            &expr_name,
-            &[Variant {
-                name: "Boolean".into(),
-                inner_type: "Boolean".into(),
-                is_boxed: false,
-                is_unit: false,
-                skip_when: None,
-            }],
-        );
-
-        let enu = scope
-            .new_enum(name)
-            .doc(&field.meta.doc)
-            .vis("pub")
-            .derive("PartialEq, Debug, Clone")
-            .attr(fuzz::CFG_DERIVE_ARBITRARY);
-        enu.new_variant("Expr").tuple(format!("Box<{expr_name}>"));
-        enu.new_variant("Literal").tuple("bool");
-        untagged::emit_untagged_serde(
-            scope,
-            name,
-            &[
-                Variant {
-                    name: "Expr".into(),
-                    inner_type: expr_name.clone(),
-                    is_boxed: true,
-                    is_unit: false,
-                    skip_when: None,
-                },
-                Variant {
-                    name: "Literal".into(),
-                    inner_type: "bool".into(),
-                    is_boxed: false,
-                    is_unit: false,
-                    skip_when: None,
-                },
-            ],
-        );
+        let doc = escape_doc_for_macro(&field.meta.doc);
+        let mut args = format!("{name}, doc = \"{doc}\"");
+        if let Some(default) = field.default {
+            args.push_str(&format!(", default = {default}"));
+        }
+        scope.raw(format!("boolean_prop!({args});"));
     } else {
         // `clippy::derivable_impls`: for `Default` implementations that are always `false`, prefer
         // `#[derive(Default)]` and avoid hand-written `impl Default`.
@@ -71,27 +29,15 @@ pub fn generate(scope: &mut Scope, name: &str, field: &MirBooleanField) {
             .derive(derives)
             .attr(fuzz::CFG_DERIVE_ARBITRARY)
             .tuple_field("bool");
-    }
 
-    if let Some(true) = field.default {
-        let default_body = if field.meta.expression.is_some() {
-            "Self::Literal(true)"
-        } else {
-            "Self(true)"
-        };
-        scope
-            .new_impl(name)
-            .impl_trait("Default")
-            .new_fn("default")
-            .ret("Self")
-            .line(default_body);
-    } else if field.default == Some(false) && field.meta.expression.is_some() {
-        scope
-            .new_impl(name)
-            .impl_trait("Default")
-            .new_fn("default")
-            .ret("Self")
-            .line("Self::Literal(false)");
+        if let Some(true) = field.default {
+            scope
+                .new_impl(name)
+                .impl_trait("Default")
+                .new_fn("default")
+                .ret("Self")
+                .line("Self(true)");
+        }
     }
     generate_test_from_example_if_present(scope, name, field.meta.example.as_ref());
 }

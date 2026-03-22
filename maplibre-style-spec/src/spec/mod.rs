@@ -11,3 +11,5 @@ pub use literals::*;
 pub use named_types::*;
 pub use root::*;
 pub use sources::*;
+
+pub use crate::shared_expr::*;

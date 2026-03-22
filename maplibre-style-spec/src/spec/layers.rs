@@ -1,6 +1,8 @@
 #![allow(clippy::large_enum_variant)]
 #[allow(unused_imports)]
 use super::*;
+#[allow(unused_imports)]
+use crate::{boolean_prop, color_prop, numeric_prop, string_prop};
 
 /// A filter expression: either a typed boolean expression or a literal bool.
 ///
@@ -140,16 +142,7 @@ pub struct BackgroundLayoutLayer {
     pub visibility: Option<BackgroundLayoutLayerVisibility>,
 }
 
-/// Whether this layer is displayed.
-#[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy, Default)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum BackgroundLayoutLayerVisibility {
-    #[serde(rename = "none")]
-    None,
-    #[serde(rename = "visible")]
-    #[default]
-    Visible,
-}
+pub type BackgroundLayoutLayerVisibility = Visibility;
 
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
@@ -168,186 +161,20 @@ pub struct BackgroundPaintLayer {
     pub background_pattern: Option<BackgroundPaintLayerBackgroundPattern>,
 }
 
-/// Nested expression: ramp (`interpolate-hcl`, …) or [`Color`] operators.
-#[derive(PartialEq, Debug, Clone)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum BackgroundPaintLayerBackgroundColorExpression {
-    Color(Color),
-    Ramp(ColorOrArrayOfColor),
-}
+color_prop!(
+    BackgroundPaintLayerBackgroundColor,
+    doc = "The color with which the background will be drawn.",
+    default = serde_json::json!("#000000")
+);
 
-impl serde::Serialize for BackgroundPaintLayerBackgroundColorExpression {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        match self {
-            Self::Color(v) => v.serialize(serializer),
-            Self::Ramp(v) => v.serialize(serializer),
-        }
-    }
-}
-
-impl<'de> serde::Deserialize<'de> for BackgroundPaintLayerBackgroundColorExpression {
-    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
-        let mut errors: Vec<(&str, std::string::String)> = Vec::new();
-        match <Color as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Color(v)),
-            Err(e) => errors.push(("Color", e.to_string())),
-        }
-        match <ColorOrArrayOfColor as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Ramp(v)),
-            Err(e) => errors.push(("Ramp", e.to_string())),
-        }
-
-        let details: Vec<std::string::String> =
-            errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
-        Err(serde::de::Error::custom(format!(
-            "BackgroundPaintLayerBackgroundColorExpression: no variant matched. Expected Color(Color) | Ramp(ColorOrArrayOfColor). Errors: [{}]",
-            details.join("; ")
-        )))
-    }
-}
-
-/// The color with which the background will be drawn.
-#[derive(PartialEq, Debug, Clone)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum BackgroundPaintLayerBackgroundColor {
-    Expr(Box<BackgroundPaintLayerBackgroundColorExpression>),
-    Literal(
-        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
-        serde_json::Value,
-    ),
-}
-
-impl serde::Serialize for BackgroundPaintLayerBackgroundColor {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        match self {
-            Self::Expr(v) => v.as_ref().serialize(serializer),
-            Self::Literal(v) => v.serialize(serializer),
-        }
-    }
-}
-
-impl<'de> serde::Deserialize<'de> for BackgroundPaintLayerBackgroundColor {
-    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
-        let mut errors: Vec<(&str, std::string::String)> = Vec::new();
-        match <BackgroundPaintLayerBackgroundColorExpression as serde::Deserialize>::deserialize(
-            &value,
-        ) {
-            Ok(v) => return Ok(Self::Expr(Box::new(v))),
-            Err(e) => errors.push(("Expr", e.to_string())),
-        }
-        match <serde_json::Value as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Literal(v)),
-            Err(e) => errors.push(("Literal", e.to_string())),
-        }
-
-        let details: Vec<std::string::String> =
-            errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
-        Err(serde::de::Error::custom(format!(
-            "BackgroundPaintLayerBackgroundColor: no variant matched. Expected Expr(BackgroundPaintLayerBackgroundColorExpression) | Literal(serde_json::Value). Errors: [{}]",
-            details.join("; ")
-        )))
-    }
-}
-
-impl Default for BackgroundPaintLayerBackgroundColor {
-    fn default() -> Self {
-        Self::Literal(serde_json::json!("#000000"))
-    }
-}
-
-/// Nested expression: ramp (`interpolate` / …) or regular [`Number`] operators.
-#[derive(PartialEq, Debug, Clone)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum BackgroundPaintLayerBackgroundOpacityExpression {
-    Number(Number),
-    Ramp(NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection),
-}
-
-impl serde::Serialize for BackgroundPaintLayerBackgroundOpacityExpression {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        match self {
-            Self::Number(v) => v.serialize(serializer),
-            Self::Ramp(v) => v.serialize(serializer),
-        }
-    }
-}
-
-impl<'de> serde::Deserialize<'de> for BackgroundPaintLayerBackgroundOpacityExpression {
-    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
-        let mut errors: Vec<(&str, std::string::String)> = Vec::new();
-        match <Number as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Number(v)),
-            Err(e) => errors.push(("Number", e.to_string())),
-        }
-        match <NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Ramp(v)),
-            Err(e) => errors.push(("Ramp", e.to_string())),
-        }
-
-        let details: Vec<std::string::String> =
-            errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
-        Err(serde::de::Error::custom(format!(
-            "BackgroundPaintLayerBackgroundOpacityExpression: no variant matched. Expected Number(Number) | Ramp(NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection). Errors: [{}]",
-            details.join("; ")
-        )))
-    }
-}
-
-/// The opacity at which the background will be drawn.
-#[derive(PartialEq, Debug, Clone)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum BackgroundPaintLayerBackgroundOpacity {
-    Expr(Box<BackgroundPaintLayerBackgroundOpacityExpression>),
-    Literal(
-        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
-        serde_json::Number,
-    ),
-}
-
-impl serde::Serialize for BackgroundPaintLayerBackgroundOpacity {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        match self {
-            Self::Expr(v) => v.as_ref().serialize(serializer),
-            Self::Literal(v) => v.serialize(serializer),
-        }
-    }
-}
-
-impl<'de> serde::Deserialize<'de> for BackgroundPaintLayerBackgroundOpacity {
-    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
-        let mut errors: Vec<(&str, std::string::String)> = Vec::new();
-        match <BackgroundPaintLayerBackgroundOpacityExpression as serde::Deserialize>::deserialize(
-            &value,
-        ) {
-            Ok(v) => return Ok(Self::Expr(Box::new(v))),
-            Err(e) => errors.push(("Expr", e.to_string())),
-        }
-        match <serde_json::Number as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Literal(v)),
-            Err(e) => errors.push(("Literal", e.to_string())),
-        }
-
-        let details: Vec<std::string::String> =
-            errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
-        Err(serde::de::Error::custom(format!(
-            "BackgroundPaintLayerBackgroundOpacity: no variant matched. Expected Expr(BackgroundPaintLayerBackgroundOpacityExpression) | Literal(serde_json::Number). Errors: [{}]",
-            details.join("; ")
-        )))
-    }
-}
-
-impl Default for BackgroundPaintLayerBackgroundOpacity {
-    fn default() -> Self {
-        Self::Literal(
-            serde_json::Number::from_i128(1)
-                .expect("the number is serialised from a number and is thus always valid"),
-        )
-    }
-}
+numeric_prop!(
+    BackgroundPaintLayerBackgroundOpacity,
+    doc = "The opacity at which the background will be drawn.",
+    min = 0_f64,
+    max = 1_f64,
+    default = serde_json::Number::from_i128(1)
+        .expect("the number is serialised from a number and is thus always valid")
+);
 
 /// Name of image in sprite to use for drawing an image background. For seamless patterns, image width and height must be a factor of two (2, 4, 8, ..., 512). Note that zoom-dependent expressions will be evaluated only at integer zoom levels.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone)]
@@ -366,98 +193,12 @@ pub struct CircleLayoutLayer {
     pub visibility: Option<CircleLayoutLayerVisibility>,
 }
 
-/// Nested expression: ramp (`interpolate` / …) or regular [`Number`] operators.
-#[derive(PartialEq, Debug, Clone)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum CircleLayoutLayerCircleSortKeyExpression {
-    Number(Number),
-    Ramp(NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection),
-}
+numeric_prop!(
+    CircleLayoutLayerCircleSortKey,
+    doc = "Sorts features in ascending order based on this value. Features with a higher sort key will appear above features with a lower sort key."
+);
 
-impl serde::Serialize for CircleLayoutLayerCircleSortKeyExpression {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        match self {
-            Self::Number(v) => v.serialize(serializer),
-            Self::Ramp(v) => v.serialize(serializer),
-        }
-    }
-}
-
-impl<'de> serde::Deserialize<'de> for CircleLayoutLayerCircleSortKeyExpression {
-    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
-        let mut errors: Vec<(&str, std::string::String)> = Vec::new();
-        match <Number as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Number(v)),
-            Err(e) => errors.push(("Number", e.to_string())),
-        }
-        match <NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Ramp(v)),
-            Err(e) => errors.push(("Ramp", e.to_string())),
-        }
-
-        let details: Vec<std::string::String> =
-            errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
-        Err(serde::de::Error::custom(format!(
-            "CircleLayoutLayerCircleSortKeyExpression: no variant matched. Expected Number(Number) | Ramp(NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection). Errors: [{}]",
-            details.join("; ")
-        )))
-    }
-}
-
-/// Sorts features in ascending order based on this value. Features with a higher sort key will appear above features with a lower sort key.
-#[derive(PartialEq, Debug, Clone)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum CircleLayoutLayerCircleSortKey {
-    Expr(Box<CircleLayoutLayerCircleSortKeyExpression>),
-    Literal(
-        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
-        serde_json::Number,
-    ),
-}
-
-impl serde::Serialize for CircleLayoutLayerCircleSortKey {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        match self {
-            Self::Expr(v) => v.as_ref().serialize(serializer),
-            Self::Literal(v) => v.serialize(serializer),
-        }
-    }
-}
-
-impl<'de> serde::Deserialize<'de> for CircleLayoutLayerCircleSortKey {
-    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
-        let mut errors: Vec<(&str, std::string::String)> = Vec::new();
-        match <CircleLayoutLayerCircleSortKeyExpression as serde::Deserialize>::deserialize(&value)
-        {
-            Ok(v) => return Ok(Self::Expr(Box::new(v))),
-            Err(e) => errors.push(("Expr", e.to_string())),
-        }
-        match <serde_json::Number as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Literal(v)),
-            Err(e) => errors.push(("Literal", e.to_string())),
-        }
-
-        let details: Vec<std::string::String> =
-            errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
-        Err(serde::de::Error::custom(format!(
-            "CircleLayoutLayerCircleSortKey: no variant matched. Expected Expr(CircleLayoutLayerCircleSortKeyExpression) | Literal(serde_json::Number). Errors: [{}]",
-            details.join("; ")
-        )))
-    }
-}
-
-/// Whether this layer is displayed.
-#[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy, Default)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum CircleLayoutLayerVisibility {
-    #[serde(rename = "none")]
-    None,
-    #[serde(rename = "visible")]
-    #[default]
-    Visible,
-}
+pub type CircleLayoutLayerVisibility = Visibility;
 
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
@@ -508,272 +249,27 @@ pub struct CirclePaintLayer {
     pub circle_translate_anchor: Option<CirclePaintLayerCircleTranslateAnchor>,
 }
 
-/// Nested expression: ramp (`interpolate` / …) or regular [`Number`] operators.
-#[derive(PartialEq, Debug, Clone)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum CirclePaintLayerCircleBlurExpression {
-    Number(Number),
-    Ramp(NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection),
-}
+numeric_prop!(
+    CirclePaintLayerCircleBlur,
+    doc = "Amount to blur the circle. 1 blurs the circle such that only the centerpoint is full opacity.",
+    default = serde_json::Number::from_i128(0)
+        .expect("the number is serialised from a number and is thus always valid")
+);
 
-impl serde::Serialize for CirclePaintLayerCircleBlurExpression {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        match self {
-            Self::Number(v) => v.serialize(serializer),
-            Self::Ramp(v) => v.serialize(serializer),
-        }
-    }
-}
+color_prop!(
+    CirclePaintLayerCircleColor,
+    doc = "The fill color of the circle.",
+    default = serde_json::json!("#000000")
+);
 
-impl<'de> serde::Deserialize<'de> for CirclePaintLayerCircleBlurExpression {
-    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
-        let mut errors: Vec<(&str, std::string::String)> = Vec::new();
-        match <Number as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Number(v)),
-            Err(e) => errors.push(("Number", e.to_string())),
-        }
-        match <NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Ramp(v)),
-            Err(e) => errors.push(("Ramp", e.to_string())),
-        }
-
-        let details: Vec<std::string::String> =
-            errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
-        Err(serde::de::Error::custom(format!(
-            "CirclePaintLayerCircleBlurExpression: no variant matched. Expected Number(Number) | Ramp(NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection). Errors: [{}]",
-            details.join("; ")
-        )))
-    }
-}
-
-/// Amount to blur the circle. 1 blurs the circle such that only the centerpoint is full opacity.
-#[derive(PartialEq, Debug, Clone)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum CirclePaintLayerCircleBlur {
-    Expr(Box<CirclePaintLayerCircleBlurExpression>),
-    Literal(
-        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
-        serde_json::Number,
-    ),
-}
-
-impl serde::Serialize for CirclePaintLayerCircleBlur {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        match self {
-            Self::Expr(v) => v.as_ref().serialize(serializer),
-            Self::Literal(v) => v.serialize(serializer),
-        }
-    }
-}
-
-impl<'de> serde::Deserialize<'de> for CirclePaintLayerCircleBlur {
-    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
-        let mut errors: Vec<(&str, std::string::String)> = Vec::new();
-        match <CirclePaintLayerCircleBlurExpression as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Expr(Box::new(v))),
-            Err(e) => errors.push(("Expr", e.to_string())),
-        }
-        match <serde_json::Number as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Literal(v)),
-            Err(e) => errors.push(("Literal", e.to_string())),
-        }
-
-        let details: Vec<std::string::String> =
-            errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
-        Err(serde::de::Error::custom(format!(
-            "CirclePaintLayerCircleBlur: no variant matched. Expected Expr(CirclePaintLayerCircleBlurExpression) | Literal(serde_json::Number). Errors: [{}]",
-            details.join("; ")
-        )))
-    }
-}
-
-impl Default for CirclePaintLayerCircleBlur {
-    fn default() -> Self {
-        Self::Literal(
-            serde_json::Number::from_i128(0)
-                .expect("the number is serialised from a number and is thus always valid"),
-        )
-    }
-}
-
-/// Nested expression: ramp (`interpolate-hcl`, …) or [`Color`] operators.
-#[derive(PartialEq, Debug, Clone)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum CirclePaintLayerCircleColorExpression {
-    Color(Color),
-    Ramp(ColorOrArrayOfColor),
-}
-
-impl serde::Serialize for CirclePaintLayerCircleColorExpression {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        match self {
-            Self::Color(v) => v.serialize(serializer),
-            Self::Ramp(v) => v.serialize(serializer),
-        }
-    }
-}
-
-impl<'de> serde::Deserialize<'de> for CirclePaintLayerCircleColorExpression {
-    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
-        let mut errors: Vec<(&str, std::string::String)> = Vec::new();
-        match <Color as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Color(v)),
-            Err(e) => errors.push(("Color", e.to_string())),
-        }
-        match <ColorOrArrayOfColor as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Ramp(v)),
-            Err(e) => errors.push(("Ramp", e.to_string())),
-        }
-
-        let details: Vec<std::string::String> =
-            errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
-        Err(serde::de::Error::custom(format!(
-            "CirclePaintLayerCircleColorExpression: no variant matched. Expected Color(Color) | Ramp(ColorOrArrayOfColor). Errors: [{}]",
-            details.join("; ")
-        )))
-    }
-}
-
-/// The fill color of the circle.
-#[derive(PartialEq, Debug, Clone)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum CirclePaintLayerCircleColor {
-    Expr(Box<CirclePaintLayerCircleColorExpression>),
-    Literal(
-        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
-        serde_json::Value,
-    ),
-}
-
-impl serde::Serialize for CirclePaintLayerCircleColor {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        match self {
-            Self::Expr(v) => v.as_ref().serialize(serializer),
-            Self::Literal(v) => v.serialize(serializer),
-        }
-    }
-}
-
-impl<'de> serde::Deserialize<'de> for CirclePaintLayerCircleColor {
-    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
-        let mut errors: Vec<(&str, std::string::String)> = Vec::new();
-        match <CirclePaintLayerCircleColorExpression as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Expr(Box::new(v))),
-            Err(e) => errors.push(("Expr", e.to_string())),
-        }
-        match <serde_json::Value as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Literal(v)),
-            Err(e) => errors.push(("Literal", e.to_string())),
-        }
-
-        let details: Vec<std::string::String> =
-            errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
-        Err(serde::de::Error::custom(format!(
-            "CirclePaintLayerCircleColor: no variant matched. Expected Expr(CirclePaintLayerCircleColorExpression) | Literal(serde_json::Value). Errors: [{}]",
-            details.join("; ")
-        )))
-    }
-}
-
-impl Default for CirclePaintLayerCircleColor {
-    fn default() -> Self {
-        Self::Literal(serde_json::json!("#000000"))
-    }
-}
-
-/// Nested expression: ramp (`interpolate` / …) or regular [`Number`] operators.
-#[derive(PartialEq, Debug, Clone)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum CirclePaintLayerCircleOpacityExpression {
-    Number(Number),
-    Ramp(NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection),
-}
-
-impl serde::Serialize for CirclePaintLayerCircleOpacityExpression {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        match self {
-            Self::Number(v) => v.serialize(serializer),
-            Self::Ramp(v) => v.serialize(serializer),
-        }
-    }
-}
-
-impl<'de> serde::Deserialize<'de> for CirclePaintLayerCircleOpacityExpression {
-    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
-        let mut errors: Vec<(&str, std::string::String)> = Vec::new();
-        match <Number as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Number(v)),
-            Err(e) => errors.push(("Number", e.to_string())),
-        }
-        match <NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Ramp(v)),
-            Err(e) => errors.push(("Ramp", e.to_string())),
-        }
-
-        let details: Vec<std::string::String> =
-            errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
-        Err(serde::de::Error::custom(format!(
-            "CirclePaintLayerCircleOpacityExpression: no variant matched. Expected Number(Number) | Ramp(NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection). Errors: [{}]",
-            details.join("; ")
-        )))
-    }
-}
-
-/// The opacity at which the circle will be drawn.
-#[derive(PartialEq, Debug, Clone)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum CirclePaintLayerCircleOpacity {
-    Expr(Box<CirclePaintLayerCircleOpacityExpression>),
-    Literal(
-        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
-        serde_json::Number,
-    ),
-}
-
-impl serde::Serialize for CirclePaintLayerCircleOpacity {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        match self {
-            Self::Expr(v) => v.as_ref().serialize(serializer),
-            Self::Literal(v) => v.serialize(serializer),
-        }
-    }
-}
-
-impl<'de> serde::Deserialize<'de> for CirclePaintLayerCircleOpacity {
-    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
-        let mut errors: Vec<(&str, std::string::String)> = Vec::new();
-        match <CirclePaintLayerCircleOpacityExpression as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Expr(Box::new(v))),
-            Err(e) => errors.push(("Expr", e.to_string())),
-        }
-        match <serde_json::Number as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Literal(v)),
-            Err(e) => errors.push(("Literal", e.to_string())),
-        }
-
-        let details: Vec<std::string::String> =
-            errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
-        Err(serde::de::Error::custom(format!(
-            "CirclePaintLayerCircleOpacity: no variant matched. Expected Expr(CirclePaintLayerCircleOpacityExpression) | Literal(serde_json::Number). Errors: [{}]",
-            details.join("; ")
-        )))
-    }
-}
-
-impl Default for CirclePaintLayerCircleOpacity {
-    fn default() -> Self {
-        Self::Literal(
-            serde_json::Number::from_i128(1)
-                .expect("the number is serialised from a number and is thus always valid"),
-        )
-    }
-}
+numeric_prop!(
+    CirclePaintLayerCircleOpacity,
+    doc = "The opacity at which the circle will be drawn.",
+    min = 0_f64,
+    max = 1_f64,
+    default = serde_json::Number::from_i128(1)
+        .expect("the number is serialised from a number and is thus always valid")
+);
 
 /// Orientation of circle when map is pitched.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy, Default)]
@@ -797,368 +293,36 @@ pub enum CirclePaintLayerCirclePitchScale {
     Viewport,
 }
 
-/// Nested expression: ramp (`interpolate` / …) or regular [`Number`] operators.
-#[derive(PartialEq, Debug, Clone)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum CirclePaintLayerCircleRadiusExpression {
-    Number(Number),
-    Ramp(NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection),
-}
+numeric_prop!(
+    CirclePaintLayerCircleRadius,
+    doc = "Circle radius.",
+    min = 0_f64,
+    default = serde_json::Number::from_i128(5)
+        .expect("the number is serialised from a number and is thus always valid")
+);
 
-impl serde::Serialize for CirclePaintLayerCircleRadiusExpression {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        match self {
-            Self::Number(v) => v.serialize(serializer),
-            Self::Ramp(v) => v.serialize(serializer),
-        }
-    }
-}
+color_prop!(
+    CirclePaintLayerCircleStrokeColor,
+    doc = "The stroke color of the circle.",
+    default = serde_json::json!("#000000")
+);
 
-impl<'de> serde::Deserialize<'de> for CirclePaintLayerCircleRadiusExpression {
-    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
-        let mut errors: Vec<(&str, std::string::String)> = Vec::new();
-        match <Number as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Number(v)),
-            Err(e) => errors.push(("Number", e.to_string())),
-        }
-        match <NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Ramp(v)),
-            Err(e) => errors.push(("Ramp", e.to_string())),
-        }
+numeric_prop!(
+    CirclePaintLayerCircleStrokeOpacity,
+    doc = "The opacity of the circle's stroke.",
+    min = 0_f64,
+    max = 1_f64,
+    default = serde_json::Number::from_i128(1)
+        .expect("the number is serialised from a number and is thus always valid")
+);
 
-        let details: Vec<std::string::String> =
-            errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
-        Err(serde::de::Error::custom(format!(
-            "CirclePaintLayerCircleRadiusExpression: no variant matched. Expected Number(Number) | Ramp(NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection). Errors: [{}]",
-            details.join("; ")
-        )))
-    }
-}
-
-/// Circle radius.
-#[derive(PartialEq, Debug, Clone)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum CirclePaintLayerCircleRadius {
-    Expr(Box<CirclePaintLayerCircleRadiusExpression>),
-    Literal(
-        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
-        serde_json::Number,
-    ),
-}
-
-impl serde::Serialize for CirclePaintLayerCircleRadius {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        match self {
-            Self::Expr(v) => v.as_ref().serialize(serializer),
-            Self::Literal(v) => v.serialize(serializer),
-        }
-    }
-}
-
-impl<'de> serde::Deserialize<'de> for CirclePaintLayerCircleRadius {
-    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
-        let mut errors: Vec<(&str, std::string::String)> = Vec::new();
-        match <CirclePaintLayerCircleRadiusExpression as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Expr(Box::new(v))),
-            Err(e) => errors.push(("Expr", e.to_string())),
-        }
-        match <serde_json::Number as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Literal(v)),
-            Err(e) => errors.push(("Literal", e.to_string())),
-        }
-
-        let details: Vec<std::string::String> =
-            errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
-        Err(serde::de::Error::custom(format!(
-            "CirclePaintLayerCircleRadius: no variant matched. Expected Expr(CirclePaintLayerCircleRadiusExpression) | Literal(serde_json::Number). Errors: [{}]",
-            details.join("; ")
-        )))
-    }
-}
-
-impl Default for CirclePaintLayerCircleRadius {
-    fn default() -> Self {
-        Self::Literal(
-            serde_json::Number::from_i128(5)
-                .expect("the number is serialised from a number and is thus always valid"),
-        )
-    }
-}
-
-/// Nested expression: ramp (`interpolate-hcl`, …) or [`Color`] operators.
-#[derive(PartialEq, Debug, Clone)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum CirclePaintLayerCircleStrokeColorExpression {
-    Color(Color),
-    Ramp(ColorOrArrayOfColor),
-}
-
-impl serde::Serialize for CirclePaintLayerCircleStrokeColorExpression {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        match self {
-            Self::Color(v) => v.serialize(serializer),
-            Self::Ramp(v) => v.serialize(serializer),
-        }
-    }
-}
-
-impl<'de> serde::Deserialize<'de> for CirclePaintLayerCircleStrokeColorExpression {
-    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
-        let mut errors: Vec<(&str, std::string::String)> = Vec::new();
-        match <Color as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Color(v)),
-            Err(e) => errors.push(("Color", e.to_string())),
-        }
-        match <ColorOrArrayOfColor as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Ramp(v)),
-            Err(e) => errors.push(("Ramp", e.to_string())),
-        }
-
-        let details: Vec<std::string::String> =
-            errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
-        Err(serde::de::Error::custom(format!(
-            "CirclePaintLayerCircleStrokeColorExpression: no variant matched. Expected Color(Color) | Ramp(ColorOrArrayOfColor). Errors: [{}]",
-            details.join("; ")
-        )))
-    }
-}
-
-/// The stroke color of the circle.
-#[derive(PartialEq, Debug, Clone)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum CirclePaintLayerCircleStrokeColor {
-    Expr(Box<CirclePaintLayerCircleStrokeColorExpression>),
-    Literal(
-        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
-        serde_json::Value,
-    ),
-}
-
-impl serde::Serialize for CirclePaintLayerCircleStrokeColor {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        match self {
-            Self::Expr(v) => v.as_ref().serialize(serializer),
-            Self::Literal(v) => v.serialize(serializer),
-        }
-    }
-}
-
-impl<'de> serde::Deserialize<'de> for CirclePaintLayerCircleStrokeColor {
-    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
-        let mut errors: Vec<(&str, std::string::String)> = Vec::new();
-        match <CirclePaintLayerCircleStrokeColorExpression as serde::Deserialize>::deserialize(
-            &value,
-        ) {
-            Ok(v) => return Ok(Self::Expr(Box::new(v))),
-            Err(e) => errors.push(("Expr", e.to_string())),
-        }
-        match <serde_json::Value as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Literal(v)),
-            Err(e) => errors.push(("Literal", e.to_string())),
-        }
-
-        let details: Vec<std::string::String> =
-            errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
-        Err(serde::de::Error::custom(format!(
-            "CirclePaintLayerCircleStrokeColor: no variant matched. Expected Expr(CirclePaintLayerCircleStrokeColorExpression) | Literal(serde_json::Value). Errors: [{}]",
-            details.join("; ")
-        )))
-    }
-}
-
-impl Default for CirclePaintLayerCircleStrokeColor {
-    fn default() -> Self {
-        Self::Literal(serde_json::json!("#000000"))
-    }
-}
-
-/// Nested expression: ramp (`interpolate` / …) or regular [`Number`] operators.
-#[derive(PartialEq, Debug, Clone)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum CirclePaintLayerCircleStrokeOpacityExpression {
-    Number(Number),
-    Ramp(NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection),
-}
-
-impl serde::Serialize for CirclePaintLayerCircleStrokeOpacityExpression {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        match self {
-            Self::Number(v) => v.serialize(serializer),
-            Self::Ramp(v) => v.serialize(serializer),
-        }
-    }
-}
-
-impl<'de> serde::Deserialize<'de> for CirclePaintLayerCircleStrokeOpacityExpression {
-    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
-        let mut errors: Vec<(&str, std::string::String)> = Vec::new();
-        match <Number as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Number(v)),
-            Err(e) => errors.push(("Number", e.to_string())),
-        }
-        match <NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Ramp(v)),
-            Err(e) => errors.push(("Ramp", e.to_string())),
-        }
-
-        let details: Vec<std::string::String> =
-            errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
-        Err(serde::de::Error::custom(format!(
-            "CirclePaintLayerCircleStrokeOpacityExpression: no variant matched. Expected Number(Number) | Ramp(NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection). Errors: [{}]",
-            details.join("; ")
-        )))
-    }
-}
-
-/// The opacity of the circle's stroke.
-#[derive(PartialEq, Debug, Clone)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum CirclePaintLayerCircleStrokeOpacity {
-    Expr(Box<CirclePaintLayerCircleStrokeOpacityExpression>),
-    Literal(
-        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
-        serde_json::Number,
-    ),
-}
-
-impl serde::Serialize for CirclePaintLayerCircleStrokeOpacity {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        match self {
-            Self::Expr(v) => v.as_ref().serialize(serializer),
-            Self::Literal(v) => v.serialize(serializer),
-        }
-    }
-}
-
-impl<'de> serde::Deserialize<'de> for CirclePaintLayerCircleStrokeOpacity {
-    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
-        let mut errors: Vec<(&str, std::string::String)> = Vec::new();
-        match <CirclePaintLayerCircleStrokeOpacityExpression as serde::Deserialize>::deserialize(
-            &value,
-        ) {
-            Ok(v) => return Ok(Self::Expr(Box::new(v))),
-            Err(e) => errors.push(("Expr", e.to_string())),
-        }
-        match <serde_json::Number as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Literal(v)),
-            Err(e) => errors.push(("Literal", e.to_string())),
-        }
-
-        let details: Vec<std::string::String> =
-            errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
-        Err(serde::de::Error::custom(format!(
-            "CirclePaintLayerCircleStrokeOpacity: no variant matched. Expected Expr(CirclePaintLayerCircleStrokeOpacityExpression) | Literal(serde_json::Number). Errors: [{}]",
-            details.join("; ")
-        )))
-    }
-}
-
-impl Default for CirclePaintLayerCircleStrokeOpacity {
-    fn default() -> Self {
-        Self::Literal(
-            serde_json::Number::from_i128(1)
-                .expect("the number is serialised from a number and is thus always valid"),
-        )
-    }
-}
-
-/// Nested expression: ramp (`interpolate` / …) or regular [`Number`] operators.
-#[derive(PartialEq, Debug, Clone)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum CirclePaintLayerCircleStrokeWidthExpression {
-    Number(Number),
-    Ramp(NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection),
-}
-
-impl serde::Serialize for CirclePaintLayerCircleStrokeWidthExpression {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        match self {
-            Self::Number(v) => v.serialize(serializer),
-            Self::Ramp(v) => v.serialize(serializer),
-        }
-    }
-}
-
-impl<'de> serde::Deserialize<'de> for CirclePaintLayerCircleStrokeWidthExpression {
-    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
-        let mut errors: Vec<(&str, std::string::String)> = Vec::new();
-        match <Number as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Number(v)),
-            Err(e) => errors.push(("Number", e.to_string())),
-        }
-        match <NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Ramp(v)),
-            Err(e) => errors.push(("Ramp", e.to_string())),
-        }
-
-        let details: Vec<std::string::String> =
-            errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
-        Err(serde::de::Error::custom(format!(
-            "CirclePaintLayerCircleStrokeWidthExpression: no variant matched. Expected Number(Number) | Ramp(NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection). Errors: [{}]",
-            details.join("; ")
-        )))
-    }
-}
-
-/// The width of the circle's stroke. Strokes are placed outside of the `circle-radius`.
-#[derive(PartialEq, Debug, Clone)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum CirclePaintLayerCircleStrokeWidth {
-    Expr(Box<CirclePaintLayerCircleStrokeWidthExpression>),
-    Literal(
-        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
-        serde_json::Number,
-    ),
-}
-
-impl serde::Serialize for CirclePaintLayerCircleStrokeWidth {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        match self {
-            Self::Expr(v) => v.as_ref().serialize(serializer),
-            Self::Literal(v) => v.serialize(serializer),
-        }
-    }
-}
-
-impl<'de> serde::Deserialize<'de> for CirclePaintLayerCircleStrokeWidth {
-    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
-        let mut errors: Vec<(&str, std::string::String)> = Vec::new();
-        match <CirclePaintLayerCircleStrokeWidthExpression as serde::Deserialize>::deserialize(
-            &value,
-        ) {
-            Ok(v) => return Ok(Self::Expr(Box::new(v))),
-            Err(e) => errors.push(("Expr", e.to_string())),
-        }
-        match <serde_json::Number as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Literal(v)),
-            Err(e) => errors.push(("Literal", e.to_string())),
-        }
-
-        let details: Vec<std::string::String> =
-            errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
-        Err(serde::de::Error::custom(format!(
-            "CirclePaintLayerCircleStrokeWidth: no variant matched. Expected Expr(CirclePaintLayerCircleStrokeWidthExpression) | Literal(serde_json::Number). Errors: [{}]",
-            details.join("; ")
-        )))
-    }
-}
-
-impl Default for CirclePaintLayerCircleStrokeWidth {
-    fn default() -> Self {
-        Self::Literal(
-            serde_json::Number::from_i128(0)
-                .expect("the number is serialised from a number and is thus always valid"),
-        )
-    }
-}
+numeric_prop!(
+    CirclePaintLayerCircleStrokeWidth,
+    doc = "The width of the circle's stroke. Strokes are placed outside of the `circle-radius`.",
+    min = 0_f64,
+    default = serde_json::Number::from_i128(0)
+        .expect("the number is serialised from a number and is thus always valid")
+);
 
 /// The geometry's offset. Values are [x, y] where negatives indicate left and up, respectively.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
@@ -1198,16 +362,7 @@ pub struct ColorReliefLayoutLayer {
     pub visibility: Option<ColorReliefLayoutLayerVisibility>,
 }
 
-/// Whether this layer is displayed.
-#[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy, Default)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum ColorReliefLayoutLayerVisibility {
-    #[serde(rename = "none")]
-    None,
-    #[serde(rename = "visible")]
-    #[default]
-    Visible,
-}
+pub type ColorReliefLayoutLayerVisibility = Visibility;
 
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
@@ -1222,180 +377,19 @@ pub struct ColorReliefPaintLayer {
     pub color_relief_opacity: Option<ColorReliefPaintLayerColorReliefOpacity>,
 }
 
-/// Nested expression: ramp (`interpolate-hcl`, …) or [`Color`] operators.
-#[derive(PartialEq, Debug, Clone)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum ColorReliefPaintLayerColorReliefColorExpression {
-    Color(Color),
-    Ramp(ColorOrArrayOfColor),
-}
+color_prop!(
+    ColorReliefPaintLayerColorReliefColor,
+    doc = "Defines the color of each pixel based on its elevation. Should be an expression that uses `[\"elevation\"]` as input."
+);
 
-impl serde::Serialize for ColorReliefPaintLayerColorReliefColorExpression {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        match self {
-            Self::Color(v) => v.serialize(serializer),
-            Self::Ramp(v) => v.serialize(serializer),
-        }
-    }
-}
-
-impl<'de> serde::Deserialize<'de> for ColorReliefPaintLayerColorReliefColorExpression {
-    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
-        let mut errors: Vec<(&str, std::string::String)> = Vec::new();
-        match <Color as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Color(v)),
-            Err(e) => errors.push(("Color", e.to_string())),
-        }
-        match <ColorOrArrayOfColor as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Ramp(v)),
-            Err(e) => errors.push(("Ramp", e.to_string())),
-        }
-
-        let details: Vec<std::string::String> =
-            errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
-        Err(serde::de::Error::custom(format!(
-            "ColorReliefPaintLayerColorReliefColorExpression: no variant matched. Expected Color(Color) | Ramp(ColorOrArrayOfColor). Errors: [{}]",
-            details.join("; ")
-        )))
-    }
-}
-
-/// Defines the color of each pixel based on its elevation. Should be an expression that uses `["elevation"]` as input.
-#[derive(PartialEq, Debug, Clone)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum ColorReliefPaintLayerColorReliefColor {
-    Expr(Box<ColorReliefPaintLayerColorReliefColorExpression>),
-    Literal(
-        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
-        serde_json::Value,
-    ),
-}
-
-impl serde::Serialize for ColorReliefPaintLayerColorReliefColor {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        match self {
-            Self::Expr(v) => v.as_ref().serialize(serializer),
-            Self::Literal(v) => v.serialize(serializer),
-        }
-    }
-}
-
-impl<'de> serde::Deserialize<'de> for ColorReliefPaintLayerColorReliefColor {
-    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
-        let mut errors: Vec<(&str, std::string::String)> = Vec::new();
-        match <ColorReliefPaintLayerColorReliefColorExpression as serde::Deserialize>::deserialize(
-            &value,
-        ) {
-            Ok(v) => return Ok(Self::Expr(Box::new(v))),
-            Err(e) => errors.push(("Expr", e.to_string())),
-        }
-        match <serde_json::Value as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Literal(v)),
-            Err(e) => errors.push(("Literal", e.to_string())),
-        }
-
-        let details: Vec<std::string::String> =
-            errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
-        Err(serde::de::Error::custom(format!(
-            "ColorReliefPaintLayerColorReliefColor: no variant matched. Expected Expr(ColorReliefPaintLayerColorReliefColorExpression) | Literal(serde_json::Value). Errors: [{}]",
-            details.join("; ")
-        )))
-    }
-}
-
-/// Nested expression: ramp (`interpolate` / …) or regular [`Number`] operators.
-#[derive(PartialEq, Debug, Clone)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum ColorReliefPaintLayerColorReliefOpacityExpression {
-    Number(Number),
-    Ramp(NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection),
-}
-
-impl serde::Serialize for ColorReliefPaintLayerColorReliefOpacityExpression {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        match self {
-            Self::Number(v) => v.serialize(serializer),
-            Self::Ramp(v) => v.serialize(serializer),
-        }
-    }
-}
-
-impl<'de> serde::Deserialize<'de> for ColorReliefPaintLayerColorReliefOpacityExpression {
-    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
-        let mut errors: Vec<(&str, std::string::String)> = Vec::new();
-        match <Number as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Number(v)),
-            Err(e) => errors.push(("Number", e.to_string())),
-        }
-        match <NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Ramp(v)),
-            Err(e) => errors.push(("Ramp", e.to_string())),
-        }
-
-        let details: Vec<std::string::String> =
-            errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
-        Err(serde::de::Error::custom(format!(
-            "ColorReliefPaintLayerColorReliefOpacityExpression: no variant matched. Expected Number(Number) | Ramp(NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection). Errors: [{}]",
-            details.join("; ")
-        )))
-    }
-}
-
-/// The opacity at which the color-relief will be drawn.
-#[derive(PartialEq, Debug, Clone)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum ColorReliefPaintLayerColorReliefOpacity {
-    Expr(Box<ColorReliefPaintLayerColorReliefOpacityExpression>),
-    Literal(
-        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
-        serde_json::Number,
-    ),
-}
-
-impl serde::Serialize for ColorReliefPaintLayerColorReliefOpacity {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        match self {
-            Self::Expr(v) => v.as_ref().serialize(serializer),
-            Self::Literal(v) => v.serialize(serializer),
-        }
-    }
-}
-
-impl<'de> serde::Deserialize<'de> for ColorReliefPaintLayerColorReliefOpacity {
-    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
-        let mut errors: Vec<(&str, std::string::String)> = Vec::new();
-        match <ColorReliefPaintLayerColorReliefOpacityExpression as serde::Deserialize>::deserialize(
-            &value,
-        ) {
-            Ok(v) => return Ok(Self::Expr(Box::new(v))),
-            Err(e) => errors.push(("Expr", e.to_string())),
-        }
-        match <serde_json::Number as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Literal(v)),
-            Err(e) => errors.push(("Literal", e.to_string())),
-        }
-
-        let details: Vec<std::string::String> =
-            errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
-        Err(serde::de::Error::custom(format!(
-            "ColorReliefPaintLayerColorReliefOpacity: no variant matched. Expected Expr(ColorReliefPaintLayerColorReliefOpacityExpression) | Literal(serde_json::Number). Errors: [{}]",
-            details.join("; ")
-        )))
-    }
-}
-
-impl Default for ColorReliefPaintLayerColorReliefOpacity {
-    fn default() -> Self {
-        Self::Literal(
-            serde_json::Number::from_i128(1)
-                .expect("the number is serialised from a number and is thus always valid"),
-        )
-    }
-}
+numeric_prop!(
+    ColorReliefPaintLayerColorReliefOpacity,
+    doc = "The opacity at which the color-relief will be drawn.",
+    min = 0_f64,
+    max = 1_f64,
+    default = serde_json::Number::from_i128(1)
+        .expect("the number is serialised from a number and is thus always valid")
+);
 
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
@@ -1409,97 +403,12 @@ pub struct FillLayoutLayer {
     pub visibility: Option<FillLayoutLayerVisibility>,
 }
 
-/// Nested expression: ramp (`interpolate` / …) or regular [`Number`] operators.
-#[derive(PartialEq, Debug, Clone)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum FillLayoutLayerFillSortKeyExpression {
-    Number(Number),
-    Ramp(NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection),
-}
+numeric_prop!(
+    FillLayoutLayerFillSortKey,
+    doc = "Sorts features in ascending order based on this value. Features with a higher sort key will appear above features with a lower sort key."
+);
 
-impl serde::Serialize for FillLayoutLayerFillSortKeyExpression {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        match self {
-            Self::Number(v) => v.serialize(serializer),
-            Self::Ramp(v) => v.serialize(serializer),
-        }
-    }
-}
-
-impl<'de> serde::Deserialize<'de> for FillLayoutLayerFillSortKeyExpression {
-    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
-        let mut errors: Vec<(&str, std::string::String)> = Vec::new();
-        match <Number as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Number(v)),
-            Err(e) => errors.push(("Number", e.to_string())),
-        }
-        match <NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Ramp(v)),
-            Err(e) => errors.push(("Ramp", e.to_string())),
-        }
-
-        let details: Vec<std::string::String> =
-            errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
-        Err(serde::de::Error::custom(format!(
-            "FillLayoutLayerFillSortKeyExpression: no variant matched. Expected Number(Number) | Ramp(NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection). Errors: [{}]",
-            details.join("; ")
-        )))
-    }
-}
-
-/// Sorts features in ascending order based on this value. Features with a higher sort key will appear above features with a lower sort key.
-#[derive(PartialEq, Debug, Clone)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum FillLayoutLayerFillSortKey {
-    Expr(Box<FillLayoutLayerFillSortKeyExpression>),
-    Literal(
-        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
-        serde_json::Number,
-    ),
-}
-
-impl serde::Serialize for FillLayoutLayerFillSortKey {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        match self {
-            Self::Expr(v) => v.as_ref().serialize(serializer),
-            Self::Literal(v) => v.serialize(serializer),
-        }
-    }
-}
-
-impl<'de> serde::Deserialize<'de> for FillLayoutLayerFillSortKey {
-    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
-        let mut errors: Vec<(&str, std::string::String)> = Vec::new();
-        match <FillLayoutLayerFillSortKeyExpression as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Expr(Box::new(v))),
-            Err(e) => errors.push(("Expr", e.to_string())),
-        }
-        match <serde_json::Number as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Literal(v)),
-            Err(e) => errors.push(("Literal", e.to_string())),
-        }
-
-        let details: Vec<std::string::String> =
-            errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
-        Err(serde::de::Error::custom(format!(
-            "FillLayoutLayerFillSortKey: no variant matched. Expected Expr(FillLayoutLayerFillSortKeyExpression) | Literal(serde_json::Number). Errors: [{}]",
-            details.join("; ")
-        )))
-    }
-}
-
-/// Whether this layer is displayed.
-#[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy, Default)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum FillLayoutLayerVisibility {
-    #[serde(rename = "none")]
-    None,
-    #[serde(rename = "visible")]
-    #[default]
-    Visible,
-}
+pub type FillLayoutLayerVisibility = Visibility;
 
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
@@ -1534,342 +443,31 @@ pub struct FillPaintLayer {
     pub fill_translate_anchor: Option<FillPaintLayerFillTranslateAnchor>,
 }
 
-/// Nested expression: [`Boolean`] operators.
-#[derive(PartialEq, Debug, Clone)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum FillPaintLayerFillAntialiasExpression {
-    Boolean(Boolean),
-}
+boolean_prop!(
+    FillPaintLayerFillAntialias,
+    doc = "Whether or not the fill should be antialiased.",
+    default = true
+);
 
-impl serde::Serialize for FillPaintLayerFillAntialiasExpression {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        match self {
-            Self::Boolean(v) => v.serialize(serializer),
-        }
-    }
-}
+color_prop!(
+    FillPaintLayerFillColor,
+    doc = "The color of the filled part of this layer. This color can be specified as `rgba` with an alpha component and the color's opacity will not affect the opacity of the 1px stroke, if it is used.",
+    default = serde_json::json!("#000000")
+);
 
-impl<'de> serde::Deserialize<'de> for FillPaintLayerFillAntialiasExpression {
-    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
-        let mut errors: Vec<(&str, std::string::String)> = Vec::new();
-        match <Boolean as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Boolean(v)),
-            Err(e) => errors.push(("Boolean", e.to_string())),
-        }
+numeric_prop!(
+    FillPaintLayerFillOpacity,
+    doc = "The opacity of the entire fill layer. In contrast to the `fill-color`, this value will also affect the 1px stroke around the fill, if the stroke is used.",
+    min = 0_f64,
+    max = 1_f64,
+    default = serde_json::Number::from_i128(1)
+        .expect("the number is serialised from a number and is thus always valid")
+);
 
-        let details: Vec<std::string::String> =
-            errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
-        Err(serde::de::Error::custom(format!(
-            "FillPaintLayerFillAntialiasExpression: no variant matched. Expected Boolean(Boolean). Errors: [{}]",
-            details.join("; ")
-        )))
-    }
-}
-
-/// Whether or not the fill should be antialiased.
-#[derive(PartialEq, Debug, Clone)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum FillPaintLayerFillAntialias {
-    Expr(Box<FillPaintLayerFillAntialiasExpression>),
-    Literal(bool),
-}
-
-impl serde::Serialize for FillPaintLayerFillAntialias {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        match self {
-            Self::Expr(v) => v.as_ref().serialize(serializer),
-            Self::Literal(v) => v.serialize(serializer),
-        }
-    }
-}
-
-impl<'de> serde::Deserialize<'de> for FillPaintLayerFillAntialias {
-    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
-        let mut errors: Vec<(&str, std::string::String)> = Vec::new();
-        match <FillPaintLayerFillAntialiasExpression as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Expr(Box::new(v))),
-            Err(e) => errors.push(("Expr", e.to_string())),
-        }
-        match <bool as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Literal(v)),
-            Err(e) => errors.push(("Literal", e.to_string())),
-        }
-
-        let details: Vec<std::string::String> =
-            errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
-        Err(serde::de::Error::custom(format!(
-            "FillPaintLayerFillAntialias: no variant matched. Expected Expr(FillPaintLayerFillAntialiasExpression) | Literal(bool). Errors: [{}]",
-            details.join("; ")
-        )))
-    }
-}
-
-impl Default for FillPaintLayerFillAntialias {
-    fn default() -> Self {
-        Self::Literal(true)
-    }
-}
-
-/// Nested expression: ramp (`interpolate-hcl`, …) or [`Color`] operators.
-#[derive(PartialEq, Debug, Clone)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum FillPaintLayerFillColorExpression {
-    Color(Color),
-    Ramp(ColorOrArrayOfColor),
-}
-
-impl serde::Serialize for FillPaintLayerFillColorExpression {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        match self {
-            Self::Color(v) => v.serialize(serializer),
-            Self::Ramp(v) => v.serialize(serializer),
-        }
-    }
-}
-
-impl<'de> serde::Deserialize<'de> for FillPaintLayerFillColorExpression {
-    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
-        let mut errors: Vec<(&str, std::string::String)> = Vec::new();
-        match <Color as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Color(v)),
-            Err(e) => errors.push(("Color", e.to_string())),
-        }
-        match <ColorOrArrayOfColor as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Ramp(v)),
-            Err(e) => errors.push(("Ramp", e.to_string())),
-        }
-
-        let details: Vec<std::string::String> =
-            errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
-        Err(serde::de::Error::custom(format!(
-            "FillPaintLayerFillColorExpression: no variant matched. Expected Color(Color) | Ramp(ColorOrArrayOfColor). Errors: [{}]",
-            details.join("; ")
-        )))
-    }
-}
-
-/// The color of the filled part of this layer. This color can be specified as `rgba` with an alpha component and the color's opacity will not affect the opacity of the 1px stroke, if it is used.
-#[derive(PartialEq, Debug, Clone)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum FillPaintLayerFillColor {
-    Expr(Box<FillPaintLayerFillColorExpression>),
-    Literal(
-        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
-        serde_json::Value,
-    ),
-}
-
-impl serde::Serialize for FillPaintLayerFillColor {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        match self {
-            Self::Expr(v) => v.as_ref().serialize(serializer),
-            Self::Literal(v) => v.serialize(serializer),
-        }
-    }
-}
-
-impl<'de> serde::Deserialize<'de> for FillPaintLayerFillColor {
-    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
-        let mut errors: Vec<(&str, std::string::String)> = Vec::new();
-        match <FillPaintLayerFillColorExpression as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Expr(Box::new(v))),
-            Err(e) => errors.push(("Expr", e.to_string())),
-        }
-        match <serde_json::Value as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Literal(v)),
-            Err(e) => errors.push(("Literal", e.to_string())),
-        }
-
-        let details: Vec<std::string::String> =
-            errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
-        Err(serde::de::Error::custom(format!(
-            "FillPaintLayerFillColor: no variant matched. Expected Expr(FillPaintLayerFillColorExpression) | Literal(serde_json::Value). Errors: [{}]",
-            details.join("; ")
-        )))
-    }
-}
-
-impl Default for FillPaintLayerFillColor {
-    fn default() -> Self {
-        Self::Literal(serde_json::json!("#000000"))
-    }
-}
-
-/// Nested expression: ramp (`interpolate` / …) or regular [`Number`] operators.
-#[derive(PartialEq, Debug, Clone)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum FillPaintLayerFillOpacityExpression {
-    Number(Number),
-    Ramp(NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection),
-}
-
-impl serde::Serialize for FillPaintLayerFillOpacityExpression {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        match self {
-            Self::Number(v) => v.serialize(serializer),
-            Self::Ramp(v) => v.serialize(serializer),
-        }
-    }
-}
-
-impl<'de> serde::Deserialize<'de> for FillPaintLayerFillOpacityExpression {
-    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
-        let mut errors: Vec<(&str, std::string::String)> = Vec::new();
-        match <Number as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Number(v)),
-            Err(e) => errors.push(("Number", e.to_string())),
-        }
-        match <NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Ramp(v)),
-            Err(e) => errors.push(("Ramp", e.to_string())),
-        }
-
-        let details: Vec<std::string::String> =
-            errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
-        Err(serde::de::Error::custom(format!(
-            "FillPaintLayerFillOpacityExpression: no variant matched. Expected Number(Number) | Ramp(NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection). Errors: [{}]",
-            details.join("; ")
-        )))
-    }
-}
-
-/// The opacity of the entire fill layer. In contrast to the `fill-color`, this value will also affect the 1px stroke around the fill, if the stroke is used.
-#[derive(PartialEq, Debug, Clone)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum FillPaintLayerFillOpacity {
-    Expr(Box<FillPaintLayerFillOpacityExpression>),
-    Literal(
-        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
-        serde_json::Number,
-    ),
-}
-
-impl serde::Serialize for FillPaintLayerFillOpacity {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        match self {
-            Self::Expr(v) => v.as_ref().serialize(serializer),
-            Self::Literal(v) => v.serialize(serializer),
-        }
-    }
-}
-
-impl<'de> serde::Deserialize<'de> for FillPaintLayerFillOpacity {
-    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
-        let mut errors: Vec<(&str, std::string::String)> = Vec::new();
-        match <FillPaintLayerFillOpacityExpression as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Expr(Box::new(v))),
-            Err(e) => errors.push(("Expr", e.to_string())),
-        }
-        match <serde_json::Number as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Literal(v)),
-            Err(e) => errors.push(("Literal", e.to_string())),
-        }
-
-        let details: Vec<std::string::String> =
-            errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
-        Err(serde::de::Error::custom(format!(
-            "FillPaintLayerFillOpacity: no variant matched. Expected Expr(FillPaintLayerFillOpacityExpression) | Literal(serde_json::Number). Errors: [{}]",
-            details.join("; ")
-        )))
-    }
-}
-
-impl Default for FillPaintLayerFillOpacity {
-    fn default() -> Self {
-        Self::Literal(
-            serde_json::Number::from_i128(1)
-                .expect("the number is serialised from a number and is thus always valid"),
-        )
-    }
-}
-
-/// Nested expression: ramp (`interpolate-hcl`, …) or [`Color`] operators.
-#[derive(PartialEq, Debug, Clone)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum FillPaintLayerFillOutlineColorExpression {
-    Color(Color),
-    Ramp(ColorOrArrayOfColor),
-}
-
-impl serde::Serialize for FillPaintLayerFillOutlineColorExpression {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        match self {
-            Self::Color(v) => v.serialize(serializer),
-            Self::Ramp(v) => v.serialize(serializer),
-        }
-    }
-}
-
-impl<'de> serde::Deserialize<'de> for FillPaintLayerFillOutlineColorExpression {
-    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
-        let mut errors: Vec<(&str, std::string::String)> = Vec::new();
-        match <Color as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Color(v)),
-            Err(e) => errors.push(("Color", e.to_string())),
-        }
-        match <ColorOrArrayOfColor as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Ramp(v)),
-            Err(e) => errors.push(("Ramp", e.to_string())),
-        }
-
-        let details: Vec<std::string::String> =
-            errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
-        Err(serde::de::Error::custom(format!(
-            "FillPaintLayerFillOutlineColorExpression: no variant matched. Expected Color(Color) | Ramp(ColorOrArrayOfColor). Errors: [{}]",
-            details.join("; ")
-        )))
-    }
-}
-
-/// The outline color of the fill. Matches the value of `fill-color` if unspecified.
-#[derive(PartialEq, Debug, Clone)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum FillPaintLayerFillOutlineColor {
-    Expr(Box<FillPaintLayerFillOutlineColorExpression>),
-    Literal(
-        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
-        serde_json::Value,
-    ),
-}
-
-impl serde::Serialize for FillPaintLayerFillOutlineColor {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        match self {
-            Self::Expr(v) => v.as_ref().serialize(serializer),
-            Self::Literal(v) => v.serialize(serializer),
-        }
-    }
-}
-
-impl<'de> serde::Deserialize<'de> for FillPaintLayerFillOutlineColor {
-    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
-        let mut errors: Vec<(&str, std::string::String)> = Vec::new();
-        match <FillPaintLayerFillOutlineColorExpression as serde::Deserialize>::deserialize(&value)
-        {
-            Ok(v) => return Ok(Self::Expr(Box::new(v))),
-            Err(e) => errors.push(("Expr", e.to_string())),
-        }
-        match <serde_json::Value as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Literal(v)),
-            Err(e) => errors.push(("Literal", e.to_string())),
-        }
-
-        let details: Vec<std::string::String> =
-            errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
-        Err(serde::de::Error::custom(format!(
-            "FillPaintLayerFillOutlineColor: no variant matched. Expected Expr(FillPaintLayerFillOutlineColorExpression) | Literal(serde_json::Value). Errors: [{}]",
-            details.join("; ")
-        )))
-    }
-}
+color_prop!(
+    FillPaintLayerFillOutlineColor,
+    doc = "The outline color of the fill. Matches the value of `fill-color` if unspecified."
+);
 
 /// Name of image in sprite to use for drawing image fills. For seamless patterns, image width and height must be a factor of two (2, 4, 8, ..., 512). Note that zoom-dependent expressions will be evaluated only at integer zoom levels.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone)]
@@ -1914,16 +512,7 @@ pub struct FillExtrusionLayoutLayer {
     pub visibility: Option<FillExtrusionLayoutLayerVisibility>,
 }
 
-/// Whether this layer is displayed.
-#[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy, Default)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum FillExtrusionLayoutLayerVisibility {
-    #[serde(rename = "none")]
-    None,
-    #[serde(rename = "visible")]
-    #[default]
-    Visible,
-}
+pub type FillExtrusionLayoutLayerVisibility = Visibility;
 
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
@@ -1964,362 +553,36 @@ pub struct FillExtrusionPaintLayer {
         Option<FillExtrusionPaintLayerFillExtrusionVerticalGradient>,
 }
 
-/// Nested expression: ramp (`interpolate` / …) or regular [`Number`] operators.
-#[derive(PartialEq, Debug, Clone)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum FillExtrusionPaintLayerFillExtrusionBaseExpression {
-    Number(Number),
-    Ramp(NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection),
-}
+numeric_prop!(
+    FillExtrusionPaintLayerFillExtrusionBase,
+    doc = "The height with which to extrude the base of this layer. Must be less than or equal to `fill-extrusion-height`.",
+    min = 0_f64,
+    default = serde_json::Number::from_i128(0)
+        .expect("the number is serialised from a number and is thus always valid")
+);
 
-impl serde::Serialize for FillExtrusionPaintLayerFillExtrusionBaseExpression {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        match self {
-            Self::Number(v) => v.serialize(serializer),
-            Self::Ramp(v) => v.serialize(serializer),
-        }
-    }
-}
+color_prop!(
+    FillExtrusionPaintLayerFillExtrusionColor,
+    doc = "The base color of the extruded fill. The extrusion's surfaces will be shaded differently based on this color in combination with the root `light` settings. If this color is specified as `rgba` with an alpha component, the alpha component will be ignored; use `fill-extrusion-opacity` to set layer opacity.",
+    default = serde_json::json!("#000000")
+);
 
-impl<'de> serde::Deserialize<'de> for FillExtrusionPaintLayerFillExtrusionBaseExpression {
-    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
-        let mut errors: Vec<(&str, std::string::String)> = Vec::new();
-        match <Number as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Number(v)),
-            Err(e) => errors.push(("Number", e.to_string())),
-        }
-        match <NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Ramp(v)),
-            Err(e) => errors.push(("Ramp", e.to_string())),
-        }
+numeric_prop!(
+    FillExtrusionPaintLayerFillExtrusionHeight,
+    doc = "The height with which to extrude this layer.",
+    min = 0_f64,
+    default = serde_json::Number::from_i128(0)
+        .expect("the number is serialised from a number and is thus always valid")
+);
 
-        let details: Vec<std::string::String> =
-            errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
-        Err(serde::de::Error::custom(format!(
-            "FillExtrusionPaintLayerFillExtrusionBaseExpression: no variant matched. Expected Number(Number) | Ramp(NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection). Errors: [{}]",
-            details.join("; ")
-        )))
-    }
-}
-
-/// The height with which to extrude the base of this layer. Must be less than or equal to `fill-extrusion-height`.
-#[derive(PartialEq, Debug, Clone)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum FillExtrusionPaintLayerFillExtrusionBase {
-    Expr(Box<FillExtrusionPaintLayerFillExtrusionBaseExpression>),
-    Literal(
-        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
-        serde_json::Number,
-    ),
-}
-
-impl serde::Serialize for FillExtrusionPaintLayerFillExtrusionBase {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        match self {
-            Self::Expr(v) => v.as_ref().serialize(serializer),
-            Self::Literal(v) => v.serialize(serializer),
-        }
-    }
-}
-
-impl<'de> serde::Deserialize<'de> for FillExtrusionPaintLayerFillExtrusionBase {
-    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
-        let mut errors: Vec<(&str, std::string::String)> = Vec::new();
-        match <FillExtrusionPaintLayerFillExtrusionBaseExpression as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Expr(Box::new(v))),
-            Err(e) => errors.push(("Expr", e.to_string())),
-        }
-        match <serde_json::Number as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Literal(v)),
-            Err(e) => errors.push(("Literal", e.to_string())),
-        }
-
-        let details: Vec<std::string::String> =
-            errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
-        Err(serde::de::Error::custom(format!(
-            "FillExtrusionPaintLayerFillExtrusionBase: no variant matched. Expected Expr(FillExtrusionPaintLayerFillExtrusionBaseExpression) | Literal(serde_json::Number). Errors: [{}]",
-            details.join("; ")
-        )))
-    }
-}
-
-impl Default for FillExtrusionPaintLayerFillExtrusionBase {
-    fn default() -> Self {
-        Self::Literal(
-            serde_json::Number::from_i128(0)
-                .expect("the number is serialised from a number and is thus always valid"),
-        )
-    }
-}
-
-/// Nested expression: ramp (`interpolate-hcl`, …) or [`Color`] operators.
-#[derive(PartialEq, Debug, Clone)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum FillExtrusionPaintLayerFillExtrusionColorExpression {
-    Color(Color),
-    Ramp(ColorOrArrayOfColor),
-}
-
-impl serde::Serialize for FillExtrusionPaintLayerFillExtrusionColorExpression {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        match self {
-            Self::Color(v) => v.serialize(serializer),
-            Self::Ramp(v) => v.serialize(serializer),
-        }
-    }
-}
-
-impl<'de> serde::Deserialize<'de> for FillExtrusionPaintLayerFillExtrusionColorExpression {
-    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
-        let mut errors: Vec<(&str, std::string::String)> = Vec::new();
-        match <Color as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Color(v)),
-            Err(e) => errors.push(("Color", e.to_string())),
-        }
-        match <ColorOrArrayOfColor as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Ramp(v)),
-            Err(e) => errors.push(("Ramp", e.to_string())),
-        }
-
-        let details: Vec<std::string::String> =
-            errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
-        Err(serde::de::Error::custom(format!(
-            "FillExtrusionPaintLayerFillExtrusionColorExpression: no variant matched. Expected Color(Color) | Ramp(ColorOrArrayOfColor). Errors: [{}]",
-            details.join("; ")
-        )))
-    }
-}
-
-/// The base color of the extruded fill. The extrusion's surfaces will be shaded differently based on this color in combination with the root `light` settings. If this color is specified as `rgba` with an alpha component, the alpha component will be ignored; use `fill-extrusion-opacity` to set layer opacity.
-#[derive(PartialEq, Debug, Clone)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum FillExtrusionPaintLayerFillExtrusionColor {
-    Expr(Box<FillExtrusionPaintLayerFillExtrusionColorExpression>),
-    Literal(
-        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
-        serde_json::Value,
-    ),
-}
-
-impl serde::Serialize for FillExtrusionPaintLayerFillExtrusionColor {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        match self {
-            Self::Expr(v) => v.as_ref().serialize(serializer),
-            Self::Literal(v) => v.serialize(serializer),
-        }
-    }
-}
-
-impl<'de> serde::Deserialize<'de> for FillExtrusionPaintLayerFillExtrusionColor {
-    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
-        let mut errors: Vec<(&str, std::string::String)> = Vec::new();
-        match <FillExtrusionPaintLayerFillExtrusionColorExpression as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Expr(Box::new(v))),
-            Err(e) => errors.push(("Expr", e.to_string())),
-        }
-        match <serde_json::Value as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Literal(v)),
-            Err(e) => errors.push(("Literal", e.to_string())),
-        }
-
-        let details: Vec<std::string::String> =
-            errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
-        Err(serde::de::Error::custom(format!(
-            "FillExtrusionPaintLayerFillExtrusionColor: no variant matched. Expected Expr(FillExtrusionPaintLayerFillExtrusionColorExpression) | Literal(serde_json::Value). Errors: [{}]",
-            details.join("; ")
-        )))
-    }
-}
-
-impl Default for FillExtrusionPaintLayerFillExtrusionColor {
-    fn default() -> Self {
-        Self::Literal(serde_json::json!("#000000"))
-    }
-}
-
-/// Nested expression: ramp (`interpolate` / …) or regular [`Number`] operators.
-#[derive(PartialEq, Debug, Clone)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum FillExtrusionPaintLayerFillExtrusionHeightExpression {
-    Number(Number),
-    Ramp(NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection),
-}
-
-impl serde::Serialize for FillExtrusionPaintLayerFillExtrusionHeightExpression {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        match self {
-            Self::Number(v) => v.serialize(serializer),
-            Self::Ramp(v) => v.serialize(serializer),
-        }
-    }
-}
-
-impl<'de> serde::Deserialize<'de> for FillExtrusionPaintLayerFillExtrusionHeightExpression {
-    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
-        let mut errors: Vec<(&str, std::string::String)> = Vec::new();
-        match <Number as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Number(v)),
-            Err(e) => errors.push(("Number", e.to_string())),
-        }
-        match <NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Ramp(v)),
-            Err(e) => errors.push(("Ramp", e.to_string())),
-        }
-
-        let details: Vec<std::string::String> =
-            errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
-        Err(serde::de::Error::custom(format!(
-            "FillExtrusionPaintLayerFillExtrusionHeightExpression: no variant matched. Expected Number(Number) | Ramp(NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection). Errors: [{}]",
-            details.join("; ")
-        )))
-    }
-}
-
-/// The height with which to extrude this layer.
-#[derive(PartialEq, Debug, Clone)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum FillExtrusionPaintLayerFillExtrusionHeight {
-    Expr(Box<FillExtrusionPaintLayerFillExtrusionHeightExpression>),
-    Literal(
-        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
-        serde_json::Number,
-    ),
-}
-
-impl serde::Serialize for FillExtrusionPaintLayerFillExtrusionHeight {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        match self {
-            Self::Expr(v) => v.as_ref().serialize(serializer),
-            Self::Literal(v) => v.serialize(serializer),
-        }
-    }
-}
-
-impl<'de> serde::Deserialize<'de> for FillExtrusionPaintLayerFillExtrusionHeight {
-    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
-        let mut errors: Vec<(&str, std::string::String)> = Vec::new();
-        match <FillExtrusionPaintLayerFillExtrusionHeightExpression as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Expr(Box::new(v))),
-            Err(e) => errors.push(("Expr", e.to_string())),
-        }
-        match <serde_json::Number as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Literal(v)),
-            Err(e) => errors.push(("Literal", e.to_string())),
-        }
-
-        let details: Vec<std::string::String> =
-            errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
-        Err(serde::de::Error::custom(format!(
-            "FillExtrusionPaintLayerFillExtrusionHeight: no variant matched. Expected Expr(FillExtrusionPaintLayerFillExtrusionHeightExpression) | Literal(serde_json::Number). Errors: [{}]",
-            details.join("; ")
-        )))
-    }
-}
-
-impl Default for FillExtrusionPaintLayerFillExtrusionHeight {
-    fn default() -> Self {
-        Self::Literal(
-            serde_json::Number::from_i128(0)
-                .expect("the number is serialised from a number and is thus always valid"),
-        )
-    }
-}
-
-/// Nested expression: ramp (`interpolate` / …) or regular [`Number`] operators.
-#[derive(PartialEq, Debug, Clone)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum FillExtrusionPaintLayerFillExtrusionOpacityExpression {
-    Number(Number),
-    Ramp(NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection),
-}
-
-impl serde::Serialize for FillExtrusionPaintLayerFillExtrusionOpacityExpression {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        match self {
-            Self::Number(v) => v.serialize(serializer),
-            Self::Ramp(v) => v.serialize(serializer),
-        }
-    }
-}
-
-impl<'de> serde::Deserialize<'de> for FillExtrusionPaintLayerFillExtrusionOpacityExpression {
-    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
-        let mut errors: Vec<(&str, std::string::String)> = Vec::new();
-        match <Number as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Number(v)),
-            Err(e) => errors.push(("Number", e.to_string())),
-        }
-        match <NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Ramp(v)),
-            Err(e) => errors.push(("Ramp", e.to_string())),
-        }
-
-        let details: Vec<std::string::String> =
-            errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
-        Err(serde::de::Error::custom(format!(
-            "FillExtrusionPaintLayerFillExtrusionOpacityExpression: no variant matched. Expected Number(Number) | Ramp(NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection). Errors: [{}]",
-            details.join("; ")
-        )))
-    }
-}
-
-/// The opacity of the entire fill extrusion layer. This is rendered on a per-layer, not per-feature, basis, and data-driven styling is not available.
-#[derive(PartialEq, Debug, Clone)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum FillExtrusionPaintLayerFillExtrusionOpacity {
-    Expr(Box<FillExtrusionPaintLayerFillExtrusionOpacityExpression>),
-    Literal(
-        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
-        serde_json::Number,
-    ),
-}
-
-impl serde::Serialize for FillExtrusionPaintLayerFillExtrusionOpacity {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        match self {
-            Self::Expr(v) => v.as_ref().serialize(serializer),
-            Self::Literal(v) => v.serialize(serializer),
-        }
-    }
-}
-
-impl<'de> serde::Deserialize<'de> for FillExtrusionPaintLayerFillExtrusionOpacity {
-    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
-        let mut errors: Vec<(&str, std::string::String)> = Vec::new();
-        match <FillExtrusionPaintLayerFillExtrusionOpacityExpression as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Expr(Box::new(v))),
-            Err(e) => errors.push(("Expr", e.to_string())),
-        }
-        match <serde_json::Number as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Literal(v)),
-            Err(e) => errors.push(("Literal", e.to_string())),
-        }
-
-        let details: Vec<std::string::String> =
-            errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
-        Err(serde::de::Error::custom(format!(
-            "FillExtrusionPaintLayerFillExtrusionOpacity: no variant matched. Expected Expr(FillExtrusionPaintLayerFillExtrusionOpacityExpression) | Literal(serde_json::Number). Errors: [{}]",
-            details.join("; ")
-        )))
-    }
-}
-
-impl Default for FillExtrusionPaintLayerFillExtrusionOpacity {
-    fn default() -> Self {
-        Self::Literal(
-            serde_json::Number::from_i128(1)
-                .expect("the number is serialised from a number and is thus always valid"),
-        )
-    }
-}
+numeric_prop!(
+    FillExtrusionPaintLayerFillExtrusionOpacity,
+    doc = "The opacity of the entire fill extrusion layer. This is rendered on a per-layer, not per-feature, basis, and data-driven styling is not available.",
+    min = 0_f64,
+    max = 1_f64,
+    default = serde_json::Number::from_i128(1)
+        .expect("the number is serialised from a number and is thus always valid")
+);
 
 /// Name of image in sprite to use for drawing images on extruded fills. For seamless patterns, image width and height must be a factor of two (2, 4, 8, ..., 512). Note that zoom-dependent expressions will be evaluated only at integer zoom levels.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone)]
@@ -2356,85 +619,11 @@ pub enum FillExtrusionPaintLayerFillExtrusionTranslateAnchor {
     Viewport,
 }
 
-/// Nested expression: [`Boolean`] operators.
-#[derive(PartialEq, Debug, Clone)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum FillExtrusionPaintLayerFillExtrusionVerticalGradientExpression {
-    Boolean(Boolean),
-}
-
-impl serde::Serialize for FillExtrusionPaintLayerFillExtrusionVerticalGradientExpression {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        match self {
-            Self::Boolean(v) => v.serialize(serializer),
-        }
-    }
-}
-
-impl<'de> serde::Deserialize<'de>
-    for FillExtrusionPaintLayerFillExtrusionVerticalGradientExpression
-{
-    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
-        let mut errors: Vec<(&str, std::string::String)> = Vec::new();
-        match <Boolean as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Boolean(v)),
-            Err(e) => errors.push(("Boolean", e.to_string())),
-        }
-
-        let details: Vec<std::string::String> =
-            errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
-        Err(serde::de::Error::custom(format!(
-            "FillExtrusionPaintLayerFillExtrusionVerticalGradientExpression: no variant matched. Expected Boolean(Boolean). Errors: [{}]",
-            details.join("; ")
-        )))
-    }
-}
-
-/// Whether to apply a vertical gradient to the sides of a fill-extrusion layer. If true, sides will be shaded slightly darker farther down.
-#[derive(PartialEq, Debug, Clone)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum FillExtrusionPaintLayerFillExtrusionVerticalGradient {
-    Expr(Box<FillExtrusionPaintLayerFillExtrusionVerticalGradientExpression>),
-    Literal(bool),
-}
-
-impl serde::Serialize for FillExtrusionPaintLayerFillExtrusionVerticalGradient {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        match self {
-            Self::Expr(v) => v.as_ref().serialize(serializer),
-            Self::Literal(v) => v.serialize(serializer),
-        }
-    }
-}
-
-impl<'de> serde::Deserialize<'de> for FillExtrusionPaintLayerFillExtrusionVerticalGradient {
-    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
-        let mut errors: Vec<(&str, std::string::String)> = Vec::new();
-        match <FillExtrusionPaintLayerFillExtrusionVerticalGradientExpression as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Expr(Box::new(v))),
-            Err(e) => errors.push(("Expr", e.to_string())),
-        }
-        match <bool as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Literal(v)),
-            Err(e) => errors.push(("Literal", e.to_string())),
-        }
-
-        let details: Vec<std::string::String> =
-            errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
-        Err(serde::de::Error::custom(format!(
-            "FillExtrusionPaintLayerFillExtrusionVerticalGradient: no variant matched. Expected Expr(FillExtrusionPaintLayerFillExtrusionVerticalGradientExpression) | Literal(bool). Errors: [{}]",
-            details.join("; ")
-        )))
-    }
-}
-
-impl Default for FillExtrusionPaintLayerFillExtrusionVerticalGradient {
-    fn default() -> Self {
-        Self::Literal(true)
-    }
-}
+boolean_prop!(
+    FillExtrusionPaintLayerFillExtrusionVerticalGradient,
+    doc = "Whether to apply a vertical gradient to the sides of a fill-extrusion layer. If true, sides will be shaded slightly darker farther down.",
+    default = true
+);
 
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
@@ -2444,16 +633,7 @@ pub struct HeatmapLayoutLayer {
     pub visibility: Option<HeatmapLayoutLayerVisibility>,
 }
 
-/// Whether this layer is displayed.
-#[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy, Default)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum HeatmapLayoutLayerVisibility {
-    #[serde(rename = "none")]
-    None,
-    #[serde(rename = "visible")]
-    #[default]
-    Visible,
-}
+pub type HeatmapLayoutLayerVisibility = Visibility;
 
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
@@ -2480,473 +660,60 @@ pub struct HeatmapPaintLayer {
     pub heatmap_weight: Option<HeatmapPaintLayerHeatmapWeight>,
 }
 
-/// Nested expression: ramp (`interpolate-hcl`, …) or [`Color`] operators.
-#[derive(PartialEq, Debug, Clone)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum HeatmapPaintLayerHeatmapColorExpression {
-    Color(Color),
-    Ramp(ColorOrArrayOfColor),
-}
+color_prop!(
+    HeatmapPaintLayerHeatmapColor,
+    doc = "Defines the color of each pixel based on its density value in a heatmap.  Should be an expression that uses `[\"heatmap-density\"]` as input.",
+    default = serde_json::json!([
+        "interpolate",
+        ["linear"],
+        ["heatmap-density"],
+        0,
+        "rgba(0, 0, 255, 0)",
+        0.1,
+        "royalblue",
+        0.3,
+        "cyan",
+        0.5,
+        "lime",
+        0.7,
+        "yellow",
+        1,
+        "red"
+    ])
+);
 
-impl serde::Serialize for HeatmapPaintLayerHeatmapColorExpression {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        match self {
-            Self::Color(v) => v.serialize(serializer),
-            Self::Ramp(v) => v.serialize(serializer),
-        }
-    }
-}
+numeric_prop!(
+    HeatmapPaintLayerHeatmapIntensity,
+    doc = "Similar to `heatmap-weight` but controls the intensity of the heatmap globally. Primarily used for adjusting the heatmap based on zoom level.",
+    min = 0_f64,
+    default = serde_json::Number::from_i128(1)
+        .expect("the number is serialised from a number and is thus always valid")
+);
 
-impl<'de> serde::Deserialize<'de> for HeatmapPaintLayerHeatmapColorExpression {
-    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
-        let mut errors: Vec<(&str, std::string::String)> = Vec::new();
-        match <Color as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Color(v)),
-            Err(e) => errors.push(("Color", e.to_string())),
-        }
-        match <ColorOrArrayOfColor as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Ramp(v)),
-            Err(e) => errors.push(("Ramp", e.to_string())),
-        }
+numeric_prop!(
+    HeatmapPaintLayerHeatmapOpacity,
+    doc = "The global opacity at which the heatmap layer will be drawn.",
+    min = 0_f64,
+    max = 1_f64,
+    default = serde_json::Number::from_i128(1)
+        .expect("the number is serialised from a number and is thus always valid")
+);
 
-        let details: Vec<std::string::String> =
-            errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
-        Err(serde::de::Error::custom(format!(
-            "HeatmapPaintLayerHeatmapColorExpression: no variant matched. Expected Color(Color) | Ramp(ColorOrArrayOfColor). Errors: [{}]",
-            details.join("; ")
-        )))
-    }
-}
+numeric_prop!(
+    HeatmapPaintLayerHeatmapRadius,
+    doc = "Radius of influence of one heatmap point in pixels. Increasing the value makes the heatmap smoother, but less detailed.",
+    min = 1_f64,
+    default = serde_json::Number::from_i128(30)
+        .expect("the number is serialised from a number and is thus always valid")
+);
 
-/// Defines the color of each pixel based on its density value in a heatmap.  Should be an expression that uses `["heatmap-density"]` as input.
-#[derive(PartialEq, Debug, Clone)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum HeatmapPaintLayerHeatmapColor {
-    Expr(Box<HeatmapPaintLayerHeatmapColorExpression>),
-    Literal(
-        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
-        serde_json::Value,
-    ),
-}
-
-impl serde::Serialize for HeatmapPaintLayerHeatmapColor {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        match self {
-            Self::Expr(v) => v.as_ref().serialize(serializer),
-            Self::Literal(v) => v.serialize(serializer),
-        }
-    }
-}
-
-impl<'de> serde::Deserialize<'de> for HeatmapPaintLayerHeatmapColor {
-    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
-        let mut errors: Vec<(&str, std::string::String)> = Vec::new();
-        match <HeatmapPaintLayerHeatmapColorExpression as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Expr(Box::new(v))),
-            Err(e) => errors.push(("Expr", e.to_string())),
-        }
-        match <serde_json::Value as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Literal(v)),
-            Err(e) => errors.push(("Literal", e.to_string())),
-        }
-
-        let details: Vec<std::string::String> =
-            errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
-        Err(serde::de::Error::custom(format!(
-            "HeatmapPaintLayerHeatmapColor: no variant matched. Expected Expr(HeatmapPaintLayerHeatmapColorExpression) | Literal(serde_json::Value). Errors: [{}]",
-            details.join("; ")
-        )))
-    }
-}
-
-impl Default for HeatmapPaintLayerHeatmapColor {
-    fn default() -> Self {
-        Self::Literal(serde_json::json!([
-            "interpolate",
-            ["linear"],
-            ["heatmap-density"],
-            0,
-            "rgba(0, 0, 255, 0)",
-            0.1,
-            "royalblue",
-            0.3,
-            "cyan",
-            0.5,
-            "lime",
-            0.7,
-            "yellow",
-            1,
-            "red"
-        ]))
-    }
-}
-
-/// Nested expression: ramp (`interpolate` / …) or regular [`Number`] operators.
-#[derive(PartialEq, Debug, Clone)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum HeatmapPaintLayerHeatmapIntensityExpression {
-    Number(Number),
-    Ramp(NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection),
-}
-
-impl serde::Serialize for HeatmapPaintLayerHeatmapIntensityExpression {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        match self {
-            Self::Number(v) => v.serialize(serializer),
-            Self::Ramp(v) => v.serialize(serializer),
-        }
-    }
-}
-
-impl<'de> serde::Deserialize<'de> for HeatmapPaintLayerHeatmapIntensityExpression {
-    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
-        let mut errors: Vec<(&str, std::string::String)> = Vec::new();
-        match <Number as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Number(v)),
-            Err(e) => errors.push(("Number", e.to_string())),
-        }
-        match <NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Ramp(v)),
-            Err(e) => errors.push(("Ramp", e.to_string())),
-        }
-
-        let details: Vec<std::string::String> =
-            errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
-        Err(serde::de::Error::custom(format!(
-            "HeatmapPaintLayerHeatmapIntensityExpression: no variant matched. Expected Number(Number) | Ramp(NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection). Errors: [{}]",
-            details.join("; ")
-        )))
-    }
-}
-
-/// Similar to `heatmap-weight` but controls the intensity of the heatmap globally. Primarily used for adjusting the heatmap based on zoom level.
-#[derive(PartialEq, Debug, Clone)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum HeatmapPaintLayerHeatmapIntensity {
-    Expr(Box<HeatmapPaintLayerHeatmapIntensityExpression>),
-    Literal(
-        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
-        serde_json::Number,
-    ),
-}
-
-impl serde::Serialize for HeatmapPaintLayerHeatmapIntensity {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        match self {
-            Self::Expr(v) => v.as_ref().serialize(serializer),
-            Self::Literal(v) => v.serialize(serializer),
-        }
-    }
-}
-
-impl<'de> serde::Deserialize<'de> for HeatmapPaintLayerHeatmapIntensity {
-    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
-        let mut errors: Vec<(&str, std::string::String)> = Vec::new();
-        match <HeatmapPaintLayerHeatmapIntensityExpression as serde::Deserialize>::deserialize(
-            &value,
-        ) {
-            Ok(v) => return Ok(Self::Expr(Box::new(v))),
-            Err(e) => errors.push(("Expr", e.to_string())),
-        }
-        match <serde_json::Number as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Literal(v)),
-            Err(e) => errors.push(("Literal", e.to_string())),
-        }
-
-        let details: Vec<std::string::String> =
-            errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
-        Err(serde::de::Error::custom(format!(
-            "HeatmapPaintLayerHeatmapIntensity: no variant matched. Expected Expr(HeatmapPaintLayerHeatmapIntensityExpression) | Literal(serde_json::Number). Errors: [{}]",
-            details.join("; ")
-        )))
-    }
-}
-
-impl Default for HeatmapPaintLayerHeatmapIntensity {
-    fn default() -> Self {
-        Self::Literal(
-            serde_json::Number::from_i128(1)
-                .expect("the number is serialised from a number and is thus always valid"),
-        )
-    }
-}
-
-/// Nested expression: ramp (`interpolate` / …) or regular [`Number`] operators.
-#[derive(PartialEq, Debug, Clone)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum HeatmapPaintLayerHeatmapOpacityExpression {
-    Number(Number),
-    Ramp(NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection),
-}
-
-impl serde::Serialize for HeatmapPaintLayerHeatmapOpacityExpression {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        match self {
-            Self::Number(v) => v.serialize(serializer),
-            Self::Ramp(v) => v.serialize(serializer),
-        }
-    }
-}
-
-impl<'de> serde::Deserialize<'de> for HeatmapPaintLayerHeatmapOpacityExpression {
-    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
-        let mut errors: Vec<(&str, std::string::String)> = Vec::new();
-        match <Number as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Number(v)),
-            Err(e) => errors.push(("Number", e.to_string())),
-        }
-        match <NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Ramp(v)),
-            Err(e) => errors.push(("Ramp", e.to_string())),
-        }
-
-        let details: Vec<std::string::String> =
-            errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
-        Err(serde::de::Error::custom(format!(
-            "HeatmapPaintLayerHeatmapOpacityExpression: no variant matched. Expected Number(Number) | Ramp(NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection). Errors: [{}]",
-            details.join("; ")
-        )))
-    }
-}
-
-/// The global opacity at which the heatmap layer will be drawn.
-#[derive(PartialEq, Debug, Clone)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum HeatmapPaintLayerHeatmapOpacity {
-    Expr(Box<HeatmapPaintLayerHeatmapOpacityExpression>),
-    Literal(
-        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
-        serde_json::Number,
-    ),
-}
-
-impl serde::Serialize for HeatmapPaintLayerHeatmapOpacity {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        match self {
-            Self::Expr(v) => v.as_ref().serialize(serializer),
-            Self::Literal(v) => v.serialize(serializer),
-        }
-    }
-}
-
-impl<'de> serde::Deserialize<'de> for HeatmapPaintLayerHeatmapOpacity {
-    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
-        let mut errors: Vec<(&str, std::string::String)> = Vec::new();
-        match <HeatmapPaintLayerHeatmapOpacityExpression as serde::Deserialize>::deserialize(&value)
-        {
-            Ok(v) => return Ok(Self::Expr(Box::new(v))),
-            Err(e) => errors.push(("Expr", e.to_string())),
-        }
-        match <serde_json::Number as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Literal(v)),
-            Err(e) => errors.push(("Literal", e.to_string())),
-        }
-
-        let details: Vec<std::string::String> =
-            errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
-        Err(serde::de::Error::custom(format!(
-            "HeatmapPaintLayerHeatmapOpacity: no variant matched. Expected Expr(HeatmapPaintLayerHeatmapOpacityExpression) | Literal(serde_json::Number). Errors: [{}]",
-            details.join("; ")
-        )))
-    }
-}
-
-impl Default for HeatmapPaintLayerHeatmapOpacity {
-    fn default() -> Self {
-        Self::Literal(
-            serde_json::Number::from_i128(1)
-                .expect("the number is serialised from a number and is thus always valid"),
-        )
-    }
-}
-
-/// Nested expression: ramp (`interpolate` / …) or regular [`Number`] operators.
-#[derive(PartialEq, Debug, Clone)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum HeatmapPaintLayerHeatmapRadiusExpression {
-    Number(Number),
-    Ramp(NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection),
-}
-
-impl serde::Serialize for HeatmapPaintLayerHeatmapRadiusExpression {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        match self {
-            Self::Number(v) => v.serialize(serializer),
-            Self::Ramp(v) => v.serialize(serializer),
-        }
-    }
-}
-
-impl<'de> serde::Deserialize<'de> for HeatmapPaintLayerHeatmapRadiusExpression {
-    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
-        let mut errors: Vec<(&str, std::string::String)> = Vec::new();
-        match <Number as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Number(v)),
-            Err(e) => errors.push(("Number", e.to_string())),
-        }
-        match <NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Ramp(v)),
-            Err(e) => errors.push(("Ramp", e.to_string())),
-        }
-
-        let details: Vec<std::string::String> =
-            errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
-        Err(serde::de::Error::custom(format!(
-            "HeatmapPaintLayerHeatmapRadiusExpression: no variant matched. Expected Number(Number) | Ramp(NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection). Errors: [{}]",
-            details.join("; ")
-        )))
-    }
-}
-
-/// Radius of influence of one heatmap point in pixels. Increasing the value makes the heatmap smoother, but less detailed.
-#[derive(PartialEq, Debug, Clone)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum HeatmapPaintLayerHeatmapRadius {
-    Expr(Box<HeatmapPaintLayerHeatmapRadiusExpression>),
-    Literal(
-        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
-        serde_json::Number,
-    ),
-}
-
-impl serde::Serialize for HeatmapPaintLayerHeatmapRadius {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        match self {
-            Self::Expr(v) => v.as_ref().serialize(serializer),
-            Self::Literal(v) => v.serialize(serializer),
-        }
-    }
-}
-
-impl<'de> serde::Deserialize<'de> for HeatmapPaintLayerHeatmapRadius {
-    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
-        let mut errors: Vec<(&str, std::string::String)> = Vec::new();
-        match <HeatmapPaintLayerHeatmapRadiusExpression as serde::Deserialize>::deserialize(&value)
-        {
-            Ok(v) => return Ok(Self::Expr(Box::new(v))),
-            Err(e) => errors.push(("Expr", e.to_string())),
-        }
-        match <serde_json::Number as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Literal(v)),
-            Err(e) => errors.push(("Literal", e.to_string())),
-        }
-
-        let details: Vec<std::string::String> =
-            errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
-        Err(serde::de::Error::custom(format!(
-            "HeatmapPaintLayerHeatmapRadius: no variant matched. Expected Expr(HeatmapPaintLayerHeatmapRadiusExpression) | Literal(serde_json::Number). Errors: [{}]",
-            details.join("; ")
-        )))
-    }
-}
-
-impl Default for HeatmapPaintLayerHeatmapRadius {
-    fn default() -> Self {
-        Self::Literal(
-            serde_json::Number::from_i128(30)
-                .expect("the number is serialised from a number and is thus always valid"),
-        )
-    }
-}
-
-/// Nested expression: ramp (`interpolate` / …) or regular [`Number`] operators.
-#[derive(PartialEq, Debug, Clone)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum HeatmapPaintLayerHeatmapWeightExpression {
-    Number(Number),
-    Ramp(NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection),
-}
-
-impl serde::Serialize for HeatmapPaintLayerHeatmapWeightExpression {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        match self {
-            Self::Number(v) => v.serialize(serializer),
-            Self::Ramp(v) => v.serialize(serializer),
-        }
-    }
-}
-
-impl<'de> serde::Deserialize<'de> for HeatmapPaintLayerHeatmapWeightExpression {
-    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
-        let mut errors: Vec<(&str, std::string::String)> = Vec::new();
-        match <Number as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Number(v)),
-            Err(e) => errors.push(("Number", e.to_string())),
-        }
-        match <NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Ramp(v)),
-            Err(e) => errors.push(("Ramp", e.to_string())),
-        }
-
-        let details: Vec<std::string::String> =
-            errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
-        Err(serde::de::Error::custom(format!(
-            "HeatmapPaintLayerHeatmapWeightExpression: no variant matched. Expected Number(Number) | Ramp(NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection). Errors: [{}]",
-            details.join("; ")
-        )))
-    }
-}
-
-/// A measure of how much an individual point contributes to the heatmap. A value of 10 would be equivalent to having 10 points of weight 1 in the same spot. Especially useful when combined with clustering.
-#[derive(PartialEq, Debug, Clone)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum HeatmapPaintLayerHeatmapWeight {
-    Expr(Box<HeatmapPaintLayerHeatmapWeightExpression>),
-    Literal(
-        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
-        serde_json::Number,
-    ),
-}
-
-impl serde::Serialize for HeatmapPaintLayerHeatmapWeight {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        match self {
-            Self::Expr(v) => v.as_ref().serialize(serializer),
-            Self::Literal(v) => v.serialize(serializer),
-        }
-    }
-}
-
-impl<'de> serde::Deserialize<'de> for HeatmapPaintLayerHeatmapWeight {
-    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
-        let mut errors: Vec<(&str, std::string::String)> = Vec::new();
-        match <HeatmapPaintLayerHeatmapWeightExpression as serde::Deserialize>::deserialize(&value)
-        {
-            Ok(v) => return Ok(Self::Expr(Box::new(v))),
-            Err(e) => errors.push(("Expr", e.to_string())),
-        }
-        match <serde_json::Number as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Literal(v)),
-            Err(e) => errors.push(("Literal", e.to_string())),
-        }
-
-        let details: Vec<std::string::String> =
-            errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
-        Err(serde::de::Error::custom(format!(
-            "HeatmapPaintLayerHeatmapWeight: no variant matched. Expected Expr(HeatmapPaintLayerHeatmapWeightExpression) | Literal(serde_json::Number). Errors: [{}]",
-            details.join("; ")
-        )))
-    }
-}
-
-impl Default for HeatmapPaintLayerHeatmapWeight {
-    fn default() -> Self {
-        Self::Literal(
-            serde_json::Number::from_i128(1)
-                .expect("the number is serialised from a number and is thus always valid"),
-        )
-    }
-}
+numeric_prop!(
+    HeatmapPaintLayerHeatmapWeight,
+    doc = "A measure of how much an individual point contributes to the heatmap. A value of 10 would be equivalent to having 10 points of weight 1 in the same spot. Especially useful when combined with clustering.",
+    min = 0_f64,
+    default = serde_json::Number::from_i128(1)
+        .expect("the number is serialised from a number and is thus always valid")
+);
 
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
@@ -2956,16 +723,7 @@ pub struct HillshadeLayoutLayer {
     pub visibility: Option<HillshadeLayoutLayerVisibility>,
 }
 
-/// Whether this layer is displayed.
-#[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy, Default)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum HillshadeLayoutLayerVisibility {
-    #[serde(rename = "none")]
-    None,
-    #[serde(rename = "visible")]
-    #[default]
-    Visible,
-}
+pub type HillshadeLayoutLayerVisibility = Visibility;
 
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
@@ -3004,184 +762,20 @@ pub struct HillshadePaintLayer {
     pub hillshade_shadow_color: Option<HillshadePaintLayerHillshadeShadowColor>,
 }
 
-/// Nested expression: ramp (`interpolate-hcl`, …) or [`Color`] operators.
-#[derive(PartialEq, Debug, Clone)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum HillshadePaintLayerHillshadeAccentColorExpression {
-    Color(Color),
-    Ramp(ColorOrArrayOfColor),
-}
+color_prop!(
+    HillshadePaintLayerHillshadeAccentColor,
+    doc = "The shading color used to accentuate rugged terrain like sharp cliffs and gorges.",
+    default = serde_json::json!("#000000")
+);
 
-impl serde::Serialize for HillshadePaintLayerHillshadeAccentColorExpression {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        match self {
-            Self::Color(v) => v.serialize(serializer),
-            Self::Ramp(v) => v.serialize(serializer),
-        }
-    }
-}
-
-impl<'de> serde::Deserialize<'de> for HillshadePaintLayerHillshadeAccentColorExpression {
-    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
-        let mut errors: Vec<(&str, std::string::String)> = Vec::new();
-        match <Color as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Color(v)),
-            Err(e) => errors.push(("Color", e.to_string())),
-        }
-        match <ColorOrArrayOfColor as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Ramp(v)),
-            Err(e) => errors.push(("Ramp", e.to_string())),
-        }
-
-        let details: Vec<std::string::String> =
-            errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
-        Err(serde::de::Error::custom(format!(
-            "HillshadePaintLayerHillshadeAccentColorExpression: no variant matched. Expected Color(Color) | Ramp(ColorOrArrayOfColor). Errors: [{}]",
-            details.join("; ")
-        )))
-    }
-}
-
-/// The shading color used to accentuate rugged terrain like sharp cliffs and gorges.
-#[derive(PartialEq, Debug, Clone)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum HillshadePaintLayerHillshadeAccentColor {
-    Expr(Box<HillshadePaintLayerHillshadeAccentColorExpression>),
-    Literal(
-        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
-        serde_json::Value,
-    ),
-}
-
-impl serde::Serialize for HillshadePaintLayerHillshadeAccentColor {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        match self {
-            Self::Expr(v) => v.as_ref().serialize(serializer),
-            Self::Literal(v) => v.serialize(serializer),
-        }
-    }
-}
-
-impl<'de> serde::Deserialize<'de> for HillshadePaintLayerHillshadeAccentColor {
-    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
-        let mut errors: Vec<(&str, std::string::String)> = Vec::new();
-        match <HillshadePaintLayerHillshadeAccentColorExpression as serde::Deserialize>::deserialize(
-            &value,
-        ) {
-            Ok(v) => return Ok(Self::Expr(Box::new(v))),
-            Err(e) => errors.push(("Expr", e.to_string())),
-        }
-        match <serde_json::Value as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Literal(v)),
-            Err(e) => errors.push(("Literal", e.to_string())),
-        }
-
-        let details: Vec<std::string::String> =
-            errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
-        Err(serde::de::Error::custom(format!(
-            "HillshadePaintLayerHillshadeAccentColor: no variant matched. Expected Expr(HillshadePaintLayerHillshadeAccentColorExpression) | Literal(serde_json::Value). Errors: [{}]",
-            details.join("; ")
-        )))
-    }
-}
-
-impl Default for HillshadePaintLayerHillshadeAccentColor {
-    fn default() -> Self {
-        Self::Literal(serde_json::json!("#000000"))
-    }
-}
-
-/// Nested expression: ramp (`interpolate` / …) or regular [`Number`] operators.
-#[derive(PartialEq, Debug, Clone)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum HillshadePaintLayerHillshadeExaggerationExpression {
-    Number(Number),
-    Ramp(NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection),
-}
-
-impl serde::Serialize for HillshadePaintLayerHillshadeExaggerationExpression {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        match self {
-            Self::Number(v) => v.serialize(serializer),
-            Self::Ramp(v) => v.serialize(serializer),
-        }
-    }
-}
-
-impl<'de> serde::Deserialize<'de> for HillshadePaintLayerHillshadeExaggerationExpression {
-    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
-        let mut errors: Vec<(&str, std::string::String)> = Vec::new();
-        match <Number as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Number(v)),
-            Err(e) => errors.push(("Number", e.to_string())),
-        }
-        match <NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Ramp(v)),
-            Err(e) => errors.push(("Ramp", e.to_string())),
-        }
-
-        let details: Vec<std::string::String> =
-            errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
-        Err(serde::de::Error::custom(format!(
-            "HillshadePaintLayerHillshadeExaggerationExpression: no variant matched. Expected Number(Number) | Ramp(NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection). Errors: [{}]",
-            details.join("; ")
-        )))
-    }
-}
-
-/// Intensity of the hillshade
-#[derive(PartialEq, Debug, Clone)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum HillshadePaintLayerHillshadeExaggeration {
-    Expr(Box<HillshadePaintLayerHillshadeExaggerationExpression>),
-    Literal(
-        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
-        serde_json::Number,
-    ),
-}
-
-impl serde::Serialize for HillshadePaintLayerHillshadeExaggeration {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        match self {
-            Self::Expr(v) => v.as_ref().serialize(serializer),
-            Self::Literal(v) => v.serialize(serializer),
-        }
-    }
-}
-
-impl<'de> serde::Deserialize<'de> for HillshadePaintLayerHillshadeExaggeration {
-    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
-        let mut errors: Vec<(&str, std::string::String)> = Vec::new();
-        match <HillshadePaintLayerHillshadeExaggerationExpression as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Expr(Box::new(v))),
-            Err(e) => errors.push(("Expr", e.to_string())),
-        }
-        match <serde_json::Number as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Literal(v)),
-            Err(e) => errors.push(("Literal", e.to_string())),
-        }
-
-        let details: Vec<std::string::String> =
-            errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
-        Err(serde::de::Error::custom(format!(
-            "HillshadePaintLayerHillshadeExaggeration: no variant matched. Expected Expr(HillshadePaintLayerHillshadeExaggerationExpression) | Literal(serde_json::Number). Errors: [{}]",
-            details.join("; ")
-        )))
-    }
-}
-
-impl Default for HillshadePaintLayerHillshadeExaggeration {
-    fn default() -> Self {
-        Self::Literal(
-            serde_json::Number::from_f64(0.5)
-                .expect("the number is serialised from a number and is thus always valid"),
-        )
-    }
-}
+numeric_prop!(
+    HillshadePaintLayerHillshadeExaggeration,
+    doc = "Intensity of the hillshade",
+    min = 0_f64,
+    max = 1_f64,
+    default = serde_json::Number::from_f64(0.5)
+        .expect("the number is serialised from a number and is thus always valid")
+);
 
 /// The shading color of areas that faces towards the light source(s). Only when `hillshade-method` is set to `multidirectional` can you specify multiple light sources.
 #[derive(PartialEq, Debug, Clone)]
@@ -3483,277 +1077,26 @@ pub enum LineLayoutLayerLineJoin {
     Round,
 }
 
-/// Nested expression: ramp (`interpolate` / …) or regular [`Number`] operators.
-#[derive(PartialEq, Debug, Clone)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum LineLayoutLayerLineMiterLimitExpression {
-    Number(Number),
-    Ramp(NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection),
-}
+numeric_prop!(
+    LineLayoutLayerLineMiterLimit,
+    doc = "Used to automatically convert miter joins to bevel joins for sharp angles.",
+    default = serde_json::Number::from_i128(2)
+        .expect("the number is serialised from a number and is thus always valid")
+);
 
-impl serde::Serialize for LineLayoutLayerLineMiterLimitExpression {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        match self {
-            Self::Number(v) => v.serialize(serializer),
-            Self::Ramp(v) => v.serialize(serializer),
-        }
-    }
-}
+numeric_prop!(
+    LineLayoutLayerLineRoundLimit,
+    doc = "Used to automatically convert round joins to miter joins for shallow angles.",
+    default = serde_json::Number::from_f64(1.05)
+        .expect("the number is serialised from a number and is thus always valid")
+);
 
-impl<'de> serde::Deserialize<'de> for LineLayoutLayerLineMiterLimitExpression {
-    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
-        let mut errors: Vec<(&str, std::string::String)> = Vec::new();
-        match <Number as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Number(v)),
-            Err(e) => errors.push(("Number", e.to_string())),
-        }
-        match <NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Ramp(v)),
-            Err(e) => errors.push(("Ramp", e.to_string())),
-        }
+numeric_prop!(
+    LineLayoutLayerLineSortKey,
+    doc = "Sorts features in ascending order based on this value. Features with a higher sort key will appear above features with a lower sort key."
+);
 
-        let details: Vec<std::string::String> =
-            errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
-        Err(serde::de::Error::custom(format!(
-            "LineLayoutLayerLineMiterLimitExpression: no variant matched. Expected Number(Number) | Ramp(NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection). Errors: [{}]",
-            details.join("; ")
-        )))
-    }
-}
-
-/// Used to automatically convert miter joins to bevel joins for sharp angles.
-#[derive(PartialEq, Debug, Clone)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum LineLayoutLayerLineMiterLimit {
-    Expr(Box<LineLayoutLayerLineMiterLimitExpression>),
-    Literal(
-        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
-        serde_json::Number,
-    ),
-}
-
-impl serde::Serialize for LineLayoutLayerLineMiterLimit {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        match self {
-            Self::Expr(v) => v.as_ref().serialize(serializer),
-            Self::Literal(v) => v.serialize(serializer),
-        }
-    }
-}
-
-impl<'de> serde::Deserialize<'de> for LineLayoutLayerLineMiterLimit {
-    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
-        let mut errors: Vec<(&str, std::string::String)> = Vec::new();
-        match <LineLayoutLayerLineMiterLimitExpression as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Expr(Box::new(v))),
-            Err(e) => errors.push(("Expr", e.to_string())),
-        }
-        match <serde_json::Number as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Literal(v)),
-            Err(e) => errors.push(("Literal", e.to_string())),
-        }
-
-        let details: Vec<std::string::String> =
-            errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
-        Err(serde::de::Error::custom(format!(
-            "LineLayoutLayerLineMiterLimit: no variant matched. Expected Expr(LineLayoutLayerLineMiterLimitExpression) | Literal(serde_json::Number). Errors: [{}]",
-            details.join("; ")
-        )))
-    }
-}
-
-impl Default for LineLayoutLayerLineMiterLimit {
-    fn default() -> Self {
-        Self::Literal(
-            serde_json::Number::from_i128(2)
-                .expect("the number is serialised from a number and is thus always valid"),
-        )
-    }
-}
-
-/// Nested expression: ramp (`interpolate` / …) or regular [`Number`] operators.
-#[derive(PartialEq, Debug, Clone)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum LineLayoutLayerLineRoundLimitExpression {
-    Number(Number),
-    Ramp(NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection),
-}
-
-impl serde::Serialize for LineLayoutLayerLineRoundLimitExpression {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        match self {
-            Self::Number(v) => v.serialize(serializer),
-            Self::Ramp(v) => v.serialize(serializer),
-        }
-    }
-}
-
-impl<'de> serde::Deserialize<'de> for LineLayoutLayerLineRoundLimitExpression {
-    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
-        let mut errors: Vec<(&str, std::string::String)> = Vec::new();
-        match <Number as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Number(v)),
-            Err(e) => errors.push(("Number", e.to_string())),
-        }
-        match <NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Ramp(v)),
-            Err(e) => errors.push(("Ramp", e.to_string())),
-        }
-
-        let details: Vec<std::string::String> =
-            errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
-        Err(serde::de::Error::custom(format!(
-            "LineLayoutLayerLineRoundLimitExpression: no variant matched. Expected Number(Number) | Ramp(NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection). Errors: [{}]",
-            details.join("; ")
-        )))
-    }
-}
-
-/// Used to automatically convert round joins to miter joins for shallow angles.
-#[derive(PartialEq, Debug, Clone)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum LineLayoutLayerLineRoundLimit {
-    Expr(Box<LineLayoutLayerLineRoundLimitExpression>),
-    Literal(
-        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
-        serde_json::Number,
-    ),
-}
-
-impl serde::Serialize for LineLayoutLayerLineRoundLimit {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        match self {
-            Self::Expr(v) => v.as_ref().serialize(serializer),
-            Self::Literal(v) => v.serialize(serializer),
-        }
-    }
-}
-
-impl<'de> serde::Deserialize<'de> for LineLayoutLayerLineRoundLimit {
-    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
-        let mut errors: Vec<(&str, std::string::String)> = Vec::new();
-        match <LineLayoutLayerLineRoundLimitExpression as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Expr(Box::new(v))),
-            Err(e) => errors.push(("Expr", e.to_string())),
-        }
-        match <serde_json::Number as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Literal(v)),
-            Err(e) => errors.push(("Literal", e.to_string())),
-        }
-
-        let details: Vec<std::string::String> =
-            errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
-        Err(serde::de::Error::custom(format!(
-            "LineLayoutLayerLineRoundLimit: no variant matched. Expected Expr(LineLayoutLayerLineRoundLimitExpression) | Literal(serde_json::Number). Errors: [{}]",
-            details.join("; ")
-        )))
-    }
-}
-
-impl Default for LineLayoutLayerLineRoundLimit {
-    fn default() -> Self {
-        Self::Literal(
-            serde_json::Number::from_f64(1.05)
-                .expect("the number is serialised from a number and is thus always valid"),
-        )
-    }
-}
-
-/// Nested expression: ramp (`interpolate` / …) or regular [`Number`] operators.
-#[derive(PartialEq, Debug, Clone)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum LineLayoutLayerLineSortKeyExpression {
-    Number(Number),
-    Ramp(NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection),
-}
-
-impl serde::Serialize for LineLayoutLayerLineSortKeyExpression {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        match self {
-            Self::Number(v) => v.serialize(serializer),
-            Self::Ramp(v) => v.serialize(serializer),
-        }
-    }
-}
-
-impl<'de> serde::Deserialize<'de> for LineLayoutLayerLineSortKeyExpression {
-    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
-        let mut errors: Vec<(&str, std::string::String)> = Vec::new();
-        match <Number as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Number(v)),
-            Err(e) => errors.push(("Number", e.to_string())),
-        }
-        match <NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Ramp(v)),
-            Err(e) => errors.push(("Ramp", e.to_string())),
-        }
-
-        let details: Vec<std::string::String> =
-            errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
-        Err(serde::de::Error::custom(format!(
-            "LineLayoutLayerLineSortKeyExpression: no variant matched. Expected Number(Number) | Ramp(NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection). Errors: [{}]",
-            details.join("; ")
-        )))
-    }
-}
-
-/// Sorts features in ascending order based on this value. Features with a higher sort key will appear above features with a lower sort key.
-#[derive(PartialEq, Debug, Clone)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum LineLayoutLayerLineSortKey {
-    Expr(Box<LineLayoutLayerLineSortKeyExpression>),
-    Literal(
-        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
-        serde_json::Number,
-    ),
-}
-
-impl serde::Serialize for LineLayoutLayerLineSortKey {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        match self {
-            Self::Expr(v) => v.as_ref().serialize(serializer),
-            Self::Literal(v) => v.serialize(serializer),
-        }
-    }
-}
-
-impl<'de> serde::Deserialize<'de> for LineLayoutLayerLineSortKey {
-    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
-        let mut errors: Vec<(&str, std::string::String)> = Vec::new();
-        match <LineLayoutLayerLineSortKeyExpression as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Expr(Box::new(v))),
-            Err(e) => errors.push(("Expr", e.to_string())),
-        }
-        match <serde_json::Number as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Literal(v)),
-            Err(e) => errors.push(("Literal", e.to_string())),
-        }
-
-        let details: Vec<std::string::String> =
-            errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
-        Err(serde::de::Error::custom(format!(
-            "LineLayoutLayerLineSortKey: no variant matched. Expected Expr(LineLayoutLayerLineSortKeyExpression) | Literal(serde_json::Number). Errors: [{}]",
-            details.join("; ")
-        )))
-    }
-}
-
-/// Whether this layer is displayed.
-#[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy, Default)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum LineLayoutLayerVisibility {
-    #[serde(rename = "none")]
-    None,
-    #[serde(rename = "visible")]
-    #[default]
-    Visible,
-}
+pub type LineLayoutLayerVisibility = Visibility;
 
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
@@ -3804,182 +1147,19 @@ pub struct LinePaintLayer {
     pub line_width: Option<LinePaintLayerLineWidth>,
 }
 
-/// Nested expression: ramp (`interpolate` / …) or regular [`Number`] operators.
-#[derive(PartialEq, Debug, Clone)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum LinePaintLayerLineBlurExpression {
-    Number(Number),
-    Ramp(NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection),
-}
+numeric_prop!(
+    LinePaintLayerLineBlur,
+    doc = "Blur applied to the line, in pixels.",
+    min = 0_f64,
+    default = serde_json::Number::from_i128(0)
+        .expect("the number is serialised from a number and is thus always valid")
+);
 
-impl serde::Serialize for LinePaintLayerLineBlurExpression {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        match self {
-            Self::Number(v) => v.serialize(serializer),
-            Self::Ramp(v) => v.serialize(serializer),
-        }
-    }
-}
-
-impl<'de> serde::Deserialize<'de> for LinePaintLayerLineBlurExpression {
-    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
-        let mut errors: Vec<(&str, std::string::String)> = Vec::new();
-        match <Number as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Number(v)),
-            Err(e) => errors.push(("Number", e.to_string())),
-        }
-        match <NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Ramp(v)),
-            Err(e) => errors.push(("Ramp", e.to_string())),
-        }
-
-        let details: Vec<std::string::String> =
-            errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
-        Err(serde::de::Error::custom(format!(
-            "LinePaintLayerLineBlurExpression: no variant matched. Expected Number(Number) | Ramp(NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection). Errors: [{}]",
-            details.join("; ")
-        )))
-    }
-}
-
-/// Blur applied to the line, in pixels.
-#[derive(PartialEq, Debug, Clone)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum LinePaintLayerLineBlur {
-    Expr(Box<LinePaintLayerLineBlurExpression>),
-    Literal(
-        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
-        serde_json::Number,
-    ),
-}
-
-impl serde::Serialize for LinePaintLayerLineBlur {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        match self {
-            Self::Expr(v) => v.as_ref().serialize(serializer),
-            Self::Literal(v) => v.serialize(serializer),
-        }
-    }
-}
-
-impl<'de> serde::Deserialize<'de> for LinePaintLayerLineBlur {
-    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
-        let mut errors: Vec<(&str, std::string::String)> = Vec::new();
-        match <LinePaintLayerLineBlurExpression as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Expr(Box::new(v))),
-            Err(e) => errors.push(("Expr", e.to_string())),
-        }
-        match <serde_json::Number as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Literal(v)),
-            Err(e) => errors.push(("Literal", e.to_string())),
-        }
-
-        let details: Vec<std::string::String> =
-            errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
-        Err(serde::de::Error::custom(format!(
-            "LinePaintLayerLineBlur: no variant matched. Expected Expr(LinePaintLayerLineBlurExpression) | Literal(serde_json::Number). Errors: [{}]",
-            details.join("; ")
-        )))
-    }
-}
-
-impl Default for LinePaintLayerLineBlur {
-    fn default() -> Self {
-        Self::Literal(
-            serde_json::Number::from_i128(0)
-                .expect("the number is serialised from a number and is thus always valid"),
-        )
-    }
-}
-
-/// Nested expression: ramp (`interpolate-hcl`, …) or [`Color`] operators.
-#[derive(PartialEq, Debug, Clone)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum LinePaintLayerLineColorExpression {
-    Color(Color),
-    Ramp(ColorOrArrayOfColor),
-}
-
-impl serde::Serialize for LinePaintLayerLineColorExpression {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        match self {
-            Self::Color(v) => v.serialize(serializer),
-            Self::Ramp(v) => v.serialize(serializer),
-        }
-    }
-}
-
-impl<'de> serde::Deserialize<'de> for LinePaintLayerLineColorExpression {
-    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
-        let mut errors: Vec<(&str, std::string::String)> = Vec::new();
-        match <Color as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Color(v)),
-            Err(e) => errors.push(("Color", e.to_string())),
-        }
-        match <ColorOrArrayOfColor as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Ramp(v)),
-            Err(e) => errors.push(("Ramp", e.to_string())),
-        }
-
-        let details: Vec<std::string::String> =
-            errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
-        Err(serde::de::Error::custom(format!(
-            "LinePaintLayerLineColorExpression: no variant matched. Expected Color(Color) | Ramp(ColorOrArrayOfColor). Errors: [{}]",
-            details.join("; ")
-        )))
-    }
-}
-
-/// The color with which the line will be drawn.
-#[derive(PartialEq, Debug, Clone)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum LinePaintLayerLineColor {
-    Expr(Box<LinePaintLayerLineColorExpression>),
-    Literal(
-        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
-        serde_json::Value,
-    ),
-}
-
-impl serde::Serialize for LinePaintLayerLineColor {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        match self {
-            Self::Expr(v) => v.as_ref().serialize(serializer),
-            Self::Literal(v) => v.serialize(serializer),
-        }
-    }
-}
-
-impl<'de> serde::Deserialize<'de> for LinePaintLayerLineColor {
-    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
-        let mut errors: Vec<(&str, std::string::String)> = Vec::new();
-        match <LinePaintLayerLineColorExpression as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Expr(Box::new(v))),
-            Err(e) => errors.push(("Expr", e.to_string())),
-        }
-        match <serde_json::Value as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Literal(v)),
-            Err(e) => errors.push(("Literal", e.to_string())),
-        }
-
-        let details: Vec<std::string::String> =
-            errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
-        Err(serde::de::Error::custom(format!(
-            "LinePaintLayerLineColor: no variant matched. Expected Expr(LinePaintLayerLineColorExpression) | Literal(serde_json::Value). Errors: [{}]",
-            details.join("; ")
-        )))
-    }
-}
-
-impl Default for LinePaintLayerLineColor {
-    fn default() -> Self {
-        Self::Literal(serde_json::json!("#000000"))
-    }
-}
+color_prop!(
+    LinePaintLayerLineColor,
+    doc = "The color with which the line will be drawn.",
+    default = serde_json::json!("#000000")
+);
 
 /// Specifies the lengths of the alternating dashes and gaps that form the dash pattern. The lengths are later scaled by the line width. To convert a dash length to pixels, multiply the length by the current line width. GeoJSON sources with `lineMetrics: true` specified won't render dashed lines to the expected scale. Zoom-dependent expressions will be evaluated only at integer zoom levels. The only way to create an array value is using `["literal", [...]]`; arrays cannot be read from or derived from feature properties.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
@@ -3989,356 +1169,34 @@ pub struct LinePaintLayerLineDasharray(
     Vec<serde_json::Number>,
 );
 
-/// Nested expression: ramp (`interpolate` / …) or regular [`Number`] operators.
-#[derive(PartialEq, Debug, Clone)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum LinePaintLayerLineGapWidthExpression {
-    Number(Number),
-    Ramp(NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection),
-}
+numeric_prop!(
+    LinePaintLayerLineGapWidth,
+    doc = "Draws a line casing outside of a line's actual path. Value indicates the width of the inner gap.",
+    min = 0_f64,
+    default = serde_json::Number::from_i128(0)
+        .expect("the number is serialised from a number and is thus always valid")
+);
 
-impl serde::Serialize for LinePaintLayerLineGapWidthExpression {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        match self {
-            Self::Number(v) => v.serialize(serializer),
-            Self::Ramp(v) => v.serialize(serializer),
-        }
-    }
-}
+color_prop!(
+    LinePaintLayerLineGradient,
+    doc = "Defines a gradient with which to color a line feature. Can only be used with GeoJSON sources that specify `\"lineMetrics\": true`."
+);
 
-impl<'de> serde::Deserialize<'de> for LinePaintLayerLineGapWidthExpression {
-    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
-        let mut errors: Vec<(&str, std::string::String)> = Vec::new();
-        match <Number as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Number(v)),
-            Err(e) => errors.push(("Number", e.to_string())),
-        }
-        match <NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Ramp(v)),
-            Err(e) => errors.push(("Ramp", e.to_string())),
-        }
+numeric_prop!(
+    LinePaintLayerLineOffset,
+    doc = "The line's offset. For linear features, a positive value offsets the line to the right, relative to the direction of the line, and a negative value to the left. For polygon features, a positive value results in an inset, and a negative value results in an outset.",
+    default = serde_json::Number::from_i128(0)
+        .expect("the number is serialised from a number and is thus always valid")
+);
 
-        let details: Vec<std::string::String> =
-            errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
-        Err(serde::de::Error::custom(format!(
-            "LinePaintLayerLineGapWidthExpression: no variant matched. Expected Number(Number) | Ramp(NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection). Errors: [{}]",
-            details.join("; ")
-        )))
-    }
-}
-
-/// Draws a line casing outside of a line's actual path. Value indicates the width of the inner gap.
-#[derive(PartialEq, Debug, Clone)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum LinePaintLayerLineGapWidth {
-    Expr(Box<LinePaintLayerLineGapWidthExpression>),
-    Literal(
-        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
-        serde_json::Number,
-    ),
-}
-
-impl serde::Serialize for LinePaintLayerLineGapWidth {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        match self {
-            Self::Expr(v) => v.as_ref().serialize(serializer),
-            Self::Literal(v) => v.serialize(serializer),
-        }
-    }
-}
-
-impl<'de> serde::Deserialize<'de> for LinePaintLayerLineGapWidth {
-    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
-        let mut errors: Vec<(&str, std::string::String)> = Vec::new();
-        match <LinePaintLayerLineGapWidthExpression as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Expr(Box::new(v))),
-            Err(e) => errors.push(("Expr", e.to_string())),
-        }
-        match <serde_json::Number as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Literal(v)),
-            Err(e) => errors.push(("Literal", e.to_string())),
-        }
-
-        let details: Vec<std::string::String> =
-            errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
-        Err(serde::de::Error::custom(format!(
-            "LinePaintLayerLineGapWidth: no variant matched. Expected Expr(LinePaintLayerLineGapWidthExpression) | Literal(serde_json::Number). Errors: [{}]",
-            details.join("; ")
-        )))
-    }
-}
-
-impl Default for LinePaintLayerLineGapWidth {
-    fn default() -> Self {
-        Self::Literal(
-            serde_json::Number::from_i128(0)
-                .expect("the number is serialised from a number and is thus always valid"),
-        )
-    }
-}
-
-/// Nested expression: ramp (`interpolate-hcl`, …) or [`Color`] operators.
-#[derive(PartialEq, Debug, Clone)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum LinePaintLayerLineGradientExpression {
-    Color(Color),
-    Ramp(ColorOrArrayOfColor),
-}
-
-impl serde::Serialize for LinePaintLayerLineGradientExpression {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        match self {
-            Self::Color(v) => v.serialize(serializer),
-            Self::Ramp(v) => v.serialize(serializer),
-        }
-    }
-}
-
-impl<'de> serde::Deserialize<'de> for LinePaintLayerLineGradientExpression {
-    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
-        let mut errors: Vec<(&str, std::string::String)> = Vec::new();
-        match <Color as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Color(v)),
-            Err(e) => errors.push(("Color", e.to_string())),
-        }
-        match <ColorOrArrayOfColor as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Ramp(v)),
-            Err(e) => errors.push(("Ramp", e.to_string())),
-        }
-
-        let details: Vec<std::string::String> =
-            errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
-        Err(serde::de::Error::custom(format!(
-            "LinePaintLayerLineGradientExpression: no variant matched. Expected Color(Color) | Ramp(ColorOrArrayOfColor). Errors: [{}]",
-            details.join("; ")
-        )))
-    }
-}
-
-/// Defines a gradient with which to color a line feature. Can only be used with GeoJSON sources that specify `"lineMetrics": true`.
-#[derive(PartialEq, Debug, Clone)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum LinePaintLayerLineGradient {
-    Expr(Box<LinePaintLayerLineGradientExpression>),
-    Literal(
-        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
-        serde_json::Value,
-    ),
-}
-
-impl serde::Serialize for LinePaintLayerLineGradient {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        match self {
-            Self::Expr(v) => v.as_ref().serialize(serializer),
-            Self::Literal(v) => v.serialize(serializer),
-        }
-    }
-}
-
-impl<'de> serde::Deserialize<'de> for LinePaintLayerLineGradient {
-    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
-        let mut errors: Vec<(&str, std::string::String)> = Vec::new();
-        match <LinePaintLayerLineGradientExpression as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Expr(Box::new(v))),
-            Err(e) => errors.push(("Expr", e.to_string())),
-        }
-        match <serde_json::Value as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Literal(v)),
-            Err(e) => errors.push(("Literal", e.to_string())),
-        }
-
-        let details: Vec<std::string::String> =
-            errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
-        Err(serde::de::Error::custom(format!(
-            "LinePaintLayerLineGradient: no variant matched. Expected Expr(LinePaintLayerLineGradientExpression) | Literal(serde_json::Value). Errors: [{}]",
-            details.join("; ")
-        )))
-    }
-}
-
-/// Nested expression: ramp (`interpolate` / …) or regular [`Number`] operators.
-#[derive(PartialEq, Debug, Clone)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum LinePaintLayerLineOffsetExpression {
-    Number(Number),
-    Ramp(NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection),
-}
-
-impl serde::Serialize for LinePaintLayerLineOffsetExpression {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        match self {
-            Self::Number(v) => v.serialize(serializer),
-            Self::Ramp(v) => v.serialize(serializer),
-        }
-    }
-}
-
-impl<'de> serde::Deserialize<'de> for LinePaintLayerLineOffsetExpression {
-    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
-        let mut errors: Vec<(&str, std::string::String)> = Vec::new();
-        match <Number as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Number(v)),
-            Err(e) => errors.push(("Number", e.to_string())),
-        }
-        match <NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Ramp(v)),
-            Err(e) => errors.push(("Ramp", e.to_string())),
-        }
-
-        let details: Vec<std::string::String> =
-            errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
-        Err(serde::de::Error::custom(format!(
-            "LinePaintLayerLineOffsetExpression: no variant matched. Expected Number(Number) | Ramp(NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection). Errors: [{}]",
-            details.join("; ")
-        )))
-    }
-}
-
-/// The line's offset. For linear features, a positive value offsets the line to the right, relative to the direction of the line, and a negative value to the left. For polygon features, a positive value results in an inset, and a negative value results in an outset.
-#[derive(PartialEq, Debug, Clone)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum LinePaintLayerLineOffset {
-    Expr(Box<LinePaintLayerLineOffsetExpression>),
-    Literal(
-        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
-        serde_json::Number,
-    ),
-}
-
-impl serde::Serialize for LinePaintLayerLineOffset {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        match self {
-            Self::Expr(v) => v.as_ref().serialize(serializer),
-            Self::Literal(v) => v.serialize(serializer),
-        }
-    }
-}
-
-impl<'de> serde::Deserialize<'de> for LinePaintLayerLineOffset {
-    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
-        let mut errors: Vec<(&str, std::string::String)> = Vec::new();
-        match <LinePaintLayerLineOffsetExpression as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Expr(Box::new(v))),
-            Err(e) => errors.push(("Expr", e.to_string())),
-        }
-        match <serde_json::Number as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Literal(v)),
-            Err(e) => errors.push(("Literal", e.to_string())),
-        }
-
-        let details: Vec<std::string::String> =
-            errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
-        Err(serde::de::Error::custom(format!(
-            "LinePaintLayerLineOffset: no variant matched. Expected Expr(LinePaintLayerLineOffsetExpression) | Literal(serde_json::Number). Errors: [{}]",
-            details.join("; ")
-        )))
-    }
-}
-
-impl Default for LinePaintLayerLineOffset {
-    fn default() -> Self {
-        Self::Literal(
-            serde_json::Number::from_i128(0)
-                .expect("the number is serialised from a number and is thus always valid"),
-        )
-    }
-}
-
-/// Nested expression: ramp (`interpolate` / …) or regular [`Number`] operators.
-#[derive(PartialEq, Debug, Clone)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum LinePaintLayerLineOpacityExpression {
-    Number(Number),
-    Ramp(NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection),
-}
-
-impl serde::Serialize for LinePaintLayerLineOpacityExpression {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        match self {
-            Self::Number(v) => v.serialize(serializer),
-            Self::Ramp(v) => v.serialize(serializer),
-        }
-    }
-}
-
-impl<'de> serde::Deserialize<'de> for LinePaintLayerLineOpacityExpression {
-    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
-        let mut errors: Vec<(&str, std::string::String)> = Vec::new();
-        match <Number as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Number(v)),
-            Err(e) => errors.push(("Number", e.to_string())),
-        }
-        match <NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Ramp(v)),
-            Err(e) => errors.push(("Ramp", e.to_string())),
-        }
-
-        let details: Vec<std::string::String> =
-            errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
-        Err(serde::de::Error::custom(format!(
-            "LinePaintLayerLineOpacityExpression: no variant matched. Expected Number(Number) | Ramp(NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection). Errors: [{}]",
-            details.join("; ")
-        )))
-    }
-}
-
-/// The opacity at which the line will be drawn.
-#[derive(PartialEq, Debug, Clone)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum LinePaintLayerLineOpacity {
-    Expr(Box<LinePaintLayerLineOpacityExpression>),
-    Literal(
-        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
-        serde_json::Number,
-    ),
-}
-
-impl serde::Serialize for LinePaintLayerLineOpacity {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        match self {
-            Self::Expr(v) => v.as_ref().serialize(serializer),
-            Self::Literal(v) => v.serialize(serializer),
-        }
-    }
-}
-
-impl<'de> serde::Deserialize<'de> for LinePaintLayerLineOpacity {
-    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
-        let mut errors: Vec<(&str, std::string::String)> = Vec::new();
-        match <LinePaintLayerLineOpacityExpression as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Expr(Box::new(v))),
-            Err(e) => errors.push(("Expr", e.to_string())),
-        }
-        match <serde_json::Number as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Literal(v)),
-            Err(e) => errors.push(("Literal", e.to_string())),
-        }
-
-        let details: Vec<std::string::String> =
-            errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
-        Err(serde::de::Error::custom(format!(
-            "LinePaintLayerLineOpacity: no variant matched. Expected Expr(LinePaintLayerLineOpacityExpression) | Literal(serde_json::Number). Errors: [{}]",
-            details.join("; ")
-        )))
-    }
-}
-
-impl Default for LinePaintLayerLineOpacity {
-    fn default() -> Self {
-        Self::Literal(
-            serde_json::Number::from_i128(1)
-                .expect("the number is serialised from a number and is thus always valid"),
-        )
-    }
-}
+numeric_prop!(
+    LinePaintLayerLineOpacity,
+    doc = "The opacity at which the line will be drawn.",
+    min = 0_f64,
+    max = 1_f64,
+    default = serde_json::Number::from_i128(1)
+        .expect("the number is serialised from a number and is thus always valid")
+);
 
 /// Name of image in sprite to use for drawing image lines. For seamless patterns, image width must be a factor of two (2, 4, 8, ..., 512). Note that zoom-dependent expressions will be evaluated only at integer zoom levels.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone)]
@@ -4375,95 +1233,13 @@ pub enum LinePaintLayerLineTranslateAnchor {
     Viewport,
 }
 
-/// Nested expression: ramp (`interpolate` / …) or regular [`Number`] operators.
-#[derive(PartialEq, Debug, Clone)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum LinePaintLayerLineWidthExpression {
-    Number(Number),
-    Ramp(NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection),
-}
-
-impl serde::Serialize for LinePaintLayerLineWidthExpression {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        match self {
-            Self::Number(v) => v.serialize(serializer),
-            Self::Ramp(v) => v.serialize(serializer),
-        }
-    }
-}
-
-impl<'de> serde::Deserialize<'de> for LinePaintLayerLineWidthExpression {
-    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
-        let mut errors: Vec<(&str, std::string::String)> = Vec::new();
-        match <Number as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Number(v)),
-            Err(e) => errors.push(("Number", e.to_string())),
-        }
-        match <NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Ramp(v)),
-            Err(e) => errors.push(("Ramp", e.to_string())),
-        }
-
-        let details: Vec<std::string::String> =
-            errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
-        Err(serde::de::Error::custom(format!(
-            "LinePaintLayerLineWidthExpression: no variant matched. Expected Number(Number) | Ramp(NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection). Errors: [{}]",
-            details.join("; ")
-        )))
-    }
-}
-
-/// Stroke thickness.
-#[derive(PartialEq, Debug, Clone)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum LinePaintLayerLineWidth {
-    Expr(Box<LinePaintLayerLineWidthExpression>),
-    Literal(
-        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
-        serde_json::Number,
-    ),
-}
-
-impl serde::Serialize for LinePaintLayerLineWidth {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        match self {
-            Self::Expr(v) => v.as_ref().serialize(serializer),
-            Self::Literal(v) => v.serialize(serializer),
-        }
-    }
-}
-
-impl<'de> serde::Deserialize<'de> for LinePaintLayerLineWidth {
-    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
-        let mut errors: Vec<(&str, std::string::String)> = Vec::new();
-        match <LinePaintLayerLineWidthExpression as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Expr(Box::new(v))),
-            Err(e) => errors.push(("Expr", e.to_string())),
-        }
-        match <serde_json::Number as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Literal(v)),
-            Err(e) => errors.push(("Literal", e.to_string())),
-        }
-
-        let details: Vec<std::string::String> =
-            errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
-        Err(serde::de::Error::custom(format!(
-            "LinePaintLayerLineWidth: no variant matched. Expected Expr(LinePaintLayerLineWidthExpression) | Literal(serde_json::Number). Errors: [{}]",
-            details.join("; ")
-        )))
-    }
-}
-
-impl Default for LinePaintLayerLineWidth {
-    fn default() -> Self {
-        Self::Literal(
-            serde_json::Number::from_i128(1)
-                .expect("the number is serialised from a number and is thus always valid"),
-        )
-    }
-}
+numeric_prop!(
+    LinePaintLayerLineWidth,
+    doc = "Stroke thickness.",
+    min = 0_f64,
+    default = serde_json::Number::from_i128(1)
+        .expect("the number is serialised from a number and is thus always valid")
+);
 
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
@@ -4473,16 +1249,7 @@ pub struct RasterLayoutLayer {
     pub visibility: Option<RasterLayoutLayerVisibility>,
 }
 
-/// Whether this layer is displayed.
-#[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy, Default)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum RasterLayoutLayerVisibility {
-    #[serde(rename = "none")]
-    None,
-    #[serde(rename = "visible")]
-    #[default]
-    Visible,
-}
+pub type RasterLayoutLayerVisibility = Visibility;
 
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
@@ -4521,553 +1288,56 @@ pub struct RasterPaintLayer {
     pub raster_saturation: Option<RasterPaintLayerRasterSaturation>,
 }
 
-/// Nested expression: ramp (`interpolate` / …) or regular [`Number`] operators.
-#[derive(PartialEq, Debug, Clone)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum RasterPaintLayerRasterBrightnessMaxExpression {
-    Number(Number),
-    Ramp(NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection),
-}
+numeric_prop!(
+    RasterPaintLayerRasterBrightnessMax,
+    doc = "Increase or reduce the brightness of the image. The value is the maximum brightness.",
+    min = 0_f64,
+    max = 1_f64,
+    default = serde_json::Number::from_i128(1)
+        .expect("the number is serialised from a number and is thus always valid")
+);
 
-impl serde::Serialize for RasterPaintLayerRasterBrightnessMaxExpression {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        match self {
-            Self::Number(v) => v.serialize(serializer),
-            Self::Ramp(v) => v.serialize(serializer),
-        }
-    }
-}
+numeric_prop!(
+    RasterPaintLayerRasterBrightnessMin,
+    doc = "Increase or reduce the brightness of the image. The value is the minimum brightness.",
+    min = 0_f64,
+    max = 1_f64,
+    default = serde_json::Number::from_i128(0)
+        .expect("the number is serialised from a number and is thus always valid")
+);
 
-impl<'de> serde::Deserialize<'de> for RasterPaintLayerRasterBrightnessMaxExpression {
-    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
-        let mut errors: Vec<(&str, std::string::String)> = Vec::new();
-        match <Number as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Number(v)),
-            Err(e) => errors.push(("Number", e.to_string())),
-        }
-        match <NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Ramp(v)),
-            Err(e) => errors.push(("Ramp", e.to_string())),
-        }
+numeric_prop!(
+    RasterPaintLayerRasterContrast,
+    doc = "Increase or reduce the contrast of the image.",
+    min = -1_f64,
+    max = 1_f64,
+    default = serde_json::Number::from_i128(0)
+        .expect("the number is serialised from a number and is thus always valid")
+);
 
-        let details: Vec<std::string::String> =
-            errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
-        Err(serde::de::Error::custom(format!(
-            "RasterPaintLayerRasterBrightnessMaxExpression: no variant matched. Expected Number(Number) | Ramp(NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection). Errors: [{}]",
-            details.join("; ")
-        )))
-    }
-}
+numeric_prop!(
+    RasterPaintLayerRasterFadeDuration,
+    doc = "Fade duration when a new tile is added, or when a video is started or its coordinates are updated.",
+    min = 0_f64,
+    default = serde_json::Number::from_i128(300)
+        .expect("the number is serialised from a number and is thus always valid")
+);
 
-/// Increase or reduce the brightness of the image. The value is the maximum brightness.
-#[derive(PartialEq, Debug, Clone)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum RasterPaintLayerRasterBrightnessMax {
-    Expr(Box<RasterPaintLayerRasterBrightnessMaxExpression>),
-    Literal(
-        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
-        serde_json::Number,
-    ),
-}
+numeric_prop!(
+    RasterPaintLayerRasterHueRotate,
+    doc = "Rotates hues around the color wheel.",
+    default = serde_json::Number::from_i128(0)
+        .expect("the number is serialised from a number and is thus always valid")
+);
 
-impl serde::Serialize for RasterPaintLayerRasterBrightnessMax {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        match self {
-            Self::Expr(v) => v.as_ref().serialize(serializer),
-            Self::Literal(v) => v.serialize(serializer),
-        }
-    }
-}
-
-impl<'de> serde::Deserialize<'de> for RasterPaintLayerRasterBrightnessMax {
-    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
-        let mut errors: Vec<(&str, std::string::String)> = Vec::new();
-        match <RasterPaintLayerRasterBrightnessMaxExpression as serde::Deserialize>::deserialize(
-            &value,
-        ) {
-            Ok(v) => return Ok(Self::Expr(Box::new(v))),
-            Err(e) => errors.push(("Expr", e.to_string())),
-        }
-        match <serde_json::Number as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Literal(v)),
-            Err(e) => errors.push(("Literal", e.to_string())),
-        }
-
-        let details: Vec<std::string::String> =
-            errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
-        Err(serde::de::Error::custom(format!(
-            "RasterPaintLayerRasterBrightnessMax: no variant matched. Expected Expr(RasterPaintLayerRasterBrightnessMaxExpression) | Literal(serde_json::Number). Errors: [{}]",
-            details.join("; ")
-        )))
-    }
-}
-
-impl Default for RasterPaintLayerRasterBrightnessMax {
-    fn default() -> Self {
-        Self::Literal(
-            serde_json::Number::from_i128(1)
-                .expect("the number is serialised from a number and is thus always valid"),
-        )
-    }
-}
-
-/// Nested expression: ramp (`interpolate` / …) or regular [`Number`] operators.
-#[derive(PartialEq, Debug, Clone)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum RasterPaintLayerRasterBrightnessMinExpression {
-    Number(Number),
-    Ramp(NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection),
-}
-
-impl serde::Serialize for RasterPaintLayerRasterBrightnessMinExpression {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        match self {
-            Self::Number(v) => v.serialize(serializer),
-            Self::Ramp(v) => v.serialize(serializer),
-        }
-    }
-}
-
-impl<'de> serde::Deserialize<'de> for RasterPaintLayerRasterBrightnessMinExpression {
-    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
-        let mut errors: Vec<(&str, std::string::String)> = Vec::new();
-        match <Number as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Number(v)),
-            Err(e) => errors.push(("Number", e.to_string())),
-        }
-        match <NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Ramp(v)),
-            Err(e) => errors.push(("Ramp", e.to_string())),
-        }
-
-        let details: Vec<std::string::String> =
-            errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
-        Err(serde::de::Error::custom(format!(
-            "RasterPaintLayerRasterBrightnessMinExpression: no variant matched. Expected Number(Number) | Ramp(NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection). Errors: [{}]",
-            details.join("; ")
-        )))
-    }
-}
-
-/// Increase or reduce the brightness of the image. The value is the minimum brightness.
-#[derive(PartialEq, Debug, Clone)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum RasterPaintLayerRasterBrightnessMin {
-    Expr(Box<RasterPaintLayerRasterBrightnessMinExpression>),
-    Literal(
-        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
-        serde_json::Number,
-    ),
-}
-
-impl serde::Serialize for RasterPaintLayerRasterBrightnessMin {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        match self {
-            Self::Expr(v) => v.as_ref().serialize(serializer),
-            Self::Literal(v) => v.serialize(serializer),
-        }
-    }
-}
-
-impl<'de> serde::Deserialize<'de> for RasterPaintLayerRasterBrightnessMin {
-    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
-        let mut errors: Vec<(&str, std::string::String)> = Vec::new();
-        match <RasterPaintLayerRasterBrightnessMinExpression as serde::Deserialize>::deserialize(
-            &value,
-        ) {
-            Ok(v) => return Ok(Self::Expr(Box::new(v))),
-            Err(e) => errors.push(("Expr", e.to_string())),
-        }
-        match <serde_json::Number as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Literal(v)),
-            Err(e) => errors.push(("Literal", e.to_string())),
-        }
-
-        let details: Vec<std::string::String> =
-            errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
-        Err(serde::de::Error::custom(format!(
-            "RasterPaintLayerRasterBrightnessMin: no variant matched. Expected Expr(RasterPaintLayerRasterBrightnessMinExpression) | Literal(serde_json::Number). Errors: [{}]",
-            details.join("; ")
-        )))
-    }
-}
-
-impl Default for RasterPaintLayerRasterBrightnessMin {
-    fn default() -> Self {
-        Self::Literal(
-            serde_json::Number::from_i128(0)
-                .expect("the number is serialised from a number and is thus always valid"),
-        )
-    }
-}
-
-/// Nested expression: ramp (`interpolate` / …) or regular [`Number`] operators.
-#[derive(PartialEq, Debug, Clone)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum RasterPaintLayerRasterContrastExpression {
-    Number(Number),
-    Ramp(NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection),
-}
-
-impl serde::Serialize for RasterPaintLayerRasterContrastExpression {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        match self {
-            Self::Number(v) => v.serialize(serializer),
-            Self::Ramp(v) => v.serialize(serializer),
-        }
-    }
-}
-
-impl<'de> serde::Deserialize<'de> for RasterPaintLayerRasterContrastExpression {
-    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
-        let mut errors: Vec<(&str, std::string::String)> = Vec::new();
-        match <Number as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Number(v)),
-            Err(e) => errors.push(("Number", e.to_string())),
-        }
-        match <NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Ramp(v)),
-            Err(e) => errors.push(("Ramp", e.to_string())),
-        }
-
-        let details: Vec<std::string::String> =
-            errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
-        Err(serde::de::Error::custom(format!(
-            "RasterPaintLayerRasterContrastExpression: no variant matched. Expected Number(Number) | Ramp(NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection). Errors: [{}]",
-            details.join("; ")
-        )))
-    }
-}
-
-/// Increase or reduce the contrast of the image.
-#[derive(PartialEq, Debug, Clone)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum RasterPaintLayerRasterContrast {
-    Expr(Box<RasterPaintLayerRasterContrastExpression>),
-    Literal(
-        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
-        serde_json::Number,
-    ),
-}
-
-impl serde::Serialize for RasterPaintLayerRasterContrast {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        match self {
-            Self::Expr(v) => v.as_ref().serialize(serializer),
-            Self::Literal(v) => v.serialize(serializer),
-        }
-    }
-}
-
-impl<'de> serde::Deserialize<'de> for RasterPaintLayerRasterContrast {
-    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
-        let mut errors: Vec<(&str, std::string::String)> = Vec::new();
-        match <RasterPaintLayerRasterContrastExpression as serde::Deserialize>::deserialize(&value)
-        {
-            Ok(v) => return Ok(Self::Expr(Box::new(v))),
-            Err(e) => errors.push(("Expr", e.to_string())),
-        }
-        match <serde_json::Number as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Literal(v)),
-            Err(e) => errors.push(("Literal", e.to_string())),
-        }
-
-        let details: Vec<std::string::String> =
-            errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
-        Err(serde::de::Error::custom(format!(
-            "RasterPaintLayerRasterContrast: no variant matched. Expected Expr(RasterPaintLayerRasterContrastExpression) | Literal(serde_json::Number). Errors: [{}]",
-            details.join("; ")
-        )))
-    }
-}
-
-impl Default for RasterPaintLayerRasterContrast {
-    fn default() -> Self {
-        Self::Literal(
-            serde_json::Number::from_i128(0)
-                .expect("the number is serialised from a number and is thus always valid"),
-        )
-    }
-}
-
-/// Nested expression: ramp (`interpolate` / …) or regular [`Number`] operators.
-#[derive(PartialEq, Debug, Clone)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum RasterPaintLayerRasterFadeDurationExpression {
-    Number(Number),
-    Ramp(NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection),
-}
-
-impl serde::Serialize for RasterPaintLayerRasterFadeDurationExpression {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        match self {
-            Self::Number(v) => v.serialize(serializer),
-            Self::Ramp(v) => v.serialize(serializer),
-        }
-    }
-}
-
-impl<'de> serde::Deserialize<'de> for RasterPaintLayerRasterFadeDurationExpression {
-    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
-        let mut errors: Vec<(&str, std::string::String)> = Vec::new();
-        match <Number as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Number(v)),
-            Err(e) => errors.push(("Number", e.to_string())),
-        }
-        match <NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Ramp(v)),
-            Err(e) => errors.push(("Ramp", e.to_string())),
-        }
-
-        let details: Vec<std::string::String> =
-            errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
-        Err(serde::de::Error::custom(format!(
-            "RasterPaintLayerRasterFadeDurationExpression: no variant matched. Expected Number(Number) | Ramp(NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection). Errors: [{}]",
-            details.join("; ")
-        )))
-    }
-}
-
-/// Fade duration when a new tile is added, or when a video is started or its coordinates are updated.
-#[derive(PartialEq, Debug, Clone)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum RasterPaintLayerRasterFadeDuration {
-    Expr(Box<RasterPaintLayerRasterFadeDurationExpression>),
-    Literal(
-        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
-        serde_json::Number,
-    ),
-}
-
-impl serde::Serialize for RasterPaintLayerRasterFadeDuration {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        match self {
-            Self::Expr(v) => v.as_ref().serialize(serializer),
-            Self::Literal(v) => v.serialize(serializer),
-        }
-    }
-}
-
-impl<'de> serde::Deserialize<'de> for RasterPaintLayerRasterFadeDuration {
-    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
-        let mut errors: Vec<(&str, std::string::String)> = Vec::new();
-        match <RasterPaintLayerRasterFadeDurationExpression as serde::Deserialize>::deserialize(
-            &value,
-        ) {
-            Ok(v) => return Ok(Self::Expr(Box::new(v))),
-            Err(e) => errors.push(("Expr", e.to_string())),
-        }
-        match <serde_json::Number as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Literal(v)),
-            Err(e) => errors.push(("Literal", e.to_string())),
-        }
-
-        let details: Vec<std::string::String> =
-            errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
-        Err(serde::de::Error::custom(format!(
-            "RasterPaintLayerRasterFadeDuration: no variant matched. Expected Expr(RasterPaintLayerRasterFadeDurationExpression) | Literal(serde_json::Number). Errors: [{}]",
-            details.join("; ")
-        )))
-    }
-}
-
-impl Default for RasterPaintLayerRasterFadeDuration {
-    fn default() -> Self {
-        Self::Literal(
-            serde_json::Number::from_i128(300)
-                .expect("the number is serialised from a number and is thus always valid"),
-        )
-    }
-}
-
-/// Nested expression: ramp (`interpolate` / …) or regular [`Number`] operators.
-#[derive(PartialEq, Debug, Clone)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum RasterPaintLayerRasterHueRotateExpression {
-    Number(Number),
-    Ramp(NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection),
-}
-
-impl serde::Serialize for RasterPaintLayerRasterHueRotateExpression {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        match self {
-            Self::Number(v) => v.serialize(serializer),
-            Self::Ramp(v) => v.serialize(serializer),
-        }
-    }
-}
-
-impl<'de> serde::Deserialize<'de> for RasterPaintLayerRasterHueRotateExpression {
-    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
-        let mut errors: Vec<(&str, std::string::String)> = Vec::new();
-        match <Number as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Number(v)),
-            Err(e) => errors.push(("Number", e.to_string())),
-        }
-        match <NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Ramp(v)),
-            Err(e) => errors.push(("Ramp", e.to_string())),
-        }
-
-        let details: Vec<std::string::String> =
-            errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
-        Err(serde::de::Error::custom(format!(
-            "RasterPaintLayerRasterHueRotateExpression: no variant matched. Expected Number(Number) | Ramp(NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection). Errors: [{}]",
-            details.join("; ")
-        )))
-    }
-}
-
-/// Rotates hues around the color wheel.
-#[derive(PartialEq, Debug, Clone)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum RasterPaintLayerRasterHueRotate {
-    Expr(Box<RasterPaintLayerRasterHueRotateExpression>),
-    Literal(
-        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
-        serde_json::Number,
-    ),
-}
-
-impl serde::Serialize for RasterPaintLayerRasterHueRotate {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        match self {
-            Self::Expr(v) => v.as_ref().serialize(serializer),
-            Self::Literal(v) => v.serialize(serializer),
-        }
-    }
-}
-
-impl<'de> serde::Deserialize<'de> for RasterPaintLayerRasterHueRotate {
-    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
-        let mut errors: Vec<(&str, std::string::String)> = Vec::new();
-        match <RasterPaintLayerRasterHueRotateExpression as serde::Deserialize>::deserialize(&value)
-        {
-            Ok(v) => return Ok(Self::Expr(Box::new(v))),
-            Err(e) => errors.push(("Expr", e.to_string())),
-        }
-        match <serde_json::Number as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Literal(v)),
-            Err(e) => errors.push(("Literal", e.to_string())),
-        }
-
-        let details: Vec<std::string::String> =
-            errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
-        Err(serde::de::Error::custom(format!(
-            "RasterPaintLayerRasterHueRotate: no variant matched. Expected Expr(RasterPaintLayerRasterHueRotateExpression) | Literal(serde_json::Number). Errors: [{}]",
-            details.join("; ")
-        )))
-    }
-}
-
-impl Default for RasterPaintLayerRasterHueRotate {
-    fn default() -> Self {
-        Self::Literal(
-            serde_json::Number::from_i128(0)
-                .expect("the number is serialised from a number and is thus always valid"),
-        )
-    }
-}
-
-/// Nested expression: ramp (`interpolate` / …) or regular [`Number`] operators.
-#[derive(PartialEq, Debug, Clone)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum RasterPaintLayerRasterOpacityExpression {
-    Number(Number),
-    Ramp(NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection),
-}
-
-impl serde::Serialize for RasterPaintLayerRasterOpacityExpression {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        match self {
-            Self::Number(v) => v.serialize(serializer),
-            Self::Ramp(v) => v.serialize(serializer),
-        }
-    }
-}
-
-impl<'de> serde::Deserialize<'de> for RasterPaintLayerRasterOpacityExpression {
-    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
-        let mut errors: Vec<(&str, std::string::String)> = Vec::new();
-        match <Number as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Number(v)),
-            Err(e) => errors.push(("Number", e.to_string())),
-        }
-        match <NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Ramp(v)),
-            Err(e) => errors.push(("Ramp", e.to_string())),
-        }
-
-        let details: Vec<std::string::String> =
-            errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
-        Err(serde::de::Error::custom(format!(
-            "RasterPaintLayerRasterOpacityExpression: no variant matched. Expected Number(Number) | Ramp(NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection). Errors: [{}]",
-            details.join("; ")
-        )))
-    }
-}
-
-/// The opacity at which the image will be drawn.
-#[derive(PartialEq, Debug, Clone)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum RasterPaintLayerRasterOpacity {
-    Expr(Box<RasterPaintLayerRasterOpacityExpression>),
-    Literal(
-        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
-        serde_json::Number,
-    ),
-}
-
-impl serde::Serialize for RasterPaintLayerRasterOpacity {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        match self {
-            Self::Expr(v) => v.as_ref().serialize(serializer),
-            Self::Literal(v) => v.serialize(serializer),
-        }
-    }
-}
-
-impl<'de> serde::Deserialize<'de> for RasterPaintLayerRasterOpacity {
-    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
-        let mut errors: Vec<(&str, std::string::String)> = Vec::new();
-        match <RasterPaintLayerRasterOpacityExpression as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Expr(Box::new(v))),
-            Err(e) => errors.push(("Expr", e.to_string())),
-        }
-        match <serde_json::Number as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Literal(v)),
-            Err(e) => errors.push(("Literal", e.to_string())),
-        }
-
-        let details: Vec<std::string::String> =
-            errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
-        Err(serde::de::Error::custom(format!(
-            "RasterPaintLayerRasterOpacity: no variant matched. Expected Expr(RasterPaintLayerRasterOpacityExpression) | Literal(serde_json::Number). Errors: [{}]",
-            details.join("; ")
-        )))
-    }
-}
-
-impl Default for RasterPaintLayerRasterOpacity {
-    fn default() -> Self {
-        Self::Literal(
-            serde_json::Number::from_i128(1)
-                .expect("the number is serialised from a number and is thus always valid"),
-        )
-    }
-}
+numeric_prop!(
+    RasterPaintLayerRasterOpacity,
+    doc = "The opacity at which the image will be drawn.",
+    min = 0_f64,
+    max = 1_f64,
+    default = serde_json::Number::from_i128(1)
+        .expect("the number is serialised from a number and is thus always valid")
+);
 
 /// The resampling/interpolation method to use for overscaling, also known as texture magnification filter
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy, Default)]
@@ -5080,97 +1350,14 @@ pub enum RasterPaintLayerRasterResampling {
     Nearest,
 }
 
-/// Nested expression: ramp (`interpolate` / …) or regular [`Number`] operators.
-#[derive(PartialEq, Debug, Clone)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum RasterPaintLayerRasterSaturationExpression {
-    Number(Number),
-    Ramp(NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection),
-}
-
-impl serde::Serialize for RasterPaintLayerRasterSaturationExpression {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        match self {
-            Self::Number(v) => v.serialize(serializer),
-            Self::Ramp(v) => v.serialize(serializer),
-        }
-    }
-}
-
-impl<'de> serde::Deserialize<'de> for RasterPaintLayerRasterSaturationExpression {
-    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
-        let mut errors: Vec<(&str, std::string::String)> = Vec::new();
-        match <Number as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Number(v)),
-            Err(e) => errors.push(("Number", e.to_string())),
-        }
-        match <NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Ramp(v)),
-            Err(e) => errors.push(("Ramp", e.to_string())),
-        }
-
-        let details: Vec<std::string::String> =
-            errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
-        Err(serde::de::Error::custom(format!(
-            "RasterPaintLayerRasterSaturationExpression: no variant matched. Expected Number(Number) | Ramp(NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection). Errors: [{}]",
-            details.join("; ")
-        )))
-    }
-}
-
-/// Increase or reduce the saturation of the image.
-#[derive(PartialEq, Debug, Clone)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum RasterPaintLayerRasterSaturation {
-    Expr(Box<RasterPaintLayerRasterSaturationExpression>),
-    Literal(
-        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
-        serde_json::Number,
-    ),
-}
-
-impl serde::Serialize for RasterPaintLayerRasterSaturation {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        match self {
-            Self::Expr(v) => v.as_ref().serialize(serializer),
-            Self::Literal(v) => v.serialize(serializer),
-        }
-    }
-}
-
-impl<'de> serde::Deserialize<'de> for RasterPaintLayerRasterSaturation {
-    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
-        let mut errors: Vec<(&str, std::string::String)> = Vec::new();
-        match <RasterPaintLayerRasterSaturationExpression as serde::Deserialize>::deserialize(
-            &value,
-        ) {
-            Ok(v) => return Ok(Self::Expr(Box::new(v))),
-            Err(e) => errors.push(("Expr", e.to_string())),
-        }
-        match <serde_json::Number as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Literal(v)),
-            Err(e) => errors.push(("Literal", e.to_string())),
-        }
-
-        let details: Vec<std::string::String> =
-            errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
-        Err(serde::de::Error::custom(format!(
-            "RasterPaintLayerRasterSaturation: no variant matched. Expected Expr(RasterPaintLayerRasterSaturationExpression) | Literal(serde_json::Number). Errors: [{}]",
-            details.join("; ")
-        )))
-    }
-}
-
-impl Default for RasterPaintLayerRasterSaturation {
-    fn default() -> Self {
-        Self::Literal(
-            serde_json::Number::from_i128(0)
-                .expect("the number is serialised from a number and is thus always valid"),
-        )
-    }
-}
+numeric_prop!(
+    RasterPaintLayerRasterSaturation,
+    doc = "Increase or reduce the saturation of the image.",
+    min = -1_f64,
+    max = 1_f64,
+    default = serde_json::Number::from_i128(0)
+        .expect("the number is serialised from a number and is thus always valid")
+);
 
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
@@ -5370,85 +1557,11 @@ pub struct SymbolLayoutLayer {
     pub visibility: Option<SymbolLayoutLayerVisibility>,
 }
 
-/// Nested expression: [`Boolean`] operators.
-#[derive(PartialEq, Debug, Clone)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum SymbolLayoutLayerIconAllowOverlapExpression {
-    Boolean(Boolean),
-}
-
-impl serde::Serialize for SymbolLayoutLayerIconAllowOverlapExpression {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        match self {
-            Self::Boolean(v) => v.serialize(serializer),
-        }
-    }
-}
-
-impl<'de> serde::Deserialize<'de> for SymbolLayoutLayerIconAllowOverlapExpression {
-    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
-        let mut errors: Vec<(&str, std::string::String)> = Vec::new();
-        match <Boolean as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Boolean(v)),
-            Err(e) => errors.push(("Boolean", e.to_string())),
-        }
-
-        let details: Vec<std::string::String> =
-            errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
-        Err(serde::de::Error::custom(format!(
-            "SymbolLayoutLayerIconAllowOverlapExpression: no variant matched. Expected Boolean(Boolean). Errors: [{}]",
-            details.join("; ")
-        )))
-    }
-}
-
-/// If true, the icon will be visible even if it collides with other previously drawn symbols.
-#[derive(PartialEq, Debug, Clone)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum SymbolLayoutLayerIconAllowOverlap {
-    Expr(Box<SymbolLayoutLayerIconAllowOverlapExpression>),
-    Literal(bool),
-}
-
-impl serde::Serialize for SymbolLayoutLayerIconAllowOverlap {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        match self {
-            Self::Expr(v) => v.as_ref().serialize(serializer),
-            Self::Literal(v) => v.serialize(serializer),
-        }
-    }
-}
-
-impl<'de> serde::Deserialize<'de> for SymbolLayoutLayerIconAllowOverlap {
-    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
-        let mut errors: Vec<(&str, std::string::String)> = Vec::new();
-        match <SymbolLayoutLayerIconAllowOverlapExpression as serde::Deserialize>::deserialize(
-            &value,
-        ) {
-            Ok(v) => return Ok(Self::Expr(Box::new(v))),
-            Err(e) => errors.push(("Expr", e.to_string())),
-        }
-        match <bool as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Literal(v)),
-            Err(e) => errors.push(("Literal", e.to_string())),
-        }
-
-        let details: Vec<std::string::String> =
-            errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
-        Err(serde::de::Error::custom(format!(
-            "SymbolLayoutLayerIconAllowOverlap: no variant matched. Expected Expr(SymbolLayoutLayerIconAllowOverlapExpression) | Literal(bool). Errors: [{}]",
-            details.join("; ")
-        )))
-    }
-}
-
-impl Default for SymbolLayoutLayerIconAllowOverlap {
-    fn default() -> Self {
-        Self::Literal(false)
-    }
-}
+boolean_prop!(
+    SymbolLayoutLayerIconAllowOverlap,
+    doc = "If true, the icon will be visible even if it collides with other previously drawn symbols.",
+    default = false
+);
 
 /// Part of the icon placed closest to the anchor.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy, Default)]
@@ -5475,170 +1588,22 @@ pub enum SymbolLayoutLayerIconAnchor {
     TopRight,
 }
 
-/// Nested expression: [`Boolean`] operators.
-#[derive(PartialEq, Debug, Clone)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum SymbolLayoutLayerIconIgnorePlacementExpression {
-    Boolean(Boolean),
-}
-
-impl serde::Serialize for SymbolLayoutLayerIconIgnorePlacementExpression {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        match self {
-            Self::Boolean(v) => v.serialize(serializer),
-        }
-    }
-}
-
-impl<'de> serde::Deserialize<'de> for SymbolLayoutLayerIconIgnorePlacementExpression {
-    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
-        let mut errors: Vec<(&str, std::string::String)> = Vec::new();
-        match <Boolean as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Boolean(v)),
-            Err(e) => errors.push(("Boolean", e.to_string())),
-        }
-
-        let details: Vec<std::string::String> =
-            errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
-        Err(serde::de::Error::custom(format!(
-            "SymbolLayoutLayerIconIgnorePlacementExpression: no variant matched. Expected Boolean(Boolean). Errors: [{}]",
-            details.join("; ")
-        )))
-    }
-}
-
-/// If true, other symbols can be visible even if they collide with the icon.
-#[derive(PartialEq, Debug, Clone)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum SymbolLayoutLayerIconIgnorePlacement {
-    Expr(Box<SymbolLayoutLayerIconIgnorePlacementExpression>),
-    Literal(bool),
-}
-
-impl serde::Serialize for SymbolLayoutLayerIconIgnorePlacement {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        match self {
-            Self::Expr(v) => v.as_ref().serialize(serializer),
-            Self::Literal(v) => v.serialize(serializer),
-        }
-    }
-}
-
-impl<'de> serde::Deserialize<'de> for SymbolLayoutLayerIconIgnorePlacement {
-    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
-        let mut errors: Vec<(&str, std::string::String)> = Vec::new();
-        match <SymbolLayoutLayerIconIgnorePlacementExpression as serde::Deserialize>::deserialize(
-            &value,
-        ) {
-            Ok(v) => return Ok(Self::Expr(Box::new(v))),
-            Err(e) => errors.push(("Expr", e.to_string())),
-        }
-        match <bool as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Literal(v)),
-            Err(e) => errors.push(("Literal", e.to_string())),
-        }
-
-        let details: Vec<std::string::String> =
-            errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
-        Err(serde::de::Error::custom(format!(
-            "SymbolLayoutLayerIconIgnorePlacement: no variant matched. Expected Expr(SymbolLayoutLayerIconIgnorePlacementExpression) | Literal(bool). Errors: [{}]",
-            details.join("; ")
-        )))
-    }
-}
-
-impl Default for SymbolLayoutLayerIconIgnorePlacement {
-    fn default() -> Self {
-        Self::Literal(false)
-    }
-}
+boolean_prop!(
+    SymbolLayoutLayerIconIgnorePlacement,
+    doc = "If true, other symbols can be visible even if they collide with the icon.",
+    default = false
+);
 
 /// Name of image in sprite to use for drawing an image background.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct SymbolLayoutLayerIconImage(std::string::String);
 
-/// Nested expression: [`Boolean`] operators.
-#[derive(PartialEq, Debug, Clone)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum SymbolLayoutLayerIconKeepUprightExpression {
-    Boolean(Boolean),
-}
-
-impl serde::Serialize for SymbolLayoutLayerIconKeepUprightExpression {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        match self {
-            Self::Boolean(v) => v.serialize(serializer),
-        }
-    }
-}
-
-impl<'de> serde::Deserialize<'de> for SymbolLayoutLayerIconKeepUprightExpression {
-    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
-        let mut errors: Vec<(&str, std::string::String)> = Vec::new();
-        match <Boolean as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Boolean(v)),
-            Err(e) => errors.push(("Boolean", e.to_string())),
-        }
-
-        let details: Vec<std::string::String> =
-            errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
-        Err(serde::de::Error::custom(format!(
-            "SymbolLayoutLayerIconKeepUprightExpression: no variant matched. Expected Boolean(Boolean). Errors: [{}]",
-            details.join("; ")
-        )))
-    }
-}
-
-/// If true, the icon may be flipped to prevent it from being rendered upside-down.
-#[derive(PartialEq, Debug, Clone)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum SymbolLayoutLayerIconKeepUpright {
-    Expr(Box<SymbolLayoutLayerIconKeepUprightExpression>),
-    Literal(bool),
-}
-
-impl serde::Serialize for SymbolLayoutLayerIconKeepUpright {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        match self {
-            Self::Expr(v) => v.as_ref().serialize(serializer),
-            Self::Literal(v) => v.serialize(serializer),
-        }
-    }
-}
-
-impl<'de> serde::Deserialize<'de> for SymbolLayoutLayerIconKeepUpright {
-    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
-        let mut errors: Vec<(&str, std::string::String)> = Vec::new();
-        match <SymbolLayoutLayerIconKeepUprightExpression as serde::Deserialize>::deserialize(
-            &value,
-        ) {
-            Ok(v) => return Ok(Self::Expr(Box::new(v))),
-            Err(e) => errors.push(("Expr", e.to_string())),
-        }
-        match <bool as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Literal(v)),
-            Err(e) => errors.push(("Literal", e.to_string())),
-        }
-
-        let details: Vec<std::string::String> =
-            errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
-        Err(serde::de::Error::custom(format!(
-            "SymbolLayoutLayerIconKeepUpright: no variant matched. Expected Expr(SymbolLayoutLayerIconKeepUprightExpression) | Literal(bool). Errors: [{}]",
-            details.join("; ")
-        )))
-    }
-}
-
-impl Default for SymbolLayoutLayerIconKeepUpright {
-    fn default() -> Self {
-        Self::Literal(false)
-    }
-}
+boolean_prop!(
+    SymbolLayoutLayerIconKeepUpright,
+    doc = "If true, the icon may be flipped to prevent it from being rendered upside-down.",
+    default = false
+);
 
 /// Offset distance of icon from its anchor. Positive values indicate right and down, while negative values indicate left and up. Each component is multiplied by the value of `icon-size` to obtain the final offset in pixels. When combined with `icon-rotate` the offset will be as if the rotated direction was up.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
@@ -5659,83 +1624,11 @@ impl Default for SymbolLayoutLayerIconOffset {
     }
 }
 
-/// Nested expression: [`Boolean`] operators.
-#[derive(PartialEq, Debug, Clone)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum SymbolLayoutLayerIconOptionalExpression {
-    Boolean(Boolean),
-}
-
-impl serde::Serialize for SymbolLayoutLayerIconOptionalExpression {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        match self {
-            Self::Boolean(v) => v.serialize(serializer),
-        }
-    }
-}
-
-impl<'de> serde::Deserialize<'de> for SymbolLayoutLayerIconOptionalExpression {
-    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
-        let mut errors: Vec<(&str, std::string::String)> = Vec::new();
-        match <Boolean as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Boolean(v)),
-            Err(e) => errors.push(("Boolean", e.to_string())),
-        }
-
-        let details: Vec<std::string::String> =
-            errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
-        Err(serde::de::Error::custom(format!(
-            "SymbolLayoutLayerIconOptionalExpression: no variant matched. Expected Boolean(Boolean). Errors: [{}]",
-            details.join("; ")
-        )))
-    }
-}
-
-/// If true, text will display without their corresponding icons when the icon collides with other symbols and the text does not.
-#[derive(PartialEq, Debug, Clone)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum SymbolLayoutLayerIconOptional {
-    Expr(Box<SymbolLayoutLayerIconOptionalExpression>),
-    Literal(bool),
-}
-
-impl serde::Serialize for SymbolLayoutLayerIconOptional {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        match self {
-            Self::Expr(v) => v.as_ref().serialize(serializer),
-            Self::Literal(v) => v.serialize(serializer),
-        }
-    }
-}
-
-impl<'de> serde::Deserialize<'de> for SymbolLayoutLayerIconOptional {
-    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
-        let mut errors: Vec<(&str, std::string::String)> = Vec::new();
-        match <SymbolLayoutLayerIconOptionalExpression as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Expr(Box::new(v))),
-            Err(e) => errors.push(("Expr", e.to_string())),
-        }
-        match <bool as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Literal(v)),
-            Err(e) => errors.push(("Literal", e.to_string())),
-        }
-
-        let details: Vec<std::string::String> =
-            errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
-        Err(serde::de::Error::custom(format!(
-            "SymbolLayoutLayerIconOptional: no variant matched. Expected Expr(SymbolLayoutLayerIconOptionalExpression) | Literal(bool). Errors: [{}]",
-            details.join("; ")
-        )))
-    }
-}
-
-impl Default for SymbolLayoutLayerIconOptional {
-    fn default() -> Self {
-        Self::Literal(false)
-    }
-}
+boolean_prop!(
+    SymbolLayoutLayerIconOptional,
+    doc = "If true, text will display without their corresponding icons when the icon collides with other symbols and the text does not.",
+    default = false
+);
 
 /// Allows for control over whether to show an icon when it overlaps other symbols on the map. If `icon-overlap` is not set, `icon-allow-overlap` is used instead.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy)]
@@ -5835,95 +1728,12 @@ pub enum SymbolLayoutLayerIconPitchAlignment {
     Viewport,
 }
 
-/// Nested expression: ramp (`interpolate` / …) or regular [`Number`] operators.
-#[derive(PartialEq, Debug, Clone)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum SymbolLayoutLayerIconRotateExpression {
-    Number(Number),
-    Ramp(NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection),
-}
-
-impl serde::Serialize for SymbolLayoutLayerIconRotateExpression {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        match self {
-            Self::Number(v) => v.serialize(serializer),
-            Self::Ramp(v) => v.serialize(serializer),
-        }
-    }
-}
-
-impl<'de> serde::Deserialize<'de> for SymbolLayoutLayerIconRotateExpression {
-    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
-        let mut errors: Vec<(&str, std::string::String)> = Vec::new();
-        match <Number as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Number(v)),
-            Err(e) => errors.push(("Number", e.to_string())),
-        }
-        match <NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Ramp(v)),
-            Err(e) => errors.push(("Ramp", e.to_string())),
-        }
-
-        let details: Vec<std::string::String> =
-            errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
-        Err(serde::de::Error::custom(format!(
-            "SymbolLayoutLayerIconRotateExpression: no variant matched. Expected Number(Number) | Ramp(NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection). Errors: [{}]",
-            details.join("; ")
-        )))
-    }
-}
-
-/// Rotates the icon clockwise.
-#[derive(PartialEq, Debug, Clone)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum SymbolLayoutLayerIconRotate {
-    Expr(Box<SymbolLayoutLayerIconRotateExpression>),
-    Literal(
-        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
-        serde_json::Number,
-    ),
-}
-
-impl serde::Serialize for SymbolLayoutLayerIconRotate {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        match self {
-            Self::Expr(v) => v.as_ref().serialize(serializer),
-            Self::Literal(v) => v.serialize(serializer),
-        }
-    }
-}
-
-impl<'de> serde::Deserialize<'de> for SymbolLayoutLayerIconRotate {
-    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
-        let mut errors: Vec<(&str, std::string::String)> = Vec::new();
-        match <SymbolLayoutLayerIconRotateExpression as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Expr(Box::new(v))),
-            Err(e) => errors.push(("Expr", e.to_string())),
-        }
-        match <serde_json::Number as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Literal(v)),
-            Err(e) => errors.push(("Literal", e.to_string())),
-        }
-
-        let details: Vec<std::string::String> =
-            errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
-        Err(serde::de::Error::custom(format!(
-            "SymbolLayoutLayerIconRotate: no variant matched. Expected Expr(SymbolLayoutLayerIconRotateExpression) | Literal(serde_json::Number). Errors: [{}]",
-            details.join("; ")
-        )))
-    }
-}
-
-impl Default for SymbolLayoutLayerIconRotate {
-    fn default() -> Self {
-        Self::Literal(
-            serde_json::Number::from_i128(0)
-                .expect("the number is serialised from a number and is thus always valid"),
-        )
-    }
-}
+numeric_prop!(
+    SymbolLayoutLayerIconRotate,
+    doc = "Rotates the icon clockwise.",
+    default = serde_json::Number::from_i128(0)
+        .expect("the number is serialised from a number and is thus always valid")
+);
 
 /// In combination with `symbol-placement`, determines the rotation behavior of icons.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy, Default)]
@@ -5938,95 +1748,13 @@ pub enum SymbolLayoutLayerIconRotationAlignment {
     Viewport,
 }
 
-/// Nested expression: ramp (`interpolate` / …) or regular [`Number`] operators.
-#[derive(PartialEq, Debug, Clone)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum SymbolLayoutLayerIconSizeExpression {
-    Number(Number),
-    Ramp(NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection),
-}
-
-impl serde::Serialize for SymbolLayoutLayerIconSizeExpression {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        match self {
-            Self::Number(v) => v.serialize(serializer),
-            Self::Ramp(v) => v.serialize(serializer),
-        }
-    }
-}
-
-impl<'de> serde::Deserialize<'de> for SymbolLayoutLayerIconSizeExpression {
-    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
-        let mut errors: Vec<(&str, std::string::String)> = Vec::new();
-        match <Number as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Number(v)),
-            Err(e) => errors.push(("Number", e.to_string())),
-        }
-        match <NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Ramp(v)),
-            Err(e) => errors.push(("Ramp", e.to_string())),
-        }
-
-        let details: Vec<std::string::String> =
-            errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
-        Err(serde::de::Error::custom(format!(
-            "SymbolLayoutLayerIconSizeExpression: no variant matched. Expected Number(Number) | Ramp(NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection). Errors: [{}]",
-            details.join("; ")
-        )))
-    }
-}
-
-/// Scales the original size of the icon by the provided factor. The new pixel size of the image will be the original pixel size multiplied by `icon-size`. 1 is the original size; 3 triples the size of the image.
-#[derive(PartialEq, Debug, Clone)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum SymbolLayoutLayerIconSize {
-    Expr(Box<SymbolLayoutLayerIconSizeExpression>),
-    Literal(
-        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
-        serde_json::Number,
-    ),
-}
-
-impl serde::Serialize for SymbolLayoutLayerIconSize {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        match self {
-            Self::Expr(v) => v.as_ref().serialize(serializer),
-            Self::Literal(v) => v.serialize(serializer),
-        }
-    }
-}
-
-impl<'de> serde::Deserialize<'de> for SymbolLayoutLayerIconSize {
-    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
-        let mut errors: Vec<(&str, std::string::String)> = Vec::new();
-        match <SymbolLayoutLayerIconSizeExpression as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Expr(Box::new(v))),
-            Err(e) => errors.push(("Expr", e.to_string())),
-        }
-        match <serde_json::Number as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Literal(v)),
-            Err(e) => errors.push(("Literal", e.to_string())),
-        }
-
-        let details: Vec<std::string::String> =
-            errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
-        Err(serde::de::Error::custom(format!(
-            "SymbolLayoutLayerIconSize: no variant matched. Expected Expr(SymbolLayoutLayerIconSizeExpression) | Literal(serde_json::Number). Errors: [{}]",
-            details.join("; ")
-        )))
-    }
-}
-
-impl Default for SymbolLayoutLayerIconSize {
-    fn default() -> Self {
-        Self::Literal(
-            serde_json::Number::from_i128(1)
-                .expect("the number is serialised from a number and is thus always valid"),
-        )
-    }
-}
+numeric_prop!(
+    SymbolLayoutLayerIconSize,
+    doc = "Scales the original size of the icon by the provided factor. The new pixel size of the image will be the original pixel size multiplied by `icon-size`. 1 is the original size; 3 triples the size of the image.",
+    min = 0_f64,
+    default = serde_json::Number::from_i128(1)
+        .expect("the number is serialised from a number and is thus always valid")
+);
 
 /// Scales the icon to fit around the associated text.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy, Default)]
@@ -6066,85 +1794,11 @@ impl Default for SymbolLayoutLayerIconTextFitPadding {
     }
 }
 
-/// Nested expression: [`Boolean`] operators.
-#[derive(PartialEq, Debug, Clone)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum SymbolLayoutLayerSymbolAvoidEdgesExpression {
-    Boolean(Boolean),
-}
-
-impl serde::Serialize for SymbolLayoutLayerSymbolAvoidEdgesExpression {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        match self {
-            Self::Boolean(v) => v.serialize(serializer),
-        }
-    }
-}
-
-impl<'de> serde::Deserialize<'de> for SymbolLayoutLayerSymbolAvoidEdgesExpression {
-    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
-        let mut errors: Vec<(&str, std::string::String)> = Vec::new();
-        match <Boolean as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Boolean(v)),
-            Err(e) => errors.push(("Boolean", e.to_string())),
-        }
-
-        let details: Vec<std::string::String> =
-            errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
-        Err(serde::de::Error::custom(format!(
-            "SymbolLayoutLayerSymbolAvoidEdgesExpression: no variant matched. Expected Boolean(Boolean). Errors: [{}]",
-            details.join("; ")
-        )))
-    }
-}
-
-/// If true, the symbols will not cross tile edges to avoid mutual collisions. Recommended in layers that don't have enough padding in the vector tile to prevent collisions, or if it is a point symbol layer placed after a line symbol layer. When using a client that supports global collision detection, like MapLibre GL JS version 0.42.0 or greater, enabling this property is not needed to prevent clipped labels at tile boundaries.
-#[derive(PartialEq, Debug, Clone)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum SymbolLayoutLayerSymbolAvoidEdges {
-    Expr(Box<SymbolLayoutLayerSymbolAvoidEdgesExpression>),
-    Literal(bool),
-}
-
-impl serde::Serialize for SymbolLayoutLayerSymbolAvoidEdges {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        match self {
-            Self::Expr(v) => v.as_ref().serialize(serializer),
-            Self::Literal(v) => v.serialize(serializer),
-        }
-    }
-}
-
-impl<'de> serde::Deserialize<'de> for SymbolLayoutLayerSymbolAvoidEdges {
-    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
-        let mut errors: Vec<(&str, std::string::String)> = Vec::new();
-        match <SymbolLayoutLayerSymbolAvoidEdgesExpression as serde::Deserialize>::deserialize(
-            &value,
-        ) {
-            Ok(v) => return Ok(Self::Expr(Box::new(v))),
-            Err(e) => errors.push(("Expr", e.to_string())),
-        }
-        match <bool as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Literal(v)),
-            Err(e) => errors.push(("Literal", e.to_string())),
-        }
-
-        let details: Vec<std::string::String> =
-            errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
-        Err(serde::de::Error::custom(format!(
-            "SymbolLayoutLayerSymbolAvoidEdges: no variant matched. Expected Expr(SymbolLayoutLayerSymbolAvoidEdgesExpression) | Literal(bool). Errors: [{}]",
-            details.join("; ")
-        )))
-    }
-}
-
-impl Default for SymbolLayoutLayerSymbolAvoidEdges {
-    fn default() -> Self {
-        Self::Literal(false)
-    }
-}
+boolean_prop!(
+    SymbolLayoutLayerSymbolAvoidEdges,
+    doc = "If true, the symbols will not cross tile edges to avoid mutual collisions. Recommended in layers that don't have enough padding in the vector tile to prevent collisions, or if it is a point symbol layer placed after a line symbol layer. When using a client that supports global collision detection, like MapLibre GL JS version 0.42.0 or greater, enabling this property is not needed to prevent clipped labels at tile boundaries.",
+    default = false
+);
 
 /// Label placement relative to its geometry.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy, Default)]
@@ -6159,178 +1813,18 @@ pub enum SymbolLayoutLayerSymbolPlacement {
     Point,
 }
 
-/// Nested expression: ramp (`interpolate` / …) or regular [`Number`] operators.
-#[derive(PartialEq, Debug, Clone)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum SymbolLayoutLayerSymbolSortKeyExpression {
-    Number(Number),
-    Ramp(NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection),
-}
+numeric_prop!(
+    SymbolLayoutLayerSymbolSortKey,
+    doc = "Sorts features in ascending order based on this value. Features with lower sort keys are drawn and placed first.  When `icon-allow-overlap` or `text-allow-overlap` is `false`, features with a lower sort key will have priority during placement. When `icon-allow-overlap` or `text-allow-overlap` is set to `true`, features with a higher sort key will overlap over features with a lower sort key."
+);
 
-impl serde::Serialize for SymbolLayoutLayerSymbolSortKeyExpression {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        match self {
-            Self::Number(v) => v.serialize(serializer),
-            Self::Ramp(v) => v.serialize(serializer),
-        }
-    }
-}
-
-impl<'de> serde::Deserialize<'de> for SymbolLayoutLayerSymbolSortKeyExpression {
-    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
-        let mut errors: Vec<(&str, std::string::String)> = Vec::new();
-        match <Number as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Number(v)),
-            Err(e) => errors.push(("Number", e.to_string())),
-        }
-        match <NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Ramp(v)),
-            Err(e) => errors.push(("Ramp", e.to_string())),
-        }
-
-        let details: Vec<std::string::String> =
-            errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
-        Err(serde::de::Error::custom(format!(
-            "SymbolLayoutLayerSymbolSortKeyExpression: no variant matched. Expected Number(Number) | Ramp(NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection). Errors: [{}]",
-            details.join("; ")
-        )))
-    }
-}
-
-/// Sorts features in ascending order based on this value. Features with lower sort keys are drawn and placed first.  When `icon-allow-overlap` or `text-allow-overlap` is `false`, features with a lower sort key will have priority during placement. When `icon-allow-overlap` or `text-allow-overlap` is set to `true`, features with a higher sort key will overlap over features with a lower sort key.
-#[derive(PartialEq, Debug, Clone)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum SymbolLayoutLayerSymbolSortKey {
-    Expr(Box<SymbolLayoutLayerSymbolSortKeyExpression>),
-    Literal(
-        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
-        serde_json::Number,
-    ),
-}
-
-impl serde::Serialize for SymbolLayoutLayerSymbolSortKey {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        match self {
-            Self::Expr(v) => v.as_ref().serialize(serializer),
-            Self::Literal(v) => v.serialize(serializer),
-        }
-    }
-}
-
-impl<'de> serde::Deserialize<'de> for SymbolLayoutLayerSymbolSortKey {
-    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
-        let mut errors: Vec<(&str, std::string::String)> = Vec::new();
-        match <SymbolLayoutLayerSymbolSortKeyExpression as serde::Deserialize>::deserialize(&value)
-        {
-            Ok(v) => return Ok(Self::Expr(Box::new(v))),
-            Err(e) => errors.push(("Expr", e.to_string())),
-        }
-        match <serde_json::Number as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Literal(v)),
-            Err(e) => errors.push(("Literal", e.to_string())),
-        }
-
-        let details: Vec<std::string::String> =
-            errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
-        Err(serde::de::Error::custom(format!(
-            "SymbolLayoutLayerSymbolSortKey: no variant matched. Expected Expr(SymbolLayoutLayerSymbolSortKeyExpression) | Literal(serde_json::Number). Errors: [{}]",
-            details.join("; ")
-        )))
-    }
-}
-
-/// Nested expression: ramp (`interpolate` / …) or regular [`Number`] operators.
-#[derive(PartialEq, Debug, Clone)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum SymbolLayoutLayerSymbolSpacingExpression {
-    Number(Number),
-    Ramp(NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection),
-}
-
-impl serde::Serialize for SymbolLayoutLayerSymbolSpacingExpression {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        match self {
-            Self::Number(v) => v.serialize(serializer),
-            Self::Ramp(v) => v.serialize(serializer),
-        }
-    }
-}
-
-impl<'de> serde::Deserialize<'de> for SymbolLayoutLayerSymbolSpacingExpression {
-    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
-        let mut errors: Vec<(&str, std::string::String)> = Vec::new();
-        match <Number as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Number(v)),
-            Err(e) => errors.push(("Number", e.to_string())),
-        }
-        match <NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Ramp(v)),
-            Err(e) => errors.push(("Ramp", e.to_string())),
-        }
-
-        let details: Vec<std::string::String> =
-            errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
-        Err(serde::de::Error::custom(format!(
-            "SymbolLayoutLayerSymbolSpacingExpression: no variant matched. Expected Number(Number) | Ramp(NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection). Errors: [{}]",
-            details.join("; ")
-        )))
-    }
-}
-
-/// Distance between two symbol anchors.
-#[derive(PartialEq, Debug, Clone)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum SymbolLayoutLayerSymbolSpacing {
-    Expr(Box<SymbolLayoutLayerSymbolSpacingExpression>),
-    Literal(
-        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
-        serde_json::Number,
-    ),
-}
-
-impl serde::Serialize for SymbolLayoutLayerSymbolSpacing {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        match self {
-            Self::Expr(v) => v.as_ref().serialize(serializer),
-            Self::Literal(v) => v.serialize(serializer),
-        }
-    }
-}
-
-impl<'de> serde::Deserialize<'de> for SymbolLayoutLayerSymbolSpacing {
-    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
-        let mut errors: Vec<(&str, std::string::String)> = Vec::new();
-        match <SymbolLayoutLayerSymbolSpacingExpression as serde::Deserialize>::deserialize(&value)
-        {
-            Ok(v) => return Ok(Self::Expr(Box::new(v))),
-            Err(e) => errors.push(("Expr", e.to_string())),
-        }
-        match <serde_json::Number as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Literal(v)),
-            Err(e) => errors.push(("Literal", e.to_string())),
-        }
-
-        let details: Vec<std::string::String> =
-            errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
-        Err(serde::de::Error::custom(format!(
-            "SymbolLayoutLayerSymbolSpacing: no variant matched. Expected Expr(SymbolLayoutLayerSymbolSpacingExpression) | Literal(serde_json::Number). Errors: [{}]",
-            details.join("; ")
-        )))
-    }
-}
-
-impl Default for SymbolLayoutLayerSymbolSpacing {
-    fn default() -> Self {
-        Self::Literal(
-            serde_json::Number::from_i128(250)
-                .expect("the number is serialised from a number and is thus always valid"),
-        )
-    }
-}
+numeric_prop!(
+    SymbolLayoutLayerSymbolSpacing,
+    doc = "Distance between two symbol anchors.",
+    min = 1_f64,
+    default = serde_json::Number::from_i128(250)
+        .expect("the number is serialised from a number and is thus always valid")
+);
 
 /// Determines whether overlapping symbols in the same layer are rendered in the order that they appear in the data source or by their y-position relative to the viewport. To control the order and prioritization of symbols otherwise, use `symbol-sort-key`.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy, Default)]
@@ -6345,85 +1839,11 @@ pub enum SymbolLayoutLayerSymbolZOrder {
     ViewportY,
 }
 
-/// Nested expression: [`Boolean`] operators.
-#[derive(PartialEq, Debug, Clone)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum SymbolLayoutLayerTextAllowOverlapExpression {
-    Boolean(Boolean),
-}
-
-impl serde::Serialize for SymbolLayoutLayerTextAllowOverlapExpression {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        match self {
-            Self::Boolean(v) => v.serialize(serializer),
-        }
-    }
-}
-
-impl<'de> serde::Deserialize<'de> for SymbolLayoutLayerTextAllowOverlapExpression {
-    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
-        let mut errors: Vec<(&str, std::string::String)> = Vec::new();
-        match <Boolean as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Boolean(v)),
-            Err(e) => errors.push(("Boolean", e.to_string())),
-        }
-
-        let details: Vec<std::string::String> =
-            errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
-        Err(serde::de::Error::custom(format!(
-            "SymbolLayoutLayerTextAllowOverlapExpression: no variant matched. Expected Boolean(Boolean). Errors: [{}]",
-            details.join("; ")
-        )))
-    }
-}
-
-/// If true, the text will be visible even if it collides with other previously drawn symbols.
-#[derive(PartialEq, Debug, Clone)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum SymbolLayoutLayerTextAllowOverlap {
-    Expr(Box<SymbolLayoutLayerTextAllowOverlapExpression>),
-    Literal(bool),
-}
-
-impl serde::Serialize for SymbolLayoutLayerTextAllowOverlap {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        match self {
-            Self::Expr(v) => v.as_ref().serialize(serializer),
-            Self::Literal(v) => v.serialize(serializer),
-        }
-    }
-}
-
-impl<'de> serde::Deserialize<'de> for SymbolLayoutLayerTextAllowOverlap {
-    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
-        let mut errors: Vec<(&str, std::string::String)> = Vec::new();
-        match <SymbolLayoutLayerTextAllowOverlapExpression as serde::Deserialize>::deserialize(
-            &value,
-        ) {
-            Ok(v) => return Ok(Self::Expr(Box::new(v))),
-            Err(e) => errors.push(("Expr", e.to_string())),
-        }
-        match <bool as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Literal(v)),
-            Err(e) => errors.push(("Literal", e.to_string())),
-        }
-
-        let details: Vec<std::string::String> =
-            errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
-        Err(serde::de::Error::custom(format!(
-            "SymbolLayoutLayerTextAllowOverlap: no variant matched. Expected Expr(SymbolLayoutLayerTextAllowOverlapExpression) | Literal(bool). Errors: [{}]",
-            details.join("; ")
-        )))
-    }
-}
-
-impl Default for SymbolLayoutLayerTextAllowOverlap {
-    fn default() -> Self {
-        Self::Literal(false)
-    }
-}
+boolean_prop!(
+    SymbolLayoutLayerTextAllowOverlap,
+    doc = "If true, the text will be visible even if it collides with other previously drawn symbols.",
+    default = false
+);
 
 /// Part of the text placed closest to the anchor.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy, Default)]
@@ -6475,85 +1895,11 @@ impl Default for SymbolLayoutLayerTextFont {
     }
 }
 
-/// Nested expression: [`Boolean`] operators.
-#[derive(PartialEq, Debug, Clone)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum SymbolLayoutLayerTextIgnorePlacementExpression {
-    Boolean(Boolean),
-}
-
-impl serde::Serialize for SymbolLayoutLayerTextIgnorePlacementExpression {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        match self {
-            Self::Boolean(v) => v.serialize(serializer),
-        }
-    }
-}
-
-impl<'de> serde::Deserialize<'de> for SymbolLayoutLayerTextIgnorePlacementExpression {
-    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
-        let mut errors: Vec<(&str, std::string::String)> = Vec::new();
-        match <Boolean as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Boolean(v)),
-            Err(e) => errors.push(("Boolean", e.to_string())),
-        }
-
-        let details: Vec<std::string::String> =
-            errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
-        Err(serde::de::Error::custom(format!(
-            "SymbolLayoutLayerTextIgnorePlacementExpression: no variant matched. Expected Boolean(Boolean). Errors: [{}]",
-            details.join("; ")
-        )))
-    }
-}
-
-/// If true, other symbols can be visible even if they collide with the text.
-#[derive(PartialEq, Debug, Clone)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum SymbolLayoutLayerTextIgnorePlacement {
-    Expr(Box<SymbolLayoutLayerTextIgnorePlacementExpression>),
-    Literal(bool),
-}
-
-impl serde::Serialize for SymbolLayoutLayerTextIgnorePlacement {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        match self {
-            Self::Expr(v) => v.as_ref().serialize(serializer),
-            Self::Literal(v) => v.serialize(serializer),
-        }
-    }
-}
-
-impl<'de> serde::Deserialize<'de> for SymbolLayoutLayerTextIgnorePlacement {
-    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
-        let mut errors: Vec<(&str, std::string::String)> = Vec::new();
-        match <SymbolLayoutLayerTextIgnorePlacementExpression as serde::Deserialize>::deserialize(
-            &value,
-        ) {
-            Ok(v) => return Ok(Self::Expr(Box::new(v))),
-            Err(e) => errors.push(("Expr", e.to_string())),
-        }
-        match <bool as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Literal(v)),
-            Err(e) => errors.push(("Literal", e.to_string())),
-        }
-
-        let details: Vec<std::string::String> =
-            errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
-        Err(serde::de::Error::custom(format!(
-            "SymbolLayoutLayerTextIgnorePlacement: no variant matched. Expected Expr(SymbolLayoutLayerTextIgnorePlacementExpression) | Literal(bool). Errors: [{}]",
-            details.join("; ")
-        )))
-    }
-}
-
-impl Default for SymbolLayoutLayerTextIgnorePlacement {
-    fn default() -> Self {
-        Self::Literal(false)
-    }
-}
+boolean_prop!(
+    SymbolLayoutLayerTextIgnorePlacement,
+    doc = "If true, other symbols can be visible even if they collide with the text.",
+    default = false
+);
 
 /// Text justification options.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy, Default)]
@@ -6570,448 +1916,40 @@ pub enum SymbolLayoutLayerTextJustify {
     Right,
 }
 
-/// Nested expression: [`Boolean`] operators.
-#[derive(PartialEq, Debug, Clone)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum SymbolLayoutLayerTextKeepUprightExpression {
-    Boolean(Boolean),
-}
+boolean_prop!(
+    SymbolLayoutLayerTextKeepUpright,
+    doc = "If true, the text may be flipped vertically to prevent it from being rendered upside-down.",
+    default = true
+);
 
-impl serde::Serialize for SymbolLayoutLayerTextKeepUprightExpression {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        match self {
-            Self::Boolean(v) => v.serialize(serializer),
-        }
-    }
-}
+numeric_prop!(
+    SymbolLayoutLayerTextLetterSpacing,
+    doc = "Text tracking amount.",
+    default = serde_json::Number::from_i128(0)
+        .expect("the number is serialised from a number and is thus always valid")
+);
 
-impl<'de> serde::Deserialize<'de> for SymbolLayoutLayerTextKeepUprightExpression {
-    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
-        let mut errors: Vec<(&str, std::string::String)> = Vec::new();
-        match <Boolean as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Boolean(v)),
-            Err(e) => errors.push(("Boolean", e.to_string())),
-        }
+numeric_prop!(
+    SymbolLayoutLayerTextLineHeight,
+    doc = "Text leading value for multi-line text.",
+    default = serde_json::Number::from_f64(1.2)
+        .expect("the number is serialised from a number and is thus always valid")
+);
 
-        let details: Vec<std::string::String> =
-            errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
-        Err(serde::de::Error::custom(format!(
-            "SymbolLayoutLayerTextKeepUprightExpression: no variant matched. Expected Boolean(Boolean). Errors: [{}]",
-            details.join("; ")
-        )))
-    }
-}
+numeric_prop!(
+    SymbolLayoutLayerTextMaxAngle,
+    doc = "Maximum angle change between adjacent characters.",
+    default = serde_json::Number::from_i128(45)
+        .expect("the number is serialised from a number and is thus always valid")
+);
 
-/// If true, the text may be flipped vertically to prevent it from being rendered upside-down.
-#[derive(PartialEq, Debug, Clone)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum SymbolLayoutLayerTextKeepUpright {
-    Expr(Box<SymbolLayoutLayerTextKeepUprightExpression>),
-    Literal(bool),
-}
-
-impl serde::Serialize for SymbolLayoutLayerTextKeepUpright {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        match self {
-            Self::Expr(v) => v.as_ref().serialize(serializer),
-            Self::Literal(v) => v.serialize(serializer),
-        }
-    }
-}
-
-impl<'de> serde::Deserialize<'de> for SymbolLayoutLayerTextKeepUpright {
-    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
-        let mut errors: Vec<(&str, std::string::String)> = Vec::new();
-        match <SymbolLayoutLayerTextKeepUprightExpression as serde::Deserialize>::deserialize(
-            &value,
-        ) {
-            Ok(v) => return Ok(Self::Expr(Box::new(v))),
-            Err(e) => errors.push(("Expr", e.to_string())),
-        }
-        match <bool as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Literal(v)),
-            Err(e) => errors.push(("Literal", e.to_string())),
-        }
-
-        let details: Vec<std::string::String> =
-            errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
-        Err(serde::de::Error::custom(format!(
-            "SymbolLayoutLayerTextKeepUpright: no variant matched. Expected Expr(SymbolLayoutLayerTextKeepUprightExpression) | Literal(bool). Errors: [{}]",
-            details.join("; ")
-        )))
-    }
-}
-
-impl Default for SymbolLayoutLayerTextKeepUpright {
-    fn default() -> Self {
-        Self::Literal(true)
-    }
-}
-
-/// Nested expression: ramp (`interpolate` / …) or regular [`Number`] operators.
-#[derive(PartialEq, Debug, Clone)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum SymbolLayoutLayerTextLetterSpacingExpression {
-    Number(Number),
-    Ramp(NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection),
-}
-
-impl serde::Serialize for SymbolLayoutLayerTextLetterSpacingExpression {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        match self {
-            Self::Number(v) => v.serialize(serializer),
-            Self::Ramp(v) => v.serialize(serializer),
-        }
-    }
-}
-
-impl<'de> serde::Deserialize<'de> for SymbolLayoutLayerTextLetterSpacingExpression {
-    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
-        let mut errors: Vec<(&str, std::string::String)> = Vec::new();
-        match <Number as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Number(v)),
-            Err(e) => errors.push(("Number", e.to_string())),
-        }
-        match <NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Ramp(v)),
-            Err(e) => errors.push(("Ramp", e.to_string())),
-        }
-
-        let details: Vec<std::string::String> =
-            errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
-        Err(serde::de::Error::custom(format!(
-            "SymbolLayoutLayerTextLetterSpacingExpression: no variant matched. Expected Number(Number) | Ramp(NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection). Errors: [{}]",
-            details.join("; ")
-        )))
-    }
-}
-
-/// Text tracking amount.
-#[derive(PartialEq, Debug, Clone)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum SymbolLayoutLayerTextLetterSpacing {
-    Expr(Box<SymbolLayoutLayerTextLetterSpacingExpression>),
-    Literal(
-        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
-        serde_json::Number,
-    ),
-}
-
-impl serde::Serialize for SymbolLayoutLayerTextLetterSpacing {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        match self {
-            Self::Expr(v) => v.as_ref().serialize(serializer),
-            Self::Literal(v) => v.serialize(serializer),
-        }
-    }
-}
-
-impl<'de> serde::Deserialize<'de> for SymbolLayoutLayerTextLetterSpacing {
-    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
-        let mut errors: Vec<(&str, std::string::String)> = Vec::new();
-        match <SymbolLayoutLayerTextLetterSpacingExpression as serde::Deserialize>::deserialize(
-            &value,
-        ) {
-            Ok(v) => return Ok(Self::Expr(Box::new(v))),
-            Err(e) => errors.push(("Expr", e.to_string())),
-        }
-        match <serde_json::Number as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Literal(v)),
-            Err(e) => errors.push(("Literal", e.to_string())),
-        }
-
-        let details: Vec<std::string::String> =
-            errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
-        Err(serde::de::Error::custom(format!(
-            "SymbolLayoutLayerTextLetterSpacing: no variant matched. Expected Expr(SymbolLayoutLayerTextLetterSpacingExpression) | Literal(serde_json::Number). Errors: [{}]",
-            details.join("; ")
-        )))
-    }
-}
-
-impl Default for SymbolLayoutLayerTextLetterSpacing {
-    fn default() -> Self {
-        Self::Literal(
-            serde_json::Number::from_i128(0)
-                .expect("the number is serialised from a number and is thus always valid"),
-        )
-    }
-}
-
-/// Nested expression: ramp (`interpolate` / …) or regular [`Number`] operators.
-#[derive(PartialEq, Debug, Clone)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum SymbolLayoutLayerTextLineHeightExpression {
-    Number(Number),
-    Ramp(NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection),
-}
-
-impl serde::Serialize for SymbolLayoutLayerTextLineHeightExpression {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        match self {
-            Self::Number(v) => v.serialize(serializer),
-            Self::Ramp(v) => v.serialize(serializer),
-        }
-    }
-}
-
-impl<'de> serde::Deserialize<'de> for SymbolLayoutLayerTextLineHeightExpression {
-    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
-        let mut errors: Vec<(&str, std::string::String)> = Vec::new();
-        match <Number as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Number(v)),
-            Err(e) => errors.push(("Number", e.to_string())),
-        }
-        match <NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Ramp(v)),
-            Err(e) => errors.push(("Ramp", e.to_string())),
-        }
-
-        let details: Vec<std::string::String> =
-            errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
-        Err(serde::de::Error::custom(format!(
-            "SymbolLayoutLayerTextLineHeightExpression: no variant matched. Expected Number(Number) | Ramp(NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection). Errors: [{}]",
-            details.join("; ")
-        )))
-    }
-}
-
-/// Text leading value for multi-line text.
-#[derive(PartialEq, Debug, Clone)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum SymbolLayoutLayerTextLineHeight {
-    Expr(Box<SymbolLayoutLayerTextLineHeightExpression>),
-    Literal(
-        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
-        serde_json::Number,
-    ),
-}
-
-impl serde::Serialize for SymbolLayoutLayerTextLineHeight {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        match self {
-            Self::Expr(v) => v.as_ref().serialize(serializer),
-            Self::Literal(v) => v.serialize(serializer),
-        }
-    }
-}
-
-impl<'de> serde::Deserialize<'de> for SymbolLayoutLayerTextLineHeight {
-    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
-        let mut errors: Vec<(&str, std::string::String)> = Vec::new();
-        match <SymbolLayoutLayerTextLineHeightExpression as serde::Deserialize>::deserialize(&value)
-        {
-            Ok(v) => return Ok(Self::Expr(Box::new(v))),
-            Err(e) => errors.push(("Expr", e.to_string())),
-        }
-        match <serde_json::Number as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Literal(v)),
-            Err(e) => errors.push(("Literal", e.to_string())),
-        }
-
-        let details: Vec<std::string::String> =
-            errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
-        Err(serde::de::Error::custom(format!(
-            "SymbolLayoutLayerTextLineHeight: no variant matched. Expected Expr(SymbolLayoutLayerTextLineHeightExpression) | Literal(serde_json::Number). Errors: [{}]",
-            details.join("; ")
-        )))
-    }
-}
-
-impl Default for SymbolLayoutLayerTextLineHeight {
-    fn default() -> Self {
-        Self::Literal(
-            serde_json::Number::from_f64(1.2)
-                .expect("the number is serialised from a number and is thus always valid"),
-        )
-    }
-}
-
-/// Nested expression: ramp (`interpolate` / …) or regular [`Number`] operators.
-#[derive(PartialEq, Debug, Clone)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum SymbolLayoutLayerTextMaxAngleExpression {
-    Number(Number),
-    Ramp(NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection),
-}
-
-impl serde::Serialize for SymbolLayoutLayerTextMaxAngleExpression {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        match self {
-            Self::Number(v) => v.serialize(serializer),
-            Self::Ramp(v) => v.serialize(serializer),
-        }
-    }
-}
-
-impl<'de> serde::Deserialize<'de> for SymbolLayoutLayerTextMaxAngleExpression {
-    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
-        let mut errors: Vec<(&str, std::string::String)> = Vec::new();
-        match <Number as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Number(v)),
-            Err(e) => errors.push(("Number", e.to_string())),
-        }
-        match <NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Ramp(v)),
-            Err(e) => errors.push(("Ramp", e.to_string())),
-        }
-
-        let details: Vec<std::string::String> =
-            errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
-        Err(serde::de::Error::custom(format!(
-            "SymbolLayoutLayerTextMaxAngleExpression: no variant matched. Expected Number(Number) | Ramp(NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection). Errors: [{}]",
-            details.join("; ")
-        )))
-    }
-}
-
-/// Maximum angle change between adjacent characters.
-#[derive(PartialEq, Debug, Clone)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum SymbolLayoutLayerTextMaxAngle {
-    Expr(Box<SymbolLayoutLayerTextMaxAngleExpression>),
-    Literal(
-        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
-        serde_json::Number,
-    ),
-}
-
-impl serde::Serialize for SymbolLayoutLayerTextMaxAngle {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        match self {
-            Self::Expr(v) => v.as_ref().serialize(serializer),
-            Self::Literal(v) => v.serialize(serializer),
-        }
-    }
-}
-
-impl<'de> serde::Deserialize<'de> for SymbolLayoutLayerTextMaxAngle {
-    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
-        let mut errors: Vec<(&str, std::string::String)> = Vec::new();
-        match <SymbolLayoutLayerTextMaxAngleExpression as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Expr(Box::new(v))),
-            Err(e) => errors.push(("Expr", e.to_string())),
-        }
-        match <serde_json::Number as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Literal(v)),
-            Err(e) => errors.push(("Literal", e.to_string())),
-        }
-
-        let details: Vec<std::string::String> =
-            errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
-        Err(serde::de::Error::custom(format!(
-            "SymbolLayoutLayerTextMaxAngle: no variant matched. Expected Expr(SymbolLayoutLayerTextMaxAngleExpression) | Literal(serde_json::Number). Errors: [{}]",
-            details.join("; ")
-        )))
-    }
-}
-
-impl Default for SymbolLayoutLayerTextMaxAngle {
-    fn default() -> Self {
-        Self::Literal(
-            serde_json::Number::from_i128(45)
-                .expect("the number is serialised from a number and is thus always valid"),
-        )
-    }
-}
-
-/// Nested expression: ramp (`interpolate` / …) or regular [`Number`] operators.
-#[derive(PartialEq, Debug, Clone)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum SymbolLayoutLayerTextMaxWidthExpression {
-    Number(Number),
-    Ramp(NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection),
-}
-
-impl serde::Serialize for SymbolLayoutLayerTextMaxWidthExpression {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        match self {
-            Self::Number(v) => v.serialize(serializer),
-            Self::Ramp(v) => v.serialize(serializer),
-        }
-    }
-}
-
-impl<'de> serde::Deserialize<'de> for SymbolLayoutLayerTextMaxWidthExpression {
-    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
-        let mut errors: Vec<(&str, std::string::String)> = Vec::new();
-        match <Number as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Number(v)),
-            Err(e) => errors.push(("Number", e.to_string())),
-        }
-        match <NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Ramp(v)),
-            Err(e) => errors.push(("Ramp", e.to_string())),
-        }
-
-        let details: Vec<std::string::String> =
-            errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
-        Err(serde::de::Error::custom(format!(
-            "SymbolLayoutLayerTextMaxWidthExpression: no variant matched. Expected Number(Number) | Ramp(NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection). Errors: [{}]",
-            details.join("; ")
-        )))
-    }
-}
-
-/// The maximum line width for text wrapping.
-#[derive(PartialEq, Debug, Clone)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum SymbolLayoutLayerTextMaxWidth {
-    Expr(Box<SymbolLayoutLayerTextMaxWidthExpression>),
-    Literal(
-        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
-        serde_json::Number,
-    ),
-}
-
-impl serde::Serialize for SymbolLayoutLayerTextMaxWidth {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        match self {
-            Self::Expr(v) => v.as_ref().serialize(serializer),
-            Self::Literal(v) => v.serialize(serializer),
-        }
-    }
-}
-
-impl<'de> serde::Deserialize<'de> for SymbolLayoutLayerTextMaxWidth {
-    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
-        let mut errors: Vec<(&str, std::string::String)> = Vec::new();
-        match <SymbolLayoutLayerTextMaxWidthExpression as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Expr(Box::new(v))),
-            Err(e) => errors.push(("Expr", e.to_string())),
-        }
-        match <serde_json::Number as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Literal(v)),
-            Err(e) => errors.push(("Literal", e.to_string())),
-        }
-
-        let details: Vec<std::string::String> =
-            errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
-        Err(serde::de::Error::custom(format!(
-            "SymbolLayoutLayerTextMaxWidth: no variant matched. Expected Expr(SymbolLayoutLayerTextMaxWidthExpression) | Literal(serde_json::Number). Errors: [{}]",
-            details.join("; ")
-        )))
-    }
-}
-
-impl Default for SymbolLayoutLayerTextMaxWidth {
-    fn default() -> Self {
-        Self::Literal(
-            serde_json::Number::from_i128(10)
-                .expect("the number is serialised from a number and is thus always valid"),
-        )
-    }
-}
+numeric_prop!(
+    SymbolLayoutLayerTextMaxWidth,
+    doc = "The maximum line width for text wrapping.",
+    min = 0_f64,
+    default = serde_json::Number::from_i128(10)
+        .expect("the number is serialised from a number and is thus always valid")
+);
 
 /// Offset distance of text from its anchor. Positive values indicate right and down, while negative values indicate left and up. If used with text-variable-anchor, input values will be taken as absolute values. Offsets along the x- and y-axis will be applied automatically based on the anchor position.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
@@ -7032,83 +1970,11 @@ impl Default for SymbolLayoutLayerTextOffset {
     }
 }
 
-/// Nested expression: [`Boolean`] operators.
-#[derive(PartialEq, Debug, Clone)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum SymbolLayoutLayerTextOptionalExpression {
-    Boolean(Boolean),
-}
-
-impl serde::Serialize for SymbolLayoutLayerTextOptionalExpression {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        match self {
-            Self::Boolean(v) => v.serialize(serializer),
-        }
-    }
-}
-
-impl<'de> serde::Deserialize<'de> for SymbolLayoutLayerTextOptionalExpression {
-    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
-        let mut errors: Vec<(&str, std::string::String)> = Vec::new();
-        match <Boolean as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Boolean(v)),
-            Err(e) => errors.push(("Boolean", e.to_string())),
-        }
-
-        let details: Vec<std::string::String> =
-            errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
-        Err(serde::de::Error::custom(format!(
-            "SymbolLayoutLayerTextOptionalExpression: no variant matched. Expected Boolean(Boolean). Errors: [{}]",
-            details.join("; ")
-        )))
-    }
-}
-
-/// If true, icons will display without their corresponding text when the text collides with other symbols and the icon does not.
-#[derive(PartialEq, Debug, Clone)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum SymbolLayoutLayerTextOptional {
-    Expr(Box<SymbolLayoutLayerTextOptionalExpression>),
-    Literal(bool),
-}
-
-impl serde::Serialize for SymbolLayoutLayerTextOptional {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        match self {
-            Self::Expr(v) => v.as_ref().serialize(serializer),
-            Self::Literal(v) => v.serialize(serializer),
-        }
-    }
-}
-
-impl<'de> serde::Deserialize<'de> for SymbolLayoutLayerTextOptional {
-    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
-        let mut errors: Vec<(&str, std::string::String)> = Vec::new();
-        match <SymbolLayoutLayerTextOptionalExpression as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Expr(Box::new(v))),
-            Err(e) => errors.push(("Expr", e.to_string())),
-        }
-        match <bool as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Literal(v)),
-            Err(e) => errors.push(("Literal", e.to_string())),
-        }
-
-        let details: Vec<std::string::String> =
-            errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
-        Err(serde::de::Error::custom(format!(
-            "SymbolLayoutLayerTextOptional: no variant matched. Expected Expr(SymbolLayoutLayerTextOptionalExpression) | Literal(bool). Errors: [{}]",
-            details.join("; ")
-        )))
-    }
-}
-
-impl Default for SymbolLayoutLayerTextOptional {
-    fn default() -> Self {
-        Self::Literal(false)
-    }
-}
+boolean_prop!(
+    SymbolLayoutLayerTextOptional,
+    doc = "If true, icons will display without their corresponding text when the text collides with other symbols and the icon does not.",
+    default = false
+);
 
 /// Allows for control over whether to show symbol text when it overlaps other symbols on the map. If `text-overlap` is not set, `text-allow-overlap` is used instead
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy)]
@@ -7122,95 +1988,13 @@ pub enum SymbolLayoutLayerTextOverlap {
     Never,
 }
 
-/// Nested expression: ramp (`interpolate` / …) or regular [`Number`] operators.
-#[derive(PartialEq, Debug, Clone)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum SymbolLayoutLayerTextPaddingExpression {
-    Number(Number),
-    Ramp(NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection),
-}
-
-impl serde::Serialize for SymbolLayoutLayerTextPaddingExpression {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        match self {
-            Self::Number(v) => v.serialize(serializer),
-            Self::Ramp(v) => v.serialize(serializer),
-        }
-    }
-}
-
-impl<'de> serde::Deserialize<'de> for SymbolLayoutLayerTextPaddingExpression {
-    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
-        let mut errors: Vec<(&str, std::string::String)> = Vec::new();
-        match <Number as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Number(v)),
-            Err(e) => errors.push(("Number", e.to_string())),
-        }
-        match <NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Ramp(v)),
-            Err(e) => errors.push(("Ramp", e.to_string())),
-        }
-
-        let details: Vec<std::string::String> =
-            errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
-        Err(serde::de::Error::custom(format!(
-            "SymbolLayoutLayerTextPaddingExpression: no variant matched. Expected Number(Number) | Ramp(NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection). Errors: [{}]",
-            details.join("; ")
-        )))
-    }
-}
-
-/// Size of the additional area around the text bounding box used for detecting symbol collisions.
-#[derive(PartialEq, Debug, Clone)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum SymbolLayoutLayerTextPadding {
-    Expr(Box<SymbolLayoutLayerTextPaddingExpression>),
-    Literal(
-        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
-        serde_json::Number,
-    ),
-}
-
-impl serde::Serialize for SymbolLayoutLayerTextPadding {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        match self {
-            Self::Expr(v) => v.as_ref().serialize(serializer),
-            Self::Literal(v) => v.serialize(serializer),
-        }
-    }
-}
-
-impl<'de> serde::Deserialize<'de> for SymbolLayoutLayerTextPadding {
-    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
-        let mut errors: Vec<(&str, std::string::String)> = Vec::new();
-        match <SymbolLayoutLayerTextPaddingExpression as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Expr(Box::new(v))),
-            Err(e) => errors.push(("Expr", e.to_string())),
-        }
-        match <serde_json::Number as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Literal(v)),
-            Err(e) => errors.push(("Literal", e.to_string())),
-        }
-
-        let details: Vec<std::string::String> =
-            errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
-        Err(serde::de::Error::custom(format!(
-            "SymbolLayoutLayerTextPadding: no variant matched. Expected Expr(SymbolLayoutLayerTextPaddingExpression) | Literal(serde_json::Number). Errors: [{}]",
-            details.join("; ")
-        )))
-    }
-}
-
-impl Default for SymbolLayoutLayerTextPadding {
-    fn default() -> Self {
-        Self::Literal(
-            serde_json::Number::from_i128(2)
-                .expect("the number is serialised from a number and is thus always valid"),
-        )
-    }
-}
+numeric_prop!(
+    SymbolLayoutLayerTextPadding,
+    doc = "Size of the additional area around the text bounding box used for detecting symbol collisions.",
+    min = 0_f64,
+    default = serde_json::Number::from_i128(2)
+        .expect("the number is serialised from a number and is thus always valid")
+);
 
 /// Orientation of text when map is pitched.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy, Default)]
@@ -7225,187 +2009,19 @@ pub enum SymbolLayoutLayerTextPitchAlignment {
     Viewport,
 }
 
-/// Nested expression: ramp (`interpolate` / …) or regular [`Number`] operators.
-#[derive(PartialEq, Debug, Clone)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum SymbolLayoutLayerTextRadialOffsetExpression {
-    Number(Number),
-    Ramp(NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection),
-}
+numeric_prop!(
+    SymbolLayoutLayerTextRadialOffset,
+    doc = "Radial offset of text, in the direction of the symbol's anchor. Useful in combination with `text-variable-anchor`, which defaults to using the two-dimensional `text-offset` if present.",
+    default = serde_json::Number::from_i128(0)
+        .expect("the number is serialised from a number and is thus always valid")
+);
 
-impl serde::Serialize for SymbolLayoutLayerTextRadialOffsetExpression {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        match self {
-            Self::Number(v) => v.serialize(serializer),
-            Self::Ramp(v) => v.serialize(serializer),
-        }
-    }
-}
-
-impl<'de> serde::Deserialize<'de> for SymbolLayoutLayerTextRadialOffsetExpression {
-    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
-        let mut errors: Vec<(&str, std::string::String)> = Vec::new();
-        match <Number as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Number(v)),
-            Err(e) => errors.push(("Number", e.to_string())),
-        }
-        match <NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Ramp(v)),
-            Err(e) => errors.push(("Ramp", e.to_string())),
-        }
-
-        let details: Vec<std::string::String> =
-            errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
-        Err(serde::de::Error::custom(format!(
-            "SymbolLayoutLayerTextRadialOffsetExpression: no variant matched. Expected Number(Number) | Ramp(NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection). Errors: [{}]",
-            details.join("; ")
-        )))
-    }
-}
-
-/// Radial offset of text, in the direction of the symbol's anchor. Useful in combination with `text-variable-anchor`, which defaults to using the two-dimensional `text-offset` if present.
-#[derive(PartialEq, Debug, Clone)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum SymbolLayoutLayerTextRadialOffset {
-    Expr(Box<SymbolLayoutLayerTextRadialOffsetExpression>),
-    Literal(
-        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
-        serde_json::Number,
-    ),
-}
-
-impl serde::Serialize for SymbolLayoutLayerTextRadialOffset {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        match self {
-            Self::Expr(v) => v.as_ref().serialize(serializer),
-            Self::Literal(v) => v.serialize(serializer),
-        }
-    }
-}
-
-impl<'de> serde::Deserialize<'de> for SymbolLayoutLayerTextRadialOffset {
-    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
-        let mut errors: Vec<(&str, std::string::String)> = Vec::new();
-        match <SymbolLayoutLayerTextRadialOffsetExpression as serde::Deserialize>::deserialize(
-            &value,
-        ) {
-            Ok(v) => return Ok(Self::Expr(Box::new(v))),
-            Err(e) => errors.push(("Expr", e.to_string())),
-        }
-        match <serde_json::Number as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Literal(v)),
-            Err(e) => errors.push(("Literal", e.to_string())),
-        }
-
-        let details: Vec<std::string::String> =
-            errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
-        Err(serde::de::Error::custom(format!(
-            "SymbolLayoutLayerTextRadialOffset: no variant matched. Expected Expr(SymbolLayoutLayerTextRadialOffsetExpression) | Literal(serde_json::Number). Errors: [{}]",
-            details.join("; ")
-        )))
-    }
-}
-
-impl Default for SymbolLayoutLayerTextRadialOffset {
-    fn default() -> Self {
-        Self::Literal(
-            serde_json::Number::from_i128(0)
-                .expect("the number is serialised from a number and is thus always valid"),
-        )
-    }
-}
-
-/// Nested expression: ramp (`interpolate` / …) or regular [`Number`] operators.
-#[derive(PartialEq, Debug, Clone)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum SymbolLayoutLayerTextRotateExpression {
-    Number(Number),
-    Ramp(NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection),
-}
-
-impl serde::Serialize for SymbolLayoutLayerTextRotateExpression {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        match self {
-            Self::Number(v) => v.serialize(serializer),
-            Self::Ramp(v) => v.serialize(serializer),
-        }
-    }
-}
-
-impl<'de> serde::Deserialize<'de> for SymbolLayoutLayerTextRotateExpression {
-    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
-        let mut errors: Vec<(&str, std::string::String)> = Vec::new();
-        match <Number as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Number(v)),
-            Err(e) => errors.push(("Number", e.to_string())),
-        }
-        match <NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Ramp(v)),
-            Err(e) => errors.push(("Ramp", e.to_string())),
-        }
-
-        let details: Vec<std::string::String> =
-            errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
-        Err(serde::de::Error::custom(format!(
-            "SymbolLayoutLayerTextRotateExpression: no variant matched. Expected Number(Number) | Ramp(NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection). Errors: [{}]",
-            details.join("; ")
-        )))
-    }
-}
-
-/// Rotates the text clockwise.
-#[derive(PartialEq, Debug, Clone)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum SymbolLayoutLayerTextRotate {
-    Expr(Box<SymbolLayoutLayerTextRotateExpression>),
-    Literal(
-        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
-        serde_json::Number,
-    ),
-}
-
-impl serde::Serialize for SymbolLayoutLayerTextRotate {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        match self {
-            Self::Expr(v) => v.as_ref().serialize(serializer),
-            Self::Literal(v) => v.serialize(serializer),
-        }
-    }
-}
-
-impl<'de> serde::Deserialize<'de> for SymbolLayoutLayerTextRotate {
-    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
-        let mut errors: Vec<(&str, std::string::String)> = Vec::new();
-        match <SymbolLayoutLayerTextRotateExpression as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Expr(Box::new(v))),
-            Err(e) => errors.push(("Expr", e.to_string())),
-        }
-        match <serde_json::Number as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Literal(v)),
-            Err(e) => errors.push(("Literal", e.to_string())),
-        }
-
-        let details: Vec<std::string::String> =
-            errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
-        Err(serde::de::Error::custom(format!(
-            "SymbolLayoutLayerTextRotate: no variant matched. Expected Expr(SymbolLayoutLayerTextRotateExpression) | Literal(serde_json::Number). Errors: [{}]",
-            details.join("; ")
-        )))
-    }
-}
-
-impl Default for SymbolLayoutLayerTextRotate {
-    fn default() -> Self {
-        Self::Literal(
-            serde_json::Number::from_i128(0)
-                .expect("the number is serialised from a number and is thus always valid"),
-        )
-    }
-}
+numeric_prop!(
+    SymbolLayoutLayerTextRotate,
+    doc = "Rotates the text clockwise.",
+    default = serde_json::Number::from_i128(0)
+        .expect("the number is serialised from a number and is thus always valid")
+);
 
 /// In combination with `symbol-placement`, determines the rotation behavior of the individual glyphs forming the text.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy, Default)]
@@ -7422,95 +2038,13 @@ pub enum SymbolLayoutLayerTextRotationAlignment {
     ViewportGlyph,
 }
 
-/// Nested expression: ramp (`interpolate` / …) or regular [`Number`] operators.
-#[derive(PartialEq, Debug, Clone)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum SymbolLayoutLayerTextSizeExpression {
-    Number(Number),
-    Ramp(NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection),
-}
-
-impl serde::Serialize for SymbolLayoutLayerTextSizeExpression {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        match self {
-            Self::Number(v) => v.serialize(serializer),
-            Self::Ramp(v) => v.serialize(serializer),
-        }
-    }
-}
-
-impl<'de> serde::Deserialize<'de> for SymbolLayoutLayerTextSizeExpression {
-    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
-        let mut errors: Vec<(&str, std::string::String)> = Vec::new();
-        match <Number as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Number(v)),
-            Err(e) => errors.push(("Number", e.to_string())),
-        }
-        match <NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Ramp(v)),
-            Err(e) => errors.push(("Ramp", e.to_string())),
-        }
-
-        let details: Vec<std::string::String> =
-            errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
-        Err(serde::de::Error::custom(format!(
-            "SymbolLayoutLayerTextSizeExpression: no variant matched. Expected Number(Number) | Ramp(NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection). Errors: [{}]",
-            details.join("; ")
-        )))
-    }
-}
-
-/// Font size.
-#[derive(PartialEq, Debug, Clone)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum SymbolLayoutLayerTextSize {
-    Expr(Box<SymbolLayoutLayerTextSizeExpression>),
-    Literal(
-        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
-        serde_json::Number,
-    ),
-}
-
-impl serde::Serialize for SymbolLayoutLayerTextSize {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        match self {
-            Self::Expr(v) => v.as_ref().serialize(serializer),
-            Self::Literal(v) => v.serialize(serializer),
-        }
-    }
-}
-
-impl<'de> serde::Deserialize<'de> for SymbolLayoutLayerTextSize {
-    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
-        let mut errors: Vec<(&str, std::string::String)> = Vec::new();
-        match <SymbolLayoutLayerTextSizeExpression as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Expr(Box::new(v))),
-            Err(e) => errors.push(("Expr", e.to_string())),
-        }
-        match <serde_json::Number as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Literal(v)),
-            Err(e) => errors.push(("Literal", e.to_string())),
-        }
-
-        let details: Vec<std::string::String> =
-            errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
-        Err(serde::de::Error::custom(format!(
-            "SymbolLayoutLayerTextSize: no variant matched. Expected Expr(SymbolLayoutLayerTextSizeExpression) | Literal(serde_json::Number). Errors: [{}]",
-            details.join("; ")
-        )))
-    }
-}
-
-impl Default for SymbolLayoutLayerTextSize {
-    fn default() -> Self {
-        Self::Literal(
-            serde_json::Number::from_i128(16)
-                .expect("the number is serialised from a number and is thus always valid"),
-        )
-    }
-}
+numeric_prop!(
+    SymbolLayoutLayerTextSize,
+    doc = "Font size.",
+    min = 0_f64,
+    default = serde_json::Number::from_i128(16)
+        .expect("the number is serialised from a number and is thus always valid")
+);
 
 /// Specifies how to capitalize text, similar to the CSS `text-transform` property.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy, Default)]
@@ -7589,16 +2123,7 @@ pub enum SymbolLayoutLayerTextWritingModeValue {
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct SymbolLayoutLayerTextWritingMode(Vec<SymbolLayoutLayerTextWritingModeValue>);
 
-/// Whether this layer is displayed.
-#[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy, Default)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum SymbolLayoutLayerVisibility {
-    #[serde(rename = "none")]
-    None,
-    #[serde(rename = "visible")]
-    #[default]
-    Visible,
-}
+pub type SymbolLayoutLayerVisibility = Visibility;
 
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
@@ -7663,451 +2188,38 @@ pub struct SymbolPaintLayer {
     pub text_translate_anchor: Option<SymbolPaintLayerTextTranslateAnchor>,
 }
 
-/// Nested expression: ramp (`interpolate-hcl`, …) or [`Color`] operators.
-#[derive(PartialEq, Debug, Clone)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum SymbolPaintLayerIconColorExpression {
-    Color(Color),
-    Ramp(ColorOrArrayOfColor),
-}
+color_prop!(
+    SymbolPaintLayerIconColor,
+    doc = "The color of the icon. This can only be used with SDF icons.",
+    default = serde_json::json!("#000000")
+);
 
-impl serde::Serialize for SymbolPaintLayerIconColorExpression {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        match self {
-            Self::Color(v) => v.serialize(serializer),
-            Self::Ramp(v) => v.serialize(serializer),
-        }
-    }
-}
+numeric_prop!(
+    SymbolPaintLayerIconHaloBlur,
+    doc = "Fade out the halo towards the outside.",
+    min = 0_f64,
+    default = serde_json::Number::from_i128(0)
+        .expect("the number is serialised from a number and is thus always valid")
+);
 
-impl<'de> serde::Deserialize<'de> for SymbolPaintLayerIconColorExpression {
-    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
-        let mut errors: Vec<(&str, std::string::String)> = Vec::new();
-        match <Color as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Color(v)),
-            Err(e) => errors.push(("Color", e.to_string())),
-        }
-        match <ColorOrArrayOfColor as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Ramp(v)),
-            Err(e) => errors.push(("Ramp", e.to_string())),
-        }
+color_prop!(
+    SymbolPaintLayerIconHaloColor,
+    doc = "The color of the icon's halo. Icon halos can only be used with SDF icons.",
+    default = serde_json::json!("rgba(0, 0, 0, 0)")
+);
 
-        let details: Vec<std::string::String> =
-            errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
-        Err(serde::de::Error::custom(format!(
-            "SymbolPaintLayerIconColorExpression: no variant matched. Expected Color(Color) | Ramp(ColorOrArrayOfColor). Errors: [{}]",
-            details.join("; ")
-        )))
-    }
-}
+numeric_prop!(SymbolPaintLayerIconHaloWidth, doc = "Distance of halo to the icon outline. 
 
-/// The color of the icon. This can only be used with SDF icons.
-#[derive(PartialEq, Debug, Clone)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum SymbolPaintLayerIconColor {
-    Expr(Box<SymbolPaintLayerIconColorExpression>),
-    Literal(
-        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
-        serde_json::Value,
-    ),
-}
+The unit is in pixels only for SDF sprites that were created with a blur radius of 8, multiplied by the display density. I.e., the radius needs to be 16 for `@2x` sprites, etc.", min = 0_f64, default = serde_json::Number::from_i128(0).expect("the number is serialised from a number and is thus always valid"));
 
-impl serde::Serialize for SymbolPaintLayerIconColor {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        match self {
-            Self::Expr(v) => v.as_ref().serialize(serializer),
-            Self::Literal(v) => v.serialize(serializer),
-        }
-    }
-}
-
-impl<'de> serde::Deserialize<'de> for SymbolPaintLayerIconColor {
-    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
-        let mut errors: Vec<(&str, std::string::String)> = Vec::new();
-        match <SymbolPaintLayerIconColorExpression as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Expr(Box::new(v))),
-            Err(e) => errors.push(("Expr", e.to_string())),
-        }
-        match <serde_json::Value as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Literal(v)),
-            Err(e) => errors.push(("Literal", e.to_string())),
-        }
-
-        let details: Vec<std::string::String> =
-            errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
-        Err(serde::de::Error::custom(format!(
-            "SymbolPaintLayerIconColor: no variant matched. Expected Expr(SymbolPaintLayerIconColorExpression) | Literal(serde_json::Value). Errors: [{}]",
-            details.join("; ")
-        )))
-    }
-}
-
-impl Default for SymbolPaintLayerIconColor {
-    fn default() -> Self {
-        Self::Literal(serde_json::json!("#000000"))
-    }
-}
-
-/// Nested expression: ramp (`interpolate` / …) or regular [`Number`] operators.
-#[derive(PartialEq, Debug, Clone)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum SymbolPaintLayerIconHaloBlurExpression {
-    Number(Number),
-    Ramp(NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection),
-}
-
-impl serde::Serialize for SymbolPaintLayerIconHaloBlurExpression {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        match self {
-            Self::Number(v) => v.serialize(serializer),
-            Self::Ramp(v) => v.serialize(serializer),
-        }
-    }
-}
-
-impl<'de> serde::Deserialize<'de> for SymbolPaintLayerIconHaloBlurExpression {
-    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
-        let mut errors: Vec<(&str, std::string::String)> = Vec::new();
-        match <Number as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Number(v)),
-            Err(e) => errors.push(("Number", e.to_string())),
-        }
-        match <NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Ramp(v)),
-            Err(e) => errors.push(("Ramp", e.to_string())),
-        }
-
-        let details: Vec<std::string::String> =
-            errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
-        Err(serde::de::Error::custom(format!(
-            "SymbolPaintLayerIconHaloBlurExpression: no variant matched. Expected Number(Number) | Ramp(NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection). Errors: [{}]",
-            details.join("; ")
-        )))
-    }
-}
-
-/// Fade out the halo towards the outside.
-#[derive(PartialEq, Debug, Clone)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum SymbolPaintLayerIconHaloBlur {
-    Expr(Box<SymbolPaintLayerIconHaloBlurExpression>),
-    Literal(
-        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
-        serde_json::Number,
-    ),
-}
-
-impl serde::Serialize for SymbolPaintLayerIconHaloBlur {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        match self {
-            Self::Expr(v) => v.as_ref().serialize(serializer),
-            Self::Literal(v) => v.serialize(serializer),
-        }
-    }
-}
-
-impl<'de> serde::Deserialize<'de> for SymbolPaintLayerIconHaloBlur {
-    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
-        let mut errors: Vec<(&str, std::string::String)> = Vec::new();
-        match <SymbolPaintLayerIconHaloBlurExpression as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Expr(Box::new(v))),
-            Err(e) => errors.push(("Expr", e.to_string())),
-        }
-        match <serde_json::Number as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Literal(v)),
-            Err(e) => errors.push(("Literal", e.to_string())),
-        }
-
-        let details: Vec<std::string::String> =
-            errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
-        Err(serde::de::Error::custom(format!(
-            "SymbolPaintLayerIconHaloBlur: no variant matched. Expected Expr(SymbolPaintLayerIconHaloBlurExpression) | Literal(serde_json::Number). Errors: [{}]",
-            details.join("; ")
-        )))
-    }
-}
-
-impl Default for SymbolPaintLayerIconHaloBlur {
-    fn default() -> Self {
-        Self::Literal(
-            serde_json::Number::from_i128(0)
-                .expect("the number is serialised from a number and is thus always valid"),
-        )
-    }
-}
-
-/// Nested expression: ramp (`interpolate-hcl`, …) or [`Color`] operators.
-#[derive(PartialEq, Debug, Clone)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum SymbolPaintLayerIconHaloColorExpression {
-    Color(Color),
-    Ramp(ColorOrArrayOfColor),
-}
-
-impl serde::Serialize for SymbolPaintLayerIconHaloColorExpression {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        match self {
-            Self::Color(v) => v.serialize(serializer),
-            Self::Ramp(v) => v.serialize(serializer),
-        }
-    }
-}
-
-impl<'de> serde::Deserialize<'de> for SymbolPaintLayerIconHaloColorExpression {
-    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
-        let mut errors: Vec<(&str, std::string::String)> = Vec::new();
-        match <Color as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Color(v)),
-            Err(e) => errors.push(("Color", e.to_string())),
-        }
-        match <ColorOrArrayOfColor as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Ramp(v)),
-            Err(e) => errors.push(("Ramp", e.to_string())),
-        }
-
-        let details: Vec<std::string::String> =
-            errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
-        Err(serde::de::Error::custom(format!(
-            "SymbolPaintLayerIconHaloColorExpression: no variant matched. Expected Color(Color) | Ramp(ColorOrArrayOfColor). Errors: [{}]",
-            details.join("; ")
-        )))
-    }
-}
-
-/// The color of the icon's halo. Icon halos can only be used with SDF icons.
-#[derive(PartialEq, Debug, Clone)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum SymbolPaintLayerIconHaloColor {
-    Expr(Box<SymbolPaintLayerIconHaloColorExpression>),
-    Literal(
-        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
-        serde_json::Value,
-    ),
-}
-
-impl serde::Serialize for SymbolPaintLayerIconHaloColor {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        match self {
-            Self::Expr(v) => v.as_ref().serialize(serializer),
-            Self::Literal(v) => v.serialize(serializer),
-        }
-    }
-}
-
-impl<'de> serde::Deserialize<'de> for SymbolPaintLayerIconHaloColor {
-    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
-        let mut errors: Vec<(&str, std::string::String)> = Vec::new();
-        match <SymbolPaintLayerIconHaloColorExpression as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Expr(Box::new(v))),
-            Err(e) => errors.push(("Expr", e.to_string())),
-        }
-        match <serde_json::Value as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Literal(v)),
-            Err(e) => errors.push(("Literal", e.to_string())),
-        }
-
-        let details: Vec<std::string::String> =
-            errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
-        Err(serde::de::Error::custom(format!(
-            "SymbolPaintLayerIconHaloColor: no variant matched. Expected Expr(SymbolPaintLayerIconHaloColorExpression) | Literal(serde_json::Value). Errors: [{}]",
-            details.join("; ")
-        )))
-    }
-}
-
-impl Default for SymbolPaintLayerIconHaloColor {
-    fn default() -> Self {
-        Self::Literal(serde_json::json!("rgba(0, 0, 0, 0)"))
-    }
-}
-
-/// Nested expression: ramp (`interpolate` / …) or regular [`Number`] operators.
-#[derive(PartialEq, Debug, Clone)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum SymbolPaintLayerIconHaloWidthExpression {
-    Number(Number),
-    Ramp(NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection),
-}
-
-impl serde::Serialize for SymbolPaintLayerIconHaloWidthExpression {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        match self {
-            Self::Number(v) => v.serialize(serializer),
-            Self::Ramp(v) => v.serialize(serializer),
-        }
-    }
-}
-
-impl<'de> serde::Deserialize<'de> for SymbolPaintLayerIconHaloWidthExpression {
-    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
-        let mut errors: Vec<(&str, std::string::String)> = Vec::new();
-        match <Number as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Number(v)),
-            Err(e) => errors.push(("Number", e.to_string())),
-        }
-        match <NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Ramp(v)),
-            Err(e) => errors.push(("Ramp", e.to_string())),
-        }
-
-        let details: Vec<std::string::String> =
-            errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
-        Err(serde::de::Error::custom(format!(
-            "SymbolPaintLayerIconHaloWidthExpression: no variant matched. Expected Number(Number) | Ramp(NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection). Errors: [{}]",
-            details.join("; ")
-        )))
-    }
-}
-
-/// Distance of halo to the icon outline.
-///
-/// The unit is in pixels only for SDF sprites that were created with a blur radius of 8, multiplied by the display density. I.e., the radius needs to be 16 for `@2x` sprites, etc.
-#[derive(PartialEq, Debug, Clone)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum SymbolPaintLayerIconHaloWidth {
-    Expr(Box<SymbolPaintLayerIconHaloWidthExpression>),
-    Literal(
-        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
-        serde_json::Number,
-    ),
-}
-
-impl serde::Serialize for SymbolPaintLayerIconHaloWidth {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        match self {
-            Self::Expr(v) => v.as_ref().serialize(serializer),
-            Self::Literal(v) => v.serialize(serializer),
-        }
-    }
-}
-
-impl<'de> serde::Deserialize<'de> for SymbolPaintLayerIconHaloWidth {
-    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
-        let mut errors: Vec<(&str, std::string::String)> = Vec::new();
-        match <SymbolPaintLayerIconHaloWidthExpression as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Expr(Box::new(v))),
-            Err(e) => errors.push(("Expr", e.to_string())),
-        }
-        match <serde_json::Number as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Literal(v)),
-            Err(e) => errors.push(("Literal", e.to_string())),
-        }
-
-        let details: Vec<std::string::String> =
-            errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
-        Err(serde::de::Error::custom(format!(
-            "SymbolPaintLayerIconHaloWidth: no variant matched. Expected Expr(SymbolPaintLayerIconHaloWidthExpression) | Literal(serde_json::Number). Errors: [{}]",
-            details.join("; ")
-        )))
-    }
-}
-
-impl Default for SymbolPaintLayerIconHaloWidth {
-    fn default() -> Self {
-        Self::Literal(
-            serde_json::Number::from_i128(0)
-                .expect("the number is serialised from a number and is thus always valid"),
-        )
-    }
-}
-
-/// Nested expression: ramp (`interpolate` / …) or regular [`Number`] operators.
-#[derive(PartialEq, Debug, Clone)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum SymbolPaintLayerIconOpacityExpression {
-    Number(Number),
-    Ramp(NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection),
-}
-
-impl serde::Serialize for SymbolPaintLayerIconOpacityExpression {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        match self {
-            Self::Number(v) => v.serialize(serializer),
-            Self::Ramp(v) => v.serialize(serializer),
-        }
-    }
-}
-
-impl<'de> serde::Deserialize<'de> for SymbolPaintLayerIconOpacityExpression {
-    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
-        let mut errors: Vec<(&str, std::string::String)> = Vec::new();
-        match <Number as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Number(v)),
-            Err(e) => errors.push(("Number", e.to_string())),
-        }
-        match <NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Ramp(v)),
-            Err(e) => errors.push(("Ramp", e.to_string())),
-        }
-
-        let details: Vec<std::string::String> =
-            errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
-        Err(serde::de::Error::custom(format!(
-            "SymbolPaintLayerIconOpacityExpression: no variant matched. Expected Number(Number) | Ramp(NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection). Errors: [{}]",
-            details.join("; ")
-        )))
-    }
-}
-
-/// The opacity at which the icon will be drawn.
-#[derive(PartialEq, Debug, Clone)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum SymbolPaintLayerIconOpacity {
-    Expr(Box<SymbolPaintLayerIconOpacityExpression>),
-    Literal(
-        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
-        serde_json::Number,
-    ),
-}
-
-impl serde::Serialize for SymbolPaintLayerIconOpacity {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        match self {
-            Self::Expr(v) => v.as_ref().serialize(serializer),
-            Self::Literal(v) => v.serialize(serializer),
-        }
-    }
-}
-
-impl<'de> serde::Deserialize<'de> for SymbolPaintLayerIconOpacity {
-    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
-        let mut errors: Vec<(&str, std::string::String)> = Vec::new();
-        match <SymbolPaintLayerIconOpacityExpression as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Expr(Box::new(v))),
-            Err(e) => errors.push(("Expr", e.to_string())),
-        }
-        match <serde_json::Number as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Literal(v)),
-            Err(e) => errors.push(("Literal", e.to_string())),
-        }
-
-        let details: Vec<std::string::String> =
-            errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
-        Err(serde::de::Error::custom(format!(
-            "SymbolPaintLayerIconOpacity: no variant matched. Expected Expr(SymbolPaintLayerIconOpacityExpression) | Literal(serde_json::Number). Errors: [{}]",
-            details.join("; ")
-        )))
-    }
-}
-
-impl Default for SymbolPaintLayerIconOpacity {
-    fn default() -> Self {
-        Self::Literal(
-            serde_json::Number::from_i128(1)
-                .expect("the number is serialised from a number and is thus always valid"),
-        )
-    }
-}
+numeric_prop!(
+    SymbolPaintLayerIconOpacity,
+    doc = "The opacity at which the icon will be drawn.",
+    min = 0_f64,
+    max = 1_f64,
+    default = serde_json::Number::from_i128(1)
+        .expect("the number is serialised from a number and is thus always valid")
+);
 
 /// Distance that the icon's anchor is moved from its original placement. Positive values indicate right and down, while negative values indicate left and up.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
@@ -8139,449 +2251,42 @@ pub enum SymbolPaintLayerIconTranslateAnchor {
     Viewport,
 }
 
-/// Nested expression: ramp (`interpolate-hcl`, …) or [`Color`] operators.
-#[derive(PartialEq, Debug, Clone)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum SymbolPaintLayerTextColorExpression {
-    Color(Color),
-    Ramp(ColorOrArrayOfColor),
-}
+color_prop!(
+    SymbolPaintLayerTextColor,
+    doc = "The color with which the text will be drawn.",
+    default = serde_json::json!("#000000")
+);
 
-impl serde::Serialize for SymbolPaintLayerTextColorExpression {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        match self {
-            Self::Color(v) => v.serialize(serializer),
-            Self::Ramp(v) => v.serialize(serializer),
-        }
-    }
-}
+numeric_prop!(
+    SymbolPaintLayerTextHaloBlur,
+    doc = "The halo's fadeout distance towards the outside.",
+    min = 0_f64,
+    default = serde_json::Number::from_i128(0)
+        .expect("the number is serialised from a number and is thus always valid")
+);
 
-impl<'de> serde::Deserialize<'de> for SymbolPaintLayerTextColorExpression {
-    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
-        let mut errors: Vec<(&str, std::string::String)> = Vec::new();
-        match <Color as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Color(v)),
-            Err(e) => errors.push(("Color", e.to_string())),
-        }
-        match <ColorOrArrayOfColor as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Ramp(v)),
-            Err(e) => errors.push(("Ramp", e.to_string())),
-        }
+color_prop!(
+    SymbolPaintLayerTextHaloColor,
+    doc = "The color of the text's halo, which helps it stand out from backgrounds.",
+    default = serde_json::json!("rgba(0, 0, 0, 0)")
+);
 
-        let details: Vec<std::string::String> =
-            errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
-        Err(serde::de::Error::custom(format!(
-            "SymbolPaintLayerTextColorExpression: no variant matched. Expected Color(Color) | Ramp(ColorOrArrayOfColor). Errors: [{}]",
-            details.join("; ")
-        )))
-    }
-}
+numeric_prop!(
+    SymbolPaintLayerTextHaloWidth,
+    doc = "Distance of halo to the font outline. Max text halo width is 1/4 of the font-size.",
+    min = 0_f64,
+    default = serde_json::Number::from_i128(0)
+        .expect("the number is serialised from a number and is thus always valid")
+);
 
-/// The color with which the text will be drawn.
-#[derive(PartialEq, Debug, Clone)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum SymbolPaintLayerTextColor {
-    Expr(Box<SymbolPaintLayerTextColorExpression>),
-    Literal(
-        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
-        serde_json::Value,
-    ),
-}
-
-impl serde::Serialize for SymbolPaintLayerTextColor {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        match self {
-            Self::Expr(v) => v.as_ref().serialize(serializer),
-            Self::Literal(v) => v.serialize(serializer),
-        }
-    }
-}
-
-impl<'de> serde::Deserialize<'de> for SymbolPaintLayerTextColor {
-    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
-        let mut errors: Vec<(&str, std::string::String)> = Vec::new();
-        match <SymbolPaintLayerTextColorExpression as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Expr(Box::new(v))),
-            Err(e) => errors.push(("Expr", e.to_string())),
-        }
-        match <serde_json::Value as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Literal(v)),
-            Err(e) => errors.push(("Literal", e.to_string())),
-        }
-
-        let details: Vec<std::string::String> =
-            errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
-        Err(serde::de::Error::custom(format!(
-            "SymbolPaintLayerTextColor: no variant matched. Expected Expr(SymbolPaintLayerTextColorExpression) | Literal(serde_json::Value). Errors: [{}]",
-            details.join("; ")
-        )))
-    }
-}
-
-impl Default for SymbolPaintLayerTextColor {
-    fn default() -> Self {
-        Self::Literal(serde_json::json!("#000000"))
-    }
-}
-
-/// Nested expression: ramp (`interpolate` / …) or regular [`Number`] operators.
-#[derive(PartialEq, Debug, Clone)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum SymbolPaintLayerTextHaloBlurExpression {
-    Number(Number),
-    Ramp(NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection),
-}
-
-impl serde::Serialize for SymbolPaintLayerTextHaloBlurExpression {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        match self {
-            Self::Number(v) => v.serialize(serializer),
-            Self::Ramp(v) => v.serialize(serializer),
-        }
-    }
-}
-
-impl<'de> serde::Deserialize<'de> for SymbolPaintLayerTextHaloBlurExpression {
-    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
-        let mut errors: Vec<(&str, std::string::String)> = Vec::new();
-        match <Number as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Number(v)),
-            Err(e) => errors.push(("Number", e.to_string())),
-        }
-        match <NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Ramp(v)),
-            Err(e) => errors.push(("Ramp", e.to_string())),
-        }
-
-        let details: Vec<std::string::String> =
-            errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
-        Err(serde::de::Error::custom(format!(
-            "SymbolPaintLayerTextHaloBlurExpression: no variant matched. Expected Number(Number) | Ramp(NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection). Errors: [{}]",
-            details.join("; ")
-        )))
-    }
-}
-
-/// The halo's fadeout distance towards the outside.
-#[derive(PartialEq, Debug, Clone)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum SymbolPaintLayerTextHaloBlur {
-    Expr(Box<SymbolPaintLayerTextHaloBlurExpression>),
-    Literal(
-        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
-        serde_json::Number,
-    ),
-}
-
-impl serde::Serialize for SymbolPaintLayerTextHaloBlur {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        match self {
-            Self::Expr(v) => v.as_ref().serialize(serializer),
-            Self::Literal(v) => v.serialize(serializer),
-        }
-    }
-}
-
-impl<'de> serde::Deserialize<'de> for SymbolPaintLayerTextHaloBlur {
-    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
-        let mut errors: Vec<(&str, std::string::String)> = Vec::new();
-        match <SymbolPaintLayerTextHaloBlurExpression as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Expr(Box::new(v))),
-            Err(e) => errors.push(("Expr", e.to_string())),
-        }
-        match <serde_json::Number as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Literal(v)),
-            Err(e) => errors.push(("Literal", e.to_string())),
-        }
-
-        let details: Vec<std::string::String> =
-            errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
-        Err(serde::de::Error::custom(format!(
-            "SymbolPaintLayerTextHaloBlur: no variant matched. Expected Expr(SymbolPaintLayerTextHaloBlurExpression) | Literal(serde_json::Number). Errors: [{}]",
-            details.join("; ")
-        )))
-    }
-}
-
-impl Default for SymbolPaintLayerTextHaloBlur {
-    fn default() -> Self {
-        Self::Literal(
-            serde_json::Number::from_i128(0)
-                .expect("the number is serialised from a number and is thus always valid"),
-        )
-    }
-}
-
-/// Nested expression: ramp (`interpolate-hcl`, …) or [`Color`] operators.
-#[derive(PartialEq, Debug, Clone)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum SymbolPaintLayerTextHaloColorExpression {
-    Color(Color),
-    Ramp(ColorOrArrayOfColor),
-}
-
-impl serde::Serialize for SymbolPaintLayerTextHaloColorExpression {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        match self {
-            Self::Color(v) => v.serialize(serializer),
-            Self::Ramp(v) => v.serialize(serializer),
-        }
-    }
-}
-
-impl<'de> serde::Deserialize<'de> for SymbolPaintLayerTextHaloColorExpression {
-    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
-        let mut errors: Vec<(&str, std::string::String)> = Vec::new();
-        match <Color as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Color(v)),
-            Err(e) => errors.push(("Color", e.to_string())),
-        }
-        match <ColorOrArrayOfColor as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Ramp(v)),
-            Err(e) => errors.push(("Ramp", e.to_string())),
-        }
-
-        let details: Vec<std::string::String> =
-            errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
-        Err(serde::de::Error::custom(format!(
-            "SymbolPaintLayerTextHaloColorExpression: no variant matched. Expected Color(Color) | Ramp(ColorOrArrayOfColor). Errors: [{}]",
-            details.join("; ")
-        )))
-    }
-}
-
-/// The color of the text's halo, which helps it stand out from backgrounds.
-#[derive(PartialEq, Debug, Clone)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum SymbolPaintLayerTextHaloColor {
-    Expr(Box<SymbolPaintLayerTextHaloColorExpression>),
-    Literal(
-        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
-        serde_json::Value,
-    ),
-}
-
-impl serde::Serialize for SymbolPaintLayerTextHaloColor {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        match self {
-            Self::Expr(v) => v.as_ref().serialize(serializer),
-            Self::Literal(v) => v.serialize(serializer),
-        }
-    }
-}
-
-impl<'de> serde::Deserialize<'de> for SymbolPaintLayerTextHaloColor {
-    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
-        let mut errors: Vec<(&str, std::string::String)> = Vec::new();
-        match <SymbolPaintLayerTextHaloColorExpression as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Expr(Box::new(v))),
-            Err(e) => errors.push(("Expr", e.to_string())),
-        }
-        match <serde_json::Value as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Literal(v)),
-            Err(e) => errors.push(("Literal", e.to_string())),
-        }
-
-        let details: Vec<std::string::String> =
-            errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
-        Err(serde::de::Error::custom(format!(
-            "SymbolPaintLayerTextHaloColor: no variant matched. Expected Expr(SymbolPaintLayerTextHaloColorExpression) | Literal(serde_json::Value). Errors: [{}]",
-            details.join("; ")
-        )))
-    }
-}
-
-impl Default for SymbolPaintLayerTextHaloColor {
-    fn default() -> Self {
-        Self::Literal(serde_json::json!("rgba(0, 0, 0, 0)"))
-    }
-}
-
-/// Nested expression: ramp (`interpolate` / …) or regular [`Number`] operators.
-#[derive(PartialEq, Debug, Clone)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum SymbolPaintLayerTextHaloWidthExpression {
-    Number(Number),
-    Ramp(NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection),
-}
-
-impl serde::Serialize for SymbolPaintLayerTextHaloWidthExpression {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        match self {
-            Self::Number(v) => v.serialize(serializer),
-            Self::Ramp(v) => v.serialize(serializer),
-        }
-    }
-}
-
-impl<'de> serde::Deserialize<'de> for SymbolPaintLayerTextHaloWidthExpression {
-    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
-        let mut errors: Vec<(&str, std::string::String)> = Vec::new();
-        match <Number as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Number(v)),
-            Err(e) => errors.push(("Number", e.to_string())),
-        }
-        match <NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Ramp(v)),
-            Err(e) => errors.push(("Ramp", e.to_string())),
-        }
-
-        let details: Vec<std::string::String> =
-            errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
-        Err(serde::de::Error::custom(format!(
-            "SymbolPaintLayerTextHaloWidthExpression: no variant matched. Expected Number(Number) | Ramp(NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection). Errors: [{}]",
-            details.join("; ")
-        )))
-    }
-}
-
-/// Distance of halo to the font outline. Max text halo width is 1/4 of the font-size.
-#[derive(PartialEq, Debug, Clone)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum SymbolPaintLayerTextHaloWidth {
-    Expr(Box<SymbolPaintLayerTextHaloWidthExpression>),
-    Literal(
-        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
-        serde_json::Number,
-    ),
-}
-
-impl serde::Serialize for SymbolPaintLayerTextHaloWidth {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        match self {
-            Self::Expr(v) => v.as_ref().serialize(serializer),
-            Self::Literal(v) => v.serialize(serializer),
-        }
-    }
-}
-
-impl<'de> serde::Deserialize<'de> for SymbolPaintLayerTextHaloWidth {
-    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
-        let mut errors: Vec<(&str, std::string::String)> = Vec::new();
-        match <SymbolPaintLayerTextHaloWidthExpression as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Expr(Box::new(v))),
-            Err(e) => errors.push(("Expr", e.to_string())),
-        }
-        match <serde_json::Number as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Literal(v)),
-            Err(e) => errors.push(("Literal", e.to_string())),
-        }
-
-        let details: Vec<std::string::String> =
-            errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
-        Err(serde::de::Error::custom(format!(
-            "SymbolPaintLayerTextHaloWidth: no variant matched. Expected Expr(SymbolPaintLayerTextHaloWidthExpression) | Literal(serde_json::Number). Errors: [{}]",
-            details.join("; ")
-        )))
-    }
-}
-
-impl Default for SymbolPaintLayerTextHaloWidth {
-    fn default() -> Self {
-        Self::Literal(
-            serde_json::Number::from_i128(0)
-                .expect("the number is serialised from a number and is thus always valid"),
-        )
-    }
-}
-
-/// Nested expression: ramp (`interpolate` / …) or regular [`Number`] operators.
-#[derive(PartialEq, Debug, Clone)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum SymbolPaintLayerTextOpacityExpression {
-    Number(Number),
-    Ramp(NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection),
-}
-
-impl serde::Serialize for SymbolPaintLayerTextOpacityExpression {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        match self {
-            Self::Number(v) => v.serialize(serializer),
-            Self::Ramp(v) => v.serialize(serializer),
-        }
-    }
-}
-
-impl<'de> serde::Deserialize<'de> for SymbolPaintLayerTextOpacityExpression {
-    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
-        let mut errors: Vec<(&str, std::string::String)> = Vec::new();
-        match <Number as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Number(v)),
-            Err(e) => errors.push(("Number", e.to_string())),
-        }
-        match <NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Ramp(v)),
-            Err(e) => errors.push(("Ramp", e.to_string())),
-        }
-
-        let details: Vec<std::string::String> =
-            errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
-        Err(serde::de::Error::custom(format!(
-            "SymbolPaintLayerTextOpacityExpression: no variant matched. Expected Number(Number) | Ramp(NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection). Errors: [{}]",
-            details.join("; ")
-        )))
-    }
-}
-
-/// The opacity at which the text will be drawn.
-#[derive(PartialEq, Debug, Clone)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum SymbolPaintLayerTextOpacity {
-    Expr(Box<SymbolPaintLayerTextOpacityExpression>),
-    Literal(
-        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
-        serde_json::Number,
-    ),
-}
-
-impl serde::Serialize for SymbolPaintLayerTextOpacity {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        match self {
-            Self::Expr(v) => v.as_ref().serialize(serializer),
-            Self::Literal(v) => v.serialize(serializer),
-        }
-    }
-}
-
-impl<'de> serde::Deserialize<'de> for SymbolPaintLayerTextOpacity {
-    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
-        let mut errors: Vec<(&str, std::string::String)> = Vec::new();
-        match <SymbolPaintLayerTextOpacityExpression as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Expr(Box::new(v))),
-            Err(e) => errors.push(("Expr", e.to_string())),
-        }
-        match <serde_json::Number as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Literal(v)),
-            Err(e) => errors.push(("Literal", e.to_string())),
-        }
-
-        let details: Vec<std::string::String> =
-            errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
-        Err(serde::de::Error::custom(format!(
-            "SymbolPaintLayerTextOpacity: no variant matched. Expected Expr(SymbolPaintLayerTextOpacityExpression) | Literal(serde_json::Number). Errors: [{}]",
-            details.join("; ")
-        )))
-    }
-}
-
-impl Default for SymbolPaintLayerTextOpacity {
-    fn default() -> Self {
-        Self::Literal(
-            serde_json::Number::from_i128(1)
-                .expect("the number is serialised from a number and is thus always valid"),
-        )
-    }
-}
+numeric_prop!(
+    SymbolPaintLayerTextOpacity,
+    doc = "The opacity at which the text will be drawn.",
+    min = 0_f64,
+    max = 1_f64,
+    default = serde_json::Number::from_i128(1)
+        .expect("the number is serialised from a number and is thus always valid")
+);
 
 /// Distance that the text's anchor is moved from its original placement. Positive values indicate right and down, while negative values indicate left and up.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
