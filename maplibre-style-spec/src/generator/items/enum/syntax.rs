@@ -112,14 +112,9 @@ pub(crate) fn ensure_expr_or_literal_type(scope: &mut Scope) {
                 inner_type: "JSONObjectLiteral".into(),
                 is_boxed: false,
                 is_unit: false,
-                skip_when: None,
-            },
-            UV {
-                name: "JSONArrayLiteral".into(),
-                inner_type: "JSONArrayLiteral".into(),
-                is_boxed: false,
-                is_unit: false,
-                skip_when: None,
+                // JSONObjectLiteral wraps serde_json::Value (matches anything).
+                // Only try for non-arrays; arrays should try expression types first.
+                skip_when: Some("value.is_array()".into()),
             },
             UV {
                 name: "AnyExpr".into(),
@@ -188,6 +183,15 @@ pub(crate) fn ensure_expr_or_literal_type(scope: &mut Scope) {
                 name: "StringExpr".into(),
                 inner_type: "String".into(),
                 is_boxed: true,
+                is_unit: false,
+                skip_when: None,
+            },
+            // Array literal fallback: tried after expression types so that expression
+            // arrays (e.g. ["accumulated"]) match their expression type first.
+            UV {
+                name: "JSONArrayLiteral".into(),
+                inner_type: "JSONArrayLiteral".into(),
+                is_boxed: false,
                 is_unit: false,
                 skip_when: None,
             },
@@ -1843,11 +1847,37 @@ fn generate_syntax_enum_serializer(
             let overload = &syntax.overloads[0];
             if syntax.has_variadic_overload() {
                 let sep = overload.position_of_variadic_separator();
-                arms.push_str(&generate_ser_arm_variadic(name, key, &var_name, sep));
+                // A pure Vec<(A,B)> (no tuple wrapper) has exactly `sep` params
+                // in the template group with no extra header/suffix parameters.
+                // parameters includes "..." marker; a pure Vec has exactly sep template
+                // params + the "..." separator with no extra header/suffix params.
+                // A pure Vec<(A,B)> has ALL params in the template group (no
+                // headers/suffixes). Template params before "..." end with "_1" and
+                // after "..." end with "_n". Non-template params lack these suffixes.
+                let before = &overload.parameters[..sep];
+                let after = &overload.parameters[sep + 1..];
+                let is_pure_vec = before
+                    .iter()
+                    .all(|p| p.trim_end_matches('?').ends_with("_1"))
+                    && after
+                        .iter()
+                        .all(|p| p.trim_end_matches('?').ends_with("_n"));
+                arms.push_str(&generate_ser_arm_variadic(
+                    name,
+                    key,
+                    &var_name,
+                    sep,
+                    is_pure_vec,
+                ));
             } else {
                 // Fixed-arity: variant has N tuple fields.
                 let n = overload.parameters.len();
-                arms.push_str(&generate_ser_arm_fixed(name, key, &var_name, n));
+                let n_required = overload
+                    .parameters
+                    .iter()
+                    .filter(|p| !p.ends_with('?'))
+                    .count();
+                arms.push_str(&generate_ser_arm_fixed(name, key, &var_name, n, n_required));
             }
         } else {
             // Multi-overload: variant wraps an Options enum.
@@ -1874,8 +1904,15 @@ impl serde::Serialize for {name} {{
 }
 
 /// Serialize a fixed-arity variant: `Variant(a, b, c)` → `["op", a, b, c]`.
-/// Trailing `None` values (from optional parameters) are omitted.
-fn generate_ser_arm_fixed(name: &str, op: &str, var_name: &str, n: usize) -> String {
+/// Trailing `None` values (from optional parameters) are omitted, but at least
+/// `n_required` elements are always preserved.
+fn generate_ser_arm_fixed(
+    name: &str,
+    op: &str,
+    var_name: &str,
+    n: usize,
+    n_required: usize,
+) -> String {
     let bindings: Vec<String> = (0..n).map(|i| format!("f{i}")).collect();
     let pattern = if bindings.is_empty() {
         format!("{name}::{var_name}")
@@ -1892,7 +1929,9 @@ fn generate_ser_arm_fixed(name: &str, op: &str, var_name: &str, n: usize) -> Str
         .collect::<Vec<_>>()
         .join(",");
     body.push_str(&format!("let mut elems = vec![{elems}];\n"));
-    body.push_str("while elems.last().is_some_and(serde_json::Value::is_null) { elems.pop(); }\n");
+    body.push_str(&format!(
+        "while elems.len() > {n_required} && elems.last().is_some_and(serde_json::Value::is_null) {{ elems.pop(); }}\n"
+    ));
     body.push_str("let mut seq = serializer.serialize_seq(None)?;\n");
     body.push_str(&format!("seq.serialize_element({op:?})?;\n"));
     body.push_str("for elem in &elems { seq.serialize_element(elem)?; }\n");
@@ -1908,7 +1947,15 @@ fn generate_ser_arm_fixed(name: &str, op: &str, var_name: &str, n: usize) -> Str
 /// `sep` is the variadic separator position (number of fields per template group).
 /// When `sep == 1`, each Vec element is a single value → no flattening needed.
 /// When `sep > 1`, each Vec element is a tuple → flatten within each group.
-fn generate_ser_arm_variadic(name: &str, op: &str, var_name: &str, sep: usize) -> String {
+/// `is_pure_vec` indicates whether the inner type is a pure `Vec<(A,B)>` (true)
+/// or a tuple `(headers..., Vec<(A,B)>, suffixes...)` (false).
+fn generate_ser_arm_variadic(
+    name: &str,
+    op: &str,
+    var_name: &str,
+    sep: usize,
+    is_pure_vec: bool,
+) -> String {
     if sep <= 1 {
         // Simple variadic: Vec<T> or (hdr..., Vec<T>).
         // Each element is a single value; don't flatten nested arrays.
@@ -1928,11 +1975,10 @@ fn generate_ser_arm_variadic(name: &str, op: &str, var_name: &str, sep: usize) -
             }}
 "#
         )
-    } else {
-        // Tuple variadic: (hdr..., Vec<(a, b, ...)>) or (Vec<(a, b)>, suffix).
-        // The inner serializes as `[hdr1, ..., [[a1,b1], [a2,b2], ...], suffix?]`.
-        // We emit header fields as-is, then flatten the Vec-of-tuples element,
-        // then emit suffix fields as-is.
+    } else if !is_pure_vec {
+        // Tuple variadic with headers/suffixes: (hdr..., Vec<(a, b, ...)>, suffix...).
+        // The inner serializes as `[hdr1, ..., [[a1,b1], [a2,b2], ...]]`.
+        // We emit header fields as-is, then flatten the Vec-of-tuples element.
         format!(
             r#"            {name}::{var_name}(inner) => {{
                 let inner_val = serde_json::to_value(inner).map_err(serde::ser::Error::custom)?;
@@ -1969,12 +2015,38 @@ fn generate_ser_arm_variadic(name: &str, op: &str, var_name: &str, sep: usize) -
             }}
 "#
         )
+    } else {
+        // Pure variadic Vec<(a, b, ...)> without header fields.
+        // Each top-level element is a serialized tuple — flatten all of them.
+        format!(
+            r#"            {name}::{var_name}(inner) => {{
+                let inner_val = serde_json::to_value(inner).map_err(serde::ser::Error::custom)?;
+                let mut seq = serializer.serialize_seq(None)?;
+                seq.serialize_element({op:?})?;
+                if let serde_json::Value::Array(top) = &inner_val {{
+                    for elem in top {{
+                        if let serde_json::Value::Array(pair_elems) = elem {{
+                            for pe in pair_elems {{
+                                seq.serialize_element(pe)?;
+                            }}
+                        }} else {{
+                            seq.serialize_element(elem)?;
+                        }}
+                    }}
+                }} else {{
+                    seq.serialize_element(&inner_val)?;
+                }}
+                seq.end()
+            }}
+"#
+        )
     }
 }
 
 /// Serialize a multi-overload variant: `Variant(Options)`.
 /// Options is an `#[serde(untagged)]` tuple enum, so it serializes as a JSON array.
 /// We emit `["op", ...options_elements]`.
+/// Single-field variants serialize as a bare value (not an array) under `#[serde(untagged)]`.
 fn generate_ser_arm_options(name: &str, op: &str, var_name: &str) -> String {
     format!(
         r#"            {name}::{var_name}(opts) => {{
@@ -1986,6 +2058,8 @@ fn generate_ser_arm_options(name: &str, op: &str, var_name: &str) -> String {
                     for elem in &arr {{
                         seq.serialize_element(elem)?;
                     }}
+                }} else {{
+                    seq.serialize_element(&opts_val)?;
                 }}
                 seq.end()
             }}

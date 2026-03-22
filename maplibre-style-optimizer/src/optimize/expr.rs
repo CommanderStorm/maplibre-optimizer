@@ -279,13 +279,7 @@ pub(crate) fn bool_literal(v: &Value) -> Option<bool> {
     }
 }
 
-pub(crate) fn extract_json_literal(v: &Value) -> Option<Value> {
-    match v {
-        Value::Number(_) | Value::String(_) | Value::Bool(_) | Value::Null => Some(v.clone()),
-        Value::Array(a) if a.len() == 2 && a[0].as_str() == Some("literal") => Some(a[1].clone()),
-        _ => None,
-    }
-}
+pub(crate) use super::expr_util::extract_json_literal;
 
 /// Returns `true` if `v` is the numeric literal `expected` (bare number or `["literal", n]`).
 #[allow(clippy::float_cmp)]

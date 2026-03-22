@@ -32,7 +32,7 @@ fn layer_source_info(layer: &Value) -> Option<(&str, &str)> {
 
 /// Pre-compute vector layer info for all layers in the style (JSON variant).
 /// Returns a vec indexed by layer position; `None` if the layer doesn't have a vector source.
-pub(super) fn precompute_vector_layer_info(style: &Value) -> Vec<Option<VectorLayerInfo>> {
+pub(crate) fn precompute_vector_layer_info(style: &Value) -> Vec<Option<VectorLayerInfo>> {
     let Some(root) = style.as_object() else {
         return vec![];
     };

@@ -428,7 +428,6 @@ mod tests {
                     Self::StringLiteral(v) => v.serialize(serializer),
                     Self::GeoJSONObjectLiteral(v) => v.serialize(serializer),
                     Self::JSONObjectLiteral(v) => v.serialize(serializer),
-                    Self::JSONArrayLiteral(v) => v.serialize(serializer),
                     Self::AnyExpr(v) => v.as_ref().serialize(serializer),
                     Self::ArrayExpr(v) => v.as_ref().serialize(serializer),
                     Self::BooleanExpr(v) => v.as_ref().serialize(serializer),
@@ -439,6 +438,7 @@ mod tests {
                     Self::NumberExpr(v) => v.as_ref().serialize(serializer),
                     Self::ObjectExpr(v) => v.as_ref().serialize(serializer),
                     Self::StringExpr(v) => v.as_ref().serialize(serializer),
+                    Self::JSONArrayLiteral(v) => v.serialize(serializer),
                 }
             }
         }
@@ -466,13 +466,11 @@ mod tests {
                     Ok(v) => return Ok(Self::GeoJSONObjectLiteral(v)),
                     Err(e) => errors.push(("GeoJSONObjectLiteral", e.to_string())),
                 }
-                match <JSONObjectLiteral as serde::Deserialize>::deserialize(&value) {
-                    Ok(v) => return Ok(Self::JSONObjectLiteral(v)),
-                    Err(e) => errors.push(("JSONObjectLiteral", e.to_string())),
-                }
-                match <JSONArrayLiteral as serde::Deserialize>::deserialize(&value) {
-                    Ok(v) => return Ok(Self::JSONArrayLiteral(v)),
-                    Err(e) => errors.push(("JSONArrayLiteral", e.to_string())),
+                if !(value.is_array()) {
+                    match <JSONObjectLiteral as serde::Deserialize>::deserialize(&value) {
+                        Ok(v) => return Ok(Self::JSONObjectLiteral(v)),
+                        Err(e) => errors.push(("JSONObjectLiteral", e.to_string())),
+                    }
                 }
                 match <Any as serde::Deserialize>::deserialize(&value) {
                     Ok(v) => return Ok(Self::AnyExpr(Box::new(v))),
@@ -514,11 +512,15 @@ mod tests {
                     Ok(v) => return Ok(Self::StringExpr(Box::new(v))),
                     Err(e) => errors.push(("StringExpr", e.to_string())),
                 }
+                match <JSONArrayLiteral as serde::Deserialize>::deserialize(&value) {
+                    Ok(v) => return Ok(Self::JSONArrayLiteral(v)),
+                    Err(e) => errors.push(("JSONArrayLiteral", e.to_string())),
+                }
 
                 let details: Vec<std::string::String> =
                     errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
                 Err(serde::de::Error::custom(format!(
-                    "ExprOrLiteral: no variant matched. Expected Null | Bool(bool) | NumberLiteral(NumberLiteral) | StringLiteral(StringLiteral) | GeoJSONObjectLiteral(GeoJSONObjectLiteral) | JSONObjectLiteral(JSONObjectLiteral) | JSONArrayLiteral(JSONArrayLiteral) | AnyExpr(Any) | ArrayExpr(Array) | BooleanExpr(Boolean) | CollatorExpr(Collator) | ColorExpr(Color) | FormattedExpr(Formatted) | ImageExpr(Image) | NumberExpr(Number) | ObjectExpr(Object) | StringExpr(String). Errors: [{}]",
+                    "ExprOrLiteral: no variant matched. Expected Null | Bool(bool) | NumberLiteral(NumberLiteral) | StringLiteral(StringLiteral) | GeoJSONObjectLiteral(GeoJSONObjectLiteral) | JSONObjectLiteral(JSONObjectLiteral) | AnyExpr(Any) | ArrayExpr(Array) | BooleanExpr(Boolean) | CollatorExpr(Collator) | ColorExpr(Color) | FormattedExpr(Formatted) | ImageExpr(Image) | NumberExpr(Number) | ObjectExpr(Object) | StringExpr(String) | JSONArrayLiteral(JSONArrayLiteral). Errors: [{}]",
                     details.join("; ")
                 )))
             }
@@ -652,7 +654,6 @@ mod tests {
                     Self::StringLiteral(v) => v.serialize(serializer),
                     Self::GeoJSONObjectLiteral(v) => v.serialize(serializer),
                     Self::JSONObjectLiteral(v) => v.serialize(serializer),
-                    Self::JSONArrayLiteral(v) => v.serialize(serializer),
                     Self::AnyExpr(v) => v.as_ref().serialize(serializer),
                     Self::ArrayExpr(v) => v.as_ref().serialize(serializer),
                     Self::BooleanExpr(v) => v.as_ref().serialize(serializer),
@@ -663,6 +664,7 @@ mod tests {
                     Self::NumberExpr(v) => v.as_ref().serialize(serializer),
                     Self::ObjectExpr(v) => v.as_ref().serialize(serializer),
                     Self::StringExpr(v) => v.as_ref().serialize(serializer),
+                    Self::JSONArrayLiteral(v) => v.serialize(serializer),
                 }
             }
         }
@@ -690,13 +692,11 @@ mod tests {
                     Ok(v) => return Ok(Self::GeoJSONObjectLiteral(v)),
                     Err(e) => errors.push(("GeoJSONObjectLiteral", e.to_string())),
                 }
-                match <JSONObjectLiteral as serde::Deserialize>::deserialize(&value) {
-                    Ok(v) => return Ok(Self::JSONObjectLiteral(v)),
-                    Err(e) => errors.push(("JSONObjectLiteral", e.to_string())),
-                }
-                match <JSONArrayLiteral as serde::Deserialize>::deserialize(&value) {
-                    Ok(v) => return Ok(Self::JSONArrayLiteral(v)),
-                    Err(e) => errors.push(("JSONArrayLiteral", e.to_string())),
+                if !(value.is_array()) {
+                    match <JSONObjectLiteral as serde::Deserialize>::deserialize(&value) {
+                        Ok(v) => return Ok(Self::JSONObjectLiteral(v)),
+                        Err(e) => errors.push(("JSONObjectLiteral", e.to_string())),
+                    }
                 }
                 match <Any as serde::Deserialize>::deserialize(&value) {
                     Ok(v) => return Ok(Self::AnyExpr(Box::new(v))),
@@ -738,11 +738,15 @@ mod tests {
                     Ok(v) => return Ok(Self::StringExpr(Box::new(v))),
                     Err(e) => errors.push(("StringExpr", e.to_string())),
                 }
+                match <JSONArrayLiteral as serde::Deserialize>::deserialize(&value) {
+                    Ok(v) => return Ok(Self::JSONArrayLiteral(v)),
+                    Err(e) => errors.push(("JSONArrayLiteral", e.to_string())),
+                }
 
                 let details: Vec<std::string::String> =
                     errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
                 Err(serde::de::Error::custom(format!(
-                    "ExprOrLiteral: no variant matched. Expected Null | Bool(bool) | NumberLiteral(NumberLiteral) | StringLiteral(StringLiteral) | GeoJSONObjectLiteral(GeoJSONObjectLiteral) | JSONObjectLiteral(JSONObjectLiteral) | JSONArrayLiteral(JSONArrayLiteral) | AnyExpr(Any) | ArrayExpr(Array) | BooleanExpr(Boolean) | CollatorExpr(Collator) | ColorExpr(Color) | FormattedExpr(Formatted) | ImageExpr(Image) | NumberExpr(Number) | ObjectExpr(Object) | StringExpr(String). Errors: [{}]",
+                    "ExprOrLiteral: no variant matched. Expected Null | Bool(bool) | NumberLiteral(NumberLiteral) | StringLiteral(StringLiteral) | GeoJSONObjectLiteral(GeoJSONObjectLiteral) | JSONObjectLiteral(JSONObjectLiteral) | AnyExpr(Any) | ArrayExpr(Array) | BooleanExpr(Boolean) | CollatorExpr(Collator) | ColorExpr(Color) | FormattedExpr(Formatted) | ImageExpr(Image) | NumberExpr(Number) | ObjectExpr(Object) | StringExpr(String) | JSONArrayLiteral(JSONArrayLiteral). Errors: [{}]",
                     details.join("; ")
                 )))
             }
@@ -856,7 +860,6 @@ mod tests {
                     Self::StringLiteral(v) => v.serialize(serializer),
                     Self::GeoJSONObjectLiteral(v) => v.serialize(serializer),
                     Self::JSONObjectLiteral(v) => v.serialize(serializer),
-                    Self::JSONArrayLiteral(v) => v.serialize(serializer),
                     Self::AnyExpr(v) => v.as_ref().serialize(serializer),
                     Self::ArrayExpr(v) => v.as_ref().serialize(serializer),
                     Self::BooleanExpr(v) => v.as_ref().serialize(serializer),
@@ -867,6 +870,7 @@ mod tests {
                     Self::NumberExpr(v) => v.as_ref().serialize(serializer),
                     Self::ObjectExpr(v) => v.as_ref().serialize(serializer),
                     Self::StringExpr(v) => v.as_ref().serialize(serializer),
+                    Self::JSONArrayLiteral(v) => v.serialize(serializer),
                 }
             }
         }
@@ -894,13 +898,11 @@ mod tests {
                     Ok(v) => return Ok(Self::GeoJSONObjectLiteral(v)),
                     Err(e) => errors.push(("GeoJSONObjectLiteral", e.to_string())),
                 }
-                match <JSONObjectLiteral as serde::Deserialize>::deserialize(&value) {
-                    Ok(v) => return Ok(Self::JSONObjectLiteral(v)),
-                    Err(e) => errors.push(("JSONObjectLiteral", e.to_string())),
-                }
-                match <JSONArrayLiteral as serde::Deserialize>::deserialize(&value) {
-                    Ok(v) => return Ok(Self::JSONArrayLiteral(v)),
-                    Err(e) => errors.push(("JSONArrayLiteral", e.to_string())),
+                if !(value.is_array()) {
+                    match <JSONObjectLiteral as serde::Deserialize>::deserialize(&value) {
+                        Ok(v) => return Ok(Self::JSONObjectLiteral(v)),
+                        Err(e) => errors.push(("JSONObjectLiteral", e.to_string())),
+                    }
                 }
                 match <Any as serde::Deserialize>::deserialize(&value) {
                     Ok(v) => return Ok(Self::AnyExpr(Box::new(v))),
@@ -942,11 +944,15 @@ mod tests {
                     Ok(v) => return Ok(Self::StringExpr(Box::new(v))),
                     Err(e) => errors.push(("StringExpr", e.to_string())),
                 }
+                match <JSONArrayLiteral as serde::Deserialize>::deserialize(&value) {
+                    Ok(v) => return Ok(Self::JSONArrayLiteral(v)),
+                    Err(e) => errors.push(("JSONArrayLiteral", e.to_string())),
+                }
 
                 let details: Vec<std::string::String> =
                     errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
                 Err(serde::de::Error::custom(format!(
-                    "ExprOrLiteral: no variant matched. Expected Null | Bool(bool) | NumberLiteral(NumberLiteral) | StringLiteral(StringLiteral) | GeoJSONObjectLiteral(GeoJSONObjectLiteral) | JSONObjectLiteral(JSONObjectLiteral) | JSONArrayLiteral(JSONArrayLiteral) | AnyExpr(Any) | ArrayExpr(Array) | BooleanExpr(Boolean) | CollatorExpr(Collator) | ColorExpr(Color) | FormattedExpr(Formatted) | ImageExpr(Image) | NumberExpr(Number) | ObjectExpr(Object) | StringExpr(String). Errors: [{}]",
+                    "ExprOrLiteral: no variant matched. Expected Null | Bool(bool) | NumberLiteral(NumberLiteral) | StringLiteral(StringLiteral) | GeoJSONObjectLiteral(GeoJSONObjectLiteral) | JSONObjectLiteral(JSONObjectLiteral) | AnyExpr(Any) | ArrayExpr(Array) | BooleanExpr(Boolean) | CollatorExpr(Collator) | ColorExpr(Color) | FormattedExpr(Formatted) | ImageExpr(Image) | NumberExpr(Number) | ObjectExpr(Object) | StringExpr(String) | JSONArrayLiteral(JSONArrayLiteral). Errors: [{}]",
                     details.join("; ")
                 )))
             }

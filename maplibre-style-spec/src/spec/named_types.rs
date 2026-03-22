@@ -293,7 +293,7 @@ impl serde::Serialize for InterpolationName {
                     serde_json::to_value(f2).map_err(serde::ser::Error::custom)?,
                     serde_json::to_value(f3).map_err(serde::ser::Error::custom)?,
                 ];
-                while elems.last().is_some_and(serde_json::Value::is_null) {
+                while elems.len() > 4 && elems.last().is_some_and(serde_json::Value::is_null) {
                     elems.pop();
                 }
                 let mut seq = serializer.serialize_seq(None)?;
@@ -305,7 +305,7 @@ impl serde::Serialize for InterpolationName {
             }
             InterpolationName::Exponential(f0) => {
                 let mut elems = vec![serde_json::to_value(f0).map_err(serde::ser::Error::custom)?];
-                while elems.last().is_some_and(serde_json::Value::is_null) {
+                while elems.len() > 1 && elems.last().is_some_and(serde_json::Value::is_null) {
                     elems.pop();
                 }
                 let mut seq = serializer.serialize_seq(None)?;
@@ -317,7 +317,7 @@ impl serde::Serialize for InterpolationName {
             }
             InterpolationName::Linear => {
                 let mut elems = vec![];
-                while elems.last().is_some_and(serde_json::Value::is_null) {
+                while elems.len() > 0 && elems.last().is_some_and(serde_json::Value::is_null) {
                     elems.pop();
                 }
                 let mut seq = serializer.serialize_seq(None)?;
