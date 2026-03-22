@@ -475,6 +475,29 @@ fn generate_expression_any_of(scope: &mut Scope, types: &[MirParameterType]) -> 
         added_any_fallback = true;
     }
 
+    // Expression enums with built-in `Literal` + `AnyExpr` variants subsume their
+    // corresponding literal and `Any` arms in unions.
+    let has_string_expr = arms.iter().any(|(_, ty)| ty == "Box<String>");
+    let has_number_expr = arms.iter().any(|(_, ty)| ty == "Box<Number>");
+    let has_boolean_expr = arms.iter().any(|(_, ty)| ty == "Box<Boolean>");
+    let has_self_contained_expr = has_string_expr || has_number_expr || has_boolean_expr;
+
+    arms.retain(|(label, _)| {
+        // StringLiteral subsumed by String::Literal
+        if has_string_expr && label == "StringLiteral" {
+            return false;
+        }
+        // NumberLiteral subsumed by Number::Literal
+        if has_number_expr && label == "NumberLiteral" {
+            return false;
+        }
+        // Any fallback subsumed by *::AnyExpr on any self-contained expression type
+        if has_self_contained_expr && added_any_fallback && label == "Any" {
+            return false;
+        }
+        true
+    });
+
     // `interpolate-hcl` / `interpolate-lab` accept CSS color strings (e.g. `"#f00"`) as stop outputs.
     let mut arm_labels: Vec<&str> = arms.iter().map(|(l, _)| l.as_str()).collect();
     arm_labels.sort_unstable();

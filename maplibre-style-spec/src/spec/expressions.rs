@@ -2162,32 +2162,24 @@ impl serde::Serialize for ColorOrArrayOfColor {
 /// Either of the below variants
 #[derive(PartialEq, Debug, Clone)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum StringLiteralOrStringOrImageOrAnyAsUnion {
-    StringLiteral(StringLiteral),
+pub enum StringOrImageAsUnion {
     String(Box<String>),
     Image(Image),
-    Any(Box<Any>),
 }
 
-impl serde::Serialize for StringLiteralOrStringOrImageOrAnyAsUnion {
+impl serde::Serialize for StringOrImageAsUnion {
     fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         match self {
-            Self::StringLiteral(v) => v.serialize(serializer),
             Self::String(v) => v.serialize(serializer),
             Self::Image(v) => v.serialize(serializer),
-            Self::Any(v) => v.serialize(serializer),
         }
     }
 }
 
-impl<'de> serde::Deserialize<'de> for StringLiteralOrStringOrImageOrAnyAsUnion {
+impl<'de> serde::Deserialize<'de> for StringOrImageAsUnion {
     fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
         let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
         let mut errors: Vec<(&str, std::string::String)> = Vec::new();
-        match <StringLiteral as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::StringLiteral(v)),
-            Err(e) => errors.push(("StringLiteral", e.to_string())),
-        }
         match <Box<String> as serde::Deserialize>::deserialize(&value) {
             Ok(v) => return Ok(Self::String(v)),
             Err(e) => errors.push(("String", e.to_string())),
@@ -2196,15 +2188,11 @@ impl<'de> serde::Deserialize<'de> for StringLiteralOrStringOrImageOrAnyAsUnion {
             Ok(v) => return Ok(Self::Image(v)),
             Err(e) => errors.push(("Image", e.to_string())),
         }
-        match <Box<Any> as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Any(v)),
-            Err(e) => errors.push(("Any", e.to_string())),
-        }
 
         let details: Vec<std::string::String> =
             errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
         Err(serde::de::Error::custom(format!(
-            "StringLiteralOrStringOrImageOrAnyAsUnion: no variant matched. Expected StringLiteral(StringLiteral) | String(Box<String>) | Image(Image) | Any(Box<Any>). Errors: [{}]",
+            "StringOrImageAsUnion: no variant matched. Expected String(Box<String>) | Image(Image). Errors: [{}]",
             details.join("; ")
         )))
     }
@@ -2214,7 +2202,7 @@ impl<'de> serde::Deserialize<'de> for StringLiteralOrStringOrImageOrAnyAsUnion {
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct FormattedFormatVariadicRow(
-    StringLiteralOrStringOrImageOrAnyAsUnion,
+    StringOrImageAsUnion,
     #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_option_json_map))]
     Option<serde_json::Map<std::string::String, serde_json::Value>>,
 );
@@ -2396,32 +2384,24 @@ impl serde::Serialize for Image {
 /// Either of the below variants
 #[derive(PartialEq, Debug, Clone)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum StringLiteralOrArrayOrStringOrAnyAsUnion {
-    StringLiteral(StringLiteral),
+pub enum ArrayOrStringAsUnion {
     Array(Array),
     String(Box<String>),
-    Any(Box<Any>),
 }
 
-impl serde::Serialize for StringLiteralOrArrayOrStringOrAnyAsUnion {
+impl serde::Serialize for ArrayOrStringAsUnion {
     fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         match self {
-            Self::StringLiteral(v) => v.serialize(serializer),
             Self::Array(v) => v.serialize(serializer),
             Self::String(v) => v.serialize(serializer),
-            Self::Any(v) => v.serialize(serializer),
         }
     }
 }
 
-impl<'de> serde::Deserialize<'de> for StringLiteralOrArrayOrStringOrAnyAsUnion {
+impl<'de> serde::Deserialize<'de> for ArrayOrStringAsUnion {
     fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
         let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
         let mut errors: Vec<(&str, std::string::String)> = Vec::new();
-        match <StringLiteral as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::StringLiteral(v)),
-            Err(e) => errors.push(("StringLiteral", e.to_string())),
-        }
         match <Array as serde::Deserialize>::deserialize(&value) {
             Ok(v) => return Ok(Self::Array(v)),
             Err(e) => errors.push(("Array", e.to_string())),
@@ -2430,15 +2410,11 @@ impl<'de> serde::Deserialize<'de> for StringLiteralOrArrayOrStringOrAnyAsUnion {
             Ok(v) => return Ok(Self::String(v)),
             Err(e) => errors.push(("String", e.to_string())),
         }
-        match <Box<Any> as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Any(v)),
-            Err(e) => errors.push(("Any", e.to_string())),
-        }
 
         let details: Vec<std::string::String> =
             errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
         Err(serde::de::Error::custom(format!(
-            "StringLiteralOrArrayOrStringOrAnyAsUnion: no variant matched. Expected StringLiteral(StringLiteral) | Array(Array) | String(Box<String>) | Any(Box<Any>). Errors: [{}]",
+            "ArrayOrStringAsUnion: no variant matched. Expected Array(Array) | String(Box<String>). Errors: [{}]",
             details.join("; ")
         )))
     }
@@ -2487,7 +2463,7 @@ pub enum Number {
     /// Returns the first position at which an item can be found in an array or a substring can be found in a string, or `-1` if the input cannot be found. Accepts an optional index from where to begin the search. In a string, a UTF-16 surrogate pair counts as a single position.
     IndexOf(IndexOfOptions),
     /// Gets the length of an array or string. In a string, a UTF-16 surrogate pair counts as a single position.
-    Length(StringLiteralOrArrayOrStringOrAnyAsUnion),
+    Length(ArrayOrStringAsUnion),
     /// Gets the progress along a gradient line. Can only be used in the `line-gradient` property.
     LineProgress,
     /// Returns the natural logarithm of the input.
