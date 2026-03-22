@@ -141,8 +141,7 @@ pub enum FunctionType {
 }
 
 /// FunctionStopValue Values
-#[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-#[serde(untagged)]
+#[derive(PartialEq, Debug, Clone)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum FunctionStopValue {
     Zero(
@@ -153,6 +152,37 @@ pub enum FunctionStopValue {
         #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_dynamic_color))]
          color::DynamicColor,
     ),
+}
+
+impl serde::Serialize for FunctionStopValue {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        match self {
+            Self::Zero(v) => v.serialize(serializer),
+            Self::One(v) => v.serialize(serializer),
+        }
+    }
+}
+
+impl<'de> serde::Deserialize<'de> for FunctionStopValue {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
+        let mut errors: Vec<(&str, std::string::String)> = Vec::new();
+        match <serde_json::Number as serde::Deserialize>::deserialize(&value) {
+            Ok(v) => return Ok(Self::Zero(v)),
+            Err(e) => errors.push(("Zero", e.to_string())),
+        }
+        match <color::DynamicColor as serde::Deserialize>::deserialize(&value) {
+            Ok(v) => return Ok(Self::One(v)),
+            Err(e) => errors.push(("One", e.to_string())),
+        }
+
+        let details: Vec<std::string::String> =
+            errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
+        Err(serde::de::Error::custom(format!(
+            "FunctionStopValue: no variant matched. Expected Zero(serde_json::Number) | One(color::DynamicColor). Errors: [{}]",
+            details.join("; ")
+        )))
+    }
 }
 
 /// Zoom level and value pair.
@@ -257,11 +287,12 @@ impl serde::Serialize for InterpolationName {
         use serde::ser::SerializeSeq;
         match self {
             InterpolationName::CubicBezier(f0, f1, f2, f3) => {
-                let mut elems: Vec<serde_json::Value> = Vec::new();
-                elems.push(serde_json::to_value(&f0).map_err(serde::ser::Error::custom)?);
-                elems.push(serde_json::to_value(&f1).map_err(serde::ser::Error::custom)?);
-                elems.push(serde_json::to_value(&f2).map_err(serde::ser::Error::custom)?);
-                elems.push(serde_json::to_value(&f3).map_err(serde::ser::Error::custom)?);
+                let mut elems = vec![
+                    serde_json::to_value(f0).map_err(serde::ser::Error::custom)?,
+                    serde_json::to_value(f1).map_err(serde::ser::Error::custom)?,
+                    serde_json::to_value(f2).map_err(serde::ser::Error::custom)?,
+                    serde_json::to_value(f3).map_err(serde::ser::Error::custom)?,
+                ];
                 while elems.last().is_some_and(serde_json::Value::is_null) {
                     elems.pop();
                 }
@@ -273,8 +304,7 @@ impl serde::Serialize for InterpolationName {
                 seq.end()
             }
             InterpolationName::Exponential(f0) => {
-                let mut elems: Vec<serde_json::Value> = Vec::new();
-                elems.push(serde_json::to_value(&f0).map_err(serde::ser::Error::custom)?);
+                let mut elems = vec![serde_json::to_value(f0).map_err(serde::ser::Error::custom)?];
                 while elems.last().is_some_and(serde_json::Value::is_null) {
                     elems.pop();
                 }
@@ -286,7 +316,7 @@ impl serde::Serialize for InterpolationName {
                 seq.end()
             }
             InterpolationName::Linear => {
-                let mut elems: Vec<serde_json::Value> = Vec::new();
+                let mut elems = vec![];
                 while elems.last().is_some_and(serde_json::Value::is_null) {
                     elems.pop();
                 }
@@ -361,24 +391,84 @@ pub enum LightAnchor {
 }
 
 /// Nested expression: ramp (`interpolate-hcl`, …) or [`Color`] operators.
-#[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+#[derive(PartialEq, Debug, Clone)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-#[serde(untagged)]
 pub enum LightColorExpression {
     Color(Color),
     Ramp(ColorOrArrayOfColor),
 }
 
+impl serde::Serialize for LightColorExpression {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        match self {
+            Self::Color(v) => v.serialize(serializer),
+            Self::Ramp(v) => v.serialize(serializer),
+        }
+    }
+}
+
+impl<'de> serde::Deserialize<'de> for LightColorExpression {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
+        let mut errors: Vec<(&str, std::string::String)> = Vec::new();
+        match <Color as serde::Deserialize>::deserialize(&value) {
+            Ok(v) => return Ok(Self::Color(v)),
+            Err(e) => errors.push(("Color", e.to_string())),
+        }
+        match <ColorOrArrayOfColor as serde::Deserialize>::deserialize(&value) {
+            Ok(v) => return Ok(Self::Ramp(v)),
+            Err(e) => errors.push(("Ramp", e.to_string())),
+        }
+
+        let details: Vec<std::string::String> =
+            errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
+        Err(serde::de::Error::custom(format!(
+            "LightColorExpression: no variant matched. Expected Color(Color) | Ramp(ColorOrArrayOfColor). Errors: [{}]",
+            details.join("; ")
+        )))
+    }
+}
+
 /// Color tint for lighting extruded geometries.
-#[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+#[derive(PartialEq, Debug, Clone)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-#[serde(untagged)]
 pub enum LightColor {
     Expr(Box<LightColorExpression>),
     Literal(
         #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
         serde_json::Value,
     ),
+}
+
+impl serde::Serialize for LightColor {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        match self {
+            Self::Expr(v) => v.as_ref().serialize(serializer),
+            Self::Literal(v) => v.serialize(serializer),
+        }
+    }
+}
+
+impl<'de> serde::Deserialize<'de> for LightColor {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
+        let mut errors: Vec<(&str, std::string::String)> = Vec::new();
+        match <LightColorExpression as serde::Deserialize>::deserialize(&value) {
+            Ok(v) => return Ok(Self::Expr(Box::new(v))),
+            Err(e) => errors.push(("Expr", e.to_string())),
+        }
+        match <serde_json::Value as serde::Deserialize>::deserialize(&value) {
+            Ok(v) => return Ok(Self::Literal(v)),
+            Err(e) => errors.push(("Literal", e.to_string())),
+        }
+
+        let details: Vec<std::string::String> =
+            errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
+        Err(serde::de::Error::custom(format!(
+            "LightColor: no variant matched. Expected Expr(LightColorExpression) | Literal(serde_json::Value). Errors: [{}]",
+            details.join("; ")
+        )))
+    }
 }
 
 impl Default for LightColor {
@@ -388,26 +478,86 @@ impl Default for LightColor {
 }
 
 /// Nested expression: ramp (`interpolate` / …) or regular [`Number`] operators.
-#[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+#[derive(PartialEq, Debug, Clone)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-#[serde(untagged)]
 pub enum LightIntensityExpression {
     Number(Number),
     Ramp(NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection),
 }
 
+impl serde::Serialize for LightIntensityExpression {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        match self {
+            Self::Number(v) => v.serialize(serializer),
+            Self::Ramp(v) => v.serialize(serializer),
+        }
+    }
+}
+
+impl<'de> serde::Deserialize<'de> for LightIntensityExpression {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
+        let mut errors: Vec<(&str, std::string::String)> = Vec::new();
+        match <Number as serde::Deserialize>::deserialize(&value) {
+            Ok(v) => return Ok(Self::Number(v)),
+            Err(e) => errors.push(("Number", e.to_string())),
+        }
+        match <NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection as serde::Deserialize>::deserialize(&value) {
+            Ok(v) => return Ok(Self::Ramp(v)),
+            Err(e) => errors.push(("Ramp", e.to_string())),
+        }
+
+        let details: Vec<std::string::String> =
+            errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
+        Err(serde::de::Error::custom(format!(
+            "LightIntensityExpression: no variant matched. Expected Number(Number) | Ramp(NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection). Errors: [{}]",
+            details.join("; ")
+        )))
+    }
+}
+
 /// Intensity of lighting (on a scale from 0 to 1). Higher numbers will present as more extreme contrast.
 ///
 /// Range: 0..=1
-#[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+#[derive(PartialEq, Debug, Clone)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-#[serde(untagged)]
 pub enum LightIntensity {
     Expr(Box<LightIntensityExpression>),
     Literal(
         #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
         serde_json::Number,
     ),
+}
+
+impl serde::Serialize for LightIntensity {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        match self {
+            Self::Expr(v) => v.as_ref().serialize(serializer),
+            Self::Literal(v) => v.serialize(serializer),
+        }
+    }
+}
+
+impl<'de> serde::Deserialize<'de> for LightIntensity {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
+        let mut errors: Vec<(&str, std::string::String)> = Vec::new();
+        match <LightIntensityExpression as serde::Deserialize>::deserialize(&value) {
+            Ok(v) => return Ok(Self::Expr(Box::new(v))),
+            Err(e) => errors.push(("Expr", e.to_string())),
+        }
+        match <serde_json::Number as serde::Deserialize>::deserialize(&value) {
+            Ok(v) => return Ok(Self::Literal(v)),
+            Err(e) => errors.push(("Literal", e.to_string())),
+        }
+
+        let details: Vec<std::string::String> =
+            errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
+        Err(serde::de::Error::custom(format!(
+            "LightIntensity: no variant matched. Expected Expr(LightIntensityExpression) | Literal(serde_json::Number). Errors: [{}]",
+            details.join("; ")
+        )))
+    }
 }
 
 impl Default for LightIntensity {
@@ -450,12 +600,42 @@ pub struct Projection {
 }
 
 /// The projection definition type. Can be specified as a string, a transition state, or an expression.
-#[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+#[derive(PartialEq, Debug, Clone)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-#[serde(untagged)]
 pub enum ProjectionType {
     Expr(NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection),
     Literal(std::string::String),
+}
+
+impl serde::Serialize for ProjectionType {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        match self {
+            Self::Expr(v) => v.serialize(serializer),
+            Self::Literal(v) => v.serialize(serializer),
+        }
+    }
+}
+
+impl<'de> serde::Deserialize<'de> for ProjectionType {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
+        let mut errors: Vec<(&str, std::string::String)> = Vec::new();
+        match <NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection as serde::Deserialize>::deserialize(&value) {
+            Ok(v) => return Ok(Self::Expr(v)),
+            Err(e) => errors.push(("Expr", e.to_string())),
+        }
+        match <std::string::String as serde::Deserialize>::deserialize(&value) {
+            Ok(v) => return Ok(Self::Literal(v)),
+            Err(e) => errors.push(("Literal", e.to_string())),
+        }
+
+        let details: Vec<std::string::String> =
+            errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
+        Err(serde::de::Error::custom(format!(
+            "ProjectionType: no variant matched. Expected Expr(NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection) | Literal(std::string::String). Errors: [{}]",
+            details.join("; ")
+        )))
+    }
 }
 
 impl Default for ProjectionType {
@@ -524,26 +704,86 @@ pub struct Sky {
 }
 
 /// Nested expression: ramp (`interpolate` / …) or regular [`Number`] operators.
-#[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+#[derive(PartialEq, Debug, Clone)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-#[serde(untagged)]
 pub enum SkyAtmosphereBlendExpression {
     Number(Number),
     Ramp(NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection),
 }
 
+impl serde::Serialize for SkyAtmosphereBlendExpression {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        match self {
+            Self::Number(v) => v.serialize(serializer),
+            Self::Ramp(v) => v.serialize(serializer),
+        }
+    }
+}
+
+impl<'de> serde::Deserialize<'de> for SkyAtmosphereBlendExpression {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
+        let mut errors: Vec<(&str, std::string::String)> = Vec::new();
+        match <Number as serde::Deserialize>::deserialize(&value) {
+            Ok(v) => return Ok(Self::Number(v)),
+            Err(e) => errors.push(("Number", e.to_string())),
+        }
+        match <NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection as serde::Deserialize>::deserialize(&value) {
+            Ok(v) => return Ok(Self::Ramp(v)),
+            Err(e) => errors.push(("Ramp", e.to_string())),
+        }
+
+        let details: Vec<std::string::String> =
+            errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
+        Err(serde::de::Error::custom(format!(
+            "SkyAtmosphereBlendExpression: no variant matched. Expected Number(Number) | Ramp(NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection). Errors: [{}]",
+            details.join("; ")
+        )))
+    }
+}
+
 /// How to blend the atmosphere. Where 1 is visible atmosphere and 0 is hidden. It is best to interpolate this expression when using globe projection.
 ///
 /// Range: 0..=1
-#[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+#[derive(PartialEq, Debug, Clone)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-#[serde(untagged)]
 pub enum SkyAtmosphereBlend {
     Expr(Box<SkyAtmosphereBlendExpression>),
     Literal(
         #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
         serde_json::Number,
     ),
+}
+
+impl serde::Serialize for SkyAtmosphereBlend {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        match self {
+            Self::Expr(v) => v.as_ref().serialize(serializer),
+            Self::Literal(v) => v.serialize(serializer),
+        }
+    }
+}
+
+impl<'de> serde::Deserialize<'de> for SkyAtmosphereBlend {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
+        let mut errors: Vec<(&str, std::string::String)> = Vec::new();
+        match <SkyAtmosphereBlendExpression as serde::Deserialize>::deserialize(&value) {
+            Ok(v) => return Ok(Self::Expr(Box::new(v))),
+            Err(e) => errors.push(("Expr", e.to_string())),
+        }
+        match <serde_json::Number as serde::Deserialize>::deserialize(&value) {
+            Ok(v) => return Ok(Self::Literal(v)),
+            Err(e) => errors.push(("Literal", e.to_string())),
+        }
+
+        let details: Vec<std::string::String> =
+            errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
+        Err(serde::de::Error::custom(format!(
+            "SkyAtmosphereBlend: no variant matched. Expected Expr(SkyAtmosphereBlendExpression) | Literal(serde_json::Number). Errors: [{}]",
+            details.join("; ")
+        )))
+    }
 }
 
 impl Default for SkyAtmosphereBlend {
@@ -556,24 +796,84 @@ impl Default for SkyAtmosphereBlend {
 }
 
 /// Nested expression: ramp (`interpolate-hcl`, …) or [`Color`] operators.
-#[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+#[derive(PartialEq, Debug, Clone)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-#[serde(untagged)]
 pub enum SkyFogColorExpression {
     Color(Color),
     Ramp(ColorOrArrayOfColor),
 }
 
+impl serde::Serialize for SkyFogColorExpression {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        match self {
+            Self::Color(v) => v.serialize(serializer),
+            Self::Ramp(v) => v.serialize(serializer),
+        }
+    }
+}
+
+impl<'de> serde::Deserialize<'de> for SkyFogColorExpression {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
+        let mut errors: Vec<(&str, std::string::String)> = Vec::new();
+        match <Color as serde::Deserialize>::deserialize(&value) {
+            Ok(v) => return Ok(Self::Color(v)),
+            Err(e) => errors.push(("Color", e.to_string())),
+        }
+        match <ColorOrArrayOfColor as serde::Deserialize>::deserialize(&value) {
+            Ok(v) => return Ok(Self::Ramp(v)),
+            Err(e) => errors.push(("Ramp", e.to_string())),
+        }
+
+        let details: Vec<std::string::String> =
+            errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
+        Err(serde::de::Error::custom(format!(
+            "SkyFogColorExpression: no variant matched. Expected Color(Color) | Ramp(ColorOrArrayOfColor). Errors: [{}]",
+            details.join("; ")
+        )))
+    }
+}
+
 /// The base color for the fog. Requires 3D terrain.
-#[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+#[derive(PartialEq, Debug, Clone)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-#[serde(untagged)]
 pub enum SkyFogColor {
     Expr(Box<SkyFogColorExpression>),
     Literal(
         #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
         serde_json::Value,
     ),
+}
+
+impl serde::Serialize for SkyFogColor {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        match self {
+            Self::Expr(v) => v.as_ref().serialize(serializer),
+            Self::Literal(v) => v.serialize(serializer),
+        }
+    }
+}
+
+impl<'de> serde::Deserialize<'de> for SkyFogColor {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
+        let mut errors: Vec<(&str, std::string::String)> = Vec::new();
+        match <SkyFogColorExpression as serde::Deserialize>::deserialize(&value) {
+            Ok(v) => return Ok(Self::Expr(Box::new(v))),
+            Err(e) => errors.push(("Expr", e.to_string())),
+        }
+        match <serde_json::Value as serde::Deserialize>::deserialize(&value) {
+            Ok(v) => return Ok(Self::Literal(v)),
+            Err(e) => errors.push(("Literal", e.to_string())),
+        }
+
+        let details: Vec<std::string::String> =
+            errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
+        Err(serde::de::Error::custom(format!(
+            "SkyFogColor: no variant matched. Expected Expr(SkyFogColorExpression) | Literal(serde_json::Value). Errors: [{}]",
+            details.join("; ")
+        )))
+    }
 }
 
 impl Default for SkyFogColor {
@@ -583,26 +883,86 @@ impl Default for SkyFogColor {
 }
 
 /// Nested expression: ramp (`interpolate` / …) or regular [`Number`] operators.
-#[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+#[derive(PartialEq, Debug, Clone)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-#[serde(untagged)]
 pub enum SkyFogGroundBlendExpression {
     Number(Number),
     Ramp(NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection),
 }
 
+impl serde::Serialize for SkyFogGroundBlendExpression {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        match self {
+            Self::Number(v) => v.serialize(serializer),
+            Self::Ramp(v) => v.serialize(serializer),
+        }
+    }
+}
+
+impl<'de> serde::Deserialize<'de> for SkyFogGroundBlendExpression {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
+        let mut errors: Vec<(&str, std::string::String)> = Vec::new();
+        match <Number as serde::Deserialize>::deserialize(&value) {
+            Ok(v) => return Ok(Self::Number(v)),
+            Err(e) => errors.push(("Number", e.to_string())),
+        }
+        match <NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection as serde::Deserialize>::deserialize(&value) {
+            Ok(v) => return Ok(Self::Ramp(v)),
+            Err(e) => errors.push(("Ramp", e.to_string())),
+        }
+
+        let details: Vec<std::string::String> =
+            errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
+        Err(serde::de::Error::custom(format!(
+            "SkyFogGroundBlendExpression: no variant matched. Expected Number(Number) | Ramp(NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection). Errors: [{}]",
+            details.join("; ")
+        )))
+    }
+}
+
 /// How to blend the fog over the 3D terrain. Where 0 is the map center and 1 is the horizon.
 ///
 /// Range: 0..=1
-#[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+#[derive(PartialEq, Debug, Clone)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-#[serde(untagged)]
 pub enum SkyFogGroundBlend {
     Expr(Box<SkyFogGroundBlendExpression>),
     Literal(
         #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
         serde_json::Number,
     ),
+}
+
+impl serde::Serialize for SkyFogGroundBlend {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        match self {
+            Self::Expr(v) => v.as_ref().serialize(serializer),
+            Self::Literal(v) => v.serialize(serializer),
+        }
+    }
+}
+
+impl<'de> serde::Deserialize<'de> for SkyFogGroundBlend {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
+        let mut errors: Vec<(&str, std::string::String)> = Vec::new();
+        match <SkyFogGroundBlendExpression as serde::Deserialize>::deserialize(&value) {
+            Ok(v) => return Ok(Self::Expr(Box::new(v))),
+            Err(e) => errors.push(("Expr", e.to_string())),
+        }
+        match <serde_json::Number as serde::Deserialize>::deserialize(&value) {
+            Ok(v) => return Ok(Self::Literal(v)),
+            Err(e) => errors.push(("Literal", e.to_string())),
+        }
+
+        let details: Vec<std::string::String> =
+            errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
+        Err(serde::de::Error::custom(format!(
+            "SkyFogGroundBlend: no variant matched. Expected Expr(SkyFogGroundBlendExpression) | Literal(serde_json::Number). Errors: [{}]",
+            details.join("; ")
+        )))
+    }
 }
 
 impl Default for SkyFogGroundBlend {
@@ -615,24 +975,84 @@ impl Default for SkyFogGroundBlend {
 }
 
 /// Nested expression: ramp (`interpolate-hcl`, …) or [`Color`] operators.
-#[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+#[derive(PartialEq, Debug, Clone)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-#[serde(untagged)]
 pub enum SkyHorizonColorExpression {
     Color(Color),
     Ramp(ColorOrArrayOfColor),
 }
 
+impl serde::Serialize for SkyHorizonColorExpression {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        match self {
+            Self::Color(v) => v.serialize(serializer),
+            Self::Ramp(v) => v.serialize(serializer),
+        }
+    }
+}
+
+impl<'de> serde::Deserialize<'de> for SkyHorizonColorExpression {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
+        let mut errors: Vec<(&str, std::string::String)> = Vec::new();
+        match <Color as serde::Deserialize>::deserialize(&value) {
+            Ok(v) => return Ok(Self::Color(v)),
+            Err(e) => errors.push(("Color", e.to_string())),
+        }
+        match <ColorOrArrayOfColor as serde::Deserialize>::deserialize(&value) {
+            Ok(v) => return Ok(Self::Ramp(v)),
+            Err(e) => errors.push(("Ramp", e.to_string())),
+        }
+
+        let details: Vec<std::string::String> =
+            errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
+        Err(serde::de::Error::custom(format!(
+            "SkyHorizonColorExpression: no variant matched. Expected Color(Color) | Ramp(ColorOrArrayOfColor). Errors: [{}]",
+            details.join("; ")
+        )))
+    }
+}
+
 /// The base color at the horizon.
-#[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+#[derive(PartialEq, Debug, Clone)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-#[serde(untagged)]
 pub enum SkyHorizonColor {
     Expr(Box<SkyHorizonColorExpression>),
     Literal(
         #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
         serde_json::Value,
     ),
+}
+
+impl serde::Serialize for SkyHorizonColor {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        match self {
+            Self::Expr(v) => v.as_ref().serialize(serializer),
+            Self::Literal(v) => v.serialize(serializer),
+        }
+    }
+}
+
+impl<'de> serde::Deserialize<'de> for SkyHorizonColor {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
+        let mut errors: Vec<(&str, std::string::String)> = Vec::new();
+        match <SkyHorizonColorExpression as serde::Deserialize>::deserialize(&value) {
+            Ok(v) => return Ok(Self::Expr(Box::new(v))),
+            Err(e) => errors.push(("Expr", e.to_string())),
+        }
+        match <serde_json::Value as serde::Deserialize>::deserialize(&value) {
+            Ok(v) => return Ok(Self::Literal(v)),
+            Err(e) => errors.push(("Literal", e.to_string())),
+        }
+
+        let details: Vec<std::string::String> =
+            errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
+        Err(serde::de::Error::custom(format!(
+            "SkyHorizonColor: no variant matched. Expected Expr(SkyHorizonColorExpression) | Literal(serde_json::Value). Errors: [{}]",
+            details.join("; ")
+        )))
+    }
 }
 
 impl Default for SkyHorizonColor {
@@ -642,26 +1062,86 @@ impl Default for SkyHorizonColor {
 }
 
 /// Nested expression: ramp (`interpolate` / …) or regular [`Number`] operators.
-#[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+#[derive(PartialEq, Debug, Clone)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-#[serde(untagged)]
 pub enum SkyHorizonFogBlendExpression {
     Number(Number),
     Ramp(NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection),
 }
 
+impl serde::Serialize for SkyHorizonFogBlendExpression {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        match self {
+            Self::Number(v) => v.serialize(serializer),
+            Self::Ramp(v) => v.serialize(serializer),
+        }
+    }
+}
+
+impl<'de> serde::Deserialize<'de> for SkyHorizonFogBlendExpression {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
+        let mut errors: Vec<(&str, std::string::String)> = Vec::new();
+        match <Number as serde::Deserialize>::deserialize(&value) {
+            Ok(v) => return Ok(Self::Number(v)),
+            Err(e) => errors.push(("Number", e.to_string())),
+        }
+        match <NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection as serde::Deserialize>::deserialize(&value) {
+            Ok(v) => return Ok(Self::Ramp(v)),
+            Err(e) => errors.push(("Ramp", e.to_string())),
+        }
+
+        let details: Vec<std::string::String> =
+            errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
+        Err(serde::de::Error::custom(format!(
+            "SkyHorizonFogBlendExpression: no variant matched. Expected Number(Number) | Ramp(NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection). Errors: [{}]",
+            details.join("; ")
+        )))
+    }
+}
+
 /// How to blend the fog color and the horizon color. Where 0 is using the horizon color only and 1 is using the fog color only.
 ///
 /// Range: 0..=1
-#[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+#[derive(PartialEq, Debug, Clone)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-#[serde(untagged)]
 pub enum SkyHorizonFogBlend {
     Expr(Box<SkyHorizonFogBlendExpression>),
     Literal(
         #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
         serde_json::Number,
     ),
+}
+
+impl serde::Serialize for SkyHorizonFogBlend {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        match self {
+            Self::Expr(v) => v.as_ref().serialize(serializer),
+            Self::Literal(v) => v.serialize(serializer),
+        }
+    }
+}
+
+impl<'de> serde::Deserialize<'de> for SkyHorizonFogBlend {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
+        let mut errors: Vec<(&str, std::string::String)> = Vec::new();
+        match <SkyHorizonFogBlendExpression as serde::Deserialize>::deserialize(&value) {
+            Ok(v) => return Ok(Self::Expr(Box::new(v))),
+            Err(e) => errors.push(("Expr", e.to_string())),
+        }
+        match <serde_json::Number as serde::Deserialize>::deserialize(&value) {
+            Ok(v) => return Ok(Self::Literal(v)),
+            Err(e) => errors.push(("Literal", e.to_string())),
+        }
+
+        let details: Vec<std::string::String> =
+            errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
+        Err(serde::de::Error::custom(format!(
+            "SkyHorizonFogBlend: no variant matched. Expected Expr(SkyHorizonFogBlendExpression) | Literal(serde_json::Number). Errors: [{}]",
+            details.join("; ")
+        )))
+    }
 }
 
 impl Default for SkyHorizonFogBlend {
@@ -674,24 +1154,84 @@ impl Default for SkyHorizonFogBlend {
 }
 
 /// Nested expression: ramp (`interpolate-hcl`, …) or [`Color`] operators.
-#[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+#[derive(PartialEq, Debug, Clone)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-#[serde(untagged)]
 pub enum SkySkyColorExpression {
     Color(Color),
     Ramp(ColorOrArrayOfColor),
 }
 
+impl serde::Serialize for SkySkyColorExpression {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        match self {
+            Self::Color(v) => v.serialize(serializer),
+            Self::Ramp(v) => v.serialize(serializer),
+        }
+    }
+}
+
+impl<'de> serde::Deserialize<'de> for SkySkyColorExpression {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
+        let mut errors: Vec<(&str, std::string::String)> = Vec::new();
+        match <Color as serde::Deserialize>::deserialize(&value) {
+            Ok(v) => return Ok(Self::Color(v)),
+            Err(e) => errors.push(("Color", e.to_string())),
+        }
+        match <ColorOrArrayOfColor as serde::Deserialize>::deserialize(&value) {
+            Ok(v) => return Ok(Self::Ramp(v)),
+            Err(e) => errors.push(("Ramp", e.to_string())),
+        }
+
+        let details: Vec<std::string::String> =
+            errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
+        Err(serde::de::Error::custom(format!(
+            "SkySkyColorExpression: no variant matched. Expected Color(Color) | Ramp(ColorOrArrayOfColor). Errors: [{}]",
+            details.join("; ")
+        )))
+    }
+}
+
 /// The base color for the sky.
-#[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+#[derive(PartialEq, Debug, Clone)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-#[serde(untagged)]
 pub enum SkySkyColor {
     Expr(Box<SkySkyColorExpression>),
     Literal(
         #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
         serde_json::Value,
     ),
+}
+
+impl serde::Serialize for SkySkyColor {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        match self {
+            Self::Expr(v) => v.as_ref().serialize(serializer),
+            Self::Literal(v) => v.serialize(serializer),
+        }
+    }
+}
+
+impl<'de> serde::Deserialize<'de> for SkySkyColor {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
+        let mut errors: Vec<(&str, std::string::String)> = Vec::new();
+        match <SkySkyColorExpression as serde::Deserialize>::deserialize(&value) {
+            Ok(v) => return Ok(Self::Expr(Box::new(v))),
+            Err(e) => errors.push(("Expr", e.to_string())),
+        }
+        match <serde_json::Value as serde::Deserialize>::deserialize(&value) {
+            Ok(v) => return Ok(Self::Literal(v)),
+            Err(e) => errors.push(("Literal", e.to_string())),
+        }
+
+        let details: Vec<std::string::String> =
+            errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
+        Err(serde::de::Error::custom(format!(
+            "SkySkyColor: no variant matched. Expected Expr(SkySkyColorExpression) | Literal(serde_json::Value). Errors: [{}]",
+            details.join("; ")
+        )))
+    }
 }
 
 impl Default for SkySkyColor {
@@ -701,26 +1241,86 @@ impl Default for SkySkyColor {
 }
 
 /// Nested expression: ramp (`interpolate` / …) or regular [`Number`] operators.
-#[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+#[derive(PartialEq, Debug, Clone)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-#[serde(untagged)]
 pub enum SkySkyHorizonBlendExpression {
     Number(Number),
     Ramp(NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection),
 }
 
+impl serde::Serialize for SkySkyHorizonBlendExpression {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        match self {
+            Self::Number(v) => v.serialize(serializer),
+            Self::Ramp(v) => v.serialize(serializer),
+        }
+    }
+}
+
+impl<'de> serde::Deserialize<'de> for SkySkyHorizonBlendExpression {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
+        let mut errors: Vec<(&str, std::string::String)> = Vec::new();
+        match <Number as serde::Deserialize>::deserialize(&value) {
+            Ok(v) => return Ok(Self::Number(v)),
+            Err(e) => errors.push(("Number", e.to_string())),
+        }
+        match <NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection as serde::Deserialize>::deserialize(&value) {
+            Ok(v) => return Ok(Self::Ramp(v)),
+            Err(e) => errors.push(("Ramp", e.to_string())),
+        }
+
+        let details: Vec<std::string::String> =
+            errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
+        Err(serde::de::Error::custom(format!(
+            "SkySkyHorizonBlendExpression: no variant matched. Expected Number(Number) | Ramp(NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection). Errors: [{}]",
+            details.join("; ")
+        )))
+    }
+}
+
 /// How to blend the sky color and the horizon color. Where 1 is blending the color at the middle of the sky and 0 is not blending at all and using the sky color only.
 ///
 /// Range: 0..=1
-#[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+#[derive(PartialEq, Debug, Clone)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-#[serde(untagged)]
 pub enum SkySkyHorizonBlend {
     Expr(Box<SkySkyHorizonBlendExpression>),
     Literal(
         #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
         serde_json::Number,
     ),
+}
+
+impl serde::Serialize for SkySkyHorizonBlend {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        match self {
+            Self::Expr(v) => v.as_ref().serialize(serializer),
+            Self::Literal(v) => v.serialize(serializer),
+        }
+    }
+}
+
+impl<'de> serde::Deserialize<'de> for SkySkyHorizonBlend {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
+        let mut errors: Vec<(&str, std::string::String)> = Vec::new();
+        match <SkySkyHorizonBlendExpression as serde::Deserialize>::deserialize(&value) {
+            Ok(v) => return Ok(Self::Expr(Box::new(v))),
+            Err(e) => errors.push(("Expr", e.to_string())),
+        }
+        match <serde_json::Number as serde::Deserialize>::deserialize(&value) {
+            Ok(v) => return Ok(Self::Literal(v)),
+            Err(e) => errors.push(("Literal", e.to_string())),
+        }
+
+        let details: Vec<std::string::String> =
+            errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
+        Err(serde::de::Error::custom(format!(
+            "SkySkyHorizonBlend: no variant matched. Expected Expr(SkySkyHorizonBlendExpression) | Literal(serde_json::Number). Errors: [{}]",
+            details.join("; ")
+        )))
+    }
 }
 
 impl Default for SkySkyHorizonBlend {

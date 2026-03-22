@@ -3,20 +3,38 @@ use codegen2::Scope;
 use crate::generator::autotest::generate_test_from_example_if_present;
 use crate::generator::fuzz;
 use crate::generator::items::number::generate_number_default;
+use crate::generator::untagged::{self, Variant};
 use crate::mir::types::NumberArrayField;
 
 pub fn generate(scope: &mut Scope, name: &str, field: &NumberArrayField) {
     let enu = scope
         .new_enum(name)
         .vis("pub")
-        .attr("serde(untagged)")
         .doc(&field.meta.doc)
-        .derive("serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone")
+        .derive("PartialEq, Debug, Clone")
         .attr(fuzz::CFG_DERIVE_ARBITRARY);
     enu.new_variant("One")
         .tuple_with_attrs([fuzz::ARB_JSON_NUMBER], "serde_json::Number");
     enu.new_variant("Many")
         .tuple_with_attrs([fuzz::ARB_VEC_JSON_NUMBER], "Vec<serde_json::Number>");
+    untagged::emit_untagged_serde(
+        scope,
+        name,
+        &[
+            Variant {
+                name: "One".into(),
+                inner_type: "serde_json::Number".into(),
+                is_boxed: false,
+                is_unit: false,
+            },
+            Variant {
+                name: "Many".into(),
+                inner_type: "Vec<serde_json::Number>".into(),
+                is_boxed: false,
+                is_unit: false,
+            },
+        ],
+    );
 
     if let Some(default) = &field.default {
         let default_expr = generate_number_default(default);
@@ -49,8 +67,7 @@ mod tests {
             },
         );
         insta::assert_snapshot!(scope.to_string(), @r#"
-        #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-        #[serde(untagged)]
+        #[derive(PartialEq, Debug, Clone)]
         #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
         pub enum Foo {
             One(
@@ -61,6 +78,37 @@ mod tests {
                 #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_vec_json_number))]
                  Vec<serde_json::Number>,
             ),
+        }
+
+        impl serde::Serialize for Foo {
+            fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+                match self {
+                    Self::One(v) => v.serialize(serializer),
+                    Self::Many(v) => v.serialize(serializer),
+                }
+            }
+        }
+
+        impl<'de> serde::Deserialize<'de> for Foo {
+            fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+                let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
+                let mut errors: Vec<(&str, std::string::String)> = Vec::new();
+                match <serde_json::Number as serde::Deserialize>::deserialize(&value) {
+                    Ok(v) => return Ok(Self::One(v)),
+                    Err(e) => errors.push(("One", e.to_string())),
+                }
+                match <Vec<serde_json::Number> as serde::Deserialize>::deserialize(&value) {
+                    Ok(v) => return Ok(Self::Many(v)),
+                    Err(e) => errors.push(("Many", e.to_string())),
+                }
+
+                let details: Vec<std::string::String> =
+                    errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
+                Err(serde::de::Error::custom(format!(
+                    "Foo: no variant matched. Expected One(serde_json::Number) | Many(Vec<serde_json::Number>). Errors: [{}]",
+                    details.join("; ")
+                )))
+            }
         }
         "#)
     }

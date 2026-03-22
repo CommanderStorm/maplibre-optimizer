@@ -2,6 +2,7 @@ use codegen2::Scope;
 
 use crate::generator::autotest::generate_test_from_example_if_present;
 use crate::generator::fuzz;
+use crate::generator::untagged::{self, Variant};
 use crate::mir::types::ProjectionDefinitionField;
 
 pub fn generate(scope: &mut Scope, name: &str, field: &ProjectionDefinitionField) {
@@ -10,12 +11,29 @@ pub fn generate(scope: &mut Scope, name: &str, field: &ProjectionDefinitionField
             .new_enum(name)
             .vis("pub")
             .doc(&field.meta.doc)
-            .derive("serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone")
-            .attr(fuzz::CFG_DERIVE_ARBITRARY)
-            .attr("serde(untagged)");
+            .derive("PartialEq, Debug, Clone")
+            .attr(fuzz::CFG_DERIVE_ARBITRARY);
         enu.new_variant("Expr")
             .tuple("NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection");
         enu.new_variant("Literal").tuple("std::string::String");
+        untagged::emit_untagged_serde(
+            scope,
+            name,
+            &[
+                Variant {
+                    name: "Expr".into(),
+                    inner_type: "NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection".into(),
+                    is_boxed: false,
+                    is_unit: false,
+                },
+                Variant {
+                    name: "Literal".into(),
+                    inner_type: "std::string::String".into(),
+                    is_boxed: false,
+                    is_unit: false,
+                },
+            ],
+        );
     } else {
         scope
             .new_struct(name)

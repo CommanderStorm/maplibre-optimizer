@@ -39,17 +39,17 @@ pub(crate) fn dead_elimination_typed(
     for (i, layer) in style.layers.iter().enumerate() {
         if let AnyLayer::Typed(t) = layer {
             // Filter is always false.
-            if let Some(ref filter) = t.common().filter {
-                if filter_is_always_false(filter.as_value()) {
-                    to_drop.push(i);
-                    continue;
-                }
+            if let Some(ref filter) = t.common().filter
+                && filter_is_always_false(filter.as_value())
+            {
+                to_drop.push(i);
+                continue;
             }
             // Stats-driven: geometry type mismatch.
-            if let Some(stats) = stats {
-                if is_dead_by_geometry_typed(i, t, stats, layer_info) {
-                    to_drop.push(i);
-                }
+            if let Some(stats) = stats
+                && is_dead_by_geometry_typed(i, t, stats, layer_info)
+            {
+                to_drop.push(i);
             }
         }
     }
@@ -111,7 +111,7 @@ fn collect_used_sources_typed(layers: &[AnyLayer]) -> HashSet<String> {
     let by_id: HashMap<&str, usize> = layers
         .iter()
         .enumerate()
-        .filter_map(|(i, l)| Some((l.id().as_str(), i)))
+        .map(|(i, l)| (l.id().as_str(), i))
         .collect();
 
     let mut used = HashSet::new();
@@ -187,11 +187,14 @@ fn refine_typed_layer(
     if let Some(ref filter) = common.filter {
         let filter_val = filter.as_value();
         let (lb_raw, ub_raw) = super::metadata::zoom_bounds_from_expression(filter_val);
-        let lb = lb_raw.map(|n| n.ceil());
-        let ub = ub_raw.map(|n| n.floor());
+        let lb = lb_raw.map(f64::ceil);
+        let ub = ub_raw.map(f64::floor);
 
         if let Some(bound) = lb {
-            let cur = common.minzoom.as_ref().and_then(|m| m.as_f64());
+            let cur = common
+                .minzoom
+                .as_ref()
+                .and_then(maplibre_style_spec::spec::LayerMinzoom::as_f64);
             match cur {
                 Some(c) if bound > c => {
                     common.minzoom = maplibre_style_spec::spec::LayerMinzoom::from_f64(bound);
@@ -204,7 +207,10 @@ fn refine_typed_layer(
         }
 
         if let Some(bound) = ub {
-            let cur = common.maxzoom.as_ref().and_then(|m| m.as_f64());
+            let cur = common
+                .maxzoom
+                .as_ref()
+                .and_then(maplibre_style_spec::spec::LayerMaxzoom::as_f64);
             let new_max = match cur {
                 Some(c) => c.min(bound),
                 None => bound,
@@ -213,16 +219,22 @@ fn refine_typed_layer(
         }
 
         // Remove consumed zoom predicates from filter.
-        let adopted_min = common.minzoom.as_ref().and_then(|m| m.as_f64());
-        let adopted_max = common.maxzoom.as_ref().and_then(|m| m.as_f64());
-        if adopted_min.is_some() || adopted_max.is_some() {
-            if let Some(ref mut filter) = common.filter {
-                super::metadata::remove_consumed_zoom_predicates(
-                    filter.as_value_mut(),
-                    adopted_min,
-                    adopted_max,
-                );
-            }
+        let adopted_min = common
+            .minzoom
+            .as_ref()
+            .and_then(maplibre_style_spec::spec::LayerMinzoom::as_f64);
+        let adopted_max = common
+            .maxzoom
+            .as_ref()
+            .and_then(maplibre_style_spec::spec::LayerMaxzoom::as_f64);
+        if (adopted_min.is_some() || adopted_max.is_some())
+            && let Some(ref mut filter) = common.filter
+        {
+            super::metadata::remove_consumed_zoom_predicates(
+                filter.as_value_mut(),
+                adopted_min,
+                adopted_max,
+            );
         }
     }
 
@@ -237,12 +249,18 @@ fn refine_typed_layer(
         let data_min = f64::from(*layer_stats.features_by_zoom.keys().next().unwrap());
         let data_max = f64::from(*layer_stats.features_by_zoom.keys().next_back().unwrap());
 
-        let cur_min = common.minzoom.as_ref().and_then(|m| m.as_f64());
+        let cur_min = common
+            .minzoom
+            .as_ref()
+            .and_then(maplibre_style_spec::spec::LayerMinzoom::as_f64);
         if cur_min.is_none_or(|c| data_min > c) {
             common.minzoom = maplibre_style_spec::spec::LayerMinzoom::from_f64(data_min);
         }
 
-        let cur_max = common.maxzoom.as_ref().and_then(|m| m.as_f64());
+        let cur_max = common
+            .maxzoom
+            .as_ref()
+            .and_then(maplibre_style_spec::spec::LayerMaxzoom::as_f64);
         if cur_max.is_none_or(|c| data_max < c) {
             common.maxzoom = maplibre_style_spec::spec::LayerMaxzoom::from_f64(data_max);
         }
@@ -344,15 +362,15 @@ fn check_empty_paint_layout_opt<P: serde::Serialize, L: serde::Serialize>(
     paint: &mut Option<P>,
     layout: &mut Option<L>,
 ) {
-    if let Some(p) = paint {
-        if is_serialized_empty(p) {
-            *paint = None;
-        }
+    if let Some(p) = paint
+        && is_serialized_empty(p)
+    {
+        *paint = None;
     }
-    if let Some(l) = layout {
-        if is_serialized_empty(l) {
-            *layout = None;
-        }
+    if let Some(l) = layout
+        && is_serialized_empty(l)
+    {
+        *layout = None;
     }
 }
 
@@ -452,24 +470,24 @@ fn is_invisible_typed(layer: &AnyLayer) -> bool {
             TypedLayer::Heatmap { paint: Some(p), .. } => serde_json::to_value(p).ok(),
             _ => None,
         };
-        if let Some(pj) = paint_json {
-            if pj.get(prop).and_then(Value::as_f64) == Some(0.0) {
-                // Circle special case.
-                if layer_type == "circle" {
-                    let stroke_opacity = pj
-                        .get("circle-stroke-opacity")
-                        .and_then(Value::as_f64)
-                        .unwrap_or(1.0);
-                    let stroke_width = pj
-                        .get("circle-stroke-width")
-                        .and_then(Value::as_f64)
-                        .unwrap_or(0.0);
-                    if stroke_opacity != 0.0 && stroke_width != 0.0 {
-                        return false;
-                    }
+        if let Some(pj) = paint_json
+            && pj.get(prop).and_then(Value::as_f64) == Some(0.0)
+        {
+            // Circle special case.
+            if layer_type == "circle" {
+                let stroke_opacity = pj
+                    .get("circle-stroke-opacity")
+                    .and_then(Value::as_f64)
+                    .unwrap_or(1.0);
+                let stroke_width = pj
+                    .get("circle-stroke-width")
+                    .and_then(Value::as_f64)
+                    .unwrap_or(0.0);
+                if stroke_opacity != 0.0 && stroke_width != 0.0 {
+                    return false;
                 }
-                return true;
             }
+            return true;
         }
     }
 

@@ -7,12 +7,51 @@ use serde_json::{Number, Value};
 use crate::decoder::ParsedItem;
 use crate::generator::formatter::to_upper_camel_case;
 
-#[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
-#[serde(untagged)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum EnumValues {
     Version(Vec<Number>),
     Enum(BTreeMap<String, EnumDocs>),
     SyntaxEnum(BTreeMap<String, SyntaxEnum>),
+}
+
+impl Serialize for EnumValues {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        match self {
+            EnumValues::Version(v) => v.serialize(serializer),
+            EnumValues::Enum(m) => m.serialize(serializer),
+            EnumValues::SyntaxEnum(m) => m.serialize(serializer),
+        }
+    }
+}
+
+impl<'de> Deserialize<'de> for EnumValues {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let value = Value::deserialize(deserializer)?;
+        if value.is_array() {
+            return Vec::<Number>::deserialize(value)
+                .map(EnumValues::Version)
+                .map_err(|e| serde::de::Error::custom(format!("EnumValues::Version: {e}")));
+        }
+        if value.is_object() {
+            // try SyntaxEnum first (more specific, has "syntax" field in values), fall back to Enum
+            if let Ok(m) = BTreeMap::<String, SyntaxEnum>::deserialize(&value) {
+                return Ok(EnumValues::SyntaxEnum(m));
+            }
+            return BTreeMap::<String, EnumDocs>::deserialize(value)
+                .map(EnumValues::Enum)
+                .map_err(|e| {
+                    serde::de::Error::custom(format!(
+                        "EnumValues: expected a map of EnumDocs or SyntaxEnum, got: {e}"
+                    ))
+                });
+        }
+        Err(serde::de::Error::custom(
+            "expected an array of numbers (Version) or an object (Enum or SyntaxEnum)",
+        ))
+    }
 }
 impl EnumValues {
     /// number of variants this enum contains
@@ -150,8 +189,7 @@ impl Parameter {
     }
 }
 
-#[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
-#[serde(untagged)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum ParameterType {
     Literal(Literal),
     LiteralAnyOf(Vec<Literal>),
@@ -159,6 +197,59 @@ pub enum ParameterType {
     ExpressionAnyOf(Vec<ParameterType>),
     Object(BTreeMap<String, ParsedItem>),
     Reference(String),
+}
+
+impl Serialize for ParameterType {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        match self {
+            ParameterType::Literal(l) => l.serialize(serializer),
+            ParameterType::LiteralAnyOf(v) => v.serialize(serializer),
+            ParameterType::Expression(e) => e.serialize(serializer),
+            ParameterType::ExpressionAnyOf(v) => v.serialize(serializer),
+            ParameterType::Object(m) => m.serialize(serializer),
+            ParameterType::Reference(s) => s.serialize(serializer),
+        }
+    }
+}
+
+impl<'de> Deserialize<'de> for ParameterType {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let value = Value::deserialize(deserializer)?;
+        match &value {
+            Value::String(s) => {
+                // try Literal first, then Expression, then Reference (catch-all)
+                if let Ok(lit) = Literal::deserialize(&value) {
+                    return Ok(ParameterType::Literal(lit));
+                }
+                if let Ok(expr) = Expression::deserialize(&value) {
+                    return Ok(ParameterType::Expression(Box::new(expr)));
+                }
+                Ok(ParameterType::Reference(s.clone()))
+            }
+            Value::Array(_) => {
+                // try LiteralAnyOf first, then ExpressionAnyOf
+                if let Ok(v) = Vec::<Literal>::deserialize(&value) {
+                    return Ok(ParameterType::LiteralAnyOf(v));
+                }
+                Vec::<ParameterType>::deserialize(value)
+                    .map(ParameterType::ExpressionAnyOf)
+                    .map_err(|e| {
+                        serde::de::Error::custom(format!(
+                            "ParameterType: array is not a valid LiteralAnyOf or ExpressionAnyOf: {e}"
+                        ))
+                    })
+            }
+            Value::Object(_) => BTreeMap::<String, ParsedItem>::deserialize(value)
+                .map(ParameterType::Object)
+                .map_err(|e| serde::de::Error::custom(format!("ParameterType::Object: {e}"))),
+            other => Err(serde::de::Error::custom(format!(
+                "ParameterType: expected a string, array, or object, got {other}"
+            ))),
+        }
+    }
 }
 
 impl ParameterType {

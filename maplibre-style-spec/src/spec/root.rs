@@ -230,8 +230,7 @@ pub struct FontWithRange {
     pub unicode_range: Vec<std::string::String>,
 }
 
-#[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone)]
-#[serde(untagged)]
+#[derive(PartialEq, Eq, Debug, Clone)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum FontFace {
     /// A single global font file URL
@@ -241,6 +240,37 @@ pub enum FontFace {
     ),
     /// Load different fonts depending on the unicode range
     FontRange(Vec<FontWithRange>),
+}
+
+impl serde::Serialize for FontFace {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        match self {
+            Self::Url(v) => v.serialize(serializer),
+            Self::FontRange(v) => v.serialize(serializer),
+        }
+    }
+}
+
+impl<'de> serde::Deserialize<'de> for FontFace {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
+        let mut errors: Vec<(&str, std::string::String)> = Vec::new();
+        match <url::Url as serde::Deserialize>::deserialize(&value) {
+            Ok(v) => return Ok(Self::Url(v)),
+            Err(e) => errors.push(("Url", e.to_string())),
+        }
+        match <Vec<FontWithRange> as serde::Deserialize>::deserialize(&value) {
+            Ok(v) => return Ok(Self::FontRange(v)),
+            Err(e) => errors.push(("FontRange", e.to_string())),
+        }
+
+        let details: Vec<std::string::String> =
+            errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
+        Err(serde::de::Error::custom(format!(
+            "FontFace: no variant matched. Expected Url(url::Url) | FontRange(Vec<FontWithRange>). Errors: [{}]",
+            details.join("; ")
+        )))
+    }
 }
 
 /// The `font-faces` property can be used to specify what font files to use for rendering text. Font faces contain information needed to render complex texts such as [Devanagari](https://en.wikipedia.org/wiki/Devanagari), [Khmer](https://en.wikipedia.org/wiki/Khmer_script) among many others.<h2>Unicode range</h2>The optional `unicode-range` property can be used to only use a particular font file for characters within the specified unicode range(s). Its value should be an array of strings, each indicating a start and end of a unicode range, similar to the [CSS descriptor with the same name](https://developer.mozilla.org/en-US/docs/Web/CSS/@font-face/unicode-range). This allows specifying multiple non-consecutive unicode ranges. When not specified, the default value is `U+0-10FFFF`, meaning the font file will be used for all unicode characters.

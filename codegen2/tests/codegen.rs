@@ -975,15 +975,11 @@ fn block_with_after() {
     ");
 }
 
-
 #[test]
 fn function_with_ref_self() {
     let mut scope = Scope::new();
     let imp = scope.new_impl("Foo");
-    imp.new_fn("bar")
-        .arg_ref_self()
-        .ret("usize")
-        .line("self.x");
+    imp.new_fn("bar").arg_ref_self().ret("usize").line("self.x");
 
     insta::assert_snapshot!(scope.to_string(), @r"
     impl Foo {
@@ -998,7 +994,10 @@ fn function_with_ref_self() {
 fn function_with_mut_self() {
     let mut scope = Scope::new();
     let imp = scope.new_impl("Foo");
-    imp.new_fn("set").arg_mut_self().arg("val", "usize").line("self.x = val;");
+    imp.new_fn("set")
+        .arg_mut_self()
+        .arg("val", "usize")
+        .line("self.x = val;");
 
     insta::assert_snapshot!(scope.to_string(), @r"
     impl Foo {
@@ -1013,7 +1012,10 @@ fn function_with_mut_self() {
 fn function_with_self() {
     let mut scope = Scope::new();
     let imp = scope.new_impl("Foo");
-    imp.new_fn("into_inner").arg_self().ret("usize").line("self.x");
+    imp.new_fn("into_inner")
+        .arg_self()
+        .ret("usize")
+        .line("self.x");
 
     insta::assert_snapshot!(scope.to_string(), @r"
     impl Foo {
@@ -1048,10 +1050,7 @@ fn function_with_generics_and_bounds() {
 #[test]
 fn function_with_allow() {
     let mut scope = Scope::new();
-    scope
-        .new_fn("unused")
-        .allow("dead_code")
-        .line("let _ = 1;");
+    scope.new_fn("unused").allow("dead_code").line("let _ = 1;");
 
     insta::assert_snapshot!(scope.to_string(), @r"
     #[allow(dead_code)]
@@ -1064,10 +1063,7 @@ fn function_with_allow() {
 #[test]
 fn function_with_attr() {
     let mut scope = Scope::new();
-    scope
-        .new_fn("my_test")
-        .attr("test")
-        .line("assert!(true);");
+    scope.new_fn("my_test").attr("test").line("assert!(true);");
 
     insta::assert_snapshot!(scope.to_string(), @r"
     #[test]
@@ -1172,9 +1168,7 @@ fn trait_with_associated_type() {
     let mut scope = Scope::new();
     let trt = scope.new_trait("Iterator");
     trt.associated_type("Item");
-    trt.new_fn("next")
-        .arg_mut_self()
-        .ret("Option<Self::Item>");
+    trt.new_fn("next").arg_mut_self().ret("Option<Self::Item>");
 
     insta::assert_snapshot!(scope.to_string(), @r"
     trait Iterator {
@@ -1201,9 +1195,7 @@ fn trait_with_associated_type_bound() {
 #[test]
 fn trait_with_attr() {
     let mut scope = Scope::new();
-    scope
-        .new_trait("Foo")
-        .attr("deprecated");
+    scope.new_trait("Foo").attr("deprecated");
 
     insta::assert_snapshot!(scope.to_string(), @r"
     #[deprecated]
@@ -1473,10 +1465,7 @@ fn variant_tuple_with_attrs() {
 #[test]
 fn struct_with_vis() {
     let mut scope = Scope::new();
-    scope
-        .new_struct("Foo")
-        .vis("pub")
-        .field("x", "usize");
+    scope.new_struct("Foo").vis("pub").field("x", "usize");
 
     insta::assert_snapshot!(scope.to_string(), @r"
     pub struct Foo {
@@ -1561,7 +1550,9 @@ fn scope_raw() {
 fn scope_import_with_vis() {
     let mut scope = Scope::new();
     scope.import("std::collections", "HashMap").vis("pub");
-    scope.new_struct("Foo").field("map", "HashMap<String, String>");
+    scope
+        .new_struct("Foo")
+        .field("map", "HashMap<String, String>");
 
     insta::assert_snapshot!(scope.to_string(), @r"
     pub use std::collections::HashMap;

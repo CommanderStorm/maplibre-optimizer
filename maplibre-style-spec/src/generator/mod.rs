@@ -20,6 +20,7 @@ pub mod formatter;
 pub(crate) mod fuzz;
 mod items;
 mod literals;
+pub(crate) mod untagged;
 
 /// Generate Rust source from the semantic MIR.
 /// This is the sole entry point; it never touches decoder types.
@@ -255,18 +256,24 @@ fn generate_struct_from_fields(scope: &mut Scope, name: &str, fields: &[MirField
     }
 }
 
-/// Generate a `#[serde(tag)]` or `#[serde(untagged)]` sum-type enum.
+/// Generate a `#[serde(tag)]` or untagged (custom visitor) sum-type enum.
 fn generate_oneof(scope: &mut Scope, name: &str, one_of: &IntermediateOneOf) {
+    let is_tagged = one_of.tag.is_some();
+
+    let derive = if is_tagged {
+        "serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone"
+    } else {
+        "PartialEq, Debug, Clone"
+    };
+
     let enu = scope
         .new_enum(name)
         .vis("pub")
-        .derive("serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone")
+        .derive(derive)
         .attr(fuzz::CFG_DERIVE_ARBITRARY);
 
     if let Some(tag) = &one_of.tag {
         enu.attr(format!("serde(tag=\"{tag}\")"));
-    } else {
-        enu.attr("serde(untagged)");
     }
 
     // `clippy::enum_variant_names`: if all variants share a postfix equal to the enum name
@@ -282,15 +289,31 @@ fn generate_oneof(scope: &mut Scope, name: &str, one_of: &IntermediateOneOf) {
         None
     };
 
+    let mut variant_info: Vec<(String, String)> = Vec::new();
     for variant_key in &one_of.variants {
         let base_var_name = to_upper_camel_case(variant_key);
         let var_ident = strip_suffix
             .and_then(|s| base_var_name.strip_suffix(s))
-            .unwrap_or(&base_var_name);
-        let var = enu.new_variant(var_ident).tuple(&base_var_name);
+            .unwrap_or(&base_var_name)
+            .to_string();
+        let var = enu.new_variant(&var_ident).tuple(&base_var_name);
         if let Some(rename) = one_of.renames.get(&base_var_name) {
             var.annotation(format!("#[serde(rename=\"{rename}\")]"));
         }
+        variant_info.push((var_ident, base_var_name));
+    }
+
+    if !is_tagged {
+        let variants: Vec<untagged::Variant> = variant_info
+            .iter()
+            .map(|(vn, vt)| untagged::Variant {
+                name: vn.clone(),
+                inner_type: vt.clone(),
+                is_boxed: false,
+                is_unit: false,
+            })
+            .collect();
+        untagged::emit_untagged_serde(scope, name, &variants);
     }
 }
 
@@ -512,18 +535,34 @@ fn generate_ref_layer(scope: &mut Scope) {
         .annotation("#[serde(default, skip_serializing_if = \"Option::is_none\")]");
 }
 
-/// Generate `AnyLayer` — an `#[serde(untagged)]` enum wrapping `TypedLayer` or `RefLayer`.
+/// Generate `AnyLayer` — an untagged enum wrapping `TypedLayer` or `RefLayer`.
 fn generate_any_layer(scope: &mut Scope) {
     let enu = scope
         .new_enum("AnyLayer")
         .doc("A layer in the style: either a fully typed layer or a `ref` layer.")
         .vis("pub")
-        .derive("serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone")
-        .attr(fuzz::CFG_DERIVE_ARBITRARY)
-        .attr("serde(untagged)");
-
+        .derive("PartialEq, Debug, Clone")
+        .attr(fuzz::CFG_DERIVE_ARBITRARY);
     enu.new_variant("Typed").tuple("TypedLayer");
     enu.new_variant("Ref").tuple("RefLayer");
+    untagged::emit_untagged_serde(
+        scope,
+        "AnyLayer",
+        &[
+            untagged::Variant {
+                name: "Typed".into(),
+                inner_type: "TypedLayer".into(),
+                is_boxed: false,
+                is_unit: false,
+            },
+            untagged::Variant {
+                name: "Ref".into(),
+                inner_type: "RefLayer".into(),
+                is_boxed: false,
+                is_unit: false,
+            },
+        ],
+    );
 }
 
 /// Emit hand-written helper impls on `TypedLayer`, `AnyLayer`, and newtype wrappers.

@@ -2,15 +2,15 @@ use codegen2::Scope;
 
 use crate::generator::autotest::generate_test_from_example_if_present;
 use crate::generator::fuzz;
+use crate::generator::untagged::{self, Variant};
 use crate::mir::types::PaddingField;
 
 pub fn generate(scope: &mut Scope, name: &str, field: &PaddingField) {
     let enu = scope
         .new_enum(name)
         .vis("pub")
-        .attr("serde(untagged)")
         .doc(&field.meta.doc)
-        .derive("serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone")
+        .derive("PartialEq, Debug, Clone")
         .attr(fuzz::CFG_DERIVE_ARBITRARY);
     enu.new_variant("One")
         .doc("A single value applies to all four sides")
@@ -36,6 +36,37 @@ pub fn generate(scope: &mut Scope, name: &str, field: &PaddingField) {
             [fuzz::ARB_BOX_4_JSON_NUMBER],
             "Box<[serde_json::Number; 4]>",
         );
+
+    untagged::emit_untagged_serde(
+        scope,
+        name,
+        &[
+            Variant {
+                name: "One".into(),
+                inner_type: "[serde_json::Number; 1]".into(),
+                is_boxed: true,
+                is_unit: false,
+            },
+            Variant {
+                name: "Two".into(),
+                inner_type: "[serde_json::Number; 2]".into(),
+                is_boxed: true,
+                is_unit: false,
+            },
+            Variant {
+                name: "Three".into(),
+                inner_type: "[serde_json::Number; 3]".into(),
+                is_boxed: true,
+                is_unit: false,
+            },
+            Variant {
+                name: "Four".into(),
+                inner_type: "[serde_json::Number; 4]".into(),
+                is_boxed: true,
+                is_unit: false,
+            },
+        ],
+    );
 
     let mut items = String::from("Box::new([");
     let mut needs_separator = false;
@@ -83,8 +114,7 @@ mod tests {
             },
         );
         insta::assert_snapshot!(scope.to_string(), @r#"
-        #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-        #[serde(untagged)]
+        #[derive(PartialEq, Debug, Clone)]
         #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
         pub enum Foo {
             /// A single value applies to all four sides
@@ -107,6 +137,47 @@ mod tests {
                 #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_box_4_json_number))]
                  Box<[serde_json::Number; 4]>,
             ),
+        }
+
+        impl serde::Serialize for Foo {
+            fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+                match self {
+                    Self::One(v) => v.as_ref().serialize(serializer),
+                    Self::Two(v) => v.as_ref().serialize(serializer),
+                    Self::Three(v) => v.as_ref().serialize(serializer),
+                    Self::Four(v) => v.as_ref().serialize(serializer),
+                }
+            }
+        }
+
+        impl<'de> serde::Deserialize<'de> for Foo {
+            fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+                let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
+                let mut errors: Vec<(&str, std::string::String)> = Vec::new();
+                match <[serde_json::Number; 1] as serde::Deserialize>::deserialize(&value) {
+                    Ok(v) => return Ok(Self::One(Box::new(v))),
+                    Err(e) => errors.push(("One", e.to_string())),
+                }
+                match <[serde_json::Number; 2] as serde::Deserialize>::deserialize(&value) {
+                    Ok(v) => return Ok(Self::Two(Box::new(v))),
+                    Err(e) => errors.push(("Two", e.to_string())),
+                }
+                match <[serde_json::Number; 3] as serde::Deserialize>::deserialize(&value) {
+                    Ok(v) => return Ok(Self::Three(Box::new(v))),
+                    Err(e) => errors.push(("Three", e.to_string())),
+                }
+                match <[serde_json::Number; 4] as serde::Deserialize>::deserialize(&value) {
+                    Ok(v) => return Ok(Self::Four(Box::new(v))),
+                    Err(e) => errors.push(("Four", e.to_string())),
+                }
+
+                let details: Vec<std::string::String> =
+                    errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
+                Err(serde::de::Error::custom(format!(
+                    "Foo: no variant matched. Expected One([serde_json::Number; 1]) | Two([serde_json::Number; 2]) | Three([serde_json::Number; 3]) | Four([serde_json::Number; 4]). Errors: [{}]",
+                    details.join("; ")
+                )))
+            }
         }
 
         impl Default for Foo {

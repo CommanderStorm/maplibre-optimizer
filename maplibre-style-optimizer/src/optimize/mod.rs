@@ -133,40 +133,40 @@ fn run_pipeline(
     }
 
     // 1. Strip metadata (typed).
-    if passes.strip_metadata {
-        if let Ok(mut style) = serde_json::from_value::<MaplibreStyleSpecification>(v.clone()) {
-            strip_metadata_typed(&mut style);
-            sync_typed_to_json(&style, v);
-        }
+    if passes.strip_metadata
+        && let Ok(mut style) = serde_json::from_value::<MaplibreStyleSpecification>(v.clone())
+    {
+        strip_metadata_typed(&mut style);
+        sync_typed_to_json(&style, v);
     }
 
     // 2. Expression passes (JSON walker).
     run_json_expression_passes(v, mir, passes, stats);
 
     // 3. Dead elimination (typed).
-    if passes.dead_elimination {
-        if let Ok(mut style) = serde_json::from_value::<MaplibreStyleSpecification>(v.clone()) {
-            let layer_info = stats.map(|_| precompute_vector_layer_info_typed(&style));
-            dead_elimination_typed(&mut style, stats, layer_info.as_deref());
-            sync_typed_to_json(&style, v);
-        }
+    if passes.dead_elimination
+        && let Ok(mut style) = serde_json::from_value::<MaplibreStyleSpecification>(v.clone())
+    {
+        let layer_info = stats.map(|_| precompute_vector_layer_info_typed(&style));
+        dead_elimination_typed(&mut style, stats, layer_info.as_deref());
+        sync_typed_to_json(&style, v);
     }
 
     // 4. Metadata refinement (typed).
-    if passes.metadata_refinement {
-        if let Ok(mut style) = serde_json::from_value::<MaplibreStyleSpecification>(v.clone()) {
-            let layer_info = stats.map(|_| precompute_vector_layer_info_typed(&style));
-            metadata_refinement_typed(&mut style, stats, layer_info.as_deref());
-            sync_typed_to_json(&style, v);
-        }
+    if passes.metadata_refinement
+        && let Ok(mut style) = serde_json::from_value::<MaplibreStyleSpecification>(v.clone())
+    {
+        let layer_info = stats.map(|_| precompute_vector_layer_info_typed(&style));
+        metadata_refinement_typed(&mut style, stats, layer_info.as_deref());
+        sync_typed_to_json(&style, v);
     }
 
     // 5. Cleanup (typed).
-    if passes.cleanup {
-        if let Ok(mut style) = serde_json::from_value::<MaplibreStyleSpecification>(v.clone()) {
-            cleanup_typed(&mut style);
-            sync_typed_to_json(&style, v);
-        }
+    if passes.cleanup
+        && let Ok(mut style) = serde_json::from_value::<MaplibreStyleSpecification>(v.clone())
+    {
+        cleanup_typed(&mut style);
+        sync_typed_to_json(&style, v);
     }
 }
 
@@ -238,15 +238,15 @@ fn sync_typed_to_json(style: &MaplibreStyleSpecification, v: &mut Value) {
             obj.get("layers").and_then(Value::as_array).cloned(),
             typed_layers_val.as_array(),
         ) {
-            if json_layers.len() != typed_layers.len() {
-                obj.insert("layers".to_string(), typed_layers_val);
-            } else {
+            if json_layers.len() == typed_layers.len() {
                 let merged: Vec<Value> = json_layers
                     .into_iter()
                     .zip(typed_layers)
                     .map(|(jl, tl)| merge_layer_json(jl, tl))
                     .collect();
                 obj.insert("layers".to_string(), Value::Array(merged));
+            } else {
+                obj.insert("layers".to_string(), typed_layers_val);
             }
         } else {
             obj.insert("layers".to_string(), typed_layers_val);

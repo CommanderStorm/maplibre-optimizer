@@ -28,12 +28,47 @@ pub struct StyleReference {
     pub fields: BTreeMap<String, TopLevelItem>,
 }
 
-#[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
-#[serde(untagged)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum TopLevelItem {
     Item(Box<ParsedItem>),
     Group(BTreeMap<String, ParsedItem>),
     OneOf(Vec<String>),
+}
+
+impl Serialize for TopLevelItem {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        match self {
+            TopLevelItem::Item(item) => item.serialize(serializer),
+            TopLevelItem::Group(group) => group.serialize(serializer),
+            TopLevelItem::OneOf(one_of) => one_of.serialize(serializer),
+        }
+    }
+}
+
+impl<'de> Deserialize<'de> for TopLevelItem {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let value = Value::deserialize(deserializer)?;
+        if value.is_array() {
+            return Vec::<String>::deserialize(value)
+                .map(TopLevelItem::OneOf)
+                .map_err(|e| serde::de::Error::custom(format!("TopLevelItem::OneOf: {e}")));
+        }
+        if value.is_object() {
+            // try Item first (has a "type" field), fall back to Group
+            if let Ok(item) = ParsedItem::deserialize(&value) {
+                return Ok(TopLevelItem::Item(Box::new(item)));
+            }
+            return BTreeMap::<String, ParsedItem>::deserialize(value)
+                .map(TopLevelItem::Group)
+                .map_err(|e| serde::de::Error::custom(format!("TopLevelItem::Group: {e}")));
+        }
+        Err(serde::de::Error::custom(
+            "expected an object (Item or Group) or an array of strings (OneOf)",
+        ))
+    }
 }
 
 impl TopLevelItem {
@@ -376,16 +411,61 @@ impl PrimitiveType {
     }
 }
 
-#[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
-#[serde(untagged)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum ParsedItem {
     Primitive(PrimitiveType),
-    Reference {
-        #[serde(rename = "type")]
-        references: String,
-        #[serde(flatten)]
-        common: Fields,
-    },
+    Reference { references: String, common: Fields },
+}
+
+impl Serialize for ParsedItem {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        match self {
+            ParsedItem::Primitive(p) => p.serialize(serializer),
+            ParsedItem::Reference { references, common } => {
+                use serde::ser::SerializeMap;
+                // flatten common fields and add "type"
+                let value = serde_json::to_value(common).map_err(serde::ser::Error::custom)?;
+                let mut map = serializer.serialize_map(None)?;
+                map.serialize_entry("type", references)?;
+                if let Value::Object(obj) = value {
+                    for (k, v) in &obj {
+                        map.serialize_entry(k, v)?;
+                    }
+                }
+                map.end()
+            }
+        }
+    }
+}
+
+impl<'de> Deserialize<'de> for ParsedItem {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let value = Value::deserialize(deserializer)?;
+        // try Primitive first (internally tagged by "type" with known variant names)
+        if let Ok(p) = PrimitiveType::deserialize(&value) {
+            return Ok(ParsedItem::Primitive(p));
+        }
+        // fall back to Reference: object with a "type" string that's a reference name
+        let obj = value
+            .as_object()
+            .ok_or_else(|| serde::de::Error::custom("ParsedItem: expected an object"))?;
+        let references = obj
+            .get("type")
+            .and_then(Value::as_str)
+            .ok_or_else(|| {
+                serde::de::Error::custom(
+                    "ParsedItem: expected a known primitive type or a \"type\" field with a reference string",
+                )
+            })?
+            .to_owned();
+        // deserialize remaining fields as Fields (ignoring "type")
+        let common = Fields::deserialize(&value)
+            .map_err(|e| serde::de::Error::custom(format!("ParsedItem::Reference fields: {e}")))?;
+        Ok(ParsedItem::Reference { references, common })
+    }
 }
 
 impl ParsedItem {
@@ -492,9 +572,46 @@ pub struct Expression {
     pub parameters: Vec<String>,
 }
 
-#[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
-#[serde(untagged)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub enum Requirement {
     Exists(String),
     Equals(BTreeMap<String, Value>),
+}
+
+impl Serialize for Requirement {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        match self {
+            Requirement::Exists(s) => s.serialize(serializer),
+            Requirement::Equals(m) => m.serialize(serializer),
+        }
+    }
+}
+
+impl<'de> Deserialize<'de> for Requirement {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        struct RequirementVisitor;
+        impl<'de> serde::de::Visitor<'de> for RequirementVisitor {
+            type Value = Requirement;
+            fn expecting(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                f.write_str("a string (Exists) or a map (Equals)")
+            }
+            fn visit_str<E: serde::de::Error>(self, v: &str) -> Result<Self::Value, E> {
+                Ok(Requirement::Exists(v.to_owned()))
+            }
+            fn visit_string<E: serde::de::Error>(self, v: String) -> Result<Self::Value, E> {
+                Ok(Requirement::Exists(v))
+            }
+            fn visit_map<A: serde::de::MapAccess<'de>>(
+                self,
+                map: A,
+            ) -> Result<Self::Value, A::Error> {
+                let m = BTreeMap::deserialize(serde::de::value::MapAccessDeserializer::new(map))?;
+                Ok(Requirement::Equals(m))
+            }
+        }
+        deserializer.deserialize_any(RequirementVisitor)
+    }
 }

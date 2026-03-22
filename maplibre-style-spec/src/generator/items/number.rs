@@ -2,6 +2,7 @@ use codegen2::Scope;
 
 use crate::generator::autotest::generate_test_from_example_if_present;
 use crate::generator::fuzz;
+use crate::generator::untagged::{self, Variant};
 use crate::mir::types::NumberField;
 
 pub fn generate(scope: &mut Scope, name: &str, field: &NumberField) {
@@ -12,25 +13,59 @@ pub fn generate(scope: &mut Scope, name: &str, field: &NumberField) {
             .new_enum(&expr_name)
             .doc("Nested expression: ramp (`interpolate` / …) or regular [`Number`] operators.")
             .vis("pub")
-            .derive("serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone")
-            .attr(fuzz::CFG_DERIVE_ARBITRARY)
-            .attr("serde(untagged)");
+            .derive("PartialEq, Debug, Clone")
+            .attr(fuzz::CFG_DERIVE_ARBITRARY);
         // Try [`Number`] first so `["+", …]` / `["*", …]` decode without trying the ramp enum
         // (which only accepts `interpolate`).
         expr.new_variant("Number").tuple("Number");
         expr.new_variant("Ramp")
             .tuple("NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection");
+        untagged::emit_untagged_serde(
+            scope,
+            &expr_name,
+            &[
+                Variant {
+                    name: "Number".into(),
+                    inner_type: "Number".into(),
+                    is_boxed: false,
+                    is_unit: false,
+                },
+                Variant {
+                    name: "Ramp".into(),
+                    inner_type: "NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection".into(),
+                    is_boxed: false,
+                    is_unit: false,
+                },
+            ],
+        );
 
         let enu = scope
             .new_enum(name)
             .doc(&field.meta.doc)
             .vis("pub")
-            .derive("serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone")
-            .attr(fuzz::CFG_DERIVE_ARBITRARY)
-            .attr("serde(untagged)");
+            .derive("PartialEq, Debug, Clone")
+            .attr(fuzz::CFG_DERIVE_ARBITRARY);
         enu.new_variant("Expr").tuple(format!("Box<{expr_name}>"));
         enu.new_variant("Literal")
             .tuple_with_attrs([fuzz::ARB_JSON_NUMBER], "serde_json::Number");
+        untagged::emit_untagged_serde(
+            scope,
+            name,
+            &[
+                Variant {
+                    name: "Expr".into(),
+                    inner_type: expr_name.clone(),
+                    is_boxed: true,
+                    is_unit: false,
+                },
+                Variant {
+                    name: "Literal".into(),
+                    inner_type: "serde_json::Number".into(),
+                    is_boxed: false,
+                    is_unit: false,
+                },
+            ],
+        );
     } else {
         scope
             .new_struct(name)

@@ -3,9 +3,8 @@
 use super::*;
 
 /// An expression node or a literal JSON value in expression positions.
-#[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+#[derive(PartialEq, Debug, Clone)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-#[serde(untagged)]
 pub enum ExprOrLiteral {
     Null,
     Bool(bool),
@@ -26,9 +25,113 @@ pub enum ExprOrLiteral {
     StringExpr(Box<String>),
 }
 
+impl serde::Serialize for ExprOrLiteral {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        match self {
+            Self::Null => serializer.serialize_unit(),
+            Self::Bool(v) => v.serialize(serializer),
+            Self::NumberLiteral(v) => v.serialize(serializer),
+            Self::StringLiteral(v) => v.serialize(serializer),
+            Self::GeoJSONObjectLiteral(v) => v.serialize(serializer),
+            Self::JSONObjectLiteral(v) => v.serialize(serializer),
+            Self::JSONArrayLiteral(v) => v.serialize(serializer),
+            Self::AnyExpr(v) => v.as_ref().serialize(serializer),
+            Self::ArrayExpr(v) => v.as_ref().serialize(serializer),
+            Self::BooleanExpr(v) => v.as_ref().serialize(serializer),
+            Self::CollatorExpr(v) => v.as_ref().serialize(serializer),
+            Self::ColorExpr(v) => v.as_ref().serialize(serializer),
+            Self::FormattedExpr(v) => v.as_ref().serialize(serializer),
+            Self::ImageExpr(v) => v.as_ref().serialize(serializer),
+            Self::NumberExpr(v) => v.as_ref().serialize(serializer),
+            Self::ObjectExpr(v) => v.as_ref().serialize(serializer),
+            Self::StringExpr(v) => v.as_ref().serialize(serializer),
+        }
+    }
+}
+
+impl<'de> serde::Deserialize<'de> for ExprOrLiteral {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
+        let mut errors: Vec<(&str, std::string::String)> = Vec::new();
+        if value.is_null() {
+            return Ok(Self::Null);
+        }
+        match <bool as serde::Deserialize>::deserialize(&value) {
+            Ok(v) => return Ok(Self::Bool(v)),
+            Err(e) => errors.push(("Bool", e.to_string())),
+        }
+        match <NumberLiteral as serde::Deserialize>::deserialize(&value) {
+            Ok(v) => return Ok(Self::NumberLiteral(v)),
+            Err(e) => errors.push(("NumberLiteral", e.to_string())),
+        }
+        match <StringLiteral as serde::Deserialize>::deserialize(&value) {
+            Ok(v) => return Ok(Self::StringLiteral(v)),
+            Err(e) => errors.push(("StringLiteral", e.to_string())),
+        }
+        match <GeoJSONObjectLiteral as serde::Deserialize>::deserialize(&value) {
+            Ok(v) => return Ok(Self::GeoJSONObjectLiteral(v)),
+            Err(e) => errors.push(("GeoJSONObjectLiteral", e.to_string())),
+        }
+        match <JSONObjectLiteral as serde::Deserialize>::deserialize(&value) {
+            Ok(v) => return Ok(Self::JSONObjectLiteral(v)),
+            Err(e) => errors.push(("JSONObjectLiteral", e.to_string())),
+        }
+        match <JSONArrayLiteral as serde::Deserialize>::deserialize(&value) {
+            Ok(v) => return Ok(Self::JSONArrayLiteral(v)),
+            Err(e) => errors.push(("JSONArrayLiteral", e.to_string())),
+        }
+        match <Any as serde::Deserialize>::deserialize(&value) {
+            Ok(v) => return Ok(Self::AnyExpr(Box::new(v))),
+            Err(e) => errors.push(("AnyExpr", e.to_string())),
+        }
+        match <Array as serde::Deserialize>::deserialize(&value) {
+            Ok(v) => return Ok(Self::ArrayExpr(Box::new(v))),
+            Err(e) => errors.push(("ArrayExpr", e.to_string())),
+        }
+        match <Boolean as serde::Deserialize>::deserialize(&value) {
+            Ok(v) => return Ok(Self::BooleanExpr(Box::new(v))),
+            Err(e) => errors.push(("BooleanExpr", e.to_string())),
+        }
+        match <Collator as serde::Deserialize>::deserialize(&value) {
+            Ok(v) => return Ok(Self::CollatorExpr(Box::new(v))),
+            Err(e) => errors.push(("CollatorExpr", e.to_string())),
+        }
+        match <Color as serde::Deserialize>::deserialize(&value) {
+            Ok(v) => return Ok(Self::ColorExpr(Box::new(v))),
+            Err(e) => errors.push(("ColorExpr", e.to_string())),
+        }
+        match <Formatted as serde::Deserialize>::deserialize(&value) {
+            Ok(v) => return Ok(Self::FormattedExpr(Box::new(v))),
+            Err(e) => errors.push(("FormattedExpr", e.to_string())),
+        }
+        match <Image as serde::Deserialize>::deserialize(&value) {
+            Ok(v) => return Ok(Self::ImageExpr(Box::new(v))),
+            Err(e) => errors.push(("ImageExpr", e.to_string())),
+        }
+        match <Number as serde::Deserialize>::deserialize(&value) {
+            Ok(v) => return Ok(Self::NumberExpr(Box::new(v))),
+            Err(e) => errors.push(("NumberExpr", e.to_string())),
+        }
+        match <Object as serde::Deserialize>::deserialize(&value) {
+            Ok(v) => return Ok(Self::ObjectExpr(Box::new(v))),
+            Err(e) => errors.push(("ObjectExpr", e.to_string())),
+        }
+        match <String as serde::Deserialize>::deserialize(&value) {
+            Ok(v) => return Ok(Self::StringExpr(Box::new(v))),
+            Err(e) => errors.push(("StringExpr", e.to_string())),
+        }
+
+        let details: Vec<std::string::String> =
+            errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
+        Err(serde::de::Error::custom(format!(
+            "ExprOrLiteral: no variant matched. Expected Null | Bool(bool) | NumberLiteral(NumberLiteral) | StringLiteral(StringLiteral) | GeoJSONObjectLiteral(GeoJSONObjectLiteral) | JSONObjectLiteral(JSONObjectLiteral) | JSONArrayLiteral(JSONArrayLiteral) | AnyExpr(Any) | ArrayExpr(Array) | BooleanExpr(Boolean) | CollatorExpr(Collator) | ColorExpr(Color) | FormattedExpr(Formatted) | ImageExpr(Image) | NumberExpr(Number) | ObjectExpr(Object) | StringExpr(String). Errors: [{}]",
+            details.join("; ")
+        )))
+    }
+}
+
 /// Either of the below variants
-#[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-#[serde(untagged)]
+#[derive(PartialEq, Debug, Clone)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum StringOrNumberOrArrayOfStringOrArrayOfNumberAsUnion {
     String(StringLiteral),
@@ -37,9 +140,49 @@ pub enum StringOrNumberOrArrayOfStringOrArrayOfNumberAsUnion {
     ArrayOfNumber(ArrayOfNumberLiteral),
 }
 
+impl serde::Serialize for StringOrNumberOrArrayOfStringOrArrayOfNumberAsUnion {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        match self {
+            Self::String(v) => v.serialize(serializer),
+            Self::Number(v) => v.serialize(serializer),
+            Self::ArrayOfString(v) => v.serialize(serializer),
+            Self::ArrayOfNumber(v) => v.serialize(serializer),
+        }
+    }
+}
+
+impl<'de> serde::Deserialize<'de> for StringOrNumberOrArrayOfStringOrArrayOfNumberAsUnion {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
+        let mut errors: Vec<(&str, std::string::String)> = Vec::new();
+        match <StringLiteral as serde::Deserialize>::deserialize(&value) {
+            Ok(v) => return Ok(Self::String(v)),
+            Err(e) => errors.push(("String", e.to_string())),
+        }
+        match <NumberLiteral as serde::Deserialize>::deserialize(&value) {
+            Ok(v) => return Ok(Self::Number(v)),
+            Err(e) => errors.push(("Number", e.to_string())),
+        }
+        match <ArrayOfStringLiteral as serde::Deserialize>::deserialize(&value) {
+            Ok(v) => return Ok(Self::ArrayOfString(v)),
+            Err(e) => errors.push(("ArrayOfString", e.to_string())),
+        }
+        match <ArrayOfNumberLiteral as serde::Deserialize>::deserialize(&value) {
+            Ok(v) => return Ok(Self::ArrayOfNumber(v)),
+            Err(e) => errors.push(("ArrayOfNumber", e.to_string())),
+        }
+
+        let details: Vec<std::string::String> =
+            errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
+        Err(serde::de::Error::custom(format!(
+            "StringOrNumberOrArrayOfStringOrArrayOfNumberAsUnion: no variant matched. Expected String(StringLiteral) | Number(NumberLiteral) | ArrayOfString(ArrayOfStringLiteral) | ArrayOfNumber(ArrayOfNumberLiteral). Errors: [{}]",
+            details.join("; ")
+        )))
+    }
+}
+
 /// Either of the below variants
-#[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-#[serde(untagged)]
+#[derive(PartialEq, Debug, Clone)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum NumberLiteralOrNumberOrAnyAsUnion {
     NumberLiteral(NumberLiteral),
@@ -47,14 +190,85 @@ pub enum NumberLiteralOrNumberOrAnyAsUnion {
     Any(Box<Any>),
 }
 
+impl serde::Serialize for NumberLiteralOrNumberOrAnyAsUnion {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        match self {
+            Self::NumberLiteral(v) => v.serialize(serializer),
+            Self::Number(v) => v.serialize(serializer),
+            Self::Any(v) => v.serialize(serializer),
+        }
+    }
+}
+
+impl<'de> serde::Deserialize<'de> for NumberLiteralOrNumberOrAnyAsUnion {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
+        let mut errors: Vec<(&str, std::string::String)> = Vec::new();
+        match <NumberLiteral as serde::Deserialize>::deserialize(&value) {
+            Ok(v) => return Ok(Self::NumberLiteral(v)),
+            Err(e) => errors.push(("NumberLiteral", e.to_string())),
+        }
+        match <Box<Number> as serde::Deserialize>::deserialize(&value) {
+            Ok(v) => return Ok(Self::Number(v)),
+            Err(e) => errors.push(("Number", e.to_string())),
+        }
+        match <Box<Any> as serde::Deserialize>::deserialize(&value) {
+            Ok(v) => return Ok(Self::Any(v)),
+            Err(e) => errors.push(("Any", e.to_string())),
+        }
+
+        let details: Vec<std::string::String> =
+            errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
+        Err(serde::de::Error::custom(format!(
+            "NumberLiteralOrNumberOrAnyAsUnion: no variant matched. Expected NumberLiteral(NumberLiteral) | Number(Box<Number>) | Any(Box<Any>). Errors: [{}]",
+            details.join("; ")
+        )))
+    }
+}
+
 /// Either of the below variants
-#[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-#[serde(untagged)]
+#[derive(PartialEq, Debug, Clone)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum StringLiteralOrStringOrAnyAsUnion {
     StringLiteral(StringLiteral),
     String(Box<String>),
     Any(Box<Any>),
+}
+
+impl serde::Serialize for StringLiteralOrStringOrAnyAsUnion {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        match self {
+            Self::StringLiteral(v) => v.serialize(serializer),
+            Self::String(v) => v.serialize(serializer),
+            Self::Any(v) => v.serialize(serializer),
+        }
+    }
+}
+
+impl<'de> serde::Deserialize<'de> for StringLiteralOrStringOrAnyAsUnion {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
+        let mut errors: Vec<(&str, std::string::String)> = Vec::new();
+        match <StringLiteral as serde::Deserialize>::deserialize(&value) {
+            Ok(v) => return Ok(Self::StringLiteral(v)),
+            Err(e) => errors.push(("StringLiteral", e.to_string())),
+        }
+        match <Box<String> as serde::Deserialize>::deserialize(&value) {
+            Ok(v) => return Ok(Self::String(v)),
+            Err(e) => errors.push(("String", e.to_string())),
+        }
+        match <Box<Any> as serde::Deserialize>::deserialize(&value) {
+            Ok(v) => return Ok(Self::Any(v)),
+            Err(e) => errors.push(("Any", e.to_string())),
+        }
+
+        let details: Vec<std::string::String> =
+            errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
+        Err(serde::de::Error::custom(format!(
+            "StringLiteralOrStringOrAnyAsUnion: no variant matched. Expected StringLiteral(StringLiteral) | String(Box<String>) | Any(Box<Any>). Errors: [{}]",
+            details.join("; ")
+        )))
+    }
 }
 
 /// "Any"
@@ -195,11 +409,6 @@ impl<'de> serde::de::Visitor<'de> for AnyVisitor {
                     let element = (condition_i, output_i);
                     inputs.push(element);
                 }
-                if inputs.is_empty() {
-                    return Err(serde::de::Error::custom(
-                        "Any::Case requires at least one argument",
-                    ));
-                }
                 let fallback = serde_json::from_value(rest[inputs_len * 2].clone())
                     .map_err(serde::de::Error::custom)?;
                 Ok(Any::Case((inputs, fallback)))
@@ -208,11 +417,6 @@ impl<'de> serde::de::Visitor<'de> for AnyVisitor {
                 let mut inputs = Vec::new();
                 while let Some(element) = seq.next_element()? {
                     inputs.push(element);
-                }
-                if inputs.is_empty() {
-                    return Err(serde::de::Error::custom(
-                        "Any::Coalesce requires at least one argument",
-                    ));
                 }
                 Ok(Any::Coalesce(inputs))
             }
@@ -252,11 +456,6 @@ impl<'de> serde::de::Visitor<'de> for AnyVisitor {
                         .map_err(serde::de::Error::custom)?;
                     let element = (var_name_i, var_value_i);
                     inputs.push(element);
-                }
-                if inputs.is_empty() {
-                    return Err(serde::de::Error::custom(
-                        "Any::Let requires at least one argument",
-                    ));
                 }
                 let expression = serde_json::from_value(rest[inputs_len * 2].clone())
                     .map_err(serde::de::Error::custom)?;
@@ -306,11 +505,6 @@ impl<'de> serde::de::Visitor<'de> for AnyVisitor {
                     })?;
                     stops.push((stop_input_i, stop_output_i));
                 }
-                if stops.is_empty() {
-                    return Err(serde::de::Error::custom(
-                        "Any::Step requires at least one stop pair",
-                    ));
-                }
                 Ok(Any::Step((input, output_0, stops)))
             }
             "var" => {
@@ -346,7 +540,7 @@ impl serde::Serialize for Any {
         use serde::ser::SerializeSeq;
         match self {
             Any::Accumulated => {
-                let mut elems: Vec<serde_json::Value> = Vec::new();
+                let mut elems = vec![];
                 while elems.last().is_some_and(serde_json::Value::is_null) {
                     elems.pop();
                 }
@@ -358,9 +552,10 @@ impl serde::Serialize for Any {
                 seq.end()
             }
             Any::At(f0, f1) => {
-                let mut elems: Vec<serde_json::Value> = Vec::new();
-                elems.push(serde_json::to_value(&f0).map_err(serde::ser::Error::custom)?);
-                elems.push(serde_json::to_value(&f1).map_err(serde::ser::Error::custom)?);
+                let mut elems = vec![
+                    serde_json::to_value(f0).map_err(serde::ser::Error::custom)?,
+                    serde_json::to_value(f1).map_err(serde::ser::Error::custom)?,
+                ];
                 while elems.last().is_some_and(serde_json::Value::is_null) {
                     elems.pop();
                 }
@@ -378,8 +573,10 @@ impl serde::Serialize for Any {
                 if let serde_json::Value::Array(top) = &inner_val {
                     for elem in top {
                         if let serde_json::Value::Array(sub) = elem {
-                            // An array-of-arrays is the Vec<(A,B)> — flatten it.
-                            if !sub.is_empty() && sub[0].is_array() {
+                            if sub.is_empty() {
+                                // Empty Vec — nothing to flatten.
+                            } else if sub[0].is_array() {
+                                // An array-of-arrays is the Vec<(A,B)> — flatten it.
                                 for pair in sub {
                                     if let serde_json::Value::Array(pair_elems) = pair {
                                         for pe in pair_elems {
@@ -416,8 +613,7 @@ impl serde::Serialize for Any {
                 seq.end()
             }
             Any::FeatureState(f0) => {
-                let mut elems: Vec<serde_json::Value> = Vec::new();
-                elems.push(serde_json::to_value(&f0).map_err(serde::ser::Error::custom)?);
+                let mut elems = vec![serde_json::to_value(f0).map_err(serde::ser::Error::custom)?];
                 while elems.last().is_some_and(serde_json::Value::is_null) {
                     elems.pop();
                 }
@@ -429,9 +625,10 @@ impl serde::Serialize for Any {
                 seq.end()
             }
             Any::Get(f0, f1) => {
-                let mut elems: Vec<serde_json::Value> = Vec::new();
-                elems.push(serde_json::to_value(&f0).map_err(serde::ser::Error::custom)?);
-                elems.push(serde_json::to_value(&f1).map_err(serde::ser::Error::custom)?);
+                let mut elems = vec![
+                    serde_json::to_value(f0).map_err(serde::ser::Error::custom)?,
+                    serde_json::to_value(f1).map_err(serde::ser::Error::custom)?,
+                ];
                 while elems.last().is_some_and(serde_json::Value::is_null) {
                     elems.pop();
                 }
@@ -443,8 +640,7 @@ impl serde::Serialize for Any {
                 seq.end()
             }
             Any::GlobalState(f0) => {
-                let mut elems: Vec<serde_json::Value> = Vec::new();
-                elems.push(serde_json::to_value(&f0).map_err(serde::ser::Error::custom)?);
+                let mut elems = vec![serde_json::to_value(f0).map_err(serde::ser::Error::custom)?];
                 while elems.last().is_some_and(serde_json::Value::is_null) {
                     elems.pop();
                 }
@@ -456,7 +652,7 @@ impl serde::Serialize for Any {
                 seq.end()
             }
             Any::Id => {
-                let mut elems: Vec<serde_json::Value> = Vec::new();
+                let mut elems = vec![];
                 while elems.last().is_some_and(serde_json::Value::is_null) {
                     elems.pop();
                 }
@@ -474,8 +670,10 @@ impl serde::Serialize for Any {
                 if let serde_json::Value::Array(top) = &inner_val {
                     for elem in top {
                         if let serde_json::Value::Array(sub) = elem {
-                            // An array-of-arrays is the Vec<(A,B)> — flatten it.
-                            if !sub.is_empty() && sub[0].is_array() {
+                            if sub.is_empty() {
+                                // Empty Vec — nothing to flatten.
+                            } else if sub[0].is_array() {
+                                // An array-of-arrays is the Vec<(A,B)> — flatten it.
                                 for pair in sub {
                                     if let serde_json::Value::Array(pair_elems) = pair {
                                         for pe in pair_elems {
@@ -505,8 +703,10 @@ impl serde::Serialize for Any {
                 if let serde_json::Value::Array(top) = &inner_val {
                     for elem in top {
                         if let serde_json::Value::Array(sub) = elem {
-                            // An array-of-arrays is the Vec<(A,B)> — flatten it.
-                            if !sub.is_empty() && sub[0].is_array() {
+                            if sub.is_empty() {
+                                // Empty Vec — nothing to flatten.
+                            } else if sub[0].is_array() {
+                                // An array-of-arrays is the Vec<(A,B)> — flatten it.
                                 for pair in sub {
                                     if let serde_json::Value::Array(pair_elems) = pair {
                                         for pe in pair_elems {
@@ -536,8 +736,10 @@ impl serde::Serialize for Any {
                 if let serde_json::Value::Array(top) = &inner_val {
                     for elem in top {
                         if let serde_json::Value::Array(sub) = elem {
-                            // An array-of-arrays is the Vec<(A,B)> — flatten it.
-                            if !sub.is_empty() && sub[0].is_array() {
+                            if sub.is_empty() {
+                                // Empty Vec — nothing to flatten.
+                            } else if sub[0].is_array() {
+                                // An array-of-arrays is the Vec<(A,B)> — flatten it.
                                 for pair in sub {
                                     if let serde_json::Value::Array(pair_elems) = pair {
                                         for pe in pair_elems {
@@ -561,8 +763,7 @@ impl serde::Serialize for Any {
                 seq.end()
             }
             Any::Var(f0) => {
-                let mut elems: Vec<serde_json::Value> = Vec::new();
-                elems.push(serde_json::to_value(&f0).map_err(serde::ser::Error::custom)?);
+                let mut elems = vec![serde_json::to_value(f0).map_err(serde::ser::Error::custom)?];
                 while elems.last().is_some_and(serde_json::Value::is_null) {
                     elems.pop();
                 }
@@ -741,12 +942,42 @@ mod test {
 }
 
 /// Either of the below variants
-#[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-#[serde(untagged)]
+#[derive(PartialEq, Debug, Clone)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum StringLiteralOrColorAsUnion {
     StringLiteral(StringLiteral),
     Color(Color),
+}
+
+impl serde::Serialize for StringLiteralOrColorAsUnion {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        match self {
+            Self::StringLiteral(v) => v.serialize(serializer),
+            Self::Color(v) => v.serialize(serializer),
+        }
+    }
+}
+
+impl<'de> serde::Deserialize<'de> for StringLiteralOrColorAsUnion {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
+        let mut errors: Vec<(&str, std::string::String)> = Vec::new();
+        match <StringLiteral as serde::Deserialize>::deserialize(&value) {
+            Ok(v) => return Ok(Self::StringLiteral(v)),
+            Err(e) => errors.push(("StringLiteral", e.to_string())),
+        }
+        match <Color as serde::Deserialize>::deserialize(&value) {
+            Ok(v) => return Ok(Self::Color(v)),
+            Err(e) => errors.push(("Color", e.to_string())),
+        }
+
+        let details: Vec<std::string::String> =
+            errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
+        Err(serde::de::Error::custom(format!(
+            "StringLiteralOrColorAsUnion: no variant matched. Expected StringLiteral(StringLiteral) | Color(Color). Errors: [{}]",
+            details.join("; ")
+        )))
+    }
 }
 
 /// "Array"
@@ -839,8 +1070,7 @@ impl serde::Serialize for Array {
         use serde::ser::SerializeSeq;
         match self {
             Array::Op(f0) => {
-                let mut elems: Vec<serde_json::Value> = Vec::new();
-                elems.push(serde_json::to_value(&f0).map_err(serde::ser::Error::custom)?);
+                let mut elems = vec![serde_json::to_value(f0).map_err(serde::ser::Error::custom)?];
                 while elems.last().is_some_and(serde_json::Value::is_null) {
                     elems.pop();
                 }
@@ -852,8 +1082,7 @@ impl serde::Serialize for Array {
                 seq.end()
             }
             Array::Literal(f0) => {
-                let mut elems: Vec<serde_json::Value> = Vec::new();
-                elems.push(serde_json::to_value(&f0).map_err(serde::ser::Error::custom)?);
+                let mut elems = vec![serde_json::to_value(f0).map_err(serde::ser::Error::custom)?];
                 while elems.last().is_some_and(serde_json::Value::is_null) {
                     elems.pop();
                 }
@@ -865,10 +1094,11 @@ impl serde::Serialize for Array {
                 seq.end()
             }
             Array::Slice(f0, f1, f2) => {
-                let mut elems: Vec<serde_json::Value> = Vec::new();
-                elems.push(serde_json::to_value(&f0).map_err(serde::ser::Error::custom)?);
-                elems.push(serde_json::to_value(&f1).map_err(serde::ser::Error::custom)?);
-                elems.push(serde_json::to_value(&f2).map_err(serde::ser::Error::custom)?);
+                let mut elems = vec![
+                    serde_json::to_value(f0).map_err(serde::ser::Error::custom)?,
+                    serde_json::to_value(f1).map_err(serde::ser::Error::custom)?,
+                    serde_json::to_value(f2).map_err(serde::ser::Error::custom)?,
+                ];
                 while elems.last().is_some_and(serde_json::Value::is_null) {
                     elems.pop();
                 }
@@ -880,8 +1110,7 @@ impl serde::Serialize for Array {
                 seq.end()
             }
             Array::ToRgba(f0) => {
-                let mut elems: Vec<serde_json::Value> = Vec::new();
-                elems.push(serde_json::to_value(&f0).map_err(serde::ser::Error::custom)?);
+                let mut elems = vec![serde_json::to_value(f0).map_err(serde::ser::Error::custom)?];
                 while elems.last().is_some_and(serde_json::Value::is_null) {
                     elems.pop();
                 }
@@ -977,10 +1206,11 @@ impl serde::Serialize for ArrayLessTypeLengthGreater {
         use serde::ser::SerializeSeq;
         match self {
             ArrayLessTypeLengthGreater::Array(f0, f1, f2) => {
-                let mut elems: Vec<serde_json::Value> = Vec::new();
-                elems.push(serde_json::to_value(&f0).map_err(serde::ser::Error::custom)?);
-                elems.push(serde_json::to_value(&f1).map_err(serde::ser::Error::custom)?);
-                elems.push(serde_json::to_value(&f2).map_err(serde::ser::Error::custom)?);
+                let mut elems = vec![
+                    serde_json::to_value(f0).map_err(serde::ser::Error::custom)?,
+                    serde_json::to_value(f1).map_err(serde::ser::Error::custom)?,
+                    serde_json::to_value(f2).map_err(serde::ser::Error::custom)?,
+                ];
                 while elems.last().is_some_and(serde_json::Value::is_null) {
                     elems.pop();
                 }
@@ -1057,9 +1287,10 @@ impl serde::Serialize for ArrayOfType {
         use serde::ser::SerializeSeq;
         match self {
             ArrayOfType::Array(f0, f1) => {
-                let mut elems: Vec<serde_json::Value> = Vec::new();
-                elems.push(serde_json::to_value(&f0).map_err(serde::ser::Error::custom)?);
-                elems.push(serde_json::to_value(&f1).map_err(serde::ser::Error::custom)?);
+                let mut elems = vec![
+                    serde_json::to_value(f0).map_err(serde::ser::Error::custom)?,
+                    serde_json::to_value(f1).map_err(serde::ser::Error::custom)?,
+                ];
                 while elems.last().is_some_and(serde_json::Value::is_null) {
                     elems.pop();
                 }
@@ -1292,11 +1523,6 @@ impl<'de> serde::de::Visitor<'de> for BooleanVisitor {
                 while let Some(element) = seq.next_element()? {
                     inputs.push(element);
                 }
-                if inputs.is_empty() {
-                    return Err(serde::de::Error::custom(
-                        "Boolean::All requires at least one argument",
-                    ));
-                }
                 Ok(Boolean::All(inputs))
             }
             "any" => {
@@ -1304,22 +1530,12 @@ impl<'de> serde::de::Visitor<'de> for BooleanVisitor {
                 while let Some(element) = seq.next_element()? {
                     inputs.push(element);
                 }
-                if inputs.is_empty() {
-                    return Err(serde::de::Error::custom(
-                        "Boolean::Any requires at least one argument",
-                    ));
-                }
                 Ok(Boolean::Any(inputs))
             }
             "boolean" => {
                 let mut inputs = Vec::new();
                 while let Some(element) = seq.next_element()? {
                     inputs.push(element);
-                }
-                if inputs.is_empty() {
-                    return Err(serde::de::Error::custom(
-                        "Boolean::Op requires at least one argument",
-                    ));
                 }
                 Ok(Boolean::Op(inputs))
             }
@@ -1379,8 +1595,7 @@ impl serde::Serialize for Boolean {
         use serde::ser::SerializeSeq;
         match self {
             Boolean::Not(f0) => {
-                let mut elems: Vec<serde_json::Value> = Vec::new();
-                elems.push(serde_json::to_value(&f0).map_err(serde::ser::Error::custom)?);
+                let mut elems = vec![serde_json::to_value(f0).map_err(serde::ser::Error::custom)?];
                 while elems.last().is_some_and(serde_json::Value::is_null) {
                     elems.pop();
                 }
@@ -1392,10 +1607,11 @@ impl serde::Serialize for Boolean {
                 seq.end()
             }
             Boolean::NotEqual(f0, f1, f2) => {
-                let mut elems: Vec<serde_json::Value> = Vec::new();
-                elems.push(serde_json::to_value(&f0).map_err(serde::ser::Error::custom)?);
-                elems.push(serde_json::to_value(&f1).map_err(serde::ser::Error::custom)?);
-                elems.push(serde_json::to_value(&f2).map_err(serde::ser::Error::custom)?);
+                let mut elems = vec![
+                    serde_json::to_value(f0).map_err(serde::ser::Error::custom)?,
+                    serde_json::to_value(f1).map_err(serde::ser::Error::custom)?,
+                    serde_json::to_value(f2).map_err(serde::ser::Error::custom)?,
+                ];
                 while elems.last().is_some_and(serde_json::Value::is_null) {
                     elems.pop();
                 }
@@ -1435,10 +1651,11 @@ impl serde::Serialize for Boolean {
                 seq.end()
             }
             Boolean::EqualEqual(f0, f1, f2) => {
-                let mut elems: Vec<serde_json::Value> = Vec::new();
-                elems.push(serde_json::to_value(&f0).map_err(serde::ser::Error::custom)?);
-                elems.push(serde_json::to_value(&f1).map_err(serde::ser::Error::custom)?);
-                elems.push(serde_json::to_value(&f2).map_err(serde::ser::Error::custom)?);
+                let mut elems = vec![
+                    serde_json::to_value(f0).map_err(serde::ser::Error::custom)?,
+                    serde_json::to_value(f1).map_err(serde::ser::Error::custom)?,
+                    serde_json::to_value(f2).map_err(serde::ser::Error::custom)?,
+                ];
                 while elems.last().is_some_and(serde_json::Value::is_null) {
                     elems.pop();
                 }
@@ -1517,9 +1734,10 @@ impl serde::Serialize for Boolean {
                 seq.end()
             }
             Boolean::Has(f0, f1) => {
-                let mut elems: Vec<serde_json::Value> = Vec::new();
-                elems.push(serde_json::to_value(&f0).map_err(serde::ser::Error::custom)?);
-                elems.push(serde_json::to_value(&f1).map_err(serde::ser::Error::custom)?);
+                let mut elems = vec![
+                    serde_json::to_value(f0).map_err(serde::ser::Error::custom)?,
+                    serde_json::to_value(f1).map_err(serde::ser::Error::custom)?,
+                ];
                 while elems.last().is_some_and(serde_json::Value::is_null) {
                     elems.pop();
                 }
@@ -1545,8 +1763,7 @@ impl serde::Serialize for Boolean {
                 seq.end()
             }
             Boolean::IsSupportedScript(f0) => {
-                let mut elems: Vec<serde_json::Value> = Vec::new();
-                elems.push(serde_json::to_value(&f0).map_err(serde::ser::Error::custom)?);
+                let mut elems = vec![serde_json::to_value(f0).map_err(serde::ser::Error::custom)?];
                 while elems.last().is_some_and(serde_json::Value::is_null) {
                     elems.pop();
                 }
@@ -1558,8 +1775,7 @@ impl serde::Serialize for Boolean {
                 seq.end()
             }
             Boolean::To(f0) => {
-                let mut elems: Vec<serde_json::Value> = Vec::new();
-                elems.push(serde_json::to_value(&f0).map_err(serde::ser::Error::custom)?);
+                let mut elems = vec![serde_json::to_value(f0).map_err(serde::ser::Error::custom)?];
                 while elems.last().is_some_and(serde_json::Value::is_null) {
                     elems.pop();
                 }
@@ -1571,8 +1787,7 @@ impl serde::Serialize for Boolean {
                 seq.end()
             }
             Boolean::Within(f0) => {
-                let mut elems: Vec<serde_json::Value> = Vec::new();
-                elems.push(serde_json::to_value(&f0).map_err(serde::ser::Error::custom)?);
+                let mut elems = vec![serde_json::to_value(f0).map_err(serde::ser::Error::custom)?];
                 while elems.last().is_some_and(serde_json::Value::is_null) {
                     elems.pop();
                 }
@@ -1651,8 +1866,7 @@ impl serde::Serialize for Collator {
         use serde::ser::SerializeSeq;
         match self {
             Collator::Op(f0) => {
-                let mut elems: Vec<serde_json::Value> = Vec::new();
-                elems.push(serde_json::to_value(&f0).map_err(serde::ser::Error::custom)?);
+                let mut elems = vec![serde_json::to_value(f0).map_err(serde::ser::Error::custom)?];
                 while elems.last().is_some_and(serde_json::Value::is_null) {
                     elems.pop();
                 }
@@ -1744,11 +1958,6 @@ impl<'de> serde::de::Visitor<'de> for ColorVisitor {
                 while let Some(element) = seq.next_element()? {
                     inputs.push(element);
                 }
-                if inputs.is_empty() {
-                    return Err(serde::de::Error::custom(
-                        "Color::To requires at least one argument",
-                    ));
-                }
                 Ok(Color::To(inputs))
             }
             _ => Err(serde::de::Error::unknown_variant(
@@ -1767,10 +1976,11 @@ impl serde::Serialize for Color {
         use serde::ser::SerializeSeq;
         match self {
             Color::Rgb(f0, f1, f2) => {
-                let mut elems: Vec<serde_json::Value> = Vec::new();
-                elems.push(serde_json::to_value(&f0).map_err(serde::ser::Error::custom)?);
-                elems.push(serde_json::to_value(&f1).map_err(serde::ser::Error::custom)?);
-                elems.push(serde_json::to_value(&f2).map_err(serde::ser::Error::custom)?);
+                let mut elems = vec![
+                    serde_json::to_value(f0).map_err(serde::ser::Error::custom)?,
+                    serde_json::to_value(f1).map_err(serde::ser::Error::custom)?,
+                    serde_json::to_value(f2).map_err(serde::ser::Error::custom)?,
+                ];
                 while elems.last().is_some_and(serde_json::Value::is_null) {
                     elems.pop();
                 }
@@ -1782,11 +1992,12 @@ impl serde::Serialize for Color {
                 seq.end()
             }
             Color::Rgba(f0, f1, f2, f3) => {
-                let mut elems: Vec<serde_json::Value> = Vec::new();
-                elems.push(serde_json::to_value(&f0).map_err(serde::ser::Error::custom)?);
-                elems.push(serde_json::to_value(&f1).map_err(serde::ser::Error::custom)?);
-                elems.push(serde_json::to_value(&f2).map_err(serde::ser::Error::custom)?);
-                elems.push(serde_json::to_value(&f3).map_err(serde::ser::Error::custom)?);
+                let mut elems = vec![
+                    serde_json::to_value(f0).map_err(serde::ser::Error::custom)?,
+                    serde_json::to_value(f1).map_err(serde::ser::Error::custom)?,
+                    serde_json::to_value(f2).map_err(serde::ser::Error::custom)?,
+                    serde_json::to_value(f3).map_err(serde::ser::Error::custom)?,
+                ];
                 while elems.last().is_some_and(serde_json::Value::is_null) {
                     elems.pop();
                 }
@@ -1815,13 +2026,48 @@ impl serde::Serialize for Color {
 }
 
 /// Either of the below variants
-#[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-#[serde(untagged)]
+#[derive(PartialEq, Debug, Clone)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum StringLiteralOrColorOrArrayOfColorAsUnion {
     StringLiteral(StringLiteral),
     Color(Color),
     ArrayOfColor(ColorOrArrayOfColor),
+}
+
+impl serde::Serialize for StringLiteralOrColorOrArrayOfColorAsUnion {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        match self {
+            Self::StringLiteral(v) => v.serialize(serializer),
+            Self::Color(v) => v.serialize(serializer),
+            Self::ArrayOfColor(v) => v.serialize(serializer),
+        }
+    }
+}
+
+impl<'de> serde::Deserialize<'de> for StringLiteralOrColorOrArrayOfColorAsUnion {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
+        let mut errors: Vec<(&str, std::string::String)> = Vec::new();
+        match <StringLiteral as serde::Deserialize>::deserialize(&value) {
+            Ok(v) => return Ok(Self::StringLiteral(v)),
+            Err(e) => errors.push(("StringLiteral", e.to_string())),
+        }
+        match <Color as serde::Deserialize>::deserialize(&value) {
+            Ok(v) => return Ok(Self::Color(v)),
+            Err(e) => errors.push(("Color", e.to_string())),
+        }
+        match <ColorOrArrayOfColor as serde::Deserialize>::deserialize(&value) {
+            Ok(v) => return Ok(Self::ArrayOfColor(v)),
+            Err(e) => errors.push(("ArrayOfColor", e.to_string())),
+        }
+
+        let details: Vec<std::string::String> =
+            errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
+        Err(serde::de::Error::custom(format!(
+            "StringLiteralOrColorOrArrayOfColorAsUnion: no variant matched. Expected StringLiteral(StringLiteral) | Color(Color) | ArrayOfColor(ColorOrArrayOfColor). Errors: [{}]",
+            details.join("; ")
+        )))
+    }
 }
 
 /// "ColorOrArrayOfColor"
@@ -1896,11 +2142,6 @@ impl<'de> serde::de::Visitor<'de> for ColorOrArrayOfColorVisitor {
                         })?;
                     stops.push((stop_input_i, stop_output_i));
                 }
-                if stops.is_empty() {
-                    return Err(serde::de::Error::custom(
-                        "ColorOrArrayOfColor::InterpolateHcl requires at least one stop pair",
-                    ));
-                }
                 Ok(ColorOrArrayOfColor::InterpolateHcl((
                     interpolation_type,
                     input,
@@ -1920,11 +2161,6 @@ impl<'de> serde::de::Visitor<'de> for ColorOrArrayOfColorVisitor {
                             )
                         })?;
                     stops.push((stop_input_i, stop_output_i));
-                }
-                if stops.is_empty() {
-                    return Err(serde::de::Error::custom(
-                        "ColorOrArrayOfColor::InterpolateLab requires at least one stop pair",
-                    ));
                 }
                 Ok(ColorOrArrayOfColor::InterpolateLab((
                     interpolation_type,
@@ -1954,8 +2190,10 @@ impl serde::Serialize for ColorOrArrayOfColor {
                 if let serde_json::Value::Array(top) = &inner_val {
                     for elem in top {
                         if let serde_json::Value::Array(sub) = elem {
-                            // An array-of-arrays is the Vec<(A,B)> — flatten it.
-                            if !sub.is_empty() && sub[0].is_array() {
+                            if sub.is_empty() {
+                                // Empty Vec — nothing to flatten.
+                            } else if sub[0].is_array() {
+                                // An array-of-arrays is the Vec<(A,B)> — flatten it.
                                 for pair in sub {
                                     if let serde_json::Value::Array(pair_elems) = pair {
                                         for pe in pair_elems {
@@ -1985,8 +2223,10 @@ impl serde::Serialize for ColorOrArrayOfColor {
                 if let serde_json::Value::Array(top) = &inner_val {
                     for elem in top {
                         if let serde_json::Value::Array(sub) = elem {
-                            // An array-of-arrays is the Vec<(A,B)> — flatten it.
-                            if !sub.is_empty() && sub[0].is_array() {
+                            if sub.is_empty() {
+                                // Empty Vec — nothing to flatten.
+                            } else if sub[0].is_array() {
+                                // An array-of-arrays is the Vec<(A,B)> — flatten it.
                                 for pair in sub {
                                     if let serde_json::Value::Array(pair_elems) = pair {
                                         for pe in pair_elems {
@@ -2014,14 +2254,54 @@ impl serde::Serialize for ColorOrArrayOfColor {
 }
 
 /// Either of the below variants
-#[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-#[serde(untagged)]
+#[derive(PartialEq, Debug, Clone)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum StringLiteralOrStringOrImageOrAnyAsUnion {
     StringLiteral(StringLiteral),
     String(Box<String>),
     Image(Image),
     Any(Box<Any>),
+}
+
+impl serde::Serialize for StringLiteralOrStringOrImageOrAnyAsUnion {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        match self {
+            Self::StringLiteral(v) => v.serialize(serializer),
+            Self::String(v) => v.serialize(serializer),
+            Self::Image(v) => v.serialize(serializer),
+            Self::Any(v) => v.serialize(serializer),
+        }
+    }
+}
+
+impl<'de> serde::Deserialize<'de> for StringLiteralOrStringOrImageOrAnyAsUnion {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
+        let mut errors: Vec<(&str, std::string::String)> = Vec::new();
+        match <StringLiteral as serde::Deserialize>::deserialize(&value) {
+            Ok(v) => return Ok(Self::StringLiteral(v)),
+            Err(e) => errors.push(("StringLiteral", e.to_string())),
+        }
+        match <Box<String> as serde::Deserialize>::deserialize(&value) {
+            Ok(v) => return Ok(Self::String(v)),
+            Err(e) => errors.push(("String", e.to_string())),
+        }
+        match <Image as serde::Deserialize>::deserialize(&value) {
+            Ok(v) => return Ok(Self::Image(v)),
+            Err(e) => errors.push(("Image", e.to_string())),
+        }
+        match <Box<Any> as serde::Deserialize>::deserialize(&value) {
+            Ok(v) => return Ok(Self::Any(v)),
+            Err(e) => errors.push(("Any", e.to_string())),
+        }
+
+        let details: Vec<std::string::String> =
+            errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
+        Err(serde::de::Error::custom(format!(
+            "StringLiteralOrStringOrImageOrAnyAsUnion: no variant matched. Expected StringLiteral(StringLiteral) | String(Box<String>) | Image(Image) | Any(Box<Any>). Errors: [{}]",
+            details.join("; ")
+        )))
+    }
 }
 
 /// Tuple row for variadic (content, optional style object) pairs.
@@ -2088,11 +2368,6 @@ impl<'de> serde::de::Visitor<'de> for FormattedVisitor {
                     let element = FormattedFormatVariadicRow(input_i, style_overrides_i);
                     inputs.push(element);
                 }
-                if inputs.is_empty() {
-                    return Err(serde::de::Error::custom(
-                        "Formatted::Format requires at least one argument",
-                    ));
-                }
                 Ok(Formatted::Format(inputs))
             }
             _ => Err(serde::de::Error::unknown_variant(&op, &["format"])),
@@ -2114,8 +2389,10 @@ impl serde::Serialize for Formatted {
                 if let serde_json::Value::Array(top) = &inner_val {
                     for elem in top {
                         if let serde_json::Value::Array(sub) = elem {
-                            // An array-of-arrays is the Vec<(A,B)> — flatten it.
-                            if !sub.is_empty() && sub[0].is_array() {
+                            if sub.is_empty() {
+                                // Empty Vec — nothing to flatten.
+                            } else if sub[0].is_array() {
+                                // An array-of-arrays is the Vec<(A,B)> — flatten it.
                                 for pair in sub {
                                     if let serde_json::Value::Array(pair_elems) = pair {
                                         for pe in pair_elems {
@@ -2205,8 +2482,7 @@ impl serde::Serialize for Image {
         use serde::ser::SerializeSeq;
         match self {
             Image::Op(f0) => {
-                let mut elems: Vec<serde_json::Value> = Vec::new();
-                elems.push(serde_json::to_value(&f0).map_err(serde::ser::Error::custom)?);
+                let mut elems = vec![serde_json::to_value(f0).map_err(serde::ser::Error::custom)?];
                 while elems.last().is_some_and(serde_json::Value::is_null) {
                     elems.pop();
                 }
@@ -2222,14 +2498,54 @@ impl serde::Serialize for Image {
 }
 
 /// Either of the below variants
-#[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-#[serde(untagged)]
+#[derive(PartialEq, Debug, Clone)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum StringLiteralOrArrayOrStringOrAnyAsUnion {
     StringLiteral(StringLiteral),
     Array(Array),
     String(Box<String>),
     Any(Box<Any>),
+}
+
+impl serde::Serialize for StringLiteralOrArrayOrStringOrAnyAsUnion {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        match self {
+            Self::StringLiteral(v) => v.serialize(serializer),
+            Self::Array(v) => v.serialize(serializer),
+            Self::String(v) => v.serialize(serializer),
+            Self::Any(v) => v.serialize(serializer),
+        }
+    }
+}
+
+impl<'de> serde::Deserialize<'de> for StringLiteralOrArrayOrStringOrAnyAsUnion {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
+        let mut errors: Vec<(&str, std::string::String)> = Vec::new();
+        match <StringLiteral as serde::Deserialize>::deserialize(&value) {
+            Ok(v) => return Ok(Self::StringLiteral(v)),
+            Err(e) => errors.push(("StringLiteral", e.to_string())),
+        }
+        match <Array as serde::Deserialize>::deserialize(&value) {
+            Ok(v) => return Ok(Self::Array(v)),
+            Err(e) => errors.push(("Array", e.to_string())),
+        }
+        match <Box<String> as serde::Deserialize>::deserialize(&value) {
+            Ok(v) => return Ok(Self::String(v)),
+            Err(e) => errors.push(("String", e.to_string())),
+        }
+        match <Box<Any> as serde::Deserialize>::deserialize(&value) {
+            Ok(v) => return Ok(Self::Any(v)),
+            Err(e) => errors.push(("Any", e.to_string())),
+        }
+
+        let details: Vec<std::string::String> =
+            errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
+        Err(serde::de::Error::custom(format!(
+            "StringLiteralOrArrayOrStringOrAnyAsUnion: no variant matched. Expected StringLiteral(StringLiteral) | Array(Array) | String(Box<String>) | Any(Box<Any>). Errors: [{}]",
+            details.join("; ")
+        )))
+    }
 }
 
 /// "Number"
@@ -2396,22 +2712,12 @@ impl<'de> serde::de::Visitor<'de> for NumberVisitor {
                 while let Some(element) = seq.next_element()? {
                     inputs.push(element);
                 }
-                if inputs.is_empty() {
-                    return Err(serde::de::Error::custom(
-                        "Number::Star requires at least one argument",
-                    ));
-                }
                 Ok(Number::Star(inputs))
             }
             "+" => {
                 let mut inputs = Vec::new();
                 while let Some(element) = seq.next_element()? {
                     inputs.push(element);
-                }
-                if inputs.is_empty() {
-                    return Err(serde::de::Error::custom(
-                        "Number::Plus requires at least one argument",
-                    ));
                 }
                 Ok(Number::Plus(inputs))
             }
@@ -2517,11 +2823,6 @@ impl<'de> serde::de::Visitor<'de> for NumberVisitor {
                 while let Some(element) = seq.next_element()? {
                     inputs.push(element);
                 }
-                if inputs.is_empty() {
-                    return Err(serde::de::Error::custom(
-                        "Number::Max requires at least one argument",
-                    ));
-                }
                 Ok(Number::Max(inputs))
             }
             "min" => {
@@ -2529,22 +2830,12 @@ impl<'de> serde::de::Visitor<'de> for NumberVisitor {
                 while let Some(element) = seq.next_element()? {
                     inputs.push(element);
                 }
-                if inputs.is_empty() {
-                    return Err(serde::de::Error::custom(
-                        "Number::Min requires at least one argument",
-                    ));
-                }
                 Ok(Number::Min(inputs))
             }
             "number" => {
                 let mut inputs = Vec::new();
                 while let Some(element) = seq.next_element()? {
                     inputs.push(element);
-                }
-                if inputs.is_empty() {
-                    return Err(serde::de::Error::custom(
-                        "Number::Op requires at least one argument",
-                    ));
                 }
                 Ok(Number::Op(inputs))
             }
@@ -2569,11 +2860,6 @@ impl<'de> serde::de::Visitor<'de> for NumberVisitor {
                 let mut inputs = Vec::new();
                 while let Some(element) = seq.next_element()? {
                     inputs.push(element);
-                }
-                if inputs.is_empty() {
-                    return Err(serde::de::Error::custom(
-                        "Number::To requires at least one argument",
-                    ));
                 }
                 Ok(Number::To(inputs))
             }
@@ -2629,9 +2915,10 @@ impl serde::Serialize for Number {
         use serde::ser::SerializeSeq;
         match self {
             Number::Percentage(f0, f1) => {
-                let mut elems: Vec<serde_json::Value> = Vec::new();
-                elems.push(serde_json::to_value(&f0).map_err(serde::ser::Error::custom)?);
-                elems.push(serde_json::to_value(&f1).map_err(serde::ser::Error::custom)?);
+                let mut elems = vec![
+                    serde_json::to_value(f0).map_err(serde::ser::Error::custom)?,
+                    serde_json::to_value(f1).map_err(serde::ser::Error::custom)?,
+                ];
                 while elems.last().is_some_and(serde_json::Value::is_null) {
                     elems.pop();
                 }
@@ -2683,9 +2970,10 @@ impl serde::Serialize for Number {
                 seq.end()
             }
             Number::Slash(f0, f1) => {
-                let mut elems: Vec<serde_json::Value> = Vec::new();
-                elems.push(serde_json::to_value(&f0).map_err(serde::ser::Error::custom)?);
-                elems.push(serde_json::to_value(&f1).map_err(serde::ser::Error::custom)?);
+                let mut elems = vec![
+                    serde_json::to_value(f0).map_err(serde::ser::Error::custom)?,
+                    serde_json::to_value(f1).map_err(serde::ser::Error::custom)?,
+                ];
                 while elems.last().is_some_and(serde_json::Value::is_null) {
                     elems.pop();
                 }
@@ -2697,9 +2985,10 @@ impl serde::Serialize for Number {
                 seq.end()
             }
             Number::Power(f0, f1) => {
-                let mut elems: Vec<serde_json::Value> = Vec::new();
-                elems.push(serde_json::to_value(&f0).map_err(serde::ser::Error::custom)?);
-                elems.push(serde_json::to_value(&f1).map_err(serde::ser::Error::custom)?);
+                let mut elems = vec![
+                    serde_json::to_value(f0).map_err(serde::ser::Error::custom)?,
+                    serde_json::to_value(f1).map_err(serde::ser::Error::custom)?,
+                ];
                 while elems.last().is_some_and(serde_json::Value::is_null) {
                     elems.pop();
                 }
@@ -2711,8 +3000,7 @@ impl serde::Serialize for Number {
                 seq.end()
             }
             Number::Absolute(f0) => {
-                let mut elems: Vec<serde_json::Value> = Vec::new();
-                elems.push(serde_json::to_value(&f0).map_err(serde::ser::Error::custom)?);
+                let mut elems = vec![serde_json::to_value(f0).map_err(serde::ser::Error::custom)?];
                 while elems.last().is_some_and(serde_json::Value::is_null) {
                     elems.pop();
                 }
@@ -2724,8 +3012,7 @@ impl serde::Serialize for Number {
                 seq.end()
             }
             Number::Arccosine(f0) => {
-                let mut elems: Vec<serde_json::Value> = Vec::new();
-                elems.push(serde_json::to_value(&f0).map_err(serde::ser::Error::custom)?);
+                let mut elems = vec![serde_json::to_value(f0).map_err(serde::ser::Error::custom)?];
                 while elems.last().is_some_and(serde_json::Value::is_null) {
                     elems.pop();
                 }
@@ -2737,8 +3024,7 @@ impl serde::Serialize for Number {
                 seq.end()
             }
             Number::Asin(f0) => {
-                let mut elems: Vec<serde_json::Value> = Vec::new();
-                elems.push(serde_json::to_value(&f0).map_err(serde::ser::Error::custom)?);
+                let mut elems = vec![serde_json::to_value(f0).map_err(serde::ser::Error::custom)?];
                 while elems.last().is_some_and(serde_json::Value::is_null) {
                     elems.pop();
                 }
@@ -2750,8 +3036,7 @@ impl serde::Serialize for Number {
                 seq.end()
             }
             Number::Atan(f0) => {
-                let mut elems: Vec<serde_json::Value> = Vec::new();
-                elems.push(serde_json::to_value(&f0).map_err(serde::ser::Error::custom)?);
+                let mut elems = vec![serde_json::to_value(f0).map_err(serde::ser::Error::custom)?];
                 while elems.last().is_some_and(serde_json::Value::is_null) {
                     elems.pop();
                 }
@@ -2763,8 +3048,7 @@ impl serde::Serialize for Number {
                 seq.end()
             }
             Number::Ceil(f0) => {
-                let mut elems: Vec<serde_json::Value> = Vec::new();
-                elems.push(serde_json::to_value(&f0).map_err(serde::ser::Error::custom)?);
+                let mut elems = vec![serde_json::to_value(f0).map_err(serde::ser::Error::custom)?];
                 while elems.last().is_some_and(serde_json::Value::is_null) {
                     elems.pop();
                 }
@@ -2776,8 +3060,7 @@ impl serde::Serialize for Number {
                 seq.end()
             }
             Number::Cos(f0) => {
-                let mut elems: Vec<serde_json::Value> = Vec::new();
-                elems.push(serde_json::to_value(&f0).map_err(serde::ser::Error::custom)?);
+                let mut elems = vec![serde_json::to_value(f0).map_err(serde::ser::Error::custom)?];
                 while elems.last().is_some_and(serde_json::Value::is_null) {
                     elems.pop();
                 }
@@ -2789,8 +3072,7 @@ impl serde::Serialize for Number {
                 seq.end()
             }
             Number::Distance(f0) => {
-                let mut elems: Vec<serde_json::Value> = Vec::new();
-                elems.push(serde_json::to_value(&f0).map_err(serde::ser::Error::custom)?);
+                let mut elems = vec![serde_json::to_value(f0).map_err(serde::ser::Error::custom)?];
                 while elems.last().is_some_and(serde_json::Value::is_null) {
                     elems.pop();
                 }
@@ -2802,7 +3084,7 @@ impl serde::Serialize for Number {
                 seq.end()
             }
             Number::E => {
-                let mut elems: Vec<serde_json::Value> = Vec::new();
+                let mut elems = vec![];
                 while elems.last().is_some_and(serde_json::Value::is_null) {
                     elems.pop();
                 }
@@ -2814,7 +3096,7 @@ impl serde::Serialize for Number {
                 seq.end()
             }
             Number::Elevation => {
-                let mut elems: Vec<serde_json::Value> = Vec::new();
+                let mut elems = vec![];
                 while elems.last().is_some_and(serde_json::Value::is_null) {
                     elems.pop();
                 }
@@ -2826,8 +3108,7 @@ impl serde::Serialize for Number {
                 seq.end()
             }
             Number::Floor(f0) => {
-                let mut elems: Vec<serde_json::Value> = Vec::new();
-                elems.push(serde_json::to_value(&f0).map_err(serde::ser::Error::custom)?);
+                let mut elems = vec![serde_json::to_value(f0).map_err(serde::ser::Error::custom)?];
                 while elems.last().is_some_and(serde_json::Value::is_null) {
                     elems.pop();
                 }
@@ -2839,7 +3120,7 @@ impl serde::Serialize for Number {
                 seq.end()
             }
             Number::HeatmapDensity => {
-                let mut elems: Vec<serde_json::Value> = Vec::new();
+                let mut elems = vec![];
                 while elems.last().is_some_and(serde_json::Value::is_null) {
                     elems.pop();
                 }
@@ -2865,8 +3146,7 @@ impl serde::Serialize for Number {
                 seq.end()
             }
             Number::Length(f0) => {
-                let mut elems: Vec<serde_json::Value> = Vec::new();
-                elems.push(serde_json::to_value(&f0).map_err(serde::ser::Error::custom)?);
+                let mut elems = vec![serde_json::to_value(f0).map_err(serde::ser::Error::custom)?];
                 while elems.last().is_some_and(serde_json::Value::is_null) {
                     elems.pop();
                 }
@@ -2878,7 +3158,7 @@ impl serde::Serialize for Number {
                 seq.end()
             }
             Number::LineProgress => {
-                let mut elems: Vec<serde_json::Value> = Vec::new();
+                let mut elems = vec![];
                 while elems.last().is_some_and(serde_json::Value::is_null) {
                     elems.pop();
                 }
@@ -2890,8 +3170,7 @@ impl serde::Serialize for Number {
                 seq.end()
             }
             Number::Ln(f0) => {
-                let mut elems: Vec<serde_json::Value> = Vec::new();
-                elems.push(serde_json::to_value(&f0).map_err(serde::ser::Error::custom)?);
+                let mut elems = vec![serde_json::to_value(f0).map_err(serde::ser::Error::custom)?];
                 while elems.last().is_some_and(serde_json::Value::is_null) {
                     elems.pop();
                 }
@@ -2903,7 +3182,7 @@ impl serde::Serialize for Number {
                 seq.end()
             }
             Number::Ln2 => {
-                let mut elems: Vec<serde_json::Value> = Vec::new();
+                let mut elems = vec![];
                 while elems.last().is_some_and(serde_json::Value::is_null) {
                     elems.pop();
                 }
@@ -2915,8 +3194,7 @@ impl serde::Serialize for Number {
                 seq.end()
             }
             Number::Log10(f0) => {
-                let mut elems: Vec<serde_json::Value> = Vec::new();
-                elems.push(serde_json::to_value(&f0).map_err(serde::ser::Error::custom)?);
+                let mut elems = vec![serde_json::to_value(f0).map_err(serde::ser::Error::custom)?];
                 while elems.last().is_some_and(serde_json::Value::is_null) {
                     elems.pop();
                 }
@@ -2928,8 +3206,7 @@ impl serde::Serialize for Number {
                 seq.end()
             }
             Number::Log2(f0) => {
-                let mut elems: Vec<serde_json::Value> = Vec::new();
-                elems.push(serde_json::to_value(&f0).map_err(serde::ser::Error::custom)?);
+                let mut elems = vec![serde_json::to_value(f0).map_err(serde::ser::Error::custom)?];
                 while elems.last().is_some_and(serde_json::Value::is_null) {
                     elems.pop();
                 }
@@ -2980,7 +3257,7 @@ impl serde::Serialize for Number {
                 seq.end()
             }
             Number::Pi => {
-                let mut elems: Vec<serde_json::Value> = Vec::new();
+                let mut elems = vec![];
                 while elems.last().is_some_and(serde_json::Value::is_null) {
                     elems.pop();
                 }
@@ -2992,8 +3269,7 @@ impl serde::Serialize for Number {
                 seq.end()
             }
             Number::Round(f0) => {
-                let mut elems: Vec<serde_json::Value> = Vec::new();
-                elems.push(serde_json::to_value(&f0).map_err(serde::ser::Error::custom)?);
+                let mut elems = vec![serde_json::to_value(f0).map_err(serde::ser::Error::custom)?];
                 while elems.last().is_some_and(serde_json::Value::is_null) {
                     elems.pop();
                 }
@@ -3005,8 +3281,7 @@ impl serde::Serialize for Number {
                 seq.end()
             }
             Number::Sin(f0) => {
-                let mut elems: Vec<serde_json::Value> = Vec::new();
-                elems.push(serde_json::to_value(&f0).map_err(serde::ser::Error::custom)?);
+                let mut elems = vec![serde_json::to_value(f0).map_err(serde::ser::Error::custom)?];
                 while elems.last().is_some_and(serde_json::Value::is_null) {
                     elems.pop();
                 }
@@ -3018,8 +3293,7 @@ impl serde::Serialize for Number {
                 seq.end()
             }
             Number::Sqrt(f0) => {
-                let mut elems: Vec<serde_json::Value> = Vec::new();
-                elems.push(serde_json::to_value(&f0).map_err(serde::ser::Error::custom)?);
+                let mut elems = vec![serde_json::to_value(f0).map_err(serde::ser::Error::custom)?];
                 while elems.last().is_some_and(serde_json::Value::is_null) {
                     elems.pop();
                 }
@@ -3031,8 +3305,7 @@ impl serde::Serialize for Number {
                 seq.end()
             }
             Number::Tan(f0) => {
-                let mut elems: Vec<serde_json::Value> = Vec::new();
-                elems.push(serde_json::to_value(&f0).map_err(serde::ser::Error::custom)?);
+                let mut elems = vec![serde_json::to_value(f0).map_err(serde::ser::Error::custom)?];
                 while elems.last().is_some_and(serde_json::Value::is_null) {
                     elems.pop();
                 }
@@ -3057,7 +3330,7 @@ impl serde::Serialize for Number {
                 seq.end()
             }
             Number::Zoom => {
-                let mut elems: Vec<serde_json::Value> = Vec::new();
+                let mut elems = vec![];
                 while elems.last().is_some_and(serde_json::Value::is_null) {
                     elems.pop();
                 }
@@ -3073,8 +3346,7 @@ impl serde::Serialize for Number {
 }
 
 /// Either of the below variants
-#[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-#[serde(untagged)]
+#[derive(PartialEq, Debug, Clone)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjectionAsUnion {
     Number(NumberLiteral),
@@ -3085,6 +3357,54 @@ pub enum NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjectionAsUnion {
     Color(Color),
     ArrayOfColor(ColorOrArrayOfColor),
     Projection(Box<ProjectionType>),
+}
+
+impl serde::Serialize for NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjectionAsUnion {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        match self {
+            Self::Number(v) => v.serialize(serializer),
+            Self::ArrayOfNumber(v) => v.serialize(serializer),
+            Self::Color(v) => v.serialize(serializer),
+            Self::ArrayOfColor(v) => v.serialize(serializer),
+            Self::Projection(v) => v.serialize(serializer),
+        }
+    }
+}
+
+impl<'de> serde::Deserialize<'de>
+    for NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjectionAsUnion
+{
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
+        let mut errors: Vec<(&str, std::string::String)> = Vec::new();
+        match <NumberLiteral as serde::Deserialize>::deserialize(&value) {
+            Ok(v) => return Ok(Self::Number(v)),
+            Err(e) => errors.push(("Number", e.to_string())),
+        }
+        match <Color as serde::Deserialize>::deserialize(&value) {
+            Ok(v) => return Ok(Self::Color(v)),
+            Err(e) => errors.push(("Color", e.to_string())),
+        }
+        match <ColorOrArrayOfColor as serde::Deserialize>::deserialize(&value) {
+            Ok(v) => return Ok(Self::ArrayOfColor(v)),
+            Err(e) => errors.push(("ArrayOfColor", e.to_string())),
+        }
+        match <Box<ProjectionType> as serde::Deserialize>::deserialize(&value) {
+            Ok(v) => return Ok(Self::Projection(v)),
+            Err(e) => errors.push(("Projection", e.to_string())),
+        }
+        match <serde_json::Value as serde::Deserialize>::deserialize(&value) {
+            Ok(v) => return Ok(Self::ArrayOfNumber(v)),
+            Err(e) => errors.push(("ArrayOfNumber", e.to_string())),
+        }
+
+        let details: Vec<std::string::String> =
+            errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
+        Err(serde::de::Error::custom(format!(
+            "NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjectionAsUnion: no variant matched. Expected Number(NumberLiteral) | ArrayOfNumber(serde_json::Value) | Color(Color) | ArrayOfColor(ColorOrArrayOfColor) | Projection(Box<ProjectionType>). Errors: [{}]",
+            details.join("; ")
+        )))
+    }
 }
 
 /// "NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection"
@@ -3159,11 +3479,6 @@ impl<'de> serde::de::Visitor<'de>
                     let stop_output_i: NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjectionAsUnion = seq.next_element()?.ok_or_else(|| serde::de::Error::custom("expected stop_output_i in NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection::Interpolate"))?;
                     stops.push((stop_input_i, stop_output_i));
                 }
-                if stops.is_empty() {
-                    return Err(serde::de::Error::custom(
-                        "NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection::Interpolate requires at least one stop pair",
-                    ));
-                }
                 Ok(
                     NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection::Interpolate((
                         interpolation_type,
@@ -3191,8 +3506,10 @@ impl serde::Serialize for NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection
                 if let serde_json::Value::Array(top) = &inner_val {
                     for elem in top {
                         if let serde_json::Value::Array(sub) = elem {
-                            // An array-of-arrays is the Vec<(A,B)> — flatten it.
-                            if !sub.is_empty() && sub[0].is_array() {
+                            if sub.is_empty() {
+                                // Empty Vec — nothing to flatten.
+                            } else if sub[0].is_array() {
+                                // An array-of-arrays is the Vec<(A,B)> — flatten it.
                                 for pair in sub {
                                     if let serde_json::Value::Array(pair_elems) = pair {
                                         for pe in pair_elems {
@@ -3278,11 +3595,6 @@ impl<'de> serde::de::Visitor<'de> for ObjectVisitor {
                 while let Some(element) = seq.next_element()? {
                     inputs.push(element);
                 }
-                if inputs.is_empty() {
-                    return Err(serde::de::Error::custom(
-                        "Object::Op requires at least one argument",
-                    ));
-                }
                 Ok(Object::Op(inputs))
             }
             "properties" => Ok(Object::Properties),
@@ -3302,8 +3614,7 @@ impl serde::Serialize for Object {
         use serde::ser::SerializeSeq;
         match self {
             Object::Literal(f0) => {
-                let mut elems: Vec<serde_json::Value> = Vec::new();
-                elems.push(serde_json::to_value(&f0).map_err(serde::ser::Error::custom)?);
+                let mut elems = vec![serde_json::to_value(f0).map_err(serde::ser::Error::custom)?];
                 while elems.last().is_some_and(serde_json::Value::is_null) {
                     elems.pop();
                 }
@@ -3328,7 +3639,7 @@ impl serde::Serialize for Object {
                 seq.end()
             }
             Object::Properties => {
-                let mut elems: Vec<serde_json::Value> = Vec::new();
+                let mut elems = vec![];
                 while elems.last().is_some_and(serde_json::Value::is_null) {
                     elems.pop();
                 }
@@ -3436,11 +3747,6 @@ impl<'de> serde::de::Visitor<'de> for StringVisitor {
                 while let Some(element) = seq.next_element()? {
                     inputs.push(element);
                 }
-                if inputs.is_empty() {
-                    return Err(serde::de::Error::custom(
-                        "String::Concat requires at least one argument",
-                    ));
-                }
                 Ok(String::Concat(inputs))
             }
             "downcase" => {
@@ -3467,11 +3773,6 @@ impl<'de> serde::de::Visitor<'de> for StringVisitor {
                 let mut inputs = Vec::new();
                 while let Some(element) = seq.next_element()? {
                     inputs.push(element);
-                }
-                if inputs.is_empty() {
-                    return Err(serde::de::Error::custom(
-                        "String::Op requires at least one argument",
-                    ));
                 }
                 Ok(String::Op(inputs))
             }
@@ -3527,8 +3828,7 @@ impl serde::Serialize for String {
                 seq.end()
             }
             String::Downcase(f0) => {
-                let mut elems: Vec<serde_json::Value> = Vec::new();
-                elems.push(serde_json::to_value(&f0).map_err(serde::ser::Error::custom)?);
+                let mut elems = vec![serde_json::to_value(f0).map_err(serde::ser::Error::custom)?];
                 while elems.last().is_some_and(serde_json::Value::is_null) {
                     elems.pop();
                 }
@@ -3540,7 +3840,7 @@ impl serde::Serialize for String {
                 seq.end()
             }
             String::GeometryType => {
-                let mut elems: Vec<serde_json::Value> = Vec::new();
+                let mut elems = vec![];
                 while elems.last().is_some_and(serde_json::Value::is_null) {
                     elems.pop();
                 }
@@ -3552,9 +3852,10 @@ impl serde::Serialize for String {
                 seq.end()
             }
             String::NumberFormat(f0, f1) => {
-                let mut elems: Vec<serde_json::Value> = Vec::new();
-                elems.push(serde_json::to_value(&f0).map_err(serde::ser::Error::custom)?);
-                elems.push(serde_json::to_value(&f1).map_err(serde::ser::Error::custom)?);
+                let mut elems = vec![
+                    serde_json::to_value(f0).map_err(serde::ser::Error::custom)?,
+                    serde_json::to_value(f1).map_err(serde::ser::Error::custom)?,
+                ];
                 while elems.last().is_some_and(serde_json::Value::is_null) {
                     elems.pop();
                 }
@@ -3566,8 +3867,7 @@ impl serde::Serialize for String {
                 seq.end()
             }
             String::ResolvedLocale(f0) => {
-                let mut elems: Vec<serde_json::Value> = Vec::new();
-                elems.push(serde_json::to_value(&f0).map_err(serde::ser::Error::custom)?);
+                let mut elems = vec![serde_json::to_value(f0).map_err(serde::ser::Error::custom)?];
                 while elems.last().is_some_and(serde_json::Value::is_null) {
                     elems.pop();
                 }
@@ -3579,10 +3879,11 @@ impl serde::Serialize for String {
                 seq.end()
             }
             String::Slice(f0, f1, f2) => {
-                let mut elems: Vec<serde_json::Value> = Vec::new();
-                elems.push(serde_json::to_value(&f0).map_err(serde::ser::Error::custom)?);
-                elems.push(serde_json::to_value(&f1).map_err(serde::ser::Error::custom)?);
-                elems.push(serde_json::to_value(&f2).map_err(serde::ser::Error::custom)?);
+                let mut elems = vec![
+                    serde_json::to_value(f0).map_err(serde::ser::Error::custom)?,
+                    serde_json::to_value(f1).map_err(serde::ser::Error::custom)?,
+                    serde_json::to_value(f2).map_err(serde::ser::Error::custom)?,
+                ];
                 while elems.last().is_some_and(serde_json::Value::is_null) {
                     elems.pop();
                 }
@@ -3607,8 +3908,7 @@ impl serde::Serialize for String {
                 seq.end()
             }
             String::To(f0) => {
-                let mut elems: Vec<serde_json::Value> = Vec::new();
-                elems.push(serde_json::to_value(&f0).map_err(serde::ser::Error::custom)?);
+                let mut elems = vec![serde_json::to_value(f0).map_err(serde::ser::Error::custom)?];
                 while elems.last().is_some_and(serde_json::Value::is_null) {
                     elems.pop();
                 }
@@ -3620,8 +3920,7 @@ impl serde::Serialize for String {
                 seq.end()
             }
             String::Typeof(f0) => {
-                let mut elems: Vec<serde_json::Value> = Vec::new();
-                elems.push(serde_json::to_value(&f0).map_err(serde::ser::Error::custom)?);
+                let mut elems = vec![serde_json::to_value(f0).map_err(serde::ser::Error::custom)?];
                 while elems.last().is_some_and(serde_json::Value::is_null) {
                     elems.pop();
                 }
@@ -3633,8 +3932,7 @@ impl serde::Serialize for String {
                 seq.end()
             }
             String::Upcase(f0) => {
-                let mut elems: Vec<serde_json::Value> = Vec::new();
-                elems.push(serde_json::to_value(&f0).map_err(serde::ser::Error::custom)?);
+                let mut elems = vec![serde_json::to_value(f0).map_err(serde::ser::Error::custom)?];
                 while elems.last().is_some_and(serde_json::Value::is_null) {
                     elems.pop();
                 }

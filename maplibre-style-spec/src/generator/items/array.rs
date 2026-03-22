@@ -5,6 +5,7 @@ use crate::generator::autotest::generate_test_from_example_if_present;
 use crate::generator::formatter::to_upper_camel_case;
 use crate::generator::fuzz;
 use crate::generator::items::number::generate_number_default;
+use crate::generator::untagged::{self, Variant};
 use crate::mir::types::{ArrayElement, ArrayField, RegularEnum};
 
 pub fn generate(scope: &mut Scope, name: &str, field: &ArrayField) {
@@ -116,11 +117,10 @@ fn generate_array_element(scope: &mut Scope, name: &str, element: &ArrayElement)
             let enu = scope
                 .new_enum(name)
                 .doc(format!("{name} Values"))
-                .attr("serde(untagged)")
-                .derive("serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone")
+                .derive("PartialEq, Debug, Clone")
                 .attr(fuzz::CFG_DERIVE_ARBITRARY)
                 .vis("pub");
-            for (variant_name, variant_type) in variant_types {
+            for (variant_name, variant_type) in &variant_types {
                 let v = enu.new_variant(variant_name);
                 match variant_type.as_str() {
                     "serde_json::Number" => {
@@ -134,6 +134,16 @@ fn generate_array_element(scope: &mut Scope, name: &str, element: &ArrayElement)
                     }
                 }
             }
+            let variants: Vec<Variant> = variant_types
+                .iter()
+                .map(|(vn, vt)| Variant {
+                    name: vn.clone(),
+                    inner_type: vt.clone(),
+                    is_boxed: false,
+                    is_unit: false,
+                })
+                .collect();
+            untagged::emit_untagged_serde(scope, name, &variants);
             name.to_string()
         }
 
@@ -172,8 +182,7 @@ fn generate_font_faces(scope: &mut Scope) {
     let enu = scope
         .new_enum("FontFace")
         .vis("pub")
-        .attr("serde(untagged)")
-        .derive("serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone")
+        .derive("PartialEq, Eq, Debug, Clone")
         .attr(fuzz::CFG_DERIVE_ARBITRARY);
     enu.new_variant("Url")
         .doc("A single global font file URL")
@@ -181,6 +190,24 @@ fn generate_font_faces(scope: &mut Scope) {
     enu.new_variant("FontRange")
         .doc("Load different fonts depending on the unicode range")
         .tuple("Vec<FontWithRange>");
+    untagged::emit_untagged_serde(
+        scope,
+        "FontFace",
+        &[
+            Variant {
+                name: "Url".into(),
+                inner_type: "url::Url".into(),
+                is_boxed: false,
+                is_unit: false,
+            },
+            Variant {
+                name: "FontRange".into(),
+                inner_type: "Vec<FontWithRange>".into(),
+                is_boxed: false,
+                is_unit: false,
+            },
+        ],
+    );
 }
 
 fn generate_value_array_default(buffer: &mut String, items: &[Value], length: Option<&usize>) {
@@ -367,9 +394,8 @@ mod tests {
         }
 
         /// An expression node or a literal JSON value in expression positions.
-        #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+        #[derive(PartialEq, Debug, Clone)]
         #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-        #[serde(untagged)]
         pub enum ExprOrLiteral {
             Null,
             Bool(bool),
@@ -388,6 +414,111 @@ mod tests {
             NumberExpr(Box<Number>),
             ObjectExpr(Box<Object>),
             StringExpr(Box<String>),
+        }
+
+        impl serde::Serialize for ExprOrLiteral {
+            fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+                match self {
+                    Self::Null => serializer.serialize_unit(),
+                    Self::Bool(v) => v.serialize(serializer),
+                    Self::NumberLiteral(v) => v.serialize(serializer),
+                    Self::StringLiteral(v) => v.serialize(serializer),
+                    Self::GeoJSONObjectLiteral(v) => v.serialize(serializer),
+                    Self::JSONObjectLiteral(v) => v.serialize(serializer),
+                    Self::JSONArrayLiteral(v) => v.serialize(serializer),
+                    Self::AnyExpr(v) => v.as_ref().serialize(serializer),
+                    Self::ArrayExpr(v) => v.as_ref().serialize(serializer),
+                    Self::BooleanExpr(v) => v.as_ref().serialize(serializer),
+                    Self::CollatorExpr(v) => v.as_ref().serialize(serializer),
+                    Self::ColorExpr(v) => v.as_ref().serialize(serializer),
+                    Self::FormattedExpr(v) => v.as_ref().serialize(serializer),
+                    Self::ImageExpr(v) => v.as_ref().serialize(serializer),
+                    Self::NumberExpr(v) => v.as_ref().serialize(serializer),
+                    Self::ObjectExpr(v) => v.as_ref().serialize(serializer),
+                    Self::StringExpr(v) => v.as_ref().serialize(serializer),
+                }
+            }
+        }
+
+        impl<'de> serde::Deserialize<'de> for ExprOrLiteral {
+            fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+                let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
+                let mut errors: Vec<(&str, std::string::String)> = Vec::new();
+                if value.is_null() {
+                    return Ok(Self::Null);
+                }
+                match <bool as serde::Deserialize>::deserialize(&value) {
+                    Ok(v) => return Ok(Self::Bool(v)),
+                    Err(e) => errors.push(("Bool", e.to_string())),
+                }
+                match <NumberLiteral as serde::Deserialize>::deserialize(&value) {
+                    Ok(v) => return Ok(Self::NumberLiteral(v)),
+                    Err(e) => errors.push(("NumberLiteral", e.to_string())),
+                }
+                match <StringLiteral as serde::Deserialize>::deserialize(&value) {
+                    Ok(v) => return Ok(Self::StringLiteral(v)),
+                    Err(e) => errors.push(("StringLiteral", e.to_string())),
+                }
+                match <GeoJSONObjectLiteral as serde::Deserialize>::deserialize(&value) {
+                    Ok(v) => return Ok(Self::GeoJSONObjectLiteral(v)),
+                    Err(e) => errors.push(("GeoJSONObjectLiteral", e.to_string())),
+                }
+                match <JSONObjectLiteral as serde::Deserialize>::deserialize(&value) {
+                    Ok(v) => return Ok(Self::JSONObjectLiteral(v)),
+                    Err(e) => errors.push(("JSONObjectLiteral", e.to_string())),
+                }
+                match <JSONArrayLiteral as serde::Deserialize>::deserialize(&value) {
+                    Ok(v) => return Ok(Self::JSONArrayLiteral(v)),
+                    Err(e) => errors.push(("JSONArrayLiteral", e.to_string())),
+                }
+                match <Any as serde::Deserialize>::deserialize(&value) {
+                    Ok(v) => return Ok(Self::AnyExpr(Box::new(v))),
+                    Err(e) => errors.push(("AnyExpr", e.to_string())),
+                }
+                match <Array as serde::Deserialize>::deserialize(&value) {
+                    Ok(v) => return Ok(Self::ArrayExpr(Box::new(v))),
+                    Err(e) => errors.push(("ArrayExpr", e.to_string())),
+                }
+                match <Boolean as serde::Deserialize>::deserialize(&value) {
+                    Ok(v) => return Ok(Self::BooleanExpr(Box::new(v))),
+                    Err(e) => errors.push(("BooleanExpr", e.to_string())),
+                }
+                match <Collator as serde::Deserialize>::deserialize(&value) {
+                    Ok(v) => return Ok(Self::CollatorExpr(Box::new(v))),
+                    Err(e) => errors.push(("CollatorExpr", e.to_string())),
+                }
+                match <Color as serde::Deserialize>::deserialize(&value) {
+                    Ok(v) => return Ok(Self::ColorExpr(Box::new(v))),
+                    Err(e) => errors.push(("ColorExpr", e.to_string())),
+                }
+                match <Formatted as serde::Deserialize>::deserialize(&value) {
+                    Ok(v) => return Ok(Self::FormattedExpr(Box::new(v))),
+                    Err(e) => errors.push(("FormattedExpr", e.to_string())),
+                }
+                match <Image as serde::Deserialize>::deserialize(&value) {
+                    Ok(v) => return Ok(Self::ImageExpr(Box::new(v))),
+                    Err(e) => errors.push(("ImageExpr", e.to_string())),
+                }
+                match <Number as serde::Deserialize>::deserialize(&value) {
+                    Ok(v) => return Ok(Self::NumberExpr(Box::new(v))),
+                    Err(e) => errors.push(("NumberExpr", e.to_string())),
+                }
+                match <Object as serde::Deserialize>::deserialize(&value) {
+                    Ok(v) => return Ok(Self::ObjectExpr(Box::new(v))),
+                    Err(e) => errors.push(("ObjectExpr", e.to_string())),
+                }
+                match <String as serde::Deserialize>::deserialize(&value) {
+                    Ok(v) => return Ok(Self::StringExpr(Box::new(v))),
+                    Err(e) => errors.push(("StringExpr", e.to_string())),
+                }
+
+                let details: Vec<std::string::String> =
+                    errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
+                Err(serde::de::Error::custom(format!(
+                    "ExprOrLiteral: no variant matched. Expected Null | Bool(bool) | NumberLiteral(NumberLiteral) | StringLiteral(StringLiteral) | GeoJSONObjectLiteral(GeoJSONObjectLiteral) | JSONObjectLiteral(JSONObjectLiteral) | JSONArrayLiteral(JSONArrayLiteral) | AnyExpr(Any) | ArrayExpr(Array) | BooleanExpr(Boolean) | CollatorExpr(Collator) | ColorExpr(Color) | FormattedExpr(Formatted) | ImageExpr(Image) | NumberExpr(Number) | ObjectExpr(Object) | StringExpr(String). Errors: [{}]",
+                    details.join("; ")
+                )))
+            }
         }
         "#);
     }
@@ -487,9 +618,8 @@ mod tests {
         }
 
         /// An expression node or a literal JSON value in expression positions.
-        #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+        #[derive(PartialEq, Debug, Clone)]
         #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-        #[serde(untagged)]
         pub enum ExprOrLiteral {
             Null,
             Bool(bool),
@@ -508,6 +638,111 @@ mod tests {
             NumberExpr(Box<Number>),
             ObjectExpr(Box<Object>),
             StringExpr(Box<String>),
+        }
+
+        impl serde::Serialize for ExprOrLiteral {
+            fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+                match self {
+                    Self::Null => serializer.serialize_unit(),
+                    Self::Bool(v) => v.serialize(serializer),
+                    Self::NumberLiteral(v) => v.serialize(serializer),
+                    Self::StringLiteral(v) => v.serialize(serializer),
+                    Self::GeoJSONObjectLiteral(v) => v.serialize(serializer),
+                    Self::JSONObjectLiteral(v) => v.serialize(serializer),
+                    Self::JSONArrayLiteral(v) => v.serialize(serializer),
+                    Self::AnyExpr(v) => v.as_ref().serialize(serializer),
+                    Self::ArrayExpr(v) => v.as_ref().serialize(serializer),
+                    Self::BooleanExpr(v) => v.as_ref().serialize(serializer),
+                    Self::CollatorExpr(v) => v.as_ref().serialize(serializer),
+                    Self::ColorExpr(v) => v.as_ref().serialize(serializer),
+                    Self::FormattedExpr(v) => v.as_ref().serialize(serializer),
+                    Self::ImageExpr(v) => v.as_ref().serialize(serializer),
+                    Self::NumberExpr(v) => v.as_ref().serialize(serializer),
+                    Self::ObjectExpr(v) => v.as_ref().serialize(serializer),
+                    Self::StringExpr(v) => v.as_ref().serialize(serializer),
+                }
+            }
+        }
+
+        impl<'de> serde::Deserialize<'de> for ExprOrLiteral {
+            fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+                let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
+                let mut errors: Vec<(&str, std::string::String)> = Vec::new();
+                if value.is_null() {
+                    return Ok(Self::Null);
+                }
+                match <bool as serde::Deserialize>::deserialize(&value) {
+                    Ok(v) => return Ok(Self::Bool(v)),
+                    Err(e) => errors.push(("Bool", e.to_string())),
+                }
+                match <NumberLiteral as serde::Deserialize>::deserialize(&value) {
+                    Ok(v) => return Ok(Self::NumberLiteral(v)),
+                    Err(e) => errors.push(("NumberLiteral", e.to_string())),
+                }
+                match <StringLiteral as serde::Deserialize>::deserialize(&value) {
+                    Ok(v) => return Ok(Self::StringLiteral(v)),
+                    Err(e) => errors.push(("StringLiteral", e.to_string())),
+                }
+                match <GeoJSONObjectLiteral as serde::Deserialize>::deserialize(&value) {
+                    Ok(v) => return Ok(Self::GeoJSONObjectLiteral(v)),
+                    Err(e) => errors.push(("GeoJSONObjectLiteral", e.to_string())),
+                }
+                match <JSONObjectLiteral as serde::Deserialize>::deserialize(&value) {
+                    Ok(v) => return Ok(Self::JSONObjectLiteral(v)),
+                    Err(e) => errors.push(("JSONObjectLiteral", e.to_string())),
+                }
+                match <JSONArrayLiteral as serde::Deserialize>::deserialize(&value) {
+                    Ok(v) => return Ok(Self::JSONArrayLiteral(v)),
+                    Err(e) => errors.push(("JSONArrayLiteral", e.to_string())),
+                }
+                match <Any as serde::Deserialize>::deserialize(&value) {
+                    Ok(v) => return Ok(Self::AnyExpr(Box::new(v))),
+                    Err(e) => errors.push(("AnyExpr", e.to_string())),
+                }
+                match <Array as serde::Deserialize>::deserialize(&value) {
+                    Ok(v) => return Ok(Self::ArrayExpr(Box::new(v))),
+                    Err(e) => errors.push(("ArrayExpr", e.to_string())),
+                }
+                match <Boolean as serde::Deserialize>::deserialize(&value) {
+                    Ok(v) => return Ok(Self::BooleanExpr(Box::new(v))),
+                    Err(e) => errors.push(("BooleanExpr", e.to_string())),
+                }
+                match <Collator as serde::Deserialize>::deserialize(&value) {
+                    Ok(v) => return Ok(Self::CollatorExpr(Box::new(v))),
+                    Err(e) => errors.push(("CollatorExpr", e.to_string())),
+                }
+                match <Color as serde::Deserialize>::deserialize(&value) {
+                    Ok(v) => return Ok(Self::ColorExpr(Box::new(v))),
+                    Err(e) => errors.push(("ColorExpr", e.to_string())),
+                }
+                match <Formatted as serde::Deserialize>::deserialize(&value) {
+                    Ok(v) => return Ok(Self::FormattedExpr(Box::new(v))),
+                    Err(e) => errors.push(("FormattedExpr", e.to_string())),
+                }
+                match <Image as serde::Deserialize>::deserialize(&value) {
+                    Ok(v) => return Ok(Self::ImageExpr(Box::new(v))),
+                    Err(e) => errors.push(("ImageExpr", e.to_string())),
+                }
+                match <Number as serde::Deserialize>::deserialize(&value) {
+                    Ok(v) => return Ok(Self::NumberExpr(Box::new(v))),
+                    Err(e) => errors.push(("NumberExpr", e.to_string())),
+                }
+                match <Object as serde::Deserialize>::deserialize(&value) {
+                    Ok(v) => return Ok(Self::ObjectExpr(Box::new(v))),
+                    Err(e) => errors.push(("ObjectExpr", e.to_string())),
+                }
+                match <String as serde::Deserialize>::deserialize(&value) {
+                    Ok(v) => return Ok(Self::StringExpr(Box::new(v))),
+                    Err(e) => errors.push(("StringExpr", e.to_string())),
+                }
+
+                let details: Vec<std::string::String> =
+                    errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
+                Err(serde::de::Error::custom(format!(
+                    "ExprOrLiteral: no variant matched. Expected Null | Bool(bool) | NumberLiteral(NumberLiteral) | StringLiteral(StringLiteral) | GeoJSONObjectLiteral(GeoJSONObjectLiteral) | JSONObjectLiteral(JSONObjectLiteral) | JSONArrayLiteral(JSONArrayLiteral) | AnyExpr(Any) | ArrayExpr(Array) | BooleanExpr(Boolean) | CollatorExpr(Collator) | ColorExpr(Color) | FormattedExpr(Formatted) | ImageExpr(Image) | NumberExpr(Number) | ObjectExpr(Object) | StringExpr(String). Errors: [{}]",
+                    details.join("; ")
+                )))
+            }
         }
         "##);
     }
@@ -587,9 +822,8 @@ mod tests {
         pub struct Interpolation(InterpolationName);
 
         /// An expression node or a literal JSON value in expression positions.
-        #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+        #[derive(PartialEq, Debug, Clone)]
         #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-        #[serde(untagged)]
         pub enum ExprOrLiteral {
             Null,
             Bool(bool),
@@ -608,6 +842,111 @@ mod tests {
             NumberExpr(Box<Number>),
             ObjectExpr(Box<Object>),
             StringExpr(Box<String>),
+        }
+
+        impl serde::Serialize for ExprOrLiteral {
+            fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+                match self {
+                    Self::Null => serializer.serialize_unit(),
+                    Self::Bool(v) => v.serialize(serializer),
+                    Self::NumberLiteral(v) => v.serialize(serializer),
+                    Self::StringLiteral(v) => v.serialize(serializer),
+                    Self::GeoJSONObjectLiteral(v) => v.serialize(serializer),
+                    Self::JSONObjectLiteral(v) => v.serialize(serializer),
+                    Self::JSONArrayLiteral(v) => v.serialize(serializer),
+                    Self::AnyExpr(v) => v.as_ref().serialize(serializer),
+                    Self::ArrayExpr(v) => v.as_ref().serialize(serializer),
+                    Self::BooleanExpr(v) => v.as_ref().serialize(serializer),
+                    Self::CollatorExpr(v) => v.as_ref().serialize(serializer),
+                    Self::ColorExpr(v) => v.as_ref().serialize(serializer),
+                    Self::FormattedExpr(v) => v.as_ref().serialize(serializer),
+                    Self::ImageExpr(v) => v.as_ref().serialize(serializer),
+                    Self::NumberExpr(v) => v.as_ref().serialize(serializer),
+                    Self::ObjectExpr(v) => v.as_ref().serialize(serializer),
+                    Self::StringExpr(v) => v.as_ref().serialize(serializer),
+                }
+            }
+        }
+
+        impl<'de> serde::Deserialize<'de> for ExprOrLiteral {
+            fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+                let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
+                let mut errors: Vec<(&str, std::string::String)> = Vec::new();
+                if value.is_null() {
+                    return Ok(Self::Null);
+                }
+                match <bool as serde::Deserialize>::deserialize(&value) {
+                    Ok(v) => return Ok(Self::Bool(v)),
+                    Err(e) => errors.push(("Bool", e.to_string())),
+                }
+                match <NumberLiteral as serde::Deserialize>::deserialize(&value) {
+                    Ok(v) => return Ok(Self::NumberLiteral(v)),
+                    Err(e) => errors.push(("NumberLiteral", e.to_string())),
+                }
+                match <StringLiteral as serde::Deserialize>::deserialize(&value) {
+                    Ok(v) => return Ok(Self::StringLiteral(v)),
+                    Err(e) => errors.push(("StringLiteral", e.to_string())),
+                }
+                match <GeoJSONObjectLiteral as serde::Deserialize>::deserialize(&value) {
+                    Ok(v) => return Ok(Self::GeoJSONObjectLiteral(v)),
+                    Err(e) => errors.push(("GeoJSONObjectLiteral", e.to_string())),
+                }
+                match <JSONObjectLiteral as serde::Deserialize>::deserialize(&value) {
+                    Ok(v) => return Ok(Self::JSONObjectLiteral(v)),
+                    Err(e) => errors.push(("JSONObjectLiteral", e.to_string())),
+                }
+                match <JSONArrayLiteral as serde::Deserialize>::deserialize(&value) {
+                    Ok(v) => return Ok(Self::JSONArrayLiteral(v)),
+                    Err(e) => errors.push(("JSONArrayLiteral", e.to_string())),
+                }
+                match <Any as serde::Deserialize>::deserialize(&value) {
+                    Ok(v) => return Ok(Self::AnyExpr(Box::new(v))),
+                    Err(e) => errors.push(("AnyExpr", e.to_string())),
+                }
+                match <Array as serde::Deserialize>::deserialize(&value) {
+                    Ok(v) => return Ok(Self::ArrayExpr(Box::new(v))),
+                    Err(e) => errors.push(("ArrayExpr", e.to_string())),
+                }
+                match <Boolean as serde::Deserialize>::deserialize(&value) {
+                    Ok(v) => return Ok(Self::BooleanExpr(Box::new(v))),
+                    Err(e) => errors.push(("BooleanExpr", e.to_string())),
+                }
+                match <Collator as serde::Deserialize>::deserialize(&value) {
+                    Ok(v) => return Ok(Self::CollatorExpr(Box::new(v))),
+                    Err(e) => errors.push(("CollatorExpr", e.to_string())),
+                }
+                match <Color as serde::Deserialize>::deserialize(&value) {
+                    Ok(v) => return Ok(Self::ColorExpr(Box::new(v))),
+                    Err(e) => errors.push(("ColorExpr", e.to_string())),
+                }
+                match <Formatted as serde::Deserialize>::deserialize(&value) {
+                    Ok(v) => return Ok(Self::FormattedExpr(Box::new(v))),
+                    Err(e) => errors.push(("FormattedExpr", e.to_string())),
+                }
+                match <Image as serde::Deserialize>::deserialize(&value) {
+                    Ok(v) => return Ok(Self::ImageExpr(Box::new(v))),
+                    Err(e) => errors.push(("ImageExpr", e.to_string())),
+                }
+                match <Number as serde::Deserialize>::deserialize(&value) {
+                    Ok(v) => return Ok(Self::NumberExpr(Box::new(v))),
+                    Err(e) => errors.push(("NumberExpr", e.to_string())),
+                }
+                match <Object as serde::Deserialize>::deserialize(&value) {
+                    Ok(v) => return Ok(Self::ObjectExpr(Box::new(v))),
+                    Err(e) => errors.push(("ObjectExpr", e.to_string())),
+                }
+                match <String as serde::Deserialize>::deserialize(&value) {
+                    Ok(v) => return Ok(Self::StringExpr(Box::new(v))),
+                    Err(e) => errors.push(("StringExpr", e.to_string())),
+                }
+
+                let details: Vec<std::string::String> =
+                    errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
+                Err(serde::de::Error::custom(format!(
+                    "ExprOrLiteral: no variant matched. Expected Null | Bool(bool) | NumberLiteral(NumberLiteral) | StringLiteral(StringLiteral) | GeoJSONObjectLiteral(GeoJSONObjectLiteral) | JSONObjectLiteral(JSONObjectLiteral) | JSONArrayLiteral(JSONArrayLiteral) | AnyExpr(Any) | ArrayExpr(Array) | BooleanExpr(Boolean) | CollatorExpr(Collator) | ColorExpr(Color) | FormattedExpr(Formatted) | ImageExpr(Image) | NumberExpr(Number) | ObjectExpr(Object) | StringExpr(String). Errors: [{}]",
+                    details.join("; ")
+                )))
+            }
         }
 
         #[cfg(test)]
