@@ -46,24 +46,28 @@ pub fn generate(scope: &mut Scope, name: &str, field: &PaddingField) {
                 inner_type: "[serde_json::Number; 1]".into(),
                 is_boxed: true,
                 is_unit: false,
+                skip_when: None,
             },
             Variant {
                 name: "Two".into(),
                 inner_type: "[serde_json::Number; 2]".into(),
                 is_boxed: true,
                 is_unit: false,
+                skip_when: None,
             },
             Variant {
                 name: "Three".into(),
                 inner_type: "[serde_json::Number; 3]".into(),
                 is_boxed: true,
                 is_unit: false,
+                skip_when: None,
             },
             Variant {
                 name: "Four".into(),
                 inner_type: "[serde_json::Number; 4]".into(),
                 is_boxed: true,
                 is_unit: false,
+                skip_when: None,
             },
         ],
     );

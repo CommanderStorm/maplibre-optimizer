@@ -311,6 +311,7 @@ fn generate_oneof(scope: &mut Scope, name: &str, one_of: &IntermediateOneOf) {
                 inner_type: vt.clone(),
                 is_boxed: false,
                 is_unit: false,
+                skip_when: None,
             })
             .collect();
         untagged::emit_untagged_serde(scope, name, &variants);
@@ -554,12 +555,14 @@ fn generate_any_layer(scope: &mut Scope) {
                 inner_type: "TypedLayer".into(),
                 is_boxed: false,
                 is_unit: false,
+                skip_when: None,
             },
             untagged::Variant {
                 name: "Ref".into(),
                 inner_type: "RefLayer".into(),
                 is_boxed: false,
                 is_unit: false,
+                skip_when: None,
             },
         ],
     );

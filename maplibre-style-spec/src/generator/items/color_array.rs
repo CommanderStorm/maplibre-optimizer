@@ -27,12 +27,14 @@ pub fn generate(scope: &mut Scope, name: &str, field: &ColorArrayField) {
                 inner_type: "color::DynamicColor".into(),
                 is_boxed: false,
                 is_unit: false,
+                skip_when: None,
             },
             Variant {
                 name: "Multiple".into(),
                 inner_type: "Vec<color::DynamicColor>".into(),
                 is_boxed: false,
                 is_unit: false,
+                skip_when: None,
             },
         ],
     );

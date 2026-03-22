@@ -25,12 +25,14 @@ pub fn generate(scope: &mut Scope, name: &str, field: &ProjectionDefinitionField
                     inner_type: "NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection".into(),
                     is_boxed: false,
                     is_unit: false,
+                    skip_when: None,
                 },
                 Variant {
                     name: "Literal".into(),
                     inner_type: "std::string::String".into(),
                     is_boxed: false,
                     is_unit: false,
+                    skip_when: None,
                 },
             ],
         );

@@ -141,6 +141,7 @@ fn generate_array_element(scope: &mut Scope, name: &str, element: &ArrayElement)
                     inner_type: vt.clone(),
                     is_boxed: false,
                     is_unit: false,
+                    skip_when: None,
                 })
                 .collect();
             untagged::emit_untagged_serde(scope, name, &variants);
@@ -199,12 +200,14 @@ fn generate_font_faces(scope: &mut Scope) {
                 inner_type: "url::Url".into(),
                 is_boxed: false,
                 is_unit: false,
+                skip_when: None,
             },
             Variant {
                 name: "FontRange".into(),
                 inner_type: "Vec<FontWithRange>".into(),
                 is_boxed: false,
                 is_unit: false,
+                skip_when: None,
             },
         ],
     );

@@ -67,6 +67,7 @@ pub(crate) fn ensure_expr_or_literal_type(scope: &mut Scope) {
     enu.new_variant("StringExpr").tuple("Box<String>");
 
     use crate::generator::untagged::{self, Variant as UV};
+    // Literals first: we want geojson to win when valid (then object-literal fallback works).
     untagged::emit_untagged_serde(
         scope,
         "ExprOrLiteral",
@@ -76,102 +77,119 @@ pub(crate) fn ensure_expr_or_literal_type(scope: &mut Scope) {
                 inner_type: "".into(),
                 is_boxed: false,
                 is_unit: true,
+                skip_when: None,
             },
             UV {
                 name: "Bool".into(),
                 inner_type: "bool".into(),
                 is_boxed: false,
                 is_unit: false,
+                skip_when: None,
             },
             UV {
                 name: "NumberLiteral".into(),
                 inner_type: "NumberLiteral".into(),
                 is_boxed: false,
                 is_unit: false,
+                skip_when: None,
             },
             UV {
                 name: "StringLiteral".into(),
                 inner_type: "StringLiteral".into(),
                 is_boxed: false,
                 is_unit: false,
+                skip_when: None,
             },
             UV {
                 name: "GeoJSONObjectLiteral".into(),
                 inner_type: "GeoJSONObjectLiteral".into(),
                 is_boxed: false,
                 is_unit: false,
+                skip_when: None,
             },
             UV {
                 name: "JSONObjectLiteral".into(),
                 inner_type: "JSONObjectLiteral".into(),
                 is_boxed: false,
                 is_unit: false,
+                skip_when: None,
             },
             UV {
                 name: "JSONArrayLiteral".into(),
                 inner_type: "JSONArrayLiteral".into(),
                 is_boxed: false,
                 is_unit: false,
+                skip_when: None,
             },
             UV {
                 name: "AnyExpr".into(),
                 inner_type: "Any".into(),
                 is_boxed: true,
                 is_unit: false,
+                skip_when: None,
             },
             UV {
                 name: "ArrayExpr".into(),
                 inner_type: "Array".into(),
                 is_boxed: true,
                 is_unit: false,
+                skip_when: None,
             },
             UV {
                 name: "BooleanExpr".into(),
                 inner_type: "Boolean".into(),
                 is_boxed: true,
                 is_unit: false,
+                skip_when: None,
             },
             UV {
                 name: "CollatorExpr".into(),
                 inner_type: "Collator".into(),
                 is_boxed: true,
                 is_unit: false,
+                skip_when: None,
             },
             UV {
                 name: "ColorExpr".into(),
                 inner_type: "Color".into(),
                 is_boxed: true,
                 is_unit: false,
+                skip_when: None,
             },
             UV {
                 name: "FormattedExpr".into(),
                 inner_type: "Formatted".into(),
                 is_boxed: true,
                 is_unit: false,
+                skip_when: None,
             },
             UV {
                 name: "ImageExpr".into(),
                 inner_type: "Image".into(),
                 is_boxed: true,
                 is_unit: false,
+                skip_when: None,
             },
             UV {
                 name: "NumberExpr".into(),
                 inner_type: "Number".into(),
                 is_boxed: true,
                 is_unit: false,
+                skip_when: None,
             },
             UV {
                 name: "ObjectExpr".into(),
                 inner_type: "Object".into(),
                 is_boxed: true,
                 is_unit: false,
+                skip_when: None,
             },
             UV {
                 name: "StringExpr".into(),
                 inner_type: "String".into(),
                 is_boxed: true,
                 is_unit: false,
+                skip_when: None,
             },
         ],
     );
@@ -508,6 +526,7 @@ fn generate_expression_any_of(scope: &mut Scope, types: &[ParameterType]) -> Str
                     inner_type: vt.clone(),
                     is_boxed: false,
                     is_unit: false,
+                    skip_when: None,
                 })
                 .collect();
             untagged::emit_untagged_serde(scope, &any_of_type, &variants);
@@ -1368,10 +1387,6 @@ fn emit_any_match_deserializer_arm(visit_seq: &mut Function, (lt, ot, ft): (&str
         "let output_i: {ot} = serde_json::from_value(chunk[1].clone()).map_err(serde::de::Error::custom)?;"
     ));
     visit_seq.line("pairs.push((label_i, output_i));");
-    visit_seq.line("}");
-    visit_seq.line("if pairs.is_empty() {");
-    visit_seq
-        .line("return Err(serde::de::Error::custom(\"Any::Match: missing label/output pairs\"));");
     visit_seq.line("}");
     visit_seq.line(format!(
         "let fallback: {ft} = serde_json::from_value(fallback_v).map_err(serde::de::Error::custom)?;"

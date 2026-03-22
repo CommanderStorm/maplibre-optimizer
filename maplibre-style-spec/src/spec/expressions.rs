@@ -486,11 +486,6 @@ impl<'de> serde::de::Visitor<'de> for AnyVisitor {
                         .map_err(serde::de::Error::custom)?;
                     pairs.push((label_i, output_i));
                 }
-                if pairs.is_empty() {
-                    return Err(serde::de::Error::custom(
-                        "Any::Match: missing label/output pairs",
-                    ));
-                }
                 let fallback: ExprOrLiteral =
                     serde_json::from_value(fallback_v).map_err(serde::de::Error::custom)?;
                 Ok(Any::Match((input, pairs, fallback)))

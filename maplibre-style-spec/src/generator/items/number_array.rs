@@ -26,12 +26,14 @@ pub fn generate(scope: &mut Scope, name: &str, field: &NumberArrayField) {
                 inner_type: "serde_json::Number".into(),
                 is_boxed: false,
                 is_unit: false,
+                skip_when: None,
             },
             Variant {
                 name: "Many".into(),
                 inner_type: "Vec<serde_json::Number>".into(),
                 is_boxed: false,
                 is_unit: false,
+                skip_when: None,
             },
         ],
     );

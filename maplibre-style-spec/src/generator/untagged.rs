@@ -11,6 +11,10 @@ pub struct Variant {
     pub is_boxed: bool,
     /// Whether this is a unit variant (no inner type)
     pub is_unit: bool,
+    /// Optional condition to skip this variant during deserialization (e.g. `"value.is_array()"`).
+    /// When set, the variant is only tried if the condition evaluates to false.
+    #[allow(clippy::struct_field_names)]
+    pub skip_when: Option<String>,
 }
 
 /// Emit hand-written `Serialize` + `Deserialize` impls for an untagged enum.
@@ -70,7 +74,7 @@ pub fn emit_untagged_serde(scope: &mut Scope, enum_name: &str, variants: &[Varia
                 } else {
                     format!("Self::{}(v)", v.name)
                 };
-                format!(
+                let body = format!(
                     "\
         match <{ty} as serde::Deserialize>::deserialize(&value) {{
             Ok(v) => return Ok({wrap}),
@@ -78,7 +82,12 @@ pub fn emit_untagged_serde(scope: &mut Scope, enum_name: &str, variants: &[Varia
         }}\n",
                     ty = v.inner_type,
                     variant = v.name,
-                )
+                );
+                if let Some(ref cond) = v.skip_when {
+                    format!("        if !({cond}) {{\n    {body}        }}\n")
+                } else {
+                    body
+                }
             }
         })
         .collect();

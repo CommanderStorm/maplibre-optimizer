@@ -29,12 +29,14 @@ pub fn generate(scope: &mut Scope, name: &str, field: &NumberField) {
                     inner_type: "Number".into(),
                     is_boxed: false,
                     is_unit: false,
+                    skip_when: None,
                 },
                 Variant {
                     name: "Ramp".into(),
                     inner_type: "NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection".into(),
                     is_boxed: false,
                     is_unit: false,
+                    skip_when: None,
                 },
             ],
         );
@@ -57,12 +59,14 @@ pub fn generate(scope: &mut Scope, name: &str, field: &NumberField) {
                     inner_type: expr_name.clone(),
                     is_boxed: true,
                     is_unit: false,
+                    skip_when: None,
                 },
                 Variant {
                     name: "Literal".into(),
                     inner_type: "serde_json::Number".into(),
                     is_boxed: false,
                     is_unit: false,
+                    skip_when: None,
                 },
             ],
         );
