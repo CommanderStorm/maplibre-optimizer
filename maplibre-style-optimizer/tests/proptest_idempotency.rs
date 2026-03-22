@@ -26,9 +26,15 @@ fn mir() -> &'static MirSpec {
 /// to produce a complete value — this avoids aborting the whole proptest run.
 fn arbitrary_style() -> impl Strategy<Value = MaplibreStyleSpecification> {
     proptest::collection::vec(any::<u8>(), 0..2048).prop_filter_map(
-        "insufficient bytes for arbitrary generation",
+        "insufficient bytes or NaN/infinity in generated style",
         |bytes| {
-            MaplibreStyleSpecification::arbitrary(&mut arbitrary::Unstructured::new(&bytes)).ok()
+            let style =
+                MaplibreStyleSpecification::arbitrary(&mut arbitrary::Unstructured::new(&bytes))
+                    .ok()?;
+            // Reject styles containing NaN or infinity: JSON has no representation for them,
+            // and NaN != NaN under IEEE 754 causes false PartialEq failures.
+            serde_json::to_string(&style).ok()?;
+            Some(style)
         },
     )
 }
