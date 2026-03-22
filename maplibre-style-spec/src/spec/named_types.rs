@@ -105,7 +105,7 @@ pub struct FunctionDefault(
 /// An expression.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub struct FunctionExpression(Any);
+pub struct FunctionExpression(pub Any);
 
 /// The name of a feature property to use as the function input.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]

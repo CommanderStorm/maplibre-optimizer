@@ -172,7 +172,7 @@ pub struct GeojsonSourceData(
 /// An expression for filtering features prior to processing them for rendering.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub struct GeojsonSourceFilter(Filter);
+pub struct GeojsonSourceFilter(pub Filter);
 
 /// Whether to generate ids for the geojson features. When enabled, the `feature.id` property will be auto assigned based on its index in the `features` array, over-writing any previous values.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone, Copy, Default)]

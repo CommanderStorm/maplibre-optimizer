@@ -188,21 +188,23 @@ impl<'de> serde::Deserialize<'de> for StringOrNumberOrArrayOfStringOrArrayOfNumb
 /// Either of the below variants
 #[derive(PartialEq, Debug, Clone)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum NumberLiteralOrNumberAsUnion {
+pub enum NumberLiteralOrNumberOrAnyAsUnion {
     NumberLiteral(NumberLiteral),
     Number(Box<Number>),
+    Any(Box<Any>),
 }
 
-impl serde::Serialize for NumberLiteralOrNumberAsUnion {
+impl serde::Serialize for NumberLiteralOrNumberOrAnyAsUnion {
     fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         match self {
             Self::NumberLiteral(v) => v.serialize(serializer),
             Self::Number(v) => v.serialize(serializer),
+            Self::Any(v) => v.serialize(serializer),
         }
     }
 }
 
-impl<'de> serde::Deserialize<'de> for NumberLiteralOrNumberAsUnion {
+impl<'de> serde::Deserialize<'de> for NumberLiteralOrNumberOrAnyAsUnion {
     fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
         let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
         let mut errors: Vec<(&str, std::string::String)> = Vec::new();
@@ -214,11 +216,15 @@ impl<'de> serde::Deserialize<'de> for NumberLiteralOrNumberAsUnion {
             Ok(v) => return Ok(Self::Number(v)),
             Err(e) => errors.push(("Number", e.to_string())),
         }
+        match <Box<Any> as serde::Deserialize>::deserialize(&value) {
+            Ok(v) => return Ok(Self::Any(v)),
+            Err(e) => errors.push(("Any", e.to_string())),
+        }
 
         let details: Vec<std::string::String> =
             errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
         Err(serde::de::Error::custom(format!(
-            "NumberLiteralOrNumberAsUnion: no variant matched. Expected NumberLiteral(NumberLiteral) | Number(Box<Number>). Errors: [{}]",
+            "NumberLiteralOrNumberOrAnyAsUnion: no variant matched. Expected NumberLiteral(NumberLiteral) | Number(Box<Number>) | Any(Box<Any>). Errors: [{}]",
             details.join("; ")
         )))
     }
@@ -227,21 +233,23 @@ impl<'de> serde::Deserialize<'de> for NumberLiteralOrNumberAsUnion {
 /// Either of the below variants
 #[derive(PartialEq, Debug, Clone)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum StringLiteralOrStringAsUnion {
+pub enum StringLiteralOrStringOrAnyAsUnion {
     StringLiteral(StringLiteral),
     String(Box<String>),
+    Any(Box<Any>),
 }
 
-impl serde::Serialize for StringLiteralOrStringAsUnion {
+impl serde::Serialize for StringLiteralOrStringOrAnyAsUnion {
     fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         match self {
             Self::StringLiteral(v) => v.serialize(serializer),
             Self::String(v) => v.serialize(serializer),
+            Self::Any(v) => v.serialize(serializer),
         }
     }
 }
 
-impl<'de> serde::Deserialize<'de> for StringLiteralOrStringAsUnion {
+impl<'de> serde::Deserialize<'de> for StringLiteralOrStringOrAnyAsUnion {
     fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
         let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
         let mut errors: Vec<(&str, std::string::String)> = Vec::new();
@@ -253,11 +261,15 @@ impl<'de> serde::Deserialize<'de> for StringLiteralOrStringAsUnion {
             Ok(v) => return Ok(Self::String(v)),
             Err(e) => errors.push(("String", e.to_string())),
         }
+        match <Box<Any> as serde::Deserialize>::deserialize(&value) {
+            Ok(v) => return Ok(Self::Any(v)),
+            Err(e) => errors.push(("Any", e.to_string())),
+        }
 
         let details: Vec<std::string::String> =
             errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
         Err(serde::de::Error::custom(format!(
-            "StringLiteralOrStringAsUnion: no variant matched. Expected StringLiteral(StringLiteral) | String(Box<String>). Errors: [{}]",
+            "StringLiteralOrStringOrAnyAsUnion: no variant matched. Expected StringLiteral(StringLiteral) | String(Box<String>) | Any(Box<Any>). Errors: [{}]",
             details.join("; ")
         )))
     }
@@ -270,7 +282,7 @@ pub enum Any {
     /// Gets the value of a cluster property accumulated so far. Can only be used in the `clusterProperties` option of a clustered GeoJSON source.
     Accumulated,
     /// Retrieves an item from an array.
-    At(NumberLiteralOrNumberAsUnion, ExprOrLiteral),
+    At(NumberLiteralOrNumberOrAnyAsUnion, ExprOrLiteral),
     /// Selects the first output whose corresponding test condition evaluates to true, or the fallback value otherwise.
     ///
     ///  - [Create a hover effect](https://maplibre.org/maplibre-gl-js/docs/examples/create-a-hover-effect/)
@@ -284,7 +296,7 @@ pub enum Any {
     /// Retrieves a property value from the current feature's state. Returns null if the requested property is not present on the feature's state. A feature's state is not part of the GeoJSON or vector tile data, and must be set programmatically on each feature. When `source.promoteId` is not provided, features are identified by their `id` attribute, which must be an integer or a string that can be cast to an integer. When `source.promoteId` is provided, features are identified by their `promoteId` property, which may be a number, string, or any primitive data type. Note that ["feature-state"] can only be used with paint properties that support data-driven styling.
     ///
     ///  - [Create a hover effect](https://maplibre.org/maplibre-gl-js/docs/examples/create-a-hover-effect/)
-    FeatureState(StringLiteralOrStringAsUnion),
+    FeatureState(StringLiteralOrStringOrAnyAsUnion),
     /// Retrieves a property value from the current feature's properties, or from another object if a second argument is provided. Returns null if the requested property is missing.
     ///
     ///  - [Change the case of labels](https://maplibre.org/maplibre-gl-js/docs/examples/change-case-of-labels/)
@@ -292,7 +304,7 @@ pub enum Any {
     ///  - [Display HTML clusters with custom properties](https://maplibre.org/maplibre-gl-js/docs/examples/display-html-clusters-with-custom-properties/)
     ///
     ///  - [Extrude polygons for 3D indoor mapping](https://maplibre.org/maplibre-gl-js/docs/examples/extrude-polygons-for-3d-indoor-mapping/)
-    Get(StringLiteralOrStringAsUnion, Option<Object>),
+    Get(StringLiteralOrStringOrAnyAsUnion, Option<Object>),
     /// Retrieves a property value from global state that can be set with platform-specific APIs. Defaults can be provided using the [`state`](https://maplibre.org/maplibre-style-spec/root/#state) root property. Returns `null` if no value nor default value is set for the retrieved property.
     GlobalState(StringLiteral),
     /// Gets the feature's id, if it has one.
@@ -325,7 +337,7 @@ pub enum Any {
     ///  - [Create and style clusters](https://maplibre.org/maplibre-gl-js/docs/examples/create-and-style-clusters/)
     Step(
         (
-            NumberLiteralOrNumberAsUnion,
+            NumberLiteralOrNumberOrAnyAsUnion,
             ExprOrLiteral,
             Vec<(NumberLiteral, ExprOrLiteral)>,
         ),
@@ -487,7 +499,7 @@ impl<'de> serde::de::Visitor<'de> for AnyVisitor {
                 Ok(Any::Match((input, pairs, fallback)))
             }
             "step" => {
-                let input: NumberLiteralOrNumberAsUnion = visit_seq_field(&mut seq, "input")?;
+                let input: NumberLiteralOrNumberOrAnyAsUnion = visit_seq_field(&mut seq, "input")?;
                 let output_0: ExprOrLiteral = visit_seq_field(&mut seq, "output_0")?;
                 let mut stops = Vec::new();
                 while let Some(stop_input_i) = seq.next_element::<NumberLiteral>()? {
@@ -792,59 +804,18 @@ mod test {
     }
 
     #[rstest::rstest]
-    #[case::t_accumulated(serde_json::json!(["accumulated"]))]
-    #[case::t_at(serde_json::json!(["at",1,["literal",["a","b","c"]]]))]
-    #[case::t_case(serde_json::json!(["case",["boolean",["feature-state","hover"],false],1,0.5]))]
-    #[case::t_coalesce(serde_json::json!(["coalesce",["image",["concat",["get","icon"],"_15"]],["image","marker_15"]]))]
-    #[case::t_feature_state(serde_json::json!(["feature-state","hover"]))]
-    #[case::t_get(serde_json::json!(["get","someProperty"]))]
-    #[case::t_global_state(serde_json::json!(["global-state","someProperty"]))]
-    #[case::t_id(serde_json::json!(["id"]))]
-    #[case::t_let(serde_json::json!(["let","someNumber",500,["interpolate",["linear"],["var","someNumber"],274,"#edf8e9",1551,"#006d2c"]]))]
     #[case::t_literal(serde_json::json!(["literal",["DIN Offc Pro Italic","Arial Unicode MS Regular"]]))]
-    #[case::t_match(serde_json::json!(["match",["get","building_type"],"residential","#f00","commercial","#0f0","#000"]))]
     #[case::t_slice(serde_json::json!(["slice",["get","name"],0,3]))]
-    #[case::t_step(serde_json::json!(["step",["get","point_count"],20,100,30,750,40]))]
     #[case::t_to_rgba(serde_json::json!(["to-rgba","#ff0000"]))]
-    #[case::t_var(serde_json::json!(["var","density"]))]
     fn test_example_array_decodes(#[case] example: serde_json::Value) {
         let _ = serde_json::from_value::<Array>(example).expect("example should decode");
     }
 
     #[rstest::rstest]
-    #[case::t_accumulated(serde_json::json!(["accumulated"]))]
     #[case::t_array(serde_json::json!(["array","string",3,["literal",["a","b","c"]]]))]
-    #[case::t_at(serde_json::json!(["at",1,["literal",["a","b","c"]]]))]
-    #[case::t_case(serde_json::json!(["case",["boolean",["feature-state","hover"],false],1,0.5]))]
-    #[case::t_coalesce(serde_json::json!(["coalesce",["image",["concat",["get","icon"],"_15"]],["image","marker_15"]]))]
-    #[case::t_feature_state(serde_json::json!(["feature-state","hover"]))]
-    #[case::t_get(serde_json::json!(["get","someProperty"]))]
-    #[case::t_global_state(serde_json::json!(["global-state","someProperty"]))]
-    #[case::t_id(serde_json::json!(["id"]))]
-    #[case::t_let(serde_json::json!(["let","someNumber",500,["interpolate",["linear"],["var","someNumber"],274,"#edf8e9",1551,"#006d2c"]]))]
-    #[case::t_match(serde_json::json!(["match",["get","building_type"],"residential","#f00","commercial","#0f0","#000"]))]
-    #[case::t_step(serde_json::json!(["step",["get","point_count"],20,100,30,750,40]))]
-    #[case::t_var(serde_json::json!(["var","density"]))]
     fn test_example_array_less_type_length_greater_decodes(#[case] example: serde_json::Value) {
         let _ = serde_json::from_value::<ArrayLessTypeLengthGreater>(example)
             .expect("example should decode");
-    }
-
-    #[rstest::rstest]
-    #[case::t_accumulated(serde_json::json!(["accumulated"]))]
-    #[case::t_at(serde_json::json!(["at",1,["literal",["a","b","c"]]]))]
-    #[case::t_case(serde_json::json!(["case",["boolean",["feature-state","hover"],false],1,0.5]))]
-    #[case::t_coalesce(serde_json::json!(["coalesce",["image",["concat",["get","icon"],"_15"]],["image","marker_15"]]))]
-    #[case::t_feature_state(serde_json::json!(["feature-state","hover"]))]
-    #[case::t_get(serde_json::json!(["get","someProperty"]))]
-    #[case::t_global_state(serde_json::json!(["global-state","someProperty"]))]
-    #[case::t_id(serde_json::json!(["id"]))]
-    #[case::t_let(serde_json::json!(["let","someNumber",500,["interpolate",["linear"],["var","someNumber"],274,"#edf8e9",1551,"#006d2c"]]))]
-    #[case::t_match(serde_json::json!(["match",["get","building_type"],"residential","#f00","commercial","#0f0","#000"]))]
-    #[case::t_step(serde_json::json!(["step",["get","point_count"],20,100,30,750,40]))]
-    #[case::t_var(serde_json::json!(["var","density"]))]
-    fn test_example_array_of_type_decodes(#[case] example: serde_json::Value) {
-        let _ = serde_json::from_value::<ArrayOfType>(example).expect("example should decode");
     }
 
     #[rstest::rstest]
@@ -855,64 +826,28 @@ mod test {
     #[case::t_equal_equal(serde_json::json!(["==","$type","Polygon"]))]
     #[case::t_greater(serde_json::json!([">",["get","mag"],2]))]
     #[case::t_greater_equal(serde_json::json!([">=",["get","mag"],6]))]
-    #[case::t_accumulated(serde_json::json!(["accumulated"]))]
     #[case::t_all(serde_json::json!(["all",[">=",["get","mag"],4],["<",["get","mag"],5]]))]
     #[case::t_any(serde_json::json!(["any",[">=",["get","mag"],4],["<",["get","mag"],5]]))]
-    #[case::t_at(serde_json::json!(["at",1,["literal",["a","b","c"]]]))]
     #[case::t_boolean(serde_json::json!(["boolean",["feature-state","hover"],false]))]
-    #[case::t_case(serde_json::json!(["case",["boolean",["feature-state","hover"],false],1,0.5]))]
-    #[case::t_coalesce(serde_json::json!(["coalesce",["image",["concat",["get","icon"],"_15"]],["image","marker_15"]]))]
-    #[case::t_feature_state(serde_json::json!(["feature-state","hover"]))]
-    #[case::t_get(serde_json::json!(["get","someProperty"]))]
-    #[case::t_global_state(serde_json::json!(["global-state","someProperty"]))]
     #[case::t_has(serde_json::json!(["has","someProperty"]))]
-    #[case::t_id(serde_json::json!(["id"]))]
     #[case::t_in(serde_json::json!(["in","$type","Point"]))]
     #[case::t_is_supported_script(serde_json::json!(["is-supported-script","दिल्ली"]))]
-    #[case::t_let(serde_json::json!(["let","someNumber",500,["interpolate",["linear"],["var","someNumber"],274,"#edf8e9",1551,"#006d2c"]]))]
-    #[case::t_match(serde_json::json!(["match",["get","building_type"],"residential","#f00","commercial","#0f0","#000"]))]
-    #[case::t_step(serde_json::json!(["step",["get","point_count"],20,100,30,750,40]))]
     #[case::t_to_boolean(serde_json::json!(["to-boolean","someProperty"]))]
-    #[case::t_var(serde_json::json!(["var","density"]))]
     #[case::t_within(serde_json::json!(["within",{"coordinates":[[[0,0],[0,5],[5,5],[5,0],[0,0]]],"type":"Polygon"}]))]
     fn test_example_boolean_decodes(#[case] example: serde_json::Value) {
         let _ = serde_json::from_value::<Boolean>(example).expect("example should decode");
     }
 
     #[rstest::rstest]
-    #[case::t_accumulated(serde_json::json!(["accumulated"]))]
-    #[case::t_at(serde_json::json!(["at",1,["literal",["a","b","c"]]]))]
-    #[case::t_case(serde_json::json!(["case",["boolean",["feature-state","hover"],false],1,0.5]))]
-    #[case::t_coalesce(serde_json::json!(["coalesce",["image",["concat",["get","icon"],"_15"]],["image","marker_15"]]))]
     #[case::t_collator(serde_json::json!(["collator",{"case-sensitive":true,"diacritic-sensitive":true,"locale":"fr"}]))]
-    #[case::t_feature_state(serde_json::json!(["feature-state","hover"]))]
-    #[case::t_get(serde_json::json!(["get","someProperty"]))]
-    #[case::t_global_state(serde_json::json!(["global-state","someProperty"]))]
-    #[case::t_id(serde_json::json!(["id"]))]
-    #[case::t_let(serde_json::json!(["let","someNumber",500,["interpolate",["linear"],["var","someNumber"],274,"#edf8e9",1551,"#006d2c"]]))]
-    #[case::t_match(serde_json::json!(["match",["get","building_type"],"residential","#f00","commercial","#0f0","#000"]))]
-    #[case::t_step(serde_json::json!(["step",["get","point_count"],20,100,30,750,40]))]
-    #[case::t_var(serde_json::json!(["var","density"]))]
     fn test_example_collator_decodes(#[case] example: serde_json::Value) {
         let _ = serde_json::from_value::<Collator>(example).expect("example should decode");
     }
 
     #[rstest::rstest]
-    #[case::t_accumulated(serde_json::json!(["accumulated"]))]
-    #[case::t_at(serde_json::json!(["at",1,["literal",["a","b","c"]]]))]
-    #[case::t_case(serde_json::json!(["case",["boolean",["feature-state","hover"],false],1,0.5]))]
-    #[case::t_coalesce(serde_json::json!(["coalesce",["image",["concat",["get","icon"],"_15"]],["image","marker_15"]]))]
-    #[case::t_feature_state(serde_json::json!(["feature-state","hover"]))]
-    #[case::t_get(serde_json::json!(["get","someProperty"]))]
-    #[case::t_global_state(serde_json::json!(["global-state","someProperty"]))]
-    #[case::t_id(serde_json::json!(["id"]))]
-    #[case::t_let(serde_json::json!(["let","someNumber",500,["interpolate",["linear"],["var","someNumber"],274,"#edf8e9",1551,"#006d2c"]]))]
-    #[case::t_match(serde_json::json!(["match",["get","building_type"],"residential","#f00","commercial","#0f0","#000"]))]
     #[case::t_rgb(serde_json::json!(["rgb",255,0,0]))]
     #[case::t_rgba(serde_json::json!(["rgba",255,0,0,1]))]
-    #[case::t_step(serde_json::json!(["step",["get","point_count"],20,100,30,750,40]))]
     #[case::t_to_color(serde_json::json!(["to-color","#edf8e9"]))]
-    #[case::t_var(serde_json::json!(["var","density"]))]
     fn test_example_color_decodes(#[case] example: serde_json::Value) {
         let _ = serde_json::from_value::<Color>(example).expect("example should decode");
     }
@@ -926,37 +861,13 @@ mod test {
     }
 
     #[rstest::rstest]
-    #[case::t_accumulated(serde_json::json!(["accumulated"]))]
-    #[case::t_at(serde_json::json!(["at",1,["literal",["a","b","c"]]]))]
-    #[case::t_case(serde_json::json!(["case",["boolean",["feature-state","hover"],false],1,0.5]))]
-    #[case::t_coalesce(serde_json::json!(["coalesce",["image",["concat",["get","icon"],"_15"]],["image","marker_15"]]))]
-    #[case::t_feature_state(serde_json::json!(["feature-state","hover"]))]
     #[case::t_format(serde_json::json!(["format",["upcase",["get","FacilityName"]],{"font-scale":0.8},"\n\n",{},["downcase",["get","Comments"]],{"font-scale":0.6,"vertical-align":"center"}]))]
-    #[case::t_get(serde_json::json!(["get","someProperty"]))]
-    #[case::t_global_state(serde_json::json!(["global-state","someProperty"]))]
-    #[case::t_id(serde_json::json!(["id"]))]
-    #[case::t_let(serde_json::json!(["let","someNumber",500,["interpolate",["linear"],["var","someNumber"],274,"#edf8e9",1551,"#006d2c"]]))]
-    #[case::t_match(serde_json::json!(["match",["get","building_type"],"residential","#f00","commercial","#0f0","#000"]))]
-    #[case::t_step(serde_json::json!(["step",["get","point_count"],20,100,30,750,40]))]
-    #[case::t_var(serde_json::json!(["var","density"]))]
     fn test_example_formatted_decodes(#[case] example: serde_json::Value) {
         let _ = serde_json::from_value::<Formatted>(example).expect("example should decode");
     }
 
     #[rstest::rstest]
-    #[case::t_accumulated(serde_json::json!(["accumulated"]))]
-    #[case::t_at(serde_json::json!(["at",1,["literal",["a","b","c"]]]))]
-    #[case::t_case(serde_json::json!(["case",["boolean",["feature-state","hover"],false],1,0.5]))]
-    #[case::t_coalesce(serde_json::json!(["coalesce",["image",["concat",["get","icon"],"_15"]],["image","marker_15"]]))]
-    #[case::t_feature_state(serde_json::json!(["feature-state","hover"]))]
-    #[case::t_get(serde_json::json!(["get","someProperty"]))]
-    #[case::t_global_state(serde_json::json!(["global-state","someProperty"]))]
-    #[case::t_id(serde_json::json!(["id"]))]
     #[case::t_image(serde_json::json!(["image","marker_15"]))]
-    #[case::t_let(serde_json::json!(["let","someNumber",500,["interpolate",["linear"],["var","someNumber"],274,"#edf8e9",1551,"#006d2c"]]))]
-    #[case::t_match(serde_json::json!(["match",["get","building_type"],"residential","#f00","commercial","#0f0","#000"]))]
-    #[case::t_step(serde_json::json!(["step",["get","point_count"],20,100,30,750,40]))]
-    #[case::t_var(serde_json::json!(["var","density"]))]
     fn test_example_image_decodes(#[case] example: serde_json::Value) {
         let _ = serde_json::from_value::<Image>(example).expect("example should decode");
     }
@@ -969,33 +880,23 @@ mod test {
     #[case::t_slash(serde_json::json!(["/",["get","population"],["get","sq-km"]]))]
     #[case::t_power(serde_json::json!(["^",2,3]))]
     #[case::t_absolute(serde_json::json!(["abs",-1.5]))]
-    #[case::t_accumulated(serde_json::json!(["accumulated"]))]
     #[case::t_arccosine(serde_json::json!(["acos",1]))]
     #[case::t_asin(serde_json::json!(["asin",1]))]
-    #[case::t_at(serde_json::json!(["at",1,["literal",["a","b","c"]]]))]
     #[case::t_atan(serde_json::json!(["atan",1]))]
-    #[case::t_case(serde_json::json!(["case",["boolean",["feature-state","hover"],false],1,0.5]))]
     #[case::t_ceil(serde_json::json!(["ceil",1.5]))]
-    #[case::t_coalesce(serde_json::json!(["coalesce",["image",["concat",["get","icon"],"_15"]],["image","marker_15"]]))]
     #[case::t_cos(serde_json::json!(["cos",1]))]
     #[case::t_distance(serde_json::json!(["distance",{"coordinates":[0,0],"type":"Point"}]))]
     #[case::t_e(serde_json::json!(["e"]))]
     #[case::t_elevation(serde_json::json!(["elevation"]))]
-    #[case::t_feature_state(serde_json::json!(["feature-state","hover"]))]
     #[case::t_floor(serde_json::json!(["floor",1.5]))]
-    #[case::t_get(serde_json::json!(["get","someProperty"]))]
-    #[case::t_global_state(serde_json::json!(["global-state","someProperty"]))]
     #[case::t_heatmap_density(serde_json::json!(["heatmap-density"]))]
-    #[case::t_id(serde_json::json!(["id"]))]
     #[case::t_index_of(serde_json::json!(["index-of","foo",["baz","bar","hello","foo","world"]]))]
     #[case::t_length(serde_json::json!(["length",["get","myArray"]]))]
-    #[case::t_let(serde_json::json!(["let","someNumber",500,["interpolate",["linear"],["var","someNumber"],274,"#edf8e9",1551,"#006d2c"]]))]
     #[case::t_line_progress(serde_json::json!(["line-progress"]))]
     #[case::t_ln(serde_json::json!(["ln",8]))]
     #[case::t_ln2(serde_json::json!(["ln2"]))]
     #[case::t_log10(serde_json::json!(["log10",8]))]
     #[case::t_log2(serde_json::json!(["log2",8]))]
-    #[case::t_match(serde_json::json!(["match",["get","building_type"],"residential","#f00","commercial","#0f0","#000"]))]
     #[case::t_max(serde_json::json!(["max",1,2]))]
     #[case::t_min(serde_json::json!(["min",1,2]))]
     #[case::t_number(serde_json::json!(["number",["get","population"]]))]
@@ -1003,10 +904,8 @@ mod test {
     #[case::t_round(serde_json::json!(["round",1.5]))]
     #[case::t_sin(serde_json::json!(["sin",1]))]
     #[case::t_sqrt(serde_json::json!(["sqrt",9]))]
-    #[case::t_step(serde_json::json!(["step",["get","point_count"],20,100,30,750,40]))]
     #[case::t_tan(serde_json::json!(["tan",1]))]
     #[case::t_to_number(serde_json::json!(["to-number","someProperty"]))]
-    #[case::t_var(serde_json::json!(["var","density"]))]
     fn test_example_number_decodes(#[case] example: serde_json::Value) {
         let _ = serde_json::from_value::<Number>(example).expect("example should decode");
     }
@@ -1023,47 +922,23 @@ mod test {
     }
 
     #[rstest::rstest]
-    #[case::t_accumulated(serde_json::json!(["accumulated"]))]
-    #[case::t_at(serde_json::json!(["at",1,["literal",["a","b","c"]]]))]
-    #[case::t_case(serde_json::json!(["case",["boolean",["feature-state","hover"],false],1,0.5]))]
-    #[case::t_coalesce(serde_json::json!(["coalesce",["image",["concat",["get","icon"],"_15"]],["image","marker_15"]]))]
-    #[case::t_feature_state(serde_json::json!(["feature-state","hover"]))]
-    #[case::t_get(serde_json::json!(["get","someProperty"]))]
-    #[case::t_global_state(serde_json::json!(["global-state","someProperty"]))]
-    #[case::t_id(serde_json::json!(["id"]))]
-    #[case::t_let(serde_json::json!(["let","someNumber",500,["interpolate",["linear"],["var","someNumber"],274,"#edf8e9",1551,"#006d2c"]]))]
     #[case::t_literal(serde_json::json!(["literal",["DIN Offc Pro Italic","Arial Unicode MS Regular"]]))]
-    #[case::t_match(serde_json::json!(["match",["get","building_type"],"residential","#f00","commercial","#0f0","#000"]))]
     #[case::t_object(serde_json::json!(["object",["get","some-property"]]))]
     #[case::t_properties(serde_json::json!(["properties"]))]
-    #[case::t_step(serde_json::json!(["step",["get","point_count"],20,100,30,750,40]))]
-    #[case::t_var(serde_json::json!(["var","density"]))]
     fn test_example_object_decodes(#[case] example: serde_json::Value) {
         let _ = serde_json::from_value::<Object>(example).expect("example should decode");
     }
 
     #[rstest::rstest]
-    #[case::t_accumulated(serde_json::json!(["accumulated"]))]
-    #[case::t_at(serde_json::json!(["at",1,["literal",["a","b","c"]]]))]
-    #[case::t_case(serde_json::json!(["case",["boolean",["feature-state","hover"],false],1,0.5]))]
-    #[case::t_coalesce(serde_json::json!(["coalesce",["image",["concat",["get","icon"],"_15"]],["image","marker_15"]]))]
     #[case::t_concat(serde_json::json!(["concat","square-rgb-",["get","color"]]))]
     #[case::t_downcase(serde_json::json!(["downcase",["get","name"]]))]
-    #[case::t_feature_state(serde_json::json!(["feature-state","hover"]))]
-    #[case::t_get(serde_json::json!(["get","someProperty"]))]
-    #[case::t_global_state(serde_json::json!(["global-state","someProperty"]))]
-    #[case::t_id(serde_json::json!(["id"]))]
-    #[case::t_let(serde_json::json!(["let","someNumber",500,["interpolate",["linear"],["var","someNumber"],274,"#edf8e9",1551,"#006d2c"]]))]
-    #[case::t_match(serde_json::json!(["match",["get","building_type"],"residential","#f00","commercial","#0f0","#000"]))]
     #[case::t_number_format(serde_json::json!(["number-format",["get","mag"],{"max-fraction-digits":1,"min-fraction-digits":1}]))]
     #[case::t_resolved_locale(serde_json::json!(["resolved-locale",["collator",{"case-sensitive":true,"diacritic-sensitive":false,"locale":"de"}]]))]
     #[case::t_slice(serde_json::json!(["slice",["get","name"],0,3]))]
-    #[case::t_step(serde_json::json!(["step",["get","point_count"],20,100,30,750,40]))]
     #[case::t_string(serde_json::json!(["string",["get","name"]]))]
     #[case::t_to_string(serde_json::json!(["to-string",["get","mag"]]))]
     #[case::t_typeof(serde_json::json!(["typeof",["get","name"]]))]
     #[case::t_upcase(serde_json::json!(["upcase",["get","name"]]))]
-    #[case::t_var(serde_json::json!(["var","density"]))]
     fn test_example_string_decodes(#[case] example: serde_json::Value) {
         let _ = serde_json::from_value::<String>(example).expect("example should decode");
     }
@@ -1112,87 +987,20 @@ impl<'de> serde::Deserialize<'de> for StringLiteralOrColorAsUnion {
 #[derive(PartialEq, Debug, Clone)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum Array {
-    /// Gets the value of a cluster property accumulated so far. Can only be used in the `clusterProperties` option of a clustered GeoJSON source.
-    Accumulated,
     /// Asserts that the input is an array (optionally with a specific item type and length). If, when the input expression is evaluated, it is not of the asserted type or length, then this assertion will cause the whole expression to be aborted.
     Op(ExprOrLiteral),
-    /// Retrieves an item from an array.
-    At(NumberLiteralOrNumberAsUnion, ExprOrLiteral),
-    /// Selects the first output whose corresponding test condition evaluates to true, or the fallback value otherwise.
-    ///
-    ///  - [Create a hover effect](https://maplibre.org/maplibre-gl-js/docs/examples/create-a-hover-effect/)
-    ///
-    ///  - [Display HTML clusters with custom properties](https://maplibre.org/maplibre-gl-js/docs/examples/display-html-clusters-with-custom-properties/)
-    Case((Vec<(Boolean, ExprOrLiteral)>, ExprOrLiteral)),
-    /// Evaluates each expression in turn until the first non-null value is obtained, and returns that value.
-    ///
-    ///  - [Use a fallback image](https://maplibre.org/maplibre-gl-js/docs/examples/use-a-fallback-image/)
-    Coalesce(Vec<ExprOrLiteral>),
-    /// Retrieves a property value from the current feature's state. Returns null if the requested property is not present on the feature's state. A feature's state is not part of the GeoJSON or vector tile data, and must be set programmatically on each feature. When `source.promoteId` is not provided, features are identified by their `id` attribute, which must be an integer or a string that can be cast to an integer. When `source.promoteId` is provided, features are identified by their `promoteId` property, which may be a number, string, or any primitive data type. Note that ["feature-state"] can only be used with paint properties that support data-driven styling.
-    ///
-    ///  - [Create a hover effect](https://maplibre.org/maplibre-gl-js/docs/examples/create-a-hover-effect/)
-    FeatureState(StringLiteralOrStringAsUnion),
-    /// Retrieves a property value from the current feature's properties, or from another object if a second argument is provided. Returns null if the requested property is missing.
-    ///
-    ///  - [Change the case of labels](https://maplibre.org/maplibre-gl-js/docs/examples/change-case-of-labels/)
-    ///
-    ///  - [Display HTML clusters with custom properties](https://maplibre.org/maplibre-gl-js/docs/examples/display-html-clusters-with-custom-properties/)
-    ///
-    ///  - [Extrude polygons for 3D indoor mapping](https://maplibre.org/maplibre-gl-js/docs/examples/extrude-polygons-for-3d-indoor-mapping/)
-    Get(StringLiteralOrStringAsUnion, Option<Object>),
-    /// Retrieves a property value from global state that can be set with platform-specific APIs. Defaults can be provided using the [`state`](https://maplibre.org/maplibre-style-spec/root/#state) root property. Returns `null` if no value nor default value is set for the retrieved property.
-    GlobalState(StringLiteral),
-    /// Gets the feature's id, if it has one.
-    Id,
-    /// Binds expressions to named variables, which can then be referenced in the result expression using `["var", "variable_name"]`.
-    ///
-    ///  - [Visualize population density](https://maplibre.org/maplibre-gl-js/docs/examples/visualize-population-density/)
-    Let((Vec<(StringLiteral, ExprOrLiteral)>, ExprOrLiteral)),
     /// Provides a literal array or object value.
     ///
     ///  - [Display and style rich text labels](https://maplibre.org/maplibre-gl-js/docs/examples/display-and-style-rich-text-labels/)
     Literal(JSONArrayLiteral),
-    /// Selects the output whose label value matches the input value, or the fallback value if no match is found. The input can be any expression (e.g. `["get", "building_type"]`). Each label must be either:
-    ///
-    ///  - a single literal value; or
-    ///
-    ///  - an array of literal values, whose values must be all strings or all numbers (e.g. `[100, 101]` or `["c", "b"]`). The input matches if any of the values in the array matches, similar to the `"in"` operator.
-    ///
-    /// Each label must be unique. If the input type does not match the type of the labels, the result will be the fallback value.
-    Match(
-        (
-            ExprOrLiteral,
-            Vec<(
-                StringOrNumberOrArrayOfStringOrArrayOfNumberAsUnion,
-                ExprOrLiteral,
-            )>,
-            ExprOrLiteral,
-        ),
-    ),
     /// Returns a subarray from an array or a substring from a string from a specified start index, or between a start index and an end index if set. The return value is inclusive of the start index but not of the end index. In a string, a UTF-16 surrogate pair counts as a single position.
     Slice(
         ExprOrLiteral,
-        NumberLiteralOrNumberAsUnion,
-        Option<NumberLiteralOrNumberAsUnion>,
-    ),
-    /// Produces discrete, stepped results by evaluating a piecewise-constant function defined by pairs of input and output values ("stops"). The `input` may be any numeric expression (e.g., `["get", "population"]`). Stop inputs must be numeric literals in strictly ascending order.
-    ///
-    /// Returns the output value of the stop just less than the input, or the first output if the input is less than the first stop.
-    ///
-    ///  - [Create and style clusters](https://maplibre.org/maplibre-gl-js/docs/examples/create-and-style-clusters/)
-    Step(
-        (
-            NumberLiteralOrNumberAsUnion,
-            ExprOrLiteral,
-            Vec<(NumberLiteral, ExprOrLiteral)>,
-        ),
+        NumberLiteralOrNumberOrAnyAsUnion,
+        Option<NumberLiteralOrNumberOrAnyAsUnion>,
     ),
     /// Returns a four-element array containing the input color's red, green, blue, and alpha components, in that order.
     ToRgba(StringLiteralOrColorAsUnion),
-    /// References variable bound using `let`.
-    ///
-    ///  - [Visualize population density](https://maplibre.org/maplibre-gl-js/docs/examples/visualize-population-density/)
-    Var(StringLiteral),
 }
 
 impl<'de> serde::Deserialize<'de> for Array {
@@ -1211,7 +1019,7 @@ impl<'de> serde::de::Visitor<'de> for ArrayVisitor {
     type Value = Array;
 
     fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
-        formatter.write_str("an Array expression (example: [\"accumulated\"])")
+        formatter.write_str("an Array expression (example: [\"literal\",[\"DIN Offc Pro Italic\",\"Arial Unicode MS Regular\"]])")
     }
 
     fn visit_seq<A: serde::de::SeqAccess<'de>>(self, mut seq: A) -> Result<Self::Value, A::Error> {
@@ -1231,127 +1039,13 @@ impl<'de> serde::de::Visitor<'de> for ArrayVisitor {
             .next_element()?
             .ok_or_else(|| serde::de::Error::custom("missing operator"))?;
         match op.as_str() {
-            "accumulated" => Ok(Array::Accumulated),
             "array" => {
                 let value = visit_seq_field(&mut seq, "value")?;
                 Ok(Array::Op(value))
             }
-            "at" => {
-                let index = visit_seq_field(&mut seq, "index")?;
-                let array = visit_seq_field(&mut seq, "array")?;
-                Ok(Array::At(index, array))
-            }
-            "case" => {
-                let mut inputs = Vec::new();
-                let mut rest: Vec<serde_json::Value> = Vec::new();
-                while let Some(v) = seq.next_element()? {
-                    rest.push(v);
-                }
-                if rest.is_empty() {
-                    return Err(serde::de::Error::custom(
-                        "{name}::{variant_name}: too few arguments",
-                    ));
-                }
-                if !(rest.len() - 1).is_multiple_of(2) {
-                    return Err(serde::de::Error::custom(
-                        "Array::Case: malformed template/suffix layout",
-                    ));
-                }
-                let inputs_len = (rest.len() - 1) / 2;
-                for i in 0..inputs_len {
-                    let condition_i = serde_json::from_value(rest[i * 2].clone())
-                        .map_err(serde::de::Error::custom)?;
-                    let output_i = serde_json::from_value(rest[i * 2 + 1].clone())
-                        .map_err(serde::de::Error::custom)?;
-                    let element = (condition_i, output_i);
-                    inputs.push(element);
-                }
-                let fallback = serde_json::from_value(rest[inputs_len * 2].clone())
-                    .map_err(serde::de::Error::custom)?;
-                Ok(Array::Case((inputs, fallback)))
-            }
-            "coalesce" => {
-                let mut inputs = Vec::new();
-                while let Some(element) = seq.next_element()? {
-                    inputs.push(element);
-                }
-                Ok(Array::Coalesce(inputs))
-            }
-            "feature-state" => {
-                let property_name = visit_seq_field(&mut seq, "property_name")?;
-                Ok(Array::FeatureState(property_name))
-            }
-            "get" => {
-                let property_name = visit_seq_field(&mut seq, "property_name")?;
-                let object = seq.next_element()?;
-                Ok(Array::Get(property_name, object))
-            }
-            "global-state" => {
-                let property_name = visit_seq_field(&mut seq, "property_name")?;
-                Ok(Array::GlobalState(property_name))
-            }
-            "id" => Ok(Array::Id),
-            "let" => {
-                let mut inputs = Vec::new();
-                let mut rest: Vec<serde_json::Value> = Vec::new();
-                while let Some(v) = seq.next_element()? {
-                    rest.push(v);
-                }
-                if rest.is_empty() {
-                    return Err(serde::de::Error::custom(
-                        "{name}::{variant_name}: too few arguments",
-                    ));
-                }
-                if !(rest.len() - 1).is_multiple_of(2) {
-                    return Err(serde::de::Error::custom(
-                        "Array::Let: malformed template/suffix layout",
-                    ));
-                }
-                let inputs_len = (rest.len() - 1) / 2;
-                for i in 0..inputs_len {
-                    let var_name_i = serde_json::from_value(rest[i * 2].clone())
-                        .map_err(serde::de::Error::custom)?;
-                    let var_value_i = serde_json::from_value(rest[i * 2 + 1].clone())
-                        .map_err(serde::de::Error::custom)?;
-                    let element = (var_name_i, var_value_i);
-                    inputs.push(element);
-                }
-                let expression = serde_json::from_value(rest[inputs_len * 2].clone())
-                    .map_err(serde::de::Error::custom)?;
-                Ok(Array::Let((inputs, expression)))
-            }
             "literal" => {
                 let json_array = visit_seq_field(&mut seq, "json_array")?;
                 Ok(Array::Literal(json_array))
-            }
-            "match" => {
-                let mut rest: Vec<serde_json::Value> = Vec::new();
-                while let Some(v) = seq.next_element()? {
-                    rest.push(v);
-                }
-                if rest.len() < 2 {
-                    return Err(serde::de::Error::custom("Array::Match: too few arguments"));
-                }
-                if !rest.len().is_multiple_of(2) {
-                    return Err(serde::de::Error::custom(
-                        "Array::Match: expected an even number of arguments after operator (input + label/output pairs + fallback)",
-                    ));
-                }
-                let fallback_v = rest.pop().unwrap();
-                let input: ExprOrLiteral =
-                    serde_json::from_value(rest.remove(0)).map_err(serde::de::Error::custom)?;
-                let mut pairs = Vec::new();
-                for chunk in rest.chunks_exact(2) {
-                    let label_i: StringOrNumberOrArrayOfStringOrArrayOfNumberAsUnion =
-                        serde_json::from_value(chunk[0].clone())
-                            .map_err(serde::de::Error::custom)?;
-                    let output_i: ExprOrLiteral = serde_json::from_value(chunk[1].clone())
-                        .map_err(serde::de::Error::custom)?;
-                    pairs.push((label_i, output_i));
-                }
-                let fallback: ExprOrLiteral =
-                    serde_json::from_value(fallback_v).map_err(serde::de::Error::custom)?;
-                Ok(Array::Match((input, pairs, fallback)))
             }
             "slice" => {
                 let array = visit_seq_field(&mut seq, "array")?;
@@ -1359,46 +1053,13 @@ impl<'de> serde::de::Visitor<'de> for ArrayVisitor {
                 let end_index = seq.next_element()?;
                 Ok(Array::Slice(array, start_index, end_index))
             }
-            "step" => {
-                let input: NumberLiteralOrNumberAsUnion = visit_seq_field(&mut seq, "input")?;
-                let output_0: ExprOrLiteral = visit_seq_field(&mut seq, "output_0")?;
-                let mut stops = Vec::new();
-                while let Some(stop_input_i) = seq.next_element::<NumberLiteral>()? {
-                    let stop_output_i: ExprOrLiteral = seq.next_element()?.ok_or_else(|| {
-                        serde::de::Error::custom("expected stop_output_i in Array::Step")
-                    })?;
-                    stops.push((stop_input_i, stop_output_i));
-                }
-                Ok(Array::Step((input, output_0, stops)))
-            }
             "to-rgba" => {
                 let color = visit_seq_field(&mut seq, "color")?;
                 Ok(Array::ToRgba(color))
             }
-            "var" => {
-                let var_name = visit_seq_field(&mut seq, "var_name")?;
-                Ok(Array::Var(var_name))
-            }
             _ => Err(serde::de::Error::unknown_variant(
                 &op,
-                &[
-                    "accumulated",
-                    "array",
-                    "at",
-                    "case",
-                    "coalesce",
-                    "feature-state",
-                    "get",
-                    "global-state",
-                    "id",
-                    "let",
-                    "literal",
-                    "match",
-                    "slice",
-                    "step",
-                    "to-rgba",
-                    "var",
-                ],
+                &["array", "literal", "slice", "to-rgba"],
             )),
         }
     }
@@ -1411,18 +1072,6 @@ impl serde::Serialize for Array {
     {
         use serde::ser::SerializeSeq;
         match self {
-            Array::Accumulated => {
-                let mut elems = vec![];
-                while !elems.is_empty() && elems.last().is_some_and(serde_json::Value::is_null) {
-                    elems.pop();
-                }
-                let mut seq = serializer.serialize_seq(None)?;
-                seq.serialize_element("accumulated")?;
-                for elem in &elems {
-                    seq.serialize_element(elem)?;
-                }
-                seq.end()
-            }
             Array::Op(f0) => {
                 let mut elems = vec![serde_json::to_value(f0).map_err(serde::ser::Error::custom)?];
                 while elems.len() > 1 && elems.last().is_some_and(serde_json::Value::is_null) {
@@ -1435,151 +1084,6 @@ impl serde::Serialize for Array {
                 }
                 seq.end()
             }
-            Array::At(f0, f1) => {
-                let mut elems = vec![
-                    serde_json::to_value(f0).map_err(serde::ser::Error::custom)?,
-                    serde_json::to_value(f1).map_err(serde::ser::Error::custom)?,
-                ];
-                while elems.len() > 2 && elems.last().is_some_and(serde_json::Value::is_null) {
-                    elems.pop();
-                }
-                let mut seq = serializer.serialize_seq(None)?;
-                seq.serialize_element("at")?;
-                for elem in &elems {
-                    seq.serialize_element(elem)?;
-                }
-                seq.end()
-            }
-            Array::Case(inner) => {
-                let inner_val = serde_json::to_value(inner).map_err(serde::ser::Error::custom)?;
-                let mut seq = serializer.serialize_seq(None)?;
-                seq.serialize_element("case")?;
-                if let serde_json::Value::Array(top) = &inner_val {
-                    for elem in top {
-                        if let serde_json::Value::Array(sub) = elem {
-                            if sub.is_empty() {
-                                // Empty Vec — nothing to flatten.
-                            } else if sub[0].is_array() {
-                                // An array-of-arrays is the Vec<(A,B)> — flatten it.
-                                for pair in sub {
-                                    if let serde_json::Value::Array(pair_elems) = pair {
-                                        for pe in pair_elems {
-                                            seq.serialize_element(pe)?;
-                                        }
-                                    } else {
-                                        seq.serialize_element(pair)?;
-                                    }
-                                }
-                            } else {
-                                // Plain array value (e.g. a sub-expression like ["zoom"]).
-                                seq.serialize_element(elem)?;
-                            }
-                        } else {
-                            seq.serialize_element(elem)?;
-                        }
-                    }
-                } else {
-                    seq.serialize_element(&inner_val)?;
-                }
-                seq.end()
-            }
-            Array::Coalesce(inner) => {
-                let inner_val = serde_json::to_value(inner).map_err(serde::ser::Error::custom)?;
-                let mut seq = serializer.serialize_seq(None)?;
-                seq.serialize_element("coalesce")?;
-                if let serde_json::Value::Array(top) = &inner_val {
-                    for elem in top {
-                        seq.serialize_element(elem)?;
-                    }
-                } else {
-                    seq.serialize_element(&inner_val)?;
-                }
-                seq.end()
-            }
-            Array::FeatureState(f0) => {
-                let mut elems = vec![serde_json::to_value(f0).map_err(serde::ser::Error::custom)?];
-                while elems.len() > 1 && elems.last().is_some_and(serde_json::Value::is_null) {
-                    elems.pop();
-                }
-                let mut seq = serializer.serialize_seq(None)?;
-                seq.serialize_element("feature-state")?;
-                for elem in &elems {
-                    seq.serialize_element(elem)?;
-                }
-                seq.end()
-            }
-            Array::Get(f0, f1) => {
-                let mut elems = vec![
-                    serde_json::to_value(f0).map_err(serde::ser::Error::custom)?,
-                    serde_json::to_value(f1).map_err(serde::ser::Error::custom)?,
-                ];
-                while elems.len() > 1 && elems.last().is_some_and(serde_json::Value::is_null) {
-                    elems.pop();
-                }
-                let mut seq = serializer.serialize_seq(None)?;
-                seq.serialize_element("get")?;
-                for elem in &elems {
-                    seq.serialize_element(elem)?;
-                }
-                seq.end()
-            }
-            Array::GlobalState(f0) => {
-                let mut elems = vec![serde_json::to_value(f0).map_err(serde::ser::Error::custom)?];
-                while elems.len() > 1 && elems.last().is_some_and(serde_json::Value::is_null) {
-                    elems.pop();
-                }
-                let mut seq = serializer.serialize_seq(None)?;
-                seq.serialize_element("global-state")?;
-                for elem in &elems {
-                    seq.serialize_element(elem)?;
-                }
-                seq.end()
-            }
-            Array::Id => {
-                let mut elems = vec![];
-                while !elems.is_empty() && elems.last().is_some_and(serde_json::Value::is_null) {
-                    elems.pop();
-                }
-                let mut seq = serializer.serialize_seq(None)?;
-                seq.serialize_element("id")?;
-                for elem in &elems {
-                    seq.serialize_element(elem)?;
-                }
-                seq.end()
-            }
-            Array::Let(inner) => {
-                let inner_val = serde_json::to_value(inner).map_err(serde::ser::Error::custom)?;
-                let mut seq = serializer.serialize_seq(None)?;
-                seq.serialize_element("let")?;
-                if let serde_json::Value::Array(top) = &inner_val {
-                    for elem in top {
-                        if let serde_json::Value::Array(sub) = elem {
-                            if sub.is_empty() {
-                                // Empty Vec — nothing to flatten.
-                            } else if sub[0].is_array() {
-                                // An array-of-arrays is the Vec<(A,B)> — flatten it.
-                                for pair in sub {
-                                    if let serde_json::Value::Array(pair_elems) = pair {
-                                        for pe in pair_elems {
-                                            seq.serialize_element(pe)?;
-                                        }
-                                    } else {
-                                        seq.serialize_element(pair)?;
-                                    }
-                                }
-                            } else {
-                                // Plain array value (e.g. a sub-expression like ["zoom"]).
-                                seq.serialize_element(elem)?;
-                            }
-                        } else {
-                            seq.serialize_element(elem)?;
-                        }
-                    }
-                } else {
-                    seq.serialize_element(&inner_val)?;
-                }
-                seq.end()
-            }
             Array::Literal(f0) => {
                 let mut elems = vec![serde_json::to_value(f0).map_err(serde::ser::Error::custom)?];
                 while elems.len() > 1 && elems.last().is_some_and(serde_json::Value::is_null) {
@@ -1589,39 +1093,6 @@ impl serde::Serialize for Array {
                 seq.serialize_element("literal")?;
                 for elem in &elems {
                     seq.serialize_element(elem)?;
-                }
-                seq.end()
-            }
-            Array::Match(inner) => {
-                let inner_val = serde_json::to_value(inner).map_err(serde::ser::Error::custom)?;
-                let mut seq = serializer.serialize_seq(None)?;
-                seq.serialize_element("match")?;
-                if let serde_json::Value::Array(top) = &inner_val {
-                    for elem in top {
-                        if let serde_json::Value::Array(sub) = elem {
-                            if sub.is_empty() {
-                                // Empty Vec — nothing to flatten.
-                            } else if sub[0].is_array() {
-                                // An array-of-arrays is the Vec<(A,B)> — flatten it.
-                                for pair in sub {
-                                    if let serde_json::Value::Array(pair_elems) = pair {
-                                        for pe in pair_elems {
-                                            seq.serialize_element(pe)?;
-                                        }
-                                    } else {
-                                        seq.serialize_element(pair)?;
-                                    }
-                                }
-                            } else {
-                                // Plain array value (e.g. a sub-expression like ["zoom"]).
-                                seq.serialize_element(elem)?;
-                            }
-                        } else {
-                            seq.serialize_element(elem)?;
-                        }
-                    }
-                } else {
-                    seq.serialize_element(&inner_val)?;
                 }
                 seq.end()
             }
@@ -1641,39 +1112,6 @@ impl serde::Serialize for Array {
                 }
                 seq.end()
             }
-            Array::Step(inner) => {
-                let inner_val = serde_json::to_value(inner).map_err(serde::ser::Error::custom)?;
-                let mut seq = serializer.serialize_seq(None)?;
-                seq.serialize_element("step")?;
-                if let serde_json::Value::Array(top) = &inner_val {
-                    for elem in top {
-                        if let serde_json::Value::Array(sub) = elem {
-                            if sub.is_empty() {
-                                // Empty Vec — nothing to flatten.
-                            } else if sub[0].is_array() {
-                                // An array-of-arrays is the Vec<(A,B)> — flatten it.
-                                for pair in sub {
-                                    if let serde_json::Value::Array(pair_elems) = pair {
-                                        for pe in pair_elems {
-                                            seq.serialize_element(pe)?;
-                                        }
-                                    } else {
-                                        seq.serialize_element(pair)?;
-                                    }
-                                }
-                            } else {
-                                // Plain array value (e.g. a sub-expression like ["zoom"]).
-                                seq.serialize_element(elem)?;
-                            }
-                        } else {
-                            seq.serialize_element(elem)?;
-                        }
-                    }
-                } else {
-                    seq.serialize_element(&inner_val)?;
-                }
-                seq.end()
-            }
             Array::ToRgba(f0) => {
                 let mut elems = vec![serde_json::to_value(f0).map_err(serde::ser::Error::custom)?];
                 while elems.len() > 1 && elems.last().is_some_and(serde_json::Value::is_null) {
@@ -1681,18 +1119,6 @@ impl serde::Serialize for Array {
                 }
                 let mut seq = serializer.serialize_seq(None)?;
                 seq.serialize_element("to-rgba")?;
-                for elem in &elems {
-                    seq.serialize_element(elem)?;
-                }
-                seq.end()
-            }
-            Array::Var(f0) => {
-                let mut elems = vec![serde_json::to_value(f0).map_err(serde::ser::Error::custom)?];
-                while elems.len() > 1 && elems.last().is_some_and(serde_json::Value::is_null) {
-                    elems.pop();
-                }
-                let mut seq = serializer.serialize_seq(None)?;
-                seq.serialize_element("var")?;
                 for elem in &elems {
                     seq.serialize_element(elem)?;
                 }
@@ -1720,79 +1146,12 @@ pub enum StringOrNumberOrBooleanOrColorAsEnum {
 #[derive(PartialEq, Debug, Clone)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum ArrayLessTypeLengthGreater {
-    /// Gets the value of a cluster property accumulated so far. Can only be used in the `clusterProperties` option of a clustered GeoJSON source.
-    Accumulated,
     /// Asserts that the input is an array (optionally with a specific item type and length). If, when the input expression is evaluated, it is not of the asserted type or length, then this assertion will cause the whole expression to be aborted.
     Array(
         StringOrNumberOrBooleanOrColorAsEnum,
         NumberLiteral,
         ExprOrLiteral,
     ),
-    /// Retrieves an item from an array.
-    At(NumberLiteralOrNumberAsUnion, ExprOrLiteral),
-    /// Selects the first output whose corresponding test condition evaluates to true, or the fallback value otherwise.
-    ///
-    ///  - [Create a hover effect](https://maplibre.org/maplibre-gl-js/docs/examples/create-a-hover-effect/)
-    ///
-    ///  - [Display HTML clusters with custom properties](https://maplibre.org/maplibre-gl-js/docs/examples/display-html-clusters-with-custom-properties/)
-    Case((Vec<(Boolean, ExprOrLiteral)>, ExprOrLiteral)),
-    /// Evaluates each expression in turn until the first non-null value is obtained, and returns that value.
-    ///
-    ///  - [Use a fallback image](https://maplibre.org/maplibre-gl-js/docs/examples/use-a-fallback-image/)
-    Coalesce(Vec<ExprOrLiteral>),
-    /// Retrieves a property value from the current feature's state. Returns null if the requested property is not present on the feature's state. A feature's state is not part of the GeoJSON or vector tile data, and must be set programmatically on each feature. When `source.promoteId` is not provided, features are identified by their `id` attribute, which must be an integer or a string that can be cast to an integer. When `source.promoteId` is provided, features are identified by their `promoteId` property, which may be a number, string, or any primitive data type. Note that ["feature-state"] can only be used with paint properties that support data-driven styling.
-    ///
-    ///  - [Create a hover effect](https://maplibre.org/maplibre-gl-js/docs/examples/create-a-hover-effect/)
-    FeatureState(StringLiteralOrStringAsUnion),
-    /// Retrieves a property value from the current feature's properties, or from another object if a second argument is provided. Returns null if the requested property is missing.
-    ///
-    ///  - [Change the case of labels](https://maplibre.org/maplibre-gl-js/docs/examples/change-case-of-labels/)
-    ///
-    ///  - [Display HTML clusters with custom properties](https://maplibre.org/maplibre-gl-js/docs/examples/display-html-clusters-with-custom-properties/)
-    ///
-    ///  - [Extrude polygons for 3D indoor mapping](https://maplibre.org/maplibre-gl-js/docs/examples/extrude-polygons-for-3d-indoor-mapping/)
-    Get(StringLiteralOrStringAsUnion, Option<Object>),
-    /// Retrieves a property value from global state that can be set with platform-specific APIs. Defaults can be provided using the [`state`](https://maplibre.org/maplibre-style-spec/root/#state) root property. Returns `null` if no value nor default value is set for the retrieved property.
-    GlobalState(StringLiteral),
-    /// Gets the feature's id, if it has one.
-    Id,
-    /// Binds expressions to named variables, which can then be referenced in the result expression using `["var", "variable_name"]`.
-    ///
-    ///  - [Visualize population density](https://maplibre.org/maplibre-gl-js/docs/examples/visualize-population-density/)
-    Let((Vec<(StringLiteral, ExprOrLiteral)>, ExprOrLiteral)),
-    /// Selects the output whose label value matches the input value, or the fallback value if no match is found. The input can be any expression (e.g. `["get", "building_type"]`). Each label must be either:
-    ///
-    ///  - a single literal value; or
-    ///
-    ///  - an array of literal values, whose values must be all strings or all numbers (e.g. `[100, 101]` or `["c", "b"]`). The input matches if any of the values in the array matches, similar to the `"in"` operator.
-    ///
-    /// Each label must be unique. If the input type does not match the type of the labels, the result will be the fallback value.
-    Match(
-        (
-            ExprOrLiteral,
-            Vec<(
-                StringOrNumberOrArrayOfStringOrArrayOfNumberAsUnion,
-                ExprOrLiteral,
-            )>,
-            ExprOrLiteral,
-        ),
-    ),
-    /// Produces discrete, stepped results by evaluating a piecewise-constant function defined by pairs of input and output values ("stops"). The `input` may be any numeric expression (e.g., `["get", "population"]`). Stop inputs must be numeric literals in strictly ascending order.
-    ///
-    /// Returns the output value of the stop just less than the input, or the first output if the input is less than the first stop.
-    ///
-    ///  - [Create and style clusters](https://maplibre.org/maplibre-gl-js/docs/examples/create-and-style-clusters/)
-    Step(
-        (
-            NumberLiteralOrNumberAsUnion,
-            ExprOrLiteral,
-            Vec<(NumberLiteral, ExprOrLiteral)>,
-        ),
-    ),
-    /// References variable bound using `let`.
-    ///
-    ///  - [Visualize population density](https://maplibre.org/maplibre-gl-js/docs/examples/visualize-population-density/)
-    Var(StringLiteral),
 }
 
 impl<'de> serde::Deserialize<'de> for ArrayLessTypeLengthGreater {
@@ -1811,7 +1170,7 @@ impl<'de> serde::de::Visitor<'de> for ArrayLessTypeLengthGreaterVisitor {
     type Value = ArrayLessTypeLengthGreater;
 
     fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
-        formatter.write_str("an ArrayLessTypeLengthGreater expression (example: [\"accumulated\"])")
+        formatter.write_str("an ArrayLessTypeLengthGreater expression (example: [\"array\",\"string\",3,[\"literal\",[\"a\",\"b\",\"c\"]]])")
     }
 
     fn visit_seq<A: serde::de::SeqAccess<'de>>(self, mut seq: A) -> Result<Self::Value, A::Error> {
@@ -1831,164 +1190,13 @@ impl<'de> serde::de::Visitor<'de> for ArrayLessTypeLengthGreaterVisitor {
             .next_element()?
             .ok_or_else(|| serde::de::Error::custom("missing operator"))?;
         match op.as_str() {
-            "accumulated" => Ok(ArrayLessTypeLengthGreater::Accumulated),
             "array" => {
                 let r#type = visit_seq_field(&mut seq, "type")?;
                 let length = visit_seq_field(&mut seq, "length")?;
                 let value = visit_seq_field(&mut seq, "value")?;
                 Ok(ArrayLessTypeLengthGreater::Array(r#type, length, value))
             }
-            "at" => {
-                let index = visit_seq_field(&mut seq, "index")?;
-                let array = visit_seq_field(&mut seq, "array")?;
-                Ok(ArrayLessTypeLengthGreater::At(index, array))
-            }
-            "case" => {
-                let mut inputs = Vec::new();
-                let mut rest: Vec<serde_json::Value> = Vec::new();
-                while let Some(v) = seq.next_element()? {
-                    rest.push(v);
-                }
-                if rest.is_empty() {
-                    return Err(serde::de::Error::custom(
-                        "{name}::{variant_name}: too few arguments",
-                    ));
-                }
-                if !(rest.len() - 1).is_multiple_of(2) {
-                    return Err(serde::de::Error::custom(
-                        "ArrayLessTypeLengthGreater::Case: malformed template/suffix layout",
-                    ));
-                }
-                let inputs_len = (rest.len() - 1) / 2;
-                for i in 0..inputs_len {
-                    let condition_i = serde_json::from_value(rest[i * 2].clone())
-                        .map_err(serde::de::Error::custom)?;
-                    let output_i = serde_json::from_value(rest[i * 2 + 1].clone())
-                        .map_err(serde::de::Error::custom)?;
-                    let element = (condition_i, output_i);
-                    inputs.push(element);
-                }
-                let fallback = serde_json::from_value(rest[inputs_len * 2].clone())
-                    .map_err(serde::de::Error::custom)?;
-                Ok(ArrayLessTypeLengthGreater::Case((inputs, fallback)))
-            }
-            "coalesce" => {
-                let mut inputs = Vec::new();
-                while let Some(element) = seq.next_element()? {
-                    inputs.push(element);
-                }
-                Ok(ArrayLessTypeLengthGreater::Coalesce(inputs))
-            }
-            "feature-state" => {
-                let property_name = visit_seq_field(&mut seq, "property_name")?;
-                Ok(ArrayLessTypeLengthGreater::FeatureState(property_name))
-            }
-            "get" => {
-                let property_name = visit_seq_field(&mut seq, "property_name")?;
-                let object = seq.next_element()?;
-                Ok(ArrayLessTypeLengthGreater::Get(property_name, object))
-            }
-            "global-state" => {
-                let property_name = visit_seq_field(&mut seq, "property_name")?;
-                Ok(ArrayLessTypeLengthGreater::GlobalState(property_name))
-            }
-            "id" => Ok(ArrayLessTypeLengthGreater::Id),
-            "let" => {
-                let mut inputs = Vec::new();
-                let mut rest: Vec<serde_json::Value> = Vec::new();
-                while let Some(v) = seq.next_element()? {
-                    rest.push(v);
-                }
-                if rest.is_empty() {
-                    return Err(serde::de::Error::custom(
-                        "{name}::{variant_name}: too few arguments",
-                    ));
-                }
-                if !(rest.len() - 1).is_multiple_of(2) {
-                    return Err(serde::de::Error::custom(
-                        "ArrayLessTypeLengthGreater::Let: malformed template/suffix layout",
-                    ));
-                }
-                let inputs_len = (rest.len() - 1) / 2;
-                for i in 0..inputs_len {
-                    let var_name_i = serde_json::from_value(rest[i * 2].clone())
-                        .map_err(serde::de::Error::custom)?;
-                    let var_value_i = serde_json::from_value(rest[i * 2 + 1].clone())
-                        .map_err(serde::de::Error::custom)?;
-                    let element = (var_name_i, var_value_i);
-                    inputs.push(element);
-                }
-                let expression = serde_json::from_value(rest[inputs_len * 2].clone())
-                    .map_err(serde::de::Error::custom)?;
-                Ok(ArrayLessTypeLengthGreater::Let((inputs, expression)))
-            }
-            "match" => {
-                let mut rest: Vec<serde_json::Value> = Vec::new();
-                while let Some(v) = seq.next_element()? {
-                    rest.push(v);
-                }
-                if rest.len() < 2 {
-                    return Err(serde::de::Error::custom(
-                        "ArrayLessTypeLengthGreater::Match: too few arguments",
-                    ));
-                }
-                if !rest.len().is_multiple_of(2) {
-                    return Err(serde::de::Error::custom(
-                        "ArrayLessTypeLengthGreater::Match: expected an even number of arguments after operator (input + label/output pairs + fallback)",
-                    ));
-                }
-                let fallback_v = rest.pop().unwrap();
-                let input: ExprOrLiteral =
-                    serde_json::from_value(rest.remove(0)).map_err(serde::de::Error::custom)?;
-                let mut pairs = Vec::new();
-                for chunk in rest.chunks_exact(2) {
-                    let label_i: StringOrNumberOrArrayOfStringOrArrayOfNumberAsUnion =
-                        serde_json::from_value(chunk[0].clone())
-                            .map_err(serde::de::Error::custom)?;
-                    let output_i: ExprOrLiteral = serde_json::from_value(chunk[1].clone())
-                        .map_err(serde::de::Error::custom)?;
-                    pairs.push((label_i, output_i));
-                }
-                let fallback: ExprOrLiteral =
-                    serde_json::from_value(fallback_v).map_err(serde::de::Error::custom)?;
-                Ok(ArrayLessTypeLengthGreater::Match((input, pairs, fallback)))
-            }
-            "step" => {
-                let input: NumberLiteralOrNumberAsUnion = visit_seq_field(&mut seq, "input")?;
-                let output_0: ExprOrLiteral = visit_seq_field(&mut seq, "output_0")?;
-                let mut stops = Vec::new();
-                while let Some(stop_input_i) = seq.next_element::<NumberLiteral>()? {
-                    let stop_output_i: ExprOrLiteral = seq.next_element()?.ok_or_else(|| {
-                        serde::de::Error::custom(
-                            "expected stop_output_i in ArrayLessTypeLengthGreater::Step",
-                        )
-                    })?;
-                    stops.push((stop_input_i, stop_output_i));
-                }
-                Ok(ArrayLessTypeLengthGreater::Step((input, output_0, stops)))
-            }
-            "var" => {
-                let var_name = visit_seq_field(&mut seq, "var_name")?;
-                Ok(ArrayLessTypeLengthGreater::Var(var_name))
-            }
-            _ => Err(serde::de::Error::unknown_variant(
-                &op,
-                &[
-                    "accumulated",
-                    "array",
-                    "at",
-                    "case",
-                    "coalesce",
-                    "feature-state",
-                    "get",
-                    "global-state",
-                    "id",
-                    "let",
-                    "match",
-                    "step",
-                    "var",
-                ],
-            )),
+            _ => Err(serde::de::Error::unknown_variant(&op, &["array"])),
         }
     }
 }
@@ -2000,18 +1208,6 @@ impl serde::Serialize for ArrayLessTypeLengthGreater {
     {
         use serde::ser::SerializeSeq;
         match self {
-            ArrayLessTypeLengthGreater::Accumulated => {
-                let mut elems = vec![];
-                while !elems.is_empty() && elems.last().is_some_and(serde_json::Value::is_null) {
-                    elems.pop();
-                }
-                let mut seq = serializer.serialize_seq(None)?;
-                seq.serialize_element("accumulated")?;
-                for elem in &elems {
-                    seq.serialize_element(elem)?;
-                }
-                seq.end()
-            }
             ArrayLessTypeLengthGreater::Array(f0, f1, f2) => {
                 let mut elems = vec![
                     serde_json::to_value(f0).map_err(serde::ser::Error::custom)?,
@@ -2028,229 +1224,6 @@ impl serde::Serialize for ArrayLessTypeLengthGreater {
                 }
                 seq.end()
             }
-            ArrayLessTypeLengthGreater::At(f0, f1) => {
-                let mut elems = vec![
-                    serde_json::to_value(f0).map_err(serde::ser::Error::custom)?,
-                    serde_json::to_value(f1).map_err(serde::ser::Error::custom)?,
-                ];
-                while elems.len() > 2 && elems.last().is_some_and(serde_json::Value::is_null) {
-                    elems.pop();
-                }
-                let mut seq = serializer.serialize_seq(None)?;
-                seq.serialize_element("at")?;
-                for elem in &elems {
-                    seq.serialize_element(elem)?;
-                }
-                seq.end()
-            }
-            ArrayLessTypeLengthGreater::Case(inner) => {
-                let inner_val = serde_json::to_value(inner).map_err(serde::ser::Error::custom)?;
-                let mut seq = serializer.serialize_seq(None)?;
-                seq.serialize_element("case")?;
-                if let serde_json::Value::Array(top) = &inner_val {
-                    for elem in top {
-                        if let serde_json::Value::Array(sub) = elem {
-                            if sub.is_empty() {
-                                // Empty Vec — nothing to flatten.
-                            } else if sub[0].is_array() {
-                                // An array-of-arrays is the Vec<(A,B)> — flatten it.
-                                for pair in sub {
-                                    if let serde_json::Value::Array(pair_elems) = pair {
-                                        for pe in pair_elems {
-                                            seq.serialize_element(pe)?;
-                                        }
-                                    } else {
-                                        seq.serialize_element(pair)?;
-                                    }
-                                }
-                            } else {
-                                // Plain array value (e.g. a sub-expression like ["zoom"]).
-                                seq.serialize_element(elem)?;
-                            }
-                        } else {
-                            seq.serialize_element(elem)?;
-                        }
-                    }
-                } else {
-                    seq.serialize_element(&inner_val)?;
-                }
-                seq.end()
-            }
-            ArrayLessTypeLengthGreater::Coalesce(inner) => {
-                let inner_val = serde_json::to_value(inner).map_err(serde::ser::Error::custom)?;
-                let mut seq = serializer.serialize_seq(None)?;
-                seq.serialize_element("coalesce")?;
-                if let serde_json::Value::Array(top) = &inner_val {
-                    for elem in top {
-                        seq.serialize_element(elem)?;
-                    }
-                } else {
-                    seq.serialize_element(&inner_val)?;
-                }
-                seq.end()
-            }
-            ArrayLessTypeLengthGreater::FeatureState(f0) => {
-                let mut elems = vec![serde_json::to_value(f0).map_err(serde::ser::Error::custom)?];
-                while elems.len() > 1 && elems.last().is_some_and(serde_json::Value::is_null) {
-                    elems.pop();
-                }
-                let mut seq = serializer.serialize_seq(None)?;
-                seq.serialize_element("feature-state")?;
-                for elem in &elems {
-                    seq.serialize_element(elem)?;
-                }
-                seq.end()
-            }
-            ArrayLessTypeLengthGreater::Get(f0, f1) => {
-                let mut elems = vec![
-                    serde_json::to_value(f0).map_err(serde::ser::Error::custom)?,
-                    serde_json::to_value(f1).map_err(serde::ser::Error::custom)?,
-                ];
-                while elems.len() > 1 && elems.last().is_some_and(serde_json::Value::is_null) {
-                    elems.pop();
-                }
-                let mut seq = serializer.serialize_seq(None)?;
-                seq.serialize_element("get")?;
-                for elem in &elems {
-                    seq.serialize_element(elem)?;
-                }
-                seq.end()
-            }
-            ArrayLessTypeLengthGreater::GlobalState(f0) => {
-                let mut elems = vec![serde_json::to_value(f0).map_err(serde::ser::Error::custom)?];
-                while elems.len() > 1 && elems.last().is_some_and(serde_json::Value::is_null) {
-                    elems.pop();
-                }
-                let mut seq = serializer.serialize_seq(None)?;
-                seq.serialize_element("global-state")?;
-                for elem in &elems {
-                    seq.serialize_element(elem)?;
-                }
-                seq.end()
-            }
-            ArrayLessTypeLengthGreater::Id => {
-                let mut elems = vec![];
-                while !elems.is_empty() && elems.last().is_some_and(serde_json::Value::is_null) {
-                    elems.pop();
-                }
-                let mut seq = serializer.serialize_seq(None)?;
-                seq.serialize_element("id")?;
-                for elem in &elems {
-                    seq.serialize_element(elem)?;
-                }
-                seq.end()
-            }
-            ArrayLessTypeLengthGreater::Let(inner) => {
-                let inner_val = serde_json::to_value(inner).map_err(serde::ser::Error::custom)?;
-                let mut seq = serializer.serialize_seq(None)?;
-                seq.serialize_element("let")?;
-                if let serde_json::Value::Array(top) = &inner_val {
-                    for elem in top {
-                        if let serde_json::Value::Array(sub) = elem {
-                            if sub.is_empty() {
-                                // Empty Vec — nothing to flatten.
-                            } else if sub[0].is_array() {
-                                // An array-of-arrays is the Vec<(A,B)> — flatten it.
-                                for pair in sub {
-                                    if let serde_json::Value::Array(pair_elems) = pair {
-                                        for pe in pair_elems {
-                                            seq.serialize_element(pe)?;
-                                        }
-                                    } else {
-                                        seq.serialize_element(pair)?;
-                                    }
-                                }
-                            } else {
-                                // Plain array value (e.g. a sub-expression like ["zoom"]).
-                                seq.serialize_element(elem)?;
-                            }
-                        } else {
-                            seq.serialize_element(elem)?;
-                        }
-                    }
-                } else {
-                    seq.serialize_element(&inner_val)?;
-                }
-                seq.end()
-            }
-            ArrayLessTypeLengthGreater::Match(inner) => {
-                let inner_val = serde_json::to_value(inner).map_err(serde::ser::Error::custom)?;
-                let mut seq = serializer.serialize_seq(None)?;
-                seq.serialize_element("match")?;
-                if let serde_json::Value::Array(top) = &inner_val {
-                    for elem in top {
-                        if let serde_json::Value::Array(sub) = elem {
-                            if sub.is_empty() {
-                                // Empty Vec — nothing to flatten.
-                            } else if sub[0].is_array() {
-                                // An array-of-arrays is the Vec<(A,B)> — flatten it.
-                                for pair in sub {
-                                    if let serde_json::Value::Array(pair_elems) = pair {
-                                        for pe in pair_elems {
-                                            seq.serialize_element(pe)?;
-                                        }
-                                    } else {
-                                        seq.serialize_element(pair)?;
-                                    }
-                                }
-                            } else {
-                                // Plain array value (e.g. a sub-expression like ["zoom"]).
-                                seq.serialize_element(elem)?;
-                            }
-                        } else {
-                            seq.serialize_element(elem)?;
-                        }
-                    }
-                } else {
-                    seq.serialize_element(&inner_val)?;
-                }
-                seq.end()
-            }
-            ArrayLessTypeLengthGreater::Step(inner) => {
-                let inner_val = serde_json::to_value(inner).map_err(serde::ser::Error::custom)?;
-                let mut seq = serializer.serialize_seq(None)?;
-                seq.serialize_element("step")?;
-                if let serde_json::Value::Array(top) = &inner_val {
-                    for elem in top {
-                        if let serde_json::Value::Array(sub) = elem {
-                            if sub.is_empty() {
-                                // Empty Vec — nothing to flatten.
-                            } else if sub[0].is_array() {
-                                // An array-of-arrays is the Vec<(A,B)> — flatten it.
-                                for pair in sub {
-                                    if let serde_json::Value::Array(pair_elems) = pair {
-                                        for pe in pair_elems {
-                                            seq.serialize_element(pe)?;
-                                        }
-                                    } else {
-                                        seq.serialize_element(pair)?;
-                                    }
-                                }
-                            } else {
-                                // Plain array value (e.g. a sub-expression like ["zoom"]).
-                                seq.serialize_element(elem)?;
-                            }
-                        } else {
-                            seq.serialize_element(elem)?;
-                        }
-                    }
-                } else {
-                    seq.serialize_element(&inner_val)?;
-                }
-                seq.end()
-            }
-            ArrayLessTypeLengthGreater::Var(f0) => {
-                let mut elems = vec![serde_json::to_value(f0).map_err(serde::ser::Error::custom)?];
-                while elems.len() > 1 && elems.last().is_some_and(serde_json::Value::is_null) {
-                    elems.pop();
-                }
-                let mut seq = serializer.serialize_seq(None)?;
-                seq.serialize_element("var")?;
-                for elem in &elems {
-                    seq.serialize_element(elem)?;
-                }
-                seq.end()
-            }
         }
     }
 }
@@ -2259,75 +1232,8 @@ impl serde::Serialize for ArrayLessTypeLengthGreater {
 #[derive(PartialEq, Debug, Clone)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum ArrayOfType {
-    /// Gets the value of a cluster property accumulated so far. Can only be used in the `clusterProperties` option of a clustered GeoJSON source.
-    Accumulated,
     /// Asserts that the input is an array (optionally with a specific item type and length). If, when the input expression is evaluated, it is not of the asserted type or length, then this assertion will cause the whole expression to be aborted.
     Array(StringOrNumberOrBooleanOrColorAsEnum, ExprOrLiteral),
-    /// Retrieves an item from an array.
-    At(NumberLiteralOrNumberAsUnion, ExprOrLiteral),
-    /// Selects the first output whose corresponding test condition evaluates to true, or the fallback value otherwise.
-    ///
-    ///  - [Create a hover effect](https://maplibre.org/maplibre-gl-js/docs/examples/create-a-hover-effect/)
-    ///
-    ///  - [Display HTML clusters with custom properties](https://maplibre.org/maplibre-gl-js/docs/examples/display-html-clusters-with-custom-properties/)
-    Case((Vec<(Boolean, ExprOrLiteral)>, ExprOrLiteral)),
-    /// Evaluates each expression in turn until the first non-null value is obtained, and returns that value.
-    ///
-    ///  - [Use a fallback image](https://maplibre.org/maplibre-gl-js/docs/examples/use-a-fallback-image/)
-    Coalesce(Vec<ExprOrLiteral>),
-    /// Retrieves a property value from the current feature's state. Returns null if the requested property is not present on the feature's state. A feature's state is not part of the GeoJSON or vector tile data, and must be set programmatically on each feature. When `source.promoteId` is not provided, features are identified by their `id` attribute, which must be an integer or a string that can be cast to an integer. When `source.promoteId` is provided, features are identified by their `promoteId` property, which may be a number, string, or any primitive data type. Note that ["feature-state"] can only be used with paint properties that support data-driven styling.
-    ///
-    ///  - [Create a hover effect](https://maplibre.org/maplibre-gl-js/docs/examples/create-a-hover-effect/)
-    FeatureState(StringLiteralOrStringAsUnion),
-    /// Retrieves a property value from the current feature's properties, or from another object if a second argument is provided. Returns null if the requested property is missing.
-    ///
-    ///  - [Change the case of labels](https://maplibre.org/maplibre-gl-js/docs/examples/change-case-of-labels/)
-    ///
-    ///  - [Display HTML clusters with custom properties](https://maplibre.org/maplibre-gl-js/docs/examples/display-html-clusters-with-custom-properties/)
-    ///
-    ///  - [Extrude polygons for 3D indoor mapping](https://maplibre.org/maplibre-gl-js/docs/examples/extrude-polygons-for-3d-indoor-mapping/)
-    Get(StringLiteralOrStringAsUnion, Option<Object>),
-    /// Retrieves a property value from global state that can be set with platform-specific APIs. Defaults can be provided using the [`state`](https://maplibre.org/maplibre-style-spec/root/#state) root property. Returns `null` if no value nor default value is set for the retrieved property.
-    GlobalState(StringLiteral),
-    /// Gets the feature's id, if it has one.
-    Id,
-    /// Binds expressions to named variables, which can then be referenced in the result expression using `["var", "variable_name"]`.
-    ///
-    ///  - [Visualize population density](https://maplibre.org/maplibre-gl-js/docs/examples/visualize-population-density/)
-    Let((Vec<(StringLiteral, ExprOrLiteral)>, ExprOrLiteral)),
-    /// Selects the output whose label value matches the input value, or the fallback value if no match is found. The input can be any expression (e.g. `["get", "building_type"]`). Each label must be either:
-    ///
-    ///  - a single literal value; or
-    ///
-    ///  - an array of literal values, whose values must be all strings or all numbers (e.g. `[100, 101]` or `["c", "b"]`). The input matches if any of the values in the array matches, similar to the `"in"` operator.
-    ///
-    /// Each label must be unique. If the input type does not match the type of the labels, the result will be the fallback value.
-    Match(
-        (
-            ExprOrLiteral,
-            Vec<(
-                StringOrNumberOrArrayOfStringOrArrayOfNumberAsUnion,
-                ExprOrLiteral,
-            )>,
-            ExprOrLiteral,
-        ),
-    ),
-    /// Produces discrete, stepped results by evaluating a piecewise-constant function defined by pairs of input and output values ("stops"). The `input` may be any numeric expression (e.g., `["get", "population"]`). Stop inputs must be numeric literals in strictly ascending order.
-    ///
-    /// Returns the output value of the stop just less than the input, or the first output if the input is less than the first stop.
-    ///
-    ///  - [Create and style clusters](https://maplibre.org/maplibre-gl-js/docs/examples/create-and-style-clusters/)
-    Step(
-        (
-            NumberLiteralOrNumberAsUnion,
-            ExprOrLiteral,
-            Vec<(NumberLiteral, ExprOrLiteral)>,
-        ),
-    ),
-    /// References variable bound using `let`.
-    ///
-    ///  - [Visualize population density](https://maplibre.org/maplibre-gl-js/docs/examples/visualize-population-density/)
-    Var(StringLiteral),
 }
 
 impl<'de> serde::Deserialize<'de> for ArrayOfType {
@@ -2346,7 +1252,7 @@ impl<'de> serde::de::Visitor<'de> for ArrayOfTypeVisitor {
     type Value = ArrayOfType;
 
     fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
-        formatter.write_str("an ArrayOfType expression (example: [\"accumulated\"])")
+        formatter.write_str("an ArrayOfType expression (example: [\"array\",\"string\",3,[\"literal\",[\"a\",\"b\",\"c\"]]])")
     }
 
     fn visit_seq<A: serde::de::SeqAccess<'de>>(self, mut seq: A) -> Result<Self::Value, A::Error> {
@@ -2366,161 +1272,12 @@ impl<'de> serde::de::Visitor<'de> for ArrayOfTypeVisitor {
             .next_element()?
             .ok_or_else(|| serde::de::Error::custom("missing operator"))?;
         match op.as_str() {
-            "accumulated" => Ok(ArrayOfType::Accumulated),
             "array" => {
                 let r#type = visit_seq_field(&mut seq, "type")?;
                 let value = visit_seq_field(&mut seq, "value")?;
                 Ok(ArrayOfType::Array(r#type, value))
             }
-            "at" => {
-                let index = visit_seq_field(&mut seq, "index")?;
-                let array = visit_seq_field(&mut seq, "array")?;
-                Ok(ArrayOfType::At(index, array))
-            }
-            "case" => {
-                let mut inputs = Vec::new();
-                let mut rest: Vec<serde_json::Value> = Vec::new();
-                while let Some(v) = seq.next_element()? {
-                    rest.push(v);
-                }
-                if rest.is_empty() {
-                    return Err(serde::de::Error::custom(
-                        "{name}::{variant_name}: too few arguments",
-                    ));
-                }
-                if !(rest.len() - 1).is_multiple_of(2) {
-                    return Err(serde::de::Error::custom(
-                        "ArrayOfType::Case: malformed template/suffix layout",
-                    ));
-                }
-                let inputs_len = (rest.len() - 1) / 2;
-                for i in 0..inputs_len {
-                    let condition_i = serde_json::from_value(rest[i * 2].clone())
-                        .map_err(serde::de::Error::custom)?;
-                    let output_i = serde_json::from_value(rest[i * 2 + 1].clone())
-                        .map_err(serde::de::Error::custom)?;
-                    let element = (condition_i, output_i);
-                    inputs.push(element);
-                }
-                let fallback = serde_json::from_value(rest[inputs_len * 2].clone())
-                    .map_err(serde::de::Error::custom)?;
-                Ok(ArrayOfType::Case((inputs, fallback)))
-            }
-            "coalesce" => {
-                let mut inputs = Vec::new();
-                while let Some(element) = seq.next_element()? {
-                    inputs.push(element);
-                }
-                Ok(ArrayOfType::Coalesce(inputs))
-            }
-            "feature-state" => {
-                let property_name = visit_seq_field(&mut seq, "property_name")?;
-                Ok(ArrayOfType::FeatureState(property_name))
-            }
-            "get" => {
-                let property_name = visit_seq_field(&mut seq, "property_name")?;
-                let object = seq.next_element()?;
-                Ok(ArrayOfType::Get(property_name, object))
-            }
-            "global-state" => {
-                let property_name = visit_seq_field(&mut seq, "property_name")?;
-                Ok(ArrayOfType::GlobalState(property_name))
-            }
-            "id" => Ok(ArrayOfType::Id),
-            "let" => {
-                let mut inputs = Vec::new();
-                let mut rest: Vec<serde_json::Value> = Vec::new();
-                while let Some(v) = seq.next_element()? {
-                    rest.push(v);
-                }
-                if rest.is_empty() {
-                    return Err(serde::de::Error::custom(
-                        "{name}::{variant_name}: too few arguments",
-                    ));
-                }
-                if !(rest.len() - 1).is_multiple_of(2) {
-                    return Err(serde::de::Error::custom(
-                        "ArrayOfType::Let: malformed template/suffix layout",
-                    ));
-                }
-                let inputs_len = (rest.len() - 1) / 2;
-                for i in 0..inputs_len {
-                    let var_name_i = serde_json::from_value(rest[i * 2].clone())
-                        .map_err(serde::de::Error::custom)?;
-                    let var_value_i = serde_json::from_value(rest[i * 2 + 1].clone())
-                        .map_err(serde::de::Error::custom)?;
-                    let element = (var_name_i, var_value_i);
-                    inputs.push(element);
-                }
-                let expression = serde_json::from_value(rest[inputs_len * 2].clone())
-                    .map_err(serde::de::Error::custom)?;
-                Ok(ArrayOfType::Let((inputs, expression)))
-            }
-            "match" => {
-                let mut rest: Vec<serde_json::Value> = Vec::new();
-                while let Some(v) = seq.next_element()? {
-                    rest.push(v);
-                }
-                if rest.len() < 2 {
-                    return Err(serde::de::Error::custom(
-                        "ArrayOfType::Match: too few arguments",
-                    ));
-                }
-                if !rest.len().is_multiple_of(2) {
-                    return Err(serde::de::Error::custom(
-                        "ArrayOfType::Match: expected an even number of arguments after operator (input + label/output pairs + fallback)",
-                    ));
-                }
-                let fallback_v = rest.pop().unwrap();
-                let input: ExprOrLiteral =
-                    serde_json::from_value(rest.remove(0)).map_err(serde::de::Error::custom)?;
-                let mut pairs = Vec::new();
-                for chunk in rest.chunks_exact(2) {
-                    let label_i: StringOrNumberOrArrayOfStringOrArrayOfNumberAsUnion =
-                        serde_json::from_value(chunk[0].clone())
-                            .map_err(serde::de::Error::custom)?;
-                    let output_i: ExprOrLiteral = serde_json::from_value(chunk[1].clone())
-                        .map_err(serde::de::Error::custom)?;
-                    pairs.push((label_i, output_i));
-                }
-                let fallback: ExprOrLiteral =
-                    serde_json::from_value(fallback_v).map_err(serde::de::Error::custom)?;
-                Ok(ArrayOfType::Match((input, pairs, fallback)))
-            }
-            "step" => {
-                let input: NumberLiteralOrNumberAsUnion = visit_seq_field(&mut seq, "input")?;
-                let output_0: ExprOrLiteral = visit_seq_field(&mut seq, "output_0")?;
-                let mut stops = Vec::new();
-                while let Some(stop_input_i) = seq.next_element::<NumberLiteral>()? {
-                    let stop_output_i: ExprOrLiteral = seq.next_element()?.ok_or_else(|| {
-                        serde::de::Error::custom("expected stop_output_i in ArrayOfType::Step")
-                    })?;
-                    stops.push((stop_input_i, stop_output_i));
-                }
-                Ok(ArrayOfType::Step((input, output_0, stops)))
-            }
-            "var" => {
-                let var_name = visit_seq_field(&mut seq, "var_name")?;
-                Ok(ArrayOfType::Var(var_name))
-            }
-            _ => Err(serde::de::Error::unknown_variant(
-                &op,
-                &[
-                    "accumulated",
-                    "array",
-                    "at",
-                    "case",
-                    "coalesce",
-                    "feature-state",
-                    "get",
-                    "global-state",
-                    "id",
-                    "let",
-                    "match",
-                    "step",
-                    "var",
-                ],
-            )),
+            _ => Err(serde::de::Error::unknown_variant(&op, &["array"])),
         }
     }
 }
@@ -2532,18 +1289,6 @@ impl serde::Serialize for ArrayOfType {
     {
         use serde::ser::SerializeSeq;
         match self {
-            ArrayOfType::Accumulated => {
-                let mut elems = vec![];
-                while !elems.is_empty() && elems.last().is_some_and(serde_json::Value::is_null) {
-                    elems.pop();
-                }
-                let mut seq = serializer.serialize_seq(None)?;
-                seq.serialize_element("accumulated")?;
-                for elem in &elems {
-                    seq.serialize_element(elem)?;
-                }
-                seq.end()
-            }
             ArrayOfType::Array(f0, f1) => {
                 let mut elems = vec![
                     serde_json::to_value(f0).map_err(serde::ser::Error::custom)?,
@@ -2554,229 +1299,6 @@ impl serde::Serialize for ArrayOfType {
                 }
                 let mut seq = serializer.serialize_seq(None)?;
                 seq.serialize_element("array")?;
-                for elem in &elems {
-                    seq.serialize_element(elem)?;
-                }
-                seq.end()
-            }
-            ArrayOfType::At(f0, f1) => {
-                let mut elems = vec![
-                    serde_json::to_value(f0).map_err(serde::ser::Error::custom)?,
-                    serde_json::to_value(f1).map_err(serde::ser::Error::custom)?,
-                ];
-                while elems.len() > 2 && elems.last().is_some_and(serde_json::Value::is_null) {
-                    elems.pop();
-                }
-                let mut seq = serializer.serialize_seq(None)?;
-                seq.serialize_element("at")?;
-                for elem in &elems {
-                    seq.serialize_element(elem)?;
-                }
-                seq.end()
-            }
-            ArrayOfType::Case(inner) => {
-                let inner_val = serde_json::to_value(inner).map_err(serde::ser::Error::custom)?;
-                let mut seq = serializer.serialize_seq(None)?;
-                seq.serialize_element("case")?;
-                if let serde_json::Value::Array(top) = &inner_val {
-                    for elem in top {
-                        if let serde_json::Value::Array(sub) = elem {
-                            if sub.is_empty() {
-                                // Empty Vec — nothing to flatten.
-                            } else if sub[0].is_array() {
-                                // An array-of-arrays is the Vec<(A,B)> — flatten it.
-                                for pair in sub {
-                                    if let serde_json::Value::Array(pair_elems) = pair {
-                                        for pe in pair_elems {
-                                            seq.serialize_element(pe)?;
-                                        }
-                                    } else {
-                                        seq.serialize_element(pair)?;
-                                    }
-                                }
-                            } else {
-                                // Plain array value (e.g. a sub-expression like ["zoom"]).
-                                seq.serialize_element(elem)?;
-                            }
-                        } else {
-                            seq.serialize_element(elem)?;
-                        }
-                    }
-                } else {
-                    seq.serialize_element(&inner_val)?;
-                }
-                seq.end()
-            }
-            ArrayOfType::Coalesce(inner) => {
-                let inner_val = serde_json::to_value(inner).map_err(serde::ser::Error::custom)?;
-                let mut seq = serializer.serialize_seq(None)?;
-                seq.serialize_element("coalesce")?;
-                if let serde_json::Value::Array(top) = &inner_val {
-                    for elem in top {
-                        seq.serialize_element(elem)?;
-                    }
-                } else {
-                    seq.serialize_element(&inner_val)?;
-                }
-                seq.end()
-            }
-            ArrayOfType::FeatureState(f0) => {
-                let mut elems = vec![serde_json::to_value(f0).map_err(serde::ser::Error::custom)?];
-                while elems.len() > 1 && elems.last().is_some_and(serde_json::Value::is_null) {
-                    elems.pop();
-                }
-                let mut seq = serializer.serialize_seq(None)?;
-                seq.serialize_element("feature-state")?;
-                for elem in &elems {
-                    seq.serialize_element(elem)?;
-                }
-                seq.end()
-            }
-            ArrayOfType::Get(f0, f1) => {
-                let mut elems = vec![
-                    serde_json::to_value(f0).map_err(serde::ser::Error::custom)?,
-                    serde_json::to_value(f1).map_err(serde::ser::Error::custom)?,
-                ];
-                while elems.len() > 1 && elems.last().is_some_and(serde_json::Value::is_null) {
-                    elems.pop();
-                }
-                let mut seq = serializer.serialize_seq(None)?;
-                seq.serialize_element("get")?;
-                for elem in &elems {
-                    seq.serialize_element(elem)?;
-                }
-                seq.end()
-            }
-            ArrayOfType::GlobalState(f0) => {
-                let mut elems = vec![serde_json::to_value(f0).map_err(serde::ser::Error::custom)?];
-                while elems.len() > 1 && elems.last().is_some_and(serde_json::Value::is_null) {
-                    elems.pop();
-                }
-                let mut seq = serializer.serialize_seq(None)?;
-                seq.serialize_element("global-state")?;
-                for elem in &elems {
-                    seq.serialize_element(elem)?;
-                }
-                seq.end()
-            }
-            ArrayOfType::Id => {
-                let mut elems = vec![];
-                while !elems.is_empty() && elems.last().is_some_and(serde_json::Value::is_null) {
-                    elems.pop();
-                }
-                let mut seq = serializer.serialize_seq(None)?;
-                seq.serialize_element("id")?;
-                for elem in &elems {
-                    seq.serialize_element(elem)?;
-                }
-                seq.end()
-            }
-            ArrayOfType::Let(inner) => {
-                let inner_val = serde_json::to_value(inner).map_err(serde::ser::Error::custom)?;
-                let mut seq = serializer.serialize_seq(None)?;
-                seq.serialize_element("let")?;
-                if let serde_json::Value::Array(top) = &inner_val {
-                    for elem in top {
-                        if let serde_json::Value::Array(sub) = elem {
-                            if sub.is_empty() {
-                                // Empty Vec — nothing to flatten.
-                            } else if sub[0].is_array() {
-                                // An array-of-arrays is the Vec<(A,B)> — flatten it.
-                                for pair in sub {
-                                    if let serde_json::Value::Array(pair_elems) = pair {
-                                        for pe in pair_elems {
-                                            seq.serialize_element(pe)?;
-                                        }
-                                    } else {
-                                        seq.serialize_element(pair)?;
-                                    }
-                                }
-                            } else {
-                                // Plain array value (e.g. a sub-expression like ["zoom"]).
-                                seq.serialize_element(elem)?;
-                            }
-                        } else {
-                            seq.serialize_element(elem)?;
-                        }
-                    }
-                } else {
-                    seq.serialize_element(&inner_val)?;
-                }
-                seq.end()
-            }
-            ArrayOfType::Match(inner) => {
-                let inner_val = serde_json::to_value(inner).map_err(serde::ser::Error::custom)?;
-                let mut seq = serializer.serialize_seq(None)?;
-                seq.serialize_element("match")?;
-                if let serde_json::Value::Array(top) = &inner_val {
-                    for elem in top {
-                        if let serde_json::Value::Array(sub) = elem {
-                            if sub.is_empty() {
-                                // Empty Vec — nothing to flatten.
-                            } else if sub[0].is_array() {
-                                // An array-of-arrays is the Vec<(A,B)> — flatten it.
-                                for pair in sub {
-                                    if let serde_json::Value::Array(pair_elems) = pair {
-                                        for pe in pair_elems {
-                                            seq.serialize_element(pe)?;
-                                        }
-                                    } else {
-                                        seq.serialize_element(pair)?;
-                                    }
-                                }
-                            } else {
-                                // Plain array value (e.g. a sub-expression like ["zoom"]).
-                                seq.serialize_element(elem)?;
-                            }
-                        } else {
-                            seq.serialize_element(elem)?;
-                        }
-                    }
-                } else {
-                    seq.serialize_element(&inner_val)?;
-                }
-                seq.end()
-            }
-            ArrayOfType::Step(inner) => {
-                let inner_val = serde_json::to_value(inner).map_err(serde::ser::Error::custom)?;
-                let mut seq = serializer.serialize_seq(None)?;
-                seq.serialize_element("step")?;
-                if let serde_json::Value::Array(top) = &inner_val {
-                    for elem in top {
-                        if let serde_json::Value::Array(sub) = elem {
-                            if sub.is_empty() {
-                                // Empty Vec — nothing to flatten.
-                            } else if sub[0].is_array() {
-                                // An array-of-arrays is the Vec<(A,B)> — flatten it.
-                                for pair in sub {
-                                    if let serde_json::Value::Array(pair_elems) = pair {
-                                        for pe in pair_elems {
-                                            seq.serialize_element(pe)?;
-                                        }
-                                    } else {
-                                        seq.serialize_element(pair)?;
-                                    }
-                                }
-                            } else {
-                                // Plain array value (e.g. a sub-expression like ["zoom"]).
-                                seq.serialize_element(elem)?;
-                            }
-                        } else {
-                            seq.serialize_element(elem)?;
-                        }
-                    }
-                } else {
-                    seq.serialize_element(&inner_val)?;
-                }
-                seq.end()
-            }
-            ArrayOfType::Var(f0) => {
-                let mut elems = vec![serde_json::to_value(f0).map_err(serde::ser::Error::custom)?];
-                while elems.len() > 1 && elems.last().is_some_and(serde_json::Value::is_null) {
-                    elems.pop();
-                }
-                let mut seq = serializer.serialize_seq(None)?;
-                seq.serialize_element("var")?;
                 for elem in &elems {
                     seq.serialize_element(elem)?;
                 }
@@ -2820,95 +1342,28 @@ pub enum Boolean {
     ///
     ///  - [Display HTML clusters with custom properties](https://maplibre.org/maplibre-gl-js/docs/examples/display-html-clusters-with-custom-properties/)
     GreaterEqual(GreaterEqualOptions),
-    /// Gets the value of a cluster property accumulated so far. Can only be used in the `clusterProperties` option of a clustered GeoJSON source.
-    Accumulated,
     /// Returns `true` if all the inputs are `true`, `false` otherwise. The inputs are evaluated in order, and evaluation is short-circuiting: once an input expression evaluates to `false`, the result is `false` and no further input expressions are evaluated.
     ///
     ///  - [Display HTML clusters with custom properties](https://maplibre.org/maplibre-gl-js/docs/examples/display-html-clusters-with-custom-properties/)
     All(Vec<Boolean>),
     /// Returns `true` if any of the inputs are `true`, `false` otherwise. The inputs are evaluated in order, and evaluation is short-circuiting: once an input expression evaluates to `true`, the result is `true` and no further input expressions are evaluated.
     Any(Vec<Boolean>),
-    /// Retrieves an item from an array.
-    At(NumberLiteralOrNumberAsUnion, ExprOrLiteral),
     /// Asserts that the input value is a boolean. If multiple values are provided, each one is evaluated in order until a boolean is obtained. If none of the inputs are booleans, the expression is an error.
     ///
     ///  - [Create a hover effect](https://maplibre.org/maplibre-gl-js/docs/examples/create-a-hover-effect/)
     Op(Vec<ExprOrLiteral>),
-    /// Selects the first output whose corresponding test condition evaluates to true, or the fallback value otherwise.
-    ///
-    ///  - [Create a hover effect](https://maplibre.org/maplibre-gl-js/docs/examples/create-a-hover-effect/)
-    ///
-    ///  - [Display HTML clusters with custom properties](https://maplibre.org/maplibre-gl-js/docs/examples/display-html-clusters-with-custom-properties/)
-    Case((Vec<(Boolean, ExprOrLiteral)>, ExprOrLiteral)),
-    /// Evaluates each expression in turn until the first non-null value is obtained, and returns that value.
-    ///
-    ///  - [Use a fallback image](https://maplibre.org/maplibre-gl-js/docs/examples/use-a-fallback-image/)
-    Coalesce(Vec<ExprOrLiteral>),
-    /// Retrieves a property value from the current feature's state. Returns null if the requested property is not present on the feature's state. A feature's state is not part of the GeoJSON or vector tile data, and must be set programmatically on each feature. When `source.promoteId` is not provided, features are identified by their `id` attribute, which must be an integer or a string that can be cast to an integer. When `source.promoteId` is provided, features are identified by their `promoteId` property, which may be a number, string, or any primitive data type. Note that ["feature-state"] can only be used with paint properties that support data-driven styling.
-    ///
-    ///  - [Create a hover effect](https://maplibre.org/maplibre-gl-js/docs/examples/create-a-hover-effect/)
-    FeatureState(StringLiteralOrStringAsUnion),
-    /// Retrieves a property value from the current feature's properties, or from another object if a second argument is provided. Returns null if the requested property is missing.
-    ///
-    ///  - [Change the case of labels](https://maplibre.org/maplibre-gl-js/docs/examples/change-case-of-labels/)
-    ///
-    ///  - [Display HTML clusters with custom properties](https://maplibre.org/maplibre-gl-js/docs/examples/display-html-clusters-with-custom-properties/)
-    ///
-    ///  - [Extrude polygons for 3D indoor mapping](https://maplibre.org/maplibre-gl-js/docs/examples/extrude-polygons-for-3d-indoor-mapping/)
-    Get(StringLiteralOrStringAsUnion, Option<Object>),
-    /// Retrieves a property value from global state that can be set with platform-specific APIs. Defaults can be provided using the [`state`](https://maplibre.org/maplibre-style-spec/root/#state) root property. Returns `null` if no value nor default value is set for the retrieved property.
-    GlobalState(StringLiteral),
     /// Tests for the presence of a property value in the current feature's properties, or from another object if a second argument is provided.
     ///
     ///  - [Create and style clusters](https://maplibre.org/maplibre-gl-js/docs/examples/create-and-style-clusters/)
-    Has(StringLiteralOrStringAsUnion, Option<Object>),
-    /// Gets the feature's id, if it has one.
-    Id,
+    Has(StringLiteralOrStringOrAnyAsUnion, Option<Object>),
     /// Determines whether an item exists in an array or a substring exists in a string.
     ///
     ///  - [Measure distances](https://maplibre.org/maplibre-gl-js/docs/examples/measure-distances/)
     In(ExprOrLiteral, ExprOrLiteral),
     /// Returns `true` if the input string is expected to render legibly. Returns `false` if the input string contains sections that cannot be rendered without potential loss of meaning (e.g. Indic scripts that require complex text shaping, or right-to-left scripts if the `mapbox-gl-rtl-text` plugin is not in use in MapLibre GL JS).
-    IsSupportedScript(StringLiteralOrStringAsUnion),
-    /// Binds expressions to named variables, which can then be referenced in the result expression using `["var", "variable_name"]`.
-    ///
-    ///  - [Visualize population density](https://maplibre.org/maplibre-gl-js/docs/examples/visualize-population-density/)
-    Let((Vec<(StringLiteral, ExprOrLiteral)>, ExprOrLiteral)),
-    /// Selects the output whose label value matches the input value, or the fallback value if no match is found. The input can be any expression (e.g. `["get", "building_type"]`). Each label must be either:
-    ///
-    ///  - a single literal value; or
-    ///
-    ///  - an array of literal values, whose values must be all strings or all numbers (e.g. `[100, 101]` or `["c", "b"]`). The input matches if any of the values in the array matches, similar to the `"in"` operator.
-    ///
-    /// Each label must be unique. If the input type does not match the type of the labels, the result will be the fallback value.
-    Match(
-        (
-            ExprOrLiteral,
-            Vec<(
-                StringOrNumberOrArrayOfStringOrArrayOfNumberAsUnion,
-                ExprOrLiteral,
-            )>,
-            ExprOrLiteral,
-        ),
-    ),
-    /// Produces discrete, stepped results by evaluating a piecewise-constant function defined by pairs of input and output values ("stops"). The `input` may be any numeric expression (e.g., `["get", "population"]`). Stop inputs must be numeric literals in strictly ascending order.
-    ///
-    /// Returns the output value of the stop just less than the input, or the first output if the input is less than the first stop.
-    ///
-    ///  - [Create and style clusters](https://maplibre.org/maplibre-gl-js/docs/examples/create-and-style-clusters/)
-    Step(
-        (
-            NumberLiteralOrNumberAsUnion,
-            ExprOrLiteral,
-            Vec<(NumberLiteral, ExprOrLiteral)>,
-        ),
-    ),
+    IsSupportedScript(StringLiteralOrStringOrAnyAsUnion),
     /// Converts the input value to a boolean. The result is `false` when the input is an empty string, 0, `false`, `null`, or `NaN`; otherwise it is `true`.
     To(ExprOrLiteral),
-    /// References variable bound using `let`.
-    ///
-    ///  - [Visualize population density](https://maplibre.org/maplibre-gl-js/docs/examples/visualize-population-density/)
-    Var(StringLiteral),
     /// Returns `true` if the evaluated feature is fully contained inside a boundary of the input geometry, `false` otherwise. The input value can be a valid GeoJSON of type `Polygon`, `MultiPolygon`, `Feature`, or `FeatureCollection`. Supported features for evaluation:
     ///
     /// - `Point`: Returns `false` if a point is on the boundary or falls outside the boundary.
@@ -3054,7 +1509,6 @@ impl<'de> serde::de::Visitor<'de> for BooleanVisitor {
                 )?;
                 Ok(Boolean::GreaterEqual(options))
             }
-            "accumulated" => Ok(Boolean::Accumulated),
             "all" => {
                 let mut inputs = Vec::new();
                 while let Some(element) = seq.next_element()? {
@@ -3069,11 +1523,6 @@ impl<'de> serde::de::Visitor<'de> for BooleanVisitor {
                 }
                 Ok(Boolean::Any(inputs))
             }
-            "at" => {
-                let index = visit_seq_field(&mut seq, "index")?;
-                let array = visit_seq_field(&mut seq, "array")?;
-                Ok(Boolean::At(index, array))
-            }
             "boolean" => {
                 let mut inputs = Vec::new();
                 while let Some(element) = seq.next_element()? {
@@ -3081,61 +1530,11 @@ impl<'de> serde::de::Visitor<'de> for BooleanVisitor {
                 }
                 Ok(Boolean::Op(inputs))
             }
-            "case" => {
-                let mut inputs = Vec::new();
-                let mut rest: Vec<serde_json::Value> = Vec::new();
-                while let Some(v) = seq.next_element()? {
-                    rest.push(v);
-                }
-                if rest.is_empty() {
-                    return Err(serde::de::Error::custom(
-                        "{name}::{variant_name}: too few arguments",
-                    ));
-                }
-                if !(rest.len() - 1).is_multiple_of(2) {
-                    return Err(serde::de::Error::custom(
-                        "Boolean::Case: malformed template/suffix layout",
-                    ));
-                }
-                let inputs_len = (rest.len() - 1) / 2;
-                for i in 0..inputs_len {
-                    let condition_i = serde_json::from_value(rest[i * 2].clone())
-                        .map_err(serde::de::Error::custom)?;
-                    let output_i = serde_json::from_value(rest[i * 2 + 1].clone())
-                        .map_err(serde::de::Error::custom)?;
-                    let element = (condition_i, output_i);
-                    inputs.push(element);
-                }
-                let fallback = serde_json::from_value(rest[inputs_len * 2].clone())
-                    .map_err(serde::de::Error::custom)?;
-                Ok(Boolean::Case((inputs, fallback)))
-            }
-            "coalesce" => {
-                let mut inputs = Vec::new();
-                while let Some(element) = seq.next_element()? {
-                    inputs.push(element);
-                }
-                Ok(Boolean::Coalesce(inputs))
-            }
-            "feature-state" => {
-                let property_name = visit_seq_field(&mut seq, "property_name")?;
-                Ok(Boolean::FeatureState(property_name))
-            }
-            "get" => {
-                let property_name = visit_seq_field(&mut seq, "property_name")?;
-                let object = seq.next_element()?;
-                Ok(Boolean::Get(property_name, object))
-            }
-            "global-state" => {
-                let property_name = visit_seq_field(&mut seq, "property_name")?;
-                Ok(Boolean::GlobalState(property_name))
-            }
             "has" => {
                 let property_name = visit_seq_field(&mut seq, "property_name")?;
                 let object = seq.next_element()?;
                 Ok(Boolean::Has(property_name, object))
             }
-            "id" => Ok(Boolean::Id),
             "in" => {
                 let item = visit_seq_field(&mut seq, "item")?;
                 let array = visit_seq_field(&mut seq, "array")?;
@@ -3145,85 +1544,9 @@ impl<'de> serde::de::Visitor<'de> for BooleanVisitor {
                 let input = visit_seq_field(&mut seq, "input")?;
                 Ok(Boolean::IsSupportedScript(input))
             }
-            "let" => {
-                let mut inputs = Vec::new();
-                let mut rest: Vec<serde_json::Value> = Vec::new();
-                while let Some(v) = seq.next_element()? {
-                    rest.push(v);
-                }
-                if rest.is_empty() {
-                    return Err(serde::de::Error::custom(
-                        "{name}::{variant_name}: too few arguments",
-                    ));
-                }
-                if !(rest.len() - 1).is_multiple_of(2) {
-                    return Err(serde::de::Error::custom(
-                        "Boolean::Let: malformed template/suffix layout",
-                    ));
-                }
-                let inputs_len = (rest.len() - 1) / 2;
-                for i in 0..inputs_len {
-                    let var_name_i = serde_json::from_value(rest[i * 2].clone())
-                        .map_err(serde::de::Error::custom)?;
-                    let var_value_i = serde_json::from_value(rest[i * 2 + 1].clone())
-                        .map_err(serde::de::Error::custom)?;
-                    let element = (var_name_i, var_value_i);
-                    inputs.push(element);
-                }
-                let expression = serde_json::from_value(rest[inputs_len * 2].clone())
-                    .map_err(serde::de::Error::custom)?;
-                Ok(Boolean::Let((inputs, expression)))
-            }
-            "match" => {
-                let mut rest: Vec<serde_json::Value> = Vec::new();
-                while let Some(v) = seq.next_element()? {
-                    rest.push(v);
-                }
-                if rest.len() < 2 {
-                    return Err(serde::de::Error::custom(
-                        "Boolean::Match: too few arguments",
-                    ));
-                }
-                if !rest.len().is_multiple_of(2) {
-                    return Err(serde::de::Error::custom(
-                        "Boolean::Match: expected an even number of arguments after operator (input + label/output pairs + fallback)",
-                    ));
-                }
-                let fallback_v = rest.pop().unwrap();
-                let input: ExprOrLiteral =
-                    serde_json::from_value(rest.remove(0)).map_err(serde::de::Error::custom)?;
-                let mut pairs = Vec::new();
-                for chunk in rest.chunks_exact(2) {
-                    let label_i: StringOrNumberOrArrayOfStringOrArrayOfNumberAsUnion =
-                        serde_json::from_value(chunk[0].clone())
-                            .map_err(serde::de::Error::custom)?;
-                    let output_i: ExprOrLiteral = serde_json::from_value(chunk[1].clone())
-                        .map_err(serde::de::Error::custom)?;
-                    pairs.push((label_i, output_i));
-                }
-                let fallback: ExprOrLiteral =
-                    serde_json::from_value(fallback_v).map_err(serde::de::Error::custom)?;
-                Ok(Boolean::Match((input, pairs, fallback)))
-            }
-            "step" => {
-                let input: NumberLiteralOrNumberAsUnion = visit_seq_field(&mut seq, "input")?;
-                let output_0: ExprOrLiteral = visit_seq_field(&mut seq, "output_0")?;
-                let mut stops = Vec::new();
-                while let Some(stop_input_i) = seq.next_element::<NumberLiteral>()? {
-                    let stop_output_i: ExprOrLiteral = seq.next_element()?.ok_or_else(|| {
-                        serde::de::Error::custom("expected stop_output_i in Boolean::Step")
-                    })?;
-                    stops.push((stop_input_i, stop_output_i));
-                }
-                Ok(Boolean::Step((input, output_0, stops)))
-            }
             "to-boolean" => {
                 let value = visit_seq_field(&mut seq, "value")?;
                 Ok(Boolean::To(value))
-            }
-            "var" => {
-                let var_name = visit_seq_field(&mut seq, "var_name")?;
-                Ok(Boolean::Var(var_name))
             }
             "within" => {
                 let geojson = visit_seq_field(&mut seq, "geojson")?;
@@ -3239,25 +1562,13 @@ impl<'de> serde::de::Visitor<'de> for BooleanVisitor {
                     "==",
                     ">",
                     ">=",
-                    "accumulated",
                     "all",
                     "any",
-                    "at",
                     "boolean",
-                    "case",
-                    "coalesce",
-                    "feature-state",
-                    "get",
-                    "global-state",
                     "has",
-                    "id",
                     "in",
                     "is-supported-script",
-                    "let",
-                    "match",
-                    "step",
                     "to-boolean",
-                    "var",
                     "within",
                 ],
             )),
@@ -3380,18 +1691,6 @@ impl serde::Serialize for Boolean {
                 }
                 seq.end()
             }
-            Boolean::Accumulated => {
-                let mut elems = vec![];
-                while !elems.is_empty() && elems.last().is_some_and(serde_json::Value::is_null) {
-                    elems.pop();
-                }
-                let mut seq = serializer.serialize_seq(None)?;
-                seq.serialize_element("accumulated")?;
-                for elem in &elems {
-                    seq.serialize_element(elem)?;
-                }
-                seq.end()
-            }
             Boolean::All(inner) => {
                 let inner_val = serde_json::to_value(inner).map_err(serde::ser::Error::custom)?;
                 let mut seq = serializer.serialize_seq(None)?;
@@ -3418,21 +1717,6 @@ impl serde::Serialize for Boolean {
                 }
                 seq.end()
             }
-            Boolean::At(f0, f1) => {
-                let mut elems = vec![
-                    serde_json::to_value(f0).map_err(serde::ser::Error::custom)?,
-                    serde_json::to_value(f1).map_err(serde::ser::Error::custom)?,
-                ];
-                while elems.len() > 2 && elems.last().is_some_and(serde_json::Value::is_null) {
-                    elems.pop();
-                }
-                let mut seq = serializer.serialize_seq(None)?;
-                seq.serialize_element("at")?;
-                for elem in &elems {
-                    seq.serialize_element(elem)?;
-                }
-                seq.end()
-            }
             Boolean::Op(inner) => {
                 let inner_val = serde_json::to_value(inner).map_err(serde::ser::Error::custom)?;
                 let mut seq = serializer.serialize_seq(None)?;
@@ -3446,91 +1730,6 @@ impl serde::Serialize for Boolean {
                 }
                 seq.end()
             }
-            Boolean::Case(inner) => {
-                let inner_val = serde_json::to_value(inner).map_err(serde::ser::Error::custom)?;
-                let mut seq = serializer.serialize_seq(None)?;
-                seq.serialize_element("case")?;
-                if let serde_json::Value::Array(top) = &inner_val {
-                    for elem in top {
-                        if let serde_json::Value::Array(sub) = elem {
-                            if sub.is_empty() {
-                                // Empty Vec — nothing to flatten.
-                            } else if sub[0].is_array() {
-                                // An array-of-arrays is the Vec<(A,B)> — flatten it.
-                                for pair in sub {
-                                    if let serde_json::Value::Array(pair_elems) = pair {
-                                        for pe in pair_elems {
-                                            seq.serialize_element(pe)?;
-                                        }
-                                    } else {
-                                        seq.serialize_element(pair)?;
-                                    }
-                                }
-                            } else {
-                                // Plain array value (e.g. a sub-expression like ["zoom"]).
-                                seq.serialize_element(elem)?;
-                            }
-                        } else {
-                            seq.serialize_element(elem)?;
-                        }
-                    }
-                } else {
-                    seq.serialize_element(&inner_val)?;
-                }
-                seq.end()
-            }
-            Boolean::Coalesce(inner) => {
-                let inner_val = serde_json::to_value(inner).map_err(serde::ser::Error::custom)?;
-                let mut seq = serializer.serialize_seq(None)?;
-                seq.serialize_element("coalesce")?;
-                if let serde_json::Value::Array(top) = &inner_val {
-                    for elem in top {
-                        seq.serialize_element(elem)?;
-                    }
-                } else {
-                    seq.serialize_element(&inner_val)?;
-                }
-                seq.end()
-            }
-            Boolean::FeatureState(f0) => {
-                let mut elems = vec![serde_json::to_value(f0).map_err(serde::ser::Error::custom)?];
-                while elems.len() > 1 && elems.last().is_some_and(serde_json::Value::is_null) {
-                    elems.pop();
-                }
-                let mut seq = serializer.serialize_seq(None)?;
-                seq.serialize_element("feature-state")?;
-                for elem in &elems {
-                    seq.serialize_element(elem)?;
-                }
-                seq.end()
-            }
-            Boolean::Get(f0, f1) => {
-                let mut elems = vec![
-                    serde_json::to_value(f0).map_err(serde::ser::Error::custom)?,
-                    serde_json::to_value(f1).map_err(serde::ser::Error::custom)?,
-                ];
-                while elems.len() > 1 && elems.last().is_some_and(serde_json::Value::is_null) {
-                    elems.pop();
-                }
-                let mut seq = serializer.serialize_seq(None)?;
-                seq.serialize_element("get")?;
-                for elem in &elems {
-                    seq.serialize_element(elem)?;
-                }
-                seq.end()
-            }
-            Boolean::GlobalState(f0) => {
-                let mut elems = vec![serde_json::to_value(f0).map_err(serde::ser::Error::custom)?];
-                while elems.len() > 1 && elems.last().is_some_and(serde_json::Value::is_null) {
-                    elems.pop();
-                }
-                let mut seq = serializer.serialize_seq(None)?;
-                seq.serialize_element("global-state")?;
-                for elem in &elems {
-                    seq.serialize_element(elem)?;
-                }
-                seq.end()
-            }
             Boolean::Has(f0, f1) => {
                 let mut elems = vec![
                     serde_json::to_value(f0).map_err(serde::ser::Error::custom)?,
@@ -3541,18 +1740,6 @@ impl serde::Serialize for Boolean {
                 }
                 let mut seq = serializer.serialize_seq(None)?;
                 seq.serialize_element("has")?;
-                for elem in &elems {
-                    seq.serialize_element(elem)?;
-                }
-                seq.end()
-            }
-            Boolean::Id => {
-                let mut elems = vec![];
-                while !elems.is_empty() && elems.last().is_some_and(serde_json::Value::is_null) {
-                    elems.pop();
-                }
-                let mut seq = serializer.serialize_seq(None)?;
-                seq.serialize_element("id")?;
                 for elem in &elems {
                     seq.serialize_element(elem)?;
                 }
@@ -3585,105 +1772,6 @@ impl serde::Serialize for Boolean {
                 }
                 seq.end()
             }
-            Boolean::Let(inner) => {
-                let inner_val = serde_json::to_value(inner).map_err(serde::ser::Error::custom)?;
-                let mut seq = serializer.serialize_seq(None)?;
-                seq.serialize_element("let")?;
-                if let serde_json::Value::Array(top) = &inner_val {
-                    for elem in top {
-                        if let serde_json::Value::Array(sub) = elem {
-                            if sub.is_empty() {
-                                // Empty Vec — nothing to flatten.
-                            } else if sub[0].is_array() {
-                                // An array-of-arrays is the Vec<(A,B)> — flatten it.
-                                for pair in sub {
-                                    if let serde_json::Value::Array(pair_elems) = pair {
-                                        for pe in pair_elems {
-                                            seq.serialize_element(pe)?;
-                                        }
-                                    } else {
-                                        seq.serialize_element(pair)?;
-                                    }
-                                }
-                            } else {
-                                // Plain array value (e.g. a sub-expression like ["zoom"]).
-                                seq.serialize_element(elem)?;
-                            }
-                        } else {
-                            seq.serialize_element(elem)?;
-                        }
-                    }
-                } else {
-                    seq.serialize_element(&inner_val)?;
-                }
-                seq.end()
-            }
-            Boolean::Match(inner) => {
-                let inner_val = serde_json::to_value(inner).map_err(serde::ser::Error::custom)?;
-                let mut seq = serializer.serialize_seq(None)?;
-                seq.serialize_element("match")?;
-                if let serde_json::Value::Array(top) = &inner_val {
-                    for elem in top {
-                        if let serde_json::Value::Array(sub) = elem {
-                            if sub.is_empty() {
-                                // Empty Vec — nothing to flatten.
-                            } else if sub[0].is_array() {
-                                // An array-of-arrays is the Vec<(A,B)> — flatten it.
-                                for pair in sub {
-                                    if let serde_json::Value::Array(pair_elems) = pair {
-                                        for pe in pair_elems {
-                                            seq.serialize_element(pe)?;
-                                        }
-                                    } else {
-                                        seq.serialize_element(pair)?;
-                                    }
-                                }
-                            } else {
-                                // Plain array value (e.g. a sub-expression like ["zoom"]).
-                                seq.serialize_element(elem)?;
-                            }
-                        } else {
-                            seq.serialize_element(elem)?;
-                        }
-                    }
-                } else {
-                    seq.serialize_element(&inner_val)?;
-                }
-                seq.end()
-            }
-            Boolean::Step(inner) => {
-                let inner_val = serde_json::to_value(inner).map_err(serde::ser::Error::custom)?;
-                let mut seq = serializer.serialize_seq(None)?;
-                seq.serialize_element("step")?;
-                if let serde_json::Value::Array(top) = &inner_val {
-                    for elem in top {
-                        if let serde_json::Value::Array(sub) = elem {
-                            if sub.is_empty() {
-                                // Empty Vec — nothing to flatten.
-                            } else if sub[0].is_array() {
-                                // An array-of-arrays is the Vec<(A,B)> — flatten it.
-                                for pair in sub {
-                                    if let serde_json::Value::Array(pair_elems) = pair {
-                                        for pe in pair_elems {
-                                            seq.serialize_element(pe)?;
-                                        }
-                                    } else {
-                                        seq.serialize_element(pair)?;
-                                    }
-                                }
-                            } else {
-                                // Plain array value (e.g. a sub-expression like ["zoom"]).
-                                seq.serialize_element(elem)?;
-                            }
-                        } else {
-                            seq.serialize_element(elem)?;
-                        }
-                    }
-                } else {
-                    seq.serialize_element(&inner_val)?;
-                }
-                seq.end()
-            }
             Boolean::To(f0) => {
                 let mut elems = vec![serde_json::to_value(f0).map_err(serde::ser::Error::custom)?];
                 while elems.len() > 1 && elems.last().is_some_and(serde_json::Value::is_null) {
@@ -3691,18 +1779,6 @@ impl serde::Serialize for Boolean {
                 }
                 let mut seq = serializer.serialize_seq(None)?;
                 seq.serialize_element("to-boolean")?;
-                for elem in &elems {
-                    seq.serialize_element(elem)?;
-                }
-                seq.end()
-            }
-            Boolean::Var(f0) => {
-                let mut elems = vec![serde_json::to_value(f0).map_err(serde::ser::Error::custom)?];
-                while elems.len() > 1 && elems.last().is_some_and(serde_json::Value::is_null) {
-                    elems.pop();
-                }
-                let mut seq = serializer.serialize_seq(None)?;
-                seq.serialize_element("var")?;
                 for elem in &elems {
                     seq.serialize_element(elem)?;
                 }
@@ -3728,78 +1804,11 @@ impl serde::Serialize for Boolean {
 #[derive(PartialEq, Debug, Clone)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum Collator {
-    /// Gets the value of a cluster property accumulated so far. Can only be used in the `clusterProperties` option of a clustered GeoJSON source.
-    Accumulated,
-    /// Retrieves an item from an array.
-    At(NumberLiteralOrNumberAsUnion, ExprOrLiteral),
-    /// Selects the first output whose corresponding test condition evaluates to true, or the fallback value otherwise.
-    ///
-    ///  - [Create a hover effect](https://maplibre.org/maplibre-gl-js/docs/examples/create-a-hover-effect/)
-    ///
-    ///  - [Display HTML clusters with custom properties](https://maplibre.org/maplibre-gl-js/docs/examples/display-html-clusters-with-custom-properties/)
-    Case((Vec<(Boolean, ExprOrLiteral)>, ExprOrLiteral)),
-    /// Evaluates each expression in turn until the first non-null value is obtained, and returns that value.
-    ///
-    ///  - [Use a fallback image](https://maplibre.org/maplibre-gl-js/docs/examples/use-a-fallback-image/)
-    Coalesce(Vec<ExprOrLiteral>),
     /// Returns a `collator` for use in locale-dependent comparison operations. Use `resolved-locale` to test the results of locale fallback behavior.
     Op(
         #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_map))]
         serde_json::Map<std::string::String, serde_json::Value>,
     ),
-    /// Retrieves a property value from the current feature's state. Returns null if the requested property is not present on the feature's state. A feature's state is not part of the GeoJSON or vector tile data, and must be set programmatically on each feature. When `source.promoteId` is not provided, features are identified by their `id` attribute, which must be an integer or a string that can be cast to an integer. When `source.promoteId` is provided, features are identified by their `promoteId` property, which may be a number, string, or any primitive data type. Note that ["feature-state"] can only be used with paint properties that support data-driven styling.
-    ///
-    ///  - [Create a hover effect](https://maplibre.org/maplibre-gl-js/docs/examples/create-a-hover-effect/)
-    FeatureState(StringLiteralOrStringAsUnion),
-    /// Retrieves a property value from the current feature's properties, or from another object if a second argument is provided. Returns null if the requested property is missing.
-    ///
-    ///  - [Change the case of labels](https://maplibre.org/maplibre-gl-js/docs/examples/change-case-of-labels/)
-    ///
-    ///  - [Display HTML clusters with custom properties](https://maplibre.org/maplibre-gl-js/docs/examples/display-html-clusters-with-custom-properties/)
-    ///
-    ///  - [Extrude polygons for 3D indoor mapping](https://maplibre.org/maplibre-gl-js/docs/examples/extrude-polygons-for-3d-indoor-mapping/)
-    Get(StringLiteralOrStringAsUnion, Option<Object>),
-    /// Retrieves a property value from global state that can be set with platform-specific APIs. Defaults can be provided using the [`state`](https://maplibre.org/maplibre-style-spec/root/#state) root property. Returns `null` if no value nor default value is set for the retrieved property.
-    GlobalState(StringLiteral),
-    /// Gets the feature's id, if it has one.
-    Id,
-    /// Binds expressions to named variables, which can then be referenced in the result expression using `["var", "variable_name"]`.
-    ///
-    ///  - [Visualize population density](https://maplibre.org/maplibre-gl-js/docs/examples/visualize-population-density/)
-    Let((Vec<(StringLiteral, ExprOrLiteral)>, ExprOrLiteral)),
-    /// Selects the output whose label value matches the input value, or the fallback value if no match is found. The input can be any expression (e.g. `["get", "building_type"]`). Each label must be either:
-    ///
-    ///  - a single literal value; or
-    ///
-    ///  - an array of literal values, whose values must be all strings or all numbers (e.g. `[100, 101]` or `["c", "b"]`). The input matches if any of the values in the array matches, similar to the `"in"` operator.
-    ///
-    /// Each label must be unique. If the input type does not match the type of the labels, the result will be the fallback value.
-    Match(
-        (
-            ExprOrLiteral,
-            Vec<(
-                StringOrNumberOrArrayOfStringOrArrayOfNumberAsUnion,
-                ExprOrLiteral,
-            )>,
-            ExprOrLiteral,
-        ),
-    ),
-    /// Produces discrete, stepped results by evaluating a piecewise-constant function defined by pairs of input and output values ("stops"). The `input` may be any numeric expression (e.g., `["get", "population"]`). Stop inputs must be numeric literals in strictly ascending order.
-    ///
-    /// Returns the output value of the stop just less than the input, or the first output if the input is less than the first stop.
-    ///
-    ///  - [Create and style clusters](https://maplibre.org/maplibre-gl-js/docs/examples/create-and-style-clusters/)
-    Step(
-        (
-            NumberLiteralOrNumberAsUnion,
-            ExprOrLiteral,
-            Vec<(NumberLiteral, ExprOrLiteral)>,
-        ),
-    ),
-    /// References variable bound using `let`.
-    ///
-    ///  - [Visualize population density](https://maplibre.org/maplibre-gl-js/docs/examples/visualize-population-density/)
-    Var(StringLiteral),
 }
 
 impl<'de> serde::Deserialize<'de> for Collator {
@@ -3818,7 +1827,7 @@ impl<'de> serde::de::Visitor<'de> for CollatorVisitor {
     type Value = Collator;
 
     fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
-        formatter.write_str("an Collator expression (example: [\"accumulated\"])")
+        formatter.write_str("an Collator expression (example: [\"collator\",{\"case-sensitive\":true,\"diacritic-sensitive\":true,\"locale\":\"fr\"}])")
     }
 
     fn visit_seq<A: serde::de::SeqAccess<'de>>(self, mut seq: A) -> Result<Self::Value, A::Error> {
@@ -3838,160 +1847,11 @@ impl<'de> serde::de::Visitor<'de> for CollatorVisitor {
             .next_element()?
             .ok_or_else(|| serde::de::Error::custom("missing operator"))?;
         match op.as_str() {
-            "accumulated" => Ok(Collator::Accumulated),
-            "at" => {
-                let index = visit_seq_field(&mut seq, "index")?;
-                let array = visit_seq_field(&mut seq, "array")?;
-                Ok(Collator::At(index, array))
-            }
-            "case" => {
-                let mut inputs = Vec::new();
-                let mut rest: Vec<serde_json::Value> = Vec::new();
-                while let Some(v) = seq.next_element()? {
-                    rest.push(v);
-                }
-                if rest.is_empty() {
-                    return Err(serde::de::Error::custom(
-                        "{name}::{variant_name}: too few arguments",
-                    ));
-                }
-                if !(rest.len() - 1).is_multiple_of(2) {
-                    return Err(serde::de::Error::custom(
-                        "Collator::Case: malformed template/suffix layout",
-                    ));
-                }
-                let inputs_len = (rest.len() - 1) / 2;
-                for i in 0..inputs_len {
-                    let condition_i = serde_json::from_value(rest[i * 2].clone())
-                        .map_err(serde::de::Error::custom)?;
-                    let output_i = serde_json::from_value(rest[i * 2 + 1].clone())
-                        .map_err(serde::de::Error::custom)?;
-                    let element = (condition_i, output_i);
-                    inputs.push(element);
-                }
-                let fallback = serde_json::from_value(rest[inputs_len * 2].clone())
-                    .map_err(serde::de::Error::custom)?;
-                Ok(Collator::Case((inputs, fallback)))
-            }
-            "coalesce" => {
-                let mut inputs = Vec::new();
-                while let Some(element) = seq.next_element()? {
-                    inputs.push(element);
-                }
-                Ok(Collator::Coalesce(inputs))
-            }
             "collator" => {
                 let options = visit_seq_field(&mut seq, "options")?;
                 Ok(Collator::Op(options))
             }
-            "feature-state" => {
-                let property_name = visit_seq_field(&mut seq, "property_name")?;
-                Ok(Collator::FeatureState(property_name))
-            }
-            "get" => {
-                let property_name = visit_seq_field(&mut seq, "property_name")?;
-                let object = seq.next_element()?;
-                Ok(Collator::Get(property_name, object))
-            }
-            "global-state" => {
-                let property_name = visit_seq_field(&mut seq, "property_name")?;
-                Ok(Collator::GlobalState(property_name))
-            }
-            "id" => Ok(Collator::Id),
-            "let" => {
-                let mut inputs = Vec::new();
-                let mut rest: Vec<serde_json::Value> = Vec::new();
-                while let Some(v) = seq.next_element()? {
-                    rest.push(v);
-                }
-                if rest.is_empty() {
-                    return Err(serde::de::Error::custom(
-                        "{name}::{variant_name}: too few arguments",
-                    ));
-                }
-                if !(rest.len() - 1).is_multiple_of(2) {
-                    return Err(serde::de::Error::custom(
-                        "Collator::Let: malformed template/suffix layout",
-                    ));
-                }
-                let inputs_len = (rest.len() - 1) / 2;
-                for i in 0..inputs_len {
-                    let var_name_i = serde_json::from_value(rest[i * 2].clone())
-                        .map_err(serde::de::Error::custom)?;
-                    let var_value_i = serde_json::from_value(rest[i * 2 + 1].clone())
-                        .map_err(serde::de::Error::custom)?;
-                    let element = (var_name_i, var_value_i);
-                    inputs.push(element);
-                }
-                let expression = serde_json::from_value(rest[inputs_len * 2].clone())
-                    .map_err(serde::de::Error::custom)?;
-                Ok(Collator::Let((inputs, expression)))
-            }
-            "match" => {
-                let mut rest: Vec<serde_json::Value> = Vec::new();
-                while let Some(v) = seq.next_element()? {
-                    rest.push(v);
-                }
-                if rest.len() < 2 {
-                    return Err(serde::de::Error::custom(
-                        "Collator::Match: too few arguments",
-                    ));
-                }
-                if !rest.len().is_multiple_of(2) {
-                    return Err(serde::de::Error::custom(
-                        "Collator::Match: expected an even number of arguments after operator (input + label/output pairs + fallback)",
-                    ));
-                }
-                let fallback_v = rest.pop().unwrap();
-                let input: ExprOrLiteral =
-                    serde_json::from_value(rest.remove(0)).map_err(serde::de::Error::custom)?;
-                let mut pairs = Vec::new();
-                for chunk in rest.chunks_exact(2) {
-                    let label_i: StringOrNumberOrArrayOfStringOrArrayOfNumberAsUnion =
-                        serde_json::from_value(chunk[0].clone())
-                            .map_err(serde::de::Error::custom)?;
-                    let output_i: ExprOrLiteral = serde_json::from_value(chunk[1].clone())
-                        .map_err(serde::de::Error::custom)?;
-                    pairs.push((label_i, output_i));
-                }
-                let fallback: ExprOrLiteral =
-                    serde_json::from_value(fallback_v).map_err(serde::de::Error::custom)?;
-                Ok(Collator::Match((input, pairs, fallback)))
-            }
-            "step" => {
-                let input: NumberLiteralOrNumberAsUnion = visit_seq_field(&mut seq, "input")?;
-                let output_0: ExprOrLiteral = visit_seq_field(&mut seq, "output_0")?;
-                let mut stops = Vec::new();
-                while let Some(stop_input_i) = seq.next_element::<NumberLiteral>()? {
-                    let stop_output_i: ExprOrLiteral = seq.next_element()?.ok_or_else(|| {
-                        serde::de::Error::custom("expected stop_output_i in Collator::Step")
-                    })?;
-                    stops.push((stop_input_i, stop_output_i));
-                }
-                Ok(Collator::Step((input, output_0, stops)))
-            }
-            "var" => {
-                let var_name = visit_seq_field(&mut seq, "var_name")?;
-                Ok(Collator::Var(var_name))
-            }
-            _ => Err(serde::de::Error::unknown_variant(
-                &op,
-                &[
-                    "accumulated",
-                    "at",
-                    "case",
-                    "coalesce",
-                    "collator",
-                    "feature-state",
-                    "get",
-                    "global-state",
-                    "id",
-                    "let",
-                    "match",
-                    "step",
-                    "var",
-                ],
-            )),
+            _ => Err(serde::de::Error::unknown_variant(&op, &["collator"])),
         }
     }
 }
@@ -4003,79 +1863,6 @@ impl serde::Serialize for Collator {
     {
         use serde::ser::SerializeSeq;
         match self {
-            Collator::Accumulated => {
-                let mut elems = vec![];
-                while !elems.is_empty() && elems.last().is_some_and(serde_json::Value::is_null) {
-                    elems.pop();
-                }
-                let mut seq = serializer.serialize_seq(None)?;
-                seq.serialize_element("accumulated")?;
-                for elem in &elems {
-                    seq.serialize_element(elem)?;
-                }
-                seq.end()
-            }
-            Collator::At(f0, f1) => {
-                let mut elems = vec![
-                    serde_json::to_value(f0).map_err(serde::ser::Error::custom)?,
-                    serde_json::to_value(f1).map_err(serde::ser::Error::custom)?,
-                ];
-                while elems.len() > 2 && elems.last().is_some_and(serde_json::Value::is_null) {
-                    elems.pop();
-                }
-                let mut seq = serializer.serialize_seq(None)?;
-                seq.serialize_element("at")?;
-                for elem in &elems {
-                    seq.serialize_element(elem)?;
-                }
-                seq.end()
-            }
-            Collator::Case(inner) => {
-                let inner_val = serde_json::to_value(inner).map_err(serde::ser::Error::custom)?;
-                let mut seq = serializer.serialize_seq(None)?;
-                seq.serialize_element("case")?;
-                if let serde_json::Value::Array(top) = &inner_val {
-                    for elem in top {
-                        if let serde_json::Value::Array(sub) = elem {
-                            if sub.is_empty() {
-                                // Empty Vec — nothing to flatten.
-                            } else if sub[0].is_array() {
-                                // An array-of-arrays is the Vec<(A,B)> — flatten it.
-                                for pair in sub {
-                                    if let serde_json::Value::Array(pair_elems) = pair {
-                                        for pe in pair_elems {
-                                            seq.serialize_element(pe)?;
-                                        }
-                                    } else {
-                                        seq.serialize_element(pair)?;
-                                    }
-                                }
-                            } else {
-                                // Plain array value (e.g. a sub-expression like ["zoom"]).
-                                seq.serialize_element(elem)?;
-                            }
-                        } else {
-                            seq.serialize_element(elem)?;
-                        }
-                    }
-                } else {
-                    seq.serialize_element(&inner_val)?;
-                }
-                seq.end()
-            }
-            Collator::Coalesce(inner) => {
-                let inner_val = serde_json::to_value(inner).map_err(serde::ser::Error::custom)?;
-                let mut seq = serializer.serialize_seq(None)?;
-                seq.serialize_element("coalesce")?;
-                if let serde_json::Value::Array(top) = &inner_val {
-                    for elem in top {
-                        seq.serialize_element(elem)?;
-                    }
-                } else {
-                    seq.serialize_element(&inner_val)?;
-                }
-                seq.end()
-            }
             Collator::Op(f0) => {
                 let mut elems = vec![serde_json::to_value(f0).map_err(serde::ser::Error::custom)?];
                 while elems.len() > 1 && elems.last().is_some_and(serde_json::Value::is_null) {
@@ -4083,168 +1870,6 @@ impl serde::Serialize for Collator {
                 }
                 let mut seq = serializer.serialize_seq(None)?;
                 seq.serialize_element("collator")?;
-                for elem in &elems {
-                    seq.serialize_element(elem)?;
-                }
-                seq.end()
-            }
-            Collator::FeatureState(f0) => {
-                let mut elems = vec![serde_json::to_value(f0).map_err(serde::ser::Error::custom)?];
-                while elems.len() > 1 && elems.last().is_some_and(serde_json::Value::is_null) {
-                    elems.pop();
-                }
-                let mut seq = serializer.serialize_seq(None)?;
-                seq.serialize_element("feature-state")?;
-                for elem in &elems {
-                    seq.serialize_element(elem)?;
-                }
-                seq.end()
-            }
-            Collator::Get(f0, f1) => {
-                let mut elems = vec![
-                    serde_json::to_value(f0).map_err(serde::ser::Error::custom)?,
-                    serde_json::to_value(f1).map_err(serde::ser::Error::custom)?,
-                ];
-                while elems.len() > 1 && elems.last().is_some_and(serde_json::Value::is_null) {
-                    elems.pop();
-                }
-                let mut seq = serializer.serialize_seq(None)?;
-                seq.serialize_element("get")?;
-                for elem in &elems {
-                    seq.serialize_element(elem)?;
-                }
-                seq.end()
-            }
-            Collator::GlobalState(f0) => {
-                let mut elems = vec![serde_json::to_value(f0).map_err(serde::ser::Error::custom)?];
-                while elems.len() > 1 && elems.last().is_some_and(serde_json::Value::is_null) {
-                    elems.pop();
-                }
-                let mut seq = serializer.serialize_seq(None)?;
-                seq.serialize_element("global-state")?;
-                for elem in &elems {
-                    seq.serialize_element(elem)?;
-                }
-                seq.end()
-            }
-            Collator::Id => {
-                let mut elems = vec![];
-                while !elems.is_empty() && elems.last().is_some_and(serde_json::Value::is_null) {
-                    elems.pop();
-                }
-                let mut seq = serializer.serialize_seq(None)?;
-                seq.serialize_element("id")?;
-                for elem in &elems {
-                    seq.serialize_element(elem)?;
-                }
-                seq.end()
-            }
-            Collator::Let(inner) => {
-                let inner_val = serde_json::to_value(inner).map_err(serde::ser::Error::custom)?;
-                let mut seq = serializer.serialize_seq(None)?;
-                seq.serialize_element("let")?;
-                if let serde_json::Value::Array(top) = &inner_val {
-                    for elem in top {
-                        if let serde_json::Value::Array(sub) = elem {
-                            if sub.is_empty() {
-                                // Empty Vec — nothing to flatten.
-                            } else if sub[0].is_array() {
-                                // An array-of-arrays is the Vec<(A,B)> — flatten it.
-                                for pair in sub {
-                                    if let serde_json::Value::Array(pair_elems) = pair {
-                                        for pe in pair_elems {
-                                            seq.serialize_element(pe)?;
-                                        }
-                                    } else {
-                                        seq.serialize_element(pair)?;
-                                    }
-                                }
-                            } else {
-                                // Plain array value (e.g. a sub-expression like ["zoom"]).
-                                seq.serialize_element(elem)?;
-                            }
-                        } else {
-                            seq.serialize_element(elem)?;
-                        }
-                    }
-                } else {
-                    seq.serialize_element(&inner_val)?;
-                }
-                seq.end()
-            }
-            Collator::Match(inner) => {
-                let inner_val = serde_json::to_value(inner).map_err(serde::ser::Error::custom)?;
-                let mut seq = serializer.serialize_seq(None)?;
-                seq.serialize_element("match")?;
-                if let serde_json::Value::Array(top) = &inner_val {
-                    for elem in top {
-                        if let serde_json::Value::Array(sub) = elem {
-                            if sub.is_empty() {
-                                // Empty Vec — nothing to flatten.
-                            } else if sub[0].is_array() {
-                                // An array-of-arrays is the Vec<(A,B)> — flatten it.
-                                for pair in sub {
-                                    if let serde_json::Value::Array(pair_elems) = pair {
-                                        for pe in pair_elems {
-                                            seq.serialize_element(pe)?;
-                                        }
-                                    } else {
-                                        seq.serialize_element(pair)?;
-                                    }
-                                }
-                            } else {
-                                // Plain array value (e.g. a sub-expression like ["zoom"]).
-                                seq.serialize_element(elem)?;
-                            }
-                        } else {
-                            seq.serialize_element(elem)?;
-                        }
-                    }
-                } else {
-                    seq.serialize_element(&inner_val)?;
-                }
-                seq.end()
-            }
-            Collator::Step(inner) => {
-                let inner_val = serde_json::to_value(inner).map_err(serde::ser::Error::custom)?;
-                let mut seq = serializer.serialize_seq(None)?;
-                seq.serialize_element("step")?;
-                if let serde_json::Value::Array(top) = &inner_val {
-                    for elem in top {
-                        if let serde_json::Value::Array(sub) = elem {
-                            if sub.is_empty() {
-                                // Empty Vec — nothing to flatten.
-                            } else if sub[0].is_array() {
-                                // An array-of-arrays is the Vec<(A,B)> — flatten it.
-                                for pair in sub {
-                                    if let serde_json::Value::Array(pair_elems) = pair {
-                                        for pe in pair_elems {
-                                            seq.serialize_element(pe)?;
-                                        }
-                                    } else {
-                                        seq.serialize_element(pair)?;
-                                    }
-                                }
-                            } else {
-                                // Plain array value (e.g. a sub-expression like ["zoom"]).
-                                seq.serialize_element(elem)?;
-                            }
-                        } else {
-                            seq.serialize_element(elem)?;
-                        }
-                    }
-                } else {
-                    seq.serialize_element(&inner_val)?;
-                }
-                seq.end()
-            }
-            Collator::Var(f0) => {
-                let mut elems = vec![serde_json::to_value(f0).map_err(serde::ser::Error::custom)?];
-                while elems.len() > 1 && elems.last().is_some_and(serde_json::Value::is_null) {
-                    elems.pop();
-                }
-                let mut seq = serializer.serialize_seq(None)?;
-                seq.serialize_element("var")?;
                 for elem in &elems {
                     seq.serialize_element(elem)?;
                 }
@@ -4258,90 +1883,23 @@ impl serde::Serialize for Collator {
 #[derive(PartialEq, Debug, Clone)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum Color {
-    /// Gets the value of a cluster property accumulated so far. Can only be used in the `clusterProperties` option of a clustered GeoJSON source.
-    Accumulated,
-    /// Retrieves an item from an array.
-    At(NumberLiteralOrNumberAsUnion, ExprOrLiteral),
-    /// Selects the first output whose corresponding test condition evaluates to true, or the fallback value otherwise.
-    ///
-    ///  - [Create a hover effect](https://maplibre.org/maplibre-gl-js/docs/examples/create-a-hover-effect/)
-    ///
-    ///  - [Display HTML clusters with custom properties](https://maplibre.org/maplibre-gl-js/docs/examples/display-html-clusters-with-custom-properties/)
-    Case((Vec<(Boolean, ExprOrLiteral)>, ExprOrLiteral)),
-    /// Evaluates each expression in turn until the first non-null value is obtained, and returns that value.
-    ///
-    ///  - [Use a fallback image](https://maplibre.org/maplibre-gl-js/docs/examples/use-a-fallback-image/)
-    Coalesce(Vec<ExprOrLiteral>),
-    /// Retrieves a property value from the current feature's state. Returns null if the requested property is not present on the feature's state. A feature's state is not part of the GeoJSON or vector tile data, and must be set programmatically on each feature. When `source.promoteId` is not provided, features are identified by their `id` attribute, which must be an integer or a string that can be cast to an integer. When `source.promoteId` is provided, features are identified by their `promoteId` property, which may be a number, string, or any primitive data type. Note that ["feature-state"] can only be used with paint properties that support data-driven styling.
-    ///
-    ///  - [Create a hover effect](https://maplibre.org/maplibre-gl-js/docs/examples/create-a-hover-effect/)
-    FeatureState(StringLiteralOrStringAsUnion),
-    /// Retrieves a property value from the current feature's properties, or from another object if a second argument is provided. Returns null if the requested property is missing.
-    ///
-    ///  - [Change the case of labels](https://maplibre.org/maplibre-gl-js/docs/examples/change-case-of-labels/)
-    ///
-    ///  - [Display HTML clusters with custom properties](https://maplibre.org/maplibre-gl-js/docs/examples/display-html-clusters-with-custom-properties/)
-    ///
-    ///  - [Extrude polygons for 3D indoor mapping](https://maplibre.org/maplibre-gl-js/docs/examples/extrude-polygons-for-3d-indoor-mapping/)
-    Get(StringLiteralOrStringAsUnion, Option<Object>),
-    /// Retrieves a property value from global state that can be set with platform-specific APIs. Defaults can be provided using the [`state`](https://maplibre.org/maplibre-style-spec/root/#state) root property. Returns `null` if no value nor default value is set for the retrieved property.
-    GlobalState(StringLiteral),
-    /// Gets the feature's id, if it has one.
-    Id,
-    /// Binds expressions to named variables, which can then be referenced in the result expression using `["var", "variable_name"]`.
-    ///
-    ///  - [Visualize population density](https://maplibre.org/maplibre-gl-js/docs/examples/visualize-population-density/)
-    Let((Vec<(StringLiteral, ExprOrLiteral)>, ExprOrLiteral)),
-    /// Selects the output whose label value matches the input value, or the fallback value if no match is found. The input can be any expression (e.g. `["get", "building_type"]`). Each label must be either:
-    ///
-    ///  - a single literal value; or
-    ///
-    ///  - an array of literal values, whose values must be all strings or all numbers (e.g. `[100, 101]` or `["c", "b"]`). The input matches if any of the values in the array matches, similar to the `"in"` operator.
-    ///
-    /// Each label must be unique. If the input type does not match the type of the labels, the result will be the fallback value.
-    Match(
-        (
-            ExprOrLiteral,
-            Vec<(
-                StringOrNumberOrArrayOfStringOrArrayOfNumberAsUnion,
-                ExprOrLiteral,
-            )>,
-            ExprOrLiteral,
-        ),
-    ),
     /// Creates a color value from red, green, and blue components, which must range between 0 and 255, and an alpha component of 1. If any component is out of range, the expression is an error.
     Rgb(
-        NumberLiteralOrNumberAsUnion,
-        NumberLiteralOrNumberAsUnion,
-        NumberLiteralOrNumberAsUnion,
+        NumberLiteralOrNumberOrAnyAsUnion,
+        NumberLiteralOrNumberOrAnyAsUnion,
+        NumberLiteralOrNumberOrAnyAsUnion,
     ),
     /// Creates a color value from red, green, blue components, which must range between 0 and 255, and an alpha component which must range between zero and one. If any component is out of range, the expression is an error.
     Rgba(
-        NumberLiteralOrNumberAsUnion,
-        NumberLiteralOrNumberAsUnion,
-        NumberLiteralOrNumberAsUnion,
-        NumberLiteralOrNumberAsUnion,
-    ),
-    /// Produces discrete, stepped results by evaluating a piecewise-constant function defined by pairs of input and output values ("stops"). The `input` may be any numeric expression (e.g., `["get", "population"]`). Stop inputs must be numeric literals in strictly ascending order.
-    ///
-    /// Returns the output value of the stop just less than the input, or the first output if the input is less than the first stop.
-    ///
-    ///  - [Create and style clusters](https://maplibre.org/maplibre-gl-js/docs/examples/create-and-style-clusters/)
-    Step(
-        (
-            NumberLiteralOrNumberAsUnion,
-            ExprOrLiteral,
-            Vec<(NumberLiteral, ExprOrLiteral)>,
-        ),
+        NumberLiteralOrNumberOrAnyAsUnion,
+        NumberLiteralOrNumberOrAnyAsUnion,
+        NumberLiteralOrNumberOrAnyAsUnion,
+        NumberLiteralOrNumberOrAnyAsUnion,
     ),
     /// Converts the input value to a color. If multiple values are provided, each one is evaluated in order until the first successful conversion is obtained. If none of the inputs can be converted, the expression is an error.
     ///
     ///  - [Visualize population density](https://maplibre.org/maplibre-gl-js/docs/examples/visualize-population-density/)
     To(Vec<ExprOrLiteral>),
-    /// References variable bound using `let`.
-    ///
-    ///  - [Visualize population density](https://maplibre.org/maplibre-gl-js/docs/examples/visualize-population-density/)
-    Var(StringLiteral),
 }
 
 impl<'de> serde::Deserialize<'de> for Color {
@@ -4360,7 +1918,7 @@ impl<'de> serde::de::Visitor<'de> for ColorVisitor {
     type Value = Color;
 
     fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
-        formatter.write_str("an Color expression (example: [\"accumulated\"])")
+        formatter.write_str("an Color expression (example: [\"rgb\",255,0,0])")
     }
 
     fn visit_seq<A: serde::de::SeqAccess<'de>>(self, mut seq: A) -> Result<Self::Value, A::Error> {
@@ -4380,120 +1938,6 @@ impl<'de> serde::de::Visitor<'de> for ColorVisitor {
             .next_element()?
             .ok_or_else(|| serde::de::Error::custom("missing operator"))?;
         match op.as_str() {
-            "accumulated" => Ok(Color::Accumulated),
-            "at" => {
-                let index = visit_seq_field(&mut seq, "index")?;
-                let array = visit_seq_field(&mut seq, "array")?;
-                Ok(Color::At(index, array))
-            }
-            "case" => {
-                let mut inputs = Vec::new();
-                let mut rest: Vec<serde_json::Value> = Vec::new();
-                while let Some(v) = seq.next_element()? {
-                    rest.push(v);
-                }
-                if rest.is_empty() {
-                    return Err(serde::de::Error::custom(
-                        "{name}::{variant_name}: too few arguments",
-                    ));
-                }
-                if !(rest.len() - 1).is_multiple_of(2) {
-                    return Err(serde::de::Error::custom(
-                        "Color::Case: malformed template/suffix layout",
-                    ));
-                }
-                let inputs_len = (rest.len() - 1) / 2;
-                for i in 0..inputs_len {
-                    let condition_i = serde_json::from_value(rest[i * 2].clone())
-                        .map_err(serde::de::Error::custom)?;
-                    let output_i = serde_json::from_value(rest[i * 2 + 1].clone())
-                        .map_err(serde::de::Error::custom)?;
-                    let element = (condition_i, output_i);
-                    inputs.push(element);
-                }
-                let fallback = serde_json::from_value(rest[inputs_len * 2].clone())
-                    .map_err(serde::de::Error::custom)?;
-                Ok(Color::Case((inputs, fallback)))
-            }
-            "coalesce" => {
-                let mut inputs = Vec::new();
-                while let Some(element) = seq.next_element()? {
-                    inputs.push(element);
-                }
-                Ok(Color::Coalesce(inputs))
-            }
-            "feature-state" => {
-                let property_name = visit_seq_field(&mut seq, "property_name")?;
-                Ok(Color::FeatureState(property_name))
-            }
-            "get" => {
-                let property_name = visit_seq_field(&mut seq, "property_name")?;
-                let object = seq.next_element()?;
-                Ok(Color::Get(property_name, object))
-            }
-            "global-state" => {
-                let property_name = visit_seq_field(&mut seq, "property_name")?;
-                Ok(Color::GlobalState(property_name))
-            }
-            "id" => Ok(Color::Id),
-            "let" => {
-                let mut inputs = Vec::new();
-                let mut rest: Vec<serde_json::Value> = Vec::new();
-                while let Some(v) = seq.next_element()? {
-                    rest.push(v);
-                }
-                if rest.is_empty() {
-                    return Err(serde::de::Error::custom(
-                        "{name}::{variant_name}: too few arguments",
-                    ));
-                }
-                if !(rest.len() - 1).is_multiple_of(2) {
-                    return Err(serde::de::Error::custom(
-                        "Color::Let: malformed template/suffix layout",
-                    ));
-                }
-                let inputs_len = (rest.len() - 1) / 2;
-                for i in 0..inputs_len {
-                    let var_name_i = serde_json::from_value(rest[i * 2].clone())
-                        .map_err(serde::de::Error::custom)?;
-                    let var_value_i = serde_json::from_value(rest[i * 2 + 1].clone())
-                        .map_err(serde::de::Error::custom)?;
-                    let element = (var_name_i, var_value_i);
-                    inputs.push(element);
-                }
-                let expression = serde_json::from_value(rest[inputs_len * 2].clone())
-                    .map_err(serde::de::Error::custom)?;
-                Ok(Color::Let((inputs, expression)))
-            }
-            "match" => {
-                let mut rest: Vec<serde_json::Value> = Vec::new();
-                while let Some(v) = seq.next_element()? {
-                    rest.push(v);
-                }
-                if rest.len() < 2 {
-                    return Err(serde::de::Error::custom("Color::Match: too few arguments"));
-                }
-                if !rest.len().is_multiple_of(2) {
-                    return Err(serde::de::Error::custom(
-                        "Color::Match: expected an even number of arguments after operator (input + label/output pairs + fallback)",
-                    ));
-                }
-                let fallback_v = rest.pop().unwrap();
-                let input: ExprOrLiteral =
-                    serde_json::from_value(rest.remove(0)).map_err(serde::de::Error::custom)?;
-                let mut pairs = Vec::new();
-                for chunk in rest.chunks_exact(2) {
-                    let label_i: StringOrNumberOrArrayOfStringOrArrayOfNumberAsUnion =
-                        serde_json::from_value(chunk[0].clone())
-                            .map_err(serde::de::Error::custom)?;
-                    let output_i: ExprOrLiteral = serde_json::from_value(chunk[1].clone())
-                        .map_err(serde::de::Error::custom)?;
-                    pairs.push((label_i, output_i));
-                }
-                let fallback: ExprOrLiteral =
-                    serde_json::from_value(fallback_v).map_err(serde::de::Error::custom)?;
-                Ok(Color::Match((input, pairs, fallback)))
-            }
             "rgb" => {
                 let red = visit_seq_field(&mut seq, "red")?;
                 let green = visit_seq_field(&mut seq, "green")?;
@@ -4507,18 +1951,6 @@ impl<'de> serde::de::Visitor<'de> for ColorVisitor {
                 let alpha = visit_seq_field(&mut seq, "alpha")?;
                 Ok(Color::Rgba(red, green, blue, alpha))
             }
-            "step" => {
-                let input: NumberLiteralOrNumberAsUnion = visit_seq_field(&mut seq, "input")?;
-                let output_0: ExprOrLiteral = visit_seq_field(&mut seq, "output_0")?;
-                let mut stops = Vec::new();
-                while let Some(stop_input_i) = seq.next_element::<NumberLiteral>()? {
-                    let stop_output_i: ExprOrLiteral = seq.next_element()?.ok_or_else(|| {
-                        serde::de::Error::custom("expected stop_output_i in Color::Step")
-                    })?;
-                    stops.push((stop_input_i, stop_output_i));
-                }
-                Ok(Color::Step((input, output_0, stops)))
-            }
             "to-color" => {
                 let mut inputs = Vec::new();
                 while let Some(element) = seq.next_element()? {
@@ -4526,29 +1958,9 @@ impl<'de> serde::de::Visitor<'de> for ColorVisitor {
                 }
                 Ok(Color::To(inputs))
             }
-            "var" => {
-                let var_name = visit_seq_field(&mut seq, "var_name")?;
-                Ok(Color::Var(var_name))
-            }
             _ => Err(serde::de::Error::unknown_variant(
                 &op,
-                &[
-                    "accumulated",
-                    "at",
-                    "case",
-                    "coalesce",
-                    "feature-state",
-                    "get",
-                    "global-state",
-                    "id",
-                    "let",
-                    "match",
-                    "rgb",
-                    "rgba",
-                    "step",
-                    "to-color",
-                    "var",
-                ],
+                &["rgb", "rgba", "to-color"],
             )),
         }
     }
@@ -4561,196 +1973,6 @@ impl serde::Serialize for Color {
     {
         use serde::ser::SerializeSeq;
         match self {
-            Color::Accumulated => {
-                let mut elems = vec![];
-                while !elems.is_empty() && elems.last().is_some_and(serde_json::Value::is_null) {
-                    elems.pop();
-                }
-                let mut seq = serializer.serialize_seq(None)?;
-                seq.serialize_element("accumulated")?;
-                for elem in &elems {
-                    seq.serialize_element(elem)?;
-                }
-                seq.end()
-            }
-            Color::At(f0, f1) => {
-                let mut elems = vec![
-                    serde_json::to_value(f0).map_err(serde::ser::Error::custom)?,
-                    serde_json::to_value(f1).map_err(serde::ser::Error::custom)?,
-                ];
-                while elems.len() > 2 && elems.last().is_some_and(serde_json::Value::is_null) {
-                    elems.pop();
-                }
-                let mut seq = serializer.serialize_seq(None)?;
-                seq.serialize_element("at")?;
-                for elem in &elems {
-                    seq.serialize_element(elem)?;
-                }
-                seq.end()
-            }
-            Color::Case(inner) => {
-                let inner_val = serde_json::to_value(inner).map_err(serde::ser::Error::custom)?;
-                let mut seq = serializer.serialize_seq(None)?;
-                seq.serialize_element("case")?;
-                if let serde_json::Value::Array(top) = &inner_val {
-                    for elem in top {
-                        if let serde_json::Value::Array(sub) = elem {
-                            if sub.is_empty() {
-                                // Empty Vec — nothing to flatten.
-                            } else if sub[0].is_array() {
-                                // An array-of-arrays is the Vec<(A,B)> — flatten it.
-                                for pair in sub {
-                                    if let serde_json::Value::Array(pair_elems) = pair {
-                                        for pe in pair_elems {
-                                            seq.serialize_element(pe)?;
-                                        }
-                                    } else {
-                                        seq.serialize_element(pair)?;
-                                    }
-                                }
-                            } else {
-                                // Plain array value (e.g. a sub-expression like ["zoom"]).
-                                seq.serialize_element(elem)?;
-                            }
-                        } else {
-                            seq.serialize_element(elem)?;
-                        }
-                    }
-                } else {
-                    seq.serialize_element(&inner_val)?;
-                }
-                seq.end()
-            }
-            Color::Coalesce(inner) => {
-                let inner_val = serde_json::to_value(inner).map_err(serde::ser::Error::custom)?;
-                let mut seq = serializer.serialize_seq(None)?;
-                seq.serialize_element("coalesce")?;
-                if let serde_json::Value::Array(top) = &inner_val {
-                    for elem in top {
-                        seq.serialize_element(elem)?;
-                    }
-                } else {
-                    seq.serialize_element(&inner_val)?;
-                }
-                seq.end()
-            }
-            Color::FeatureState(f0) => {
-                let mut elems = vec![serde_json::to_value(f0).map_err(serde::ser::Error::custom)?];
-                while elems.len() > 1 && elems.last().is_some_and(serde_json::Value::is_null) {
-                    elems.pop();
-                }
-                let mut seq = serializer.serialize_seq(None)?;
-                seq.serialize_element("feature-state")?;
-                for elem in &elems {
-                    seq.serialize_element(elem)?;
-                }
-                seq.end()
-            }
-            Color::Get(f0, f1) => {
-                let mut elems = vec![
-                    serde_json::to_value(f0).map_err(serde::ser::Error::custom)?,
-                    serde_json::to_value(f1).map_err(serde::ser::Error::custom)?,
-                ];
-                while elems.len() > 1 && elems.last().is_some_and(serde_json::Value::is_null) {
-                    elems.pop();
-                }
-                let mut seq = serializer.serialize_seq(None)?;
-                seq.serialize_element("get")?;
-                for elem in &elems {
-                    seq.serialize_element(elem)?;
-                }
-                seq.end()
-            }
-            Color::GlobalState(f0) => {
-                let mut elems = vec![serde_json::to_value(f0).map_err(serde::ser::Error::custom)?];
-                while elems.len() > 1 && elems.last().is_some_and(serde_json::Value::is_null) {
-                    elems.pop();
-                }
-                let mut seq = serializer.serialize_seq(None)?;
-                seq.serialize_element("global-state")?;
-                for elem in &elems {
-                    seq.serialize_element(elem)?;
-                }
-                seq.end()
-            }
-            Color::Id => {
-                let mut elems = vec![];
-                while !elems.is_empty() && elems.last().is_some_and(serde_json::Value::is_null) {
-                    elems.pop();
-                }
-                let mut seq = serializer.serialize_seq(None)?;
-                seq.serialize_element("id")?;
-                for elem in &elems {
-                    seq.serialize_element(elem)?;
-                }
-                seq.end()
-            }
-            Color::Let(inner) => {
-                let inner_val = serde_json::to_value(inner).map_err(serde::ser::Error::custom)?;
-                let mut seq = serializer.serialize_seq(None)?;
-                seq.serialize_element("let")?;
-                if let serde_json::Value::Array(top) = &inner_val {
-                    for elem in top {
-                        if let serde_json::Value::Array(sub) = elem {
-                            if sub.is_empty() {
-                                // Empty Vec — nothing to flatten.
-                            } else if sub[0].is_array() {
-                                // An array-of-arrays is the Vec<(A,B)> — flatten it.
-                                for pair in sub {
-                                    if let serde_json::Value::Array(pair_elems) = pair {
-                                        for pe in pair_elems {
-                                            seq.serialize_element(pe)?;
-                                        }
-                                    } else {
-                                        seq.serialize_element(pair)?;
-                                    }
-                                }
-                            } else {
-                                // Plain array value (e.g. a sub-expression like ["zoom"]).
-                                seq.serialize_element(elem)?;
-                            }
-                        } else {
-                            seq.serialize_element(elem)?;
-                        }
-                    }
-                } else {
-                    seq.serialize_element(&inner_val)?;
-                }
-                seq.end()
-            }
-            Color::Match(inner) => {
-                let inner_val = serde_json::to_value(inner).map_err(serde::ser::Error::custom)?;
-                let mut seq = serializer.serialize_seq(None)?;
-                seq.serialize_element("match")?;
-                if let serde_json::Value::Array(top) = &inner_val {
-                    for elem in top {
-                        if let serde_json::Value::Array(sub) = elem {
-                            if sub.is_empty() {
-                                // Empty Vec — nothing to flatten.
-                            } else if sub[0].is_array() {
-                                // An array-of-arrays is the Vec<(A,B)> — flatten it.
-                                for pair in sub {
-                                    if let serde_json::Value::Array(pair_elems) = pair {
-                                        for pe in pair_elems {
-                                            seq.serialize_element(pe)?;
-                                        }
-                                    } else {
-                                        seq.serialize_element(pair)?;
-                                    }
-                                }
-                            } else {
-                                // Plain array value (e.g. a sub-expression like ["zoom"]).
-                                seq.serialize_element(elem)?;
-                            }
-                        } else {
-                            seq.serialize_element(elem)?;
-                        }
-                    }
-                } else {
-                    seq.serialize_element(&inner_val)?;
-                }
-                seq.end()
-            }
             Color::Rgb(f0, f1, f2) => {
                 let mut elems = vec![
                     serde_json::to_value(f0).map_err(serde::ser::Error::custom)?,
@@ -4784,39 +2006,6 @@ impl serde::Serialize for Color {
                 }
                 seq.end()
             }
-            Color::Step(inner) => {
-                let inner_val = serde_json::to_value(inner).map_err(serde::ser::Error::custom)?;
-                let mut seq = serializer.serialize_seq(None)?;
-                seq.serialize_element("step")?;
-                if let serde_json::Value::Array(top) = &inner_val {
-                    for elem in top {
-                        if let serde_json::Value::Array(sub) = elem {
-                            if sub.is_empty() {
-                                // Empty Vec — nothing to flatten.
-                            } else if sub[0].is_array() {
-                                // An array-of-arrays is the Vec<(A,B)> — flatten it.
-                                for pair in sub {
-                                    if let serde_json::Value::Array(pair_elems) = pair {
-                                        for pe in pair_elems {
-                                            seq.serialize_element(pe)?;
-                                        }
-                                    } else {
-                                        seq.serialize_element(pair)?;
-                                    }
-                                }
-                            } else {
-                                // Plain array value (e.g. a sub-expression like ["zoom"]).
-                                seq.serialize_element(elem)?;
-                            }
-                        } else {
-                            seq.serialize_element(elem)?;
-                        }
-                    }
-                } else {
-                    seq.serialize_element(&inner_val)?;
-                }
-                seq.end()
-            }
             Color::To(inner) => {
                 let inner_val = serde_json::to_value(inner).map_err(serde::ser::Error::custom)?;
                 let mut seq = serializer.serialize_seq(None)?;
@@ -4827,18 +2016,6 @@ impl serde::Serialize for Color {
                     }
                 } else {
                     seq.serialize_element(&inner_val)?;
-                }
-                seq.end()
-            }
-            Color::Var(f0) => {
-                let mut elems = vec![serde_json::to_value(f0).map_err(serde::ser::Error::custom)?];
-                while elems.len() > 1 && elems.last().is_some_and(serde_json::Value::is_null) {
-                    elems.pop();
-                }
-                let mut seq = serializer.serialize_seq(None)?;
-                seq.serialize_element("var")?;
-                for elem in &elems {
-                    seq.serialize_element(elem)?;
                 }
                 seq.end()
             }
@@ -4899,7 +2076,7 @@ pub enum ColorOrArrayOfColor {
     InterpolateHcl(
         (
             Interpolation,
-            NumberLiteralOrNumberAsUnion,
+            NumberLiteralOrNumberOrAnyAsUnion,
             Vec<(NumberLiteral, StringLiteralOrColorOrArrayOfColorAsUnion)>,
         ),
     ),
@@ -4907,7 +2084,7 @@ pub enum ColorOrArrayOfColor {
     InterpolateLab(
         (
             Interpolation,
-            NumberLiteralOrNumberAsUnion,
+            NumberLiteralOrNumberOrAnyAsUnion,
             Vec<(NumberLiteral, StringLiteralOrColorOrArrayOfColorAsUnion)>,
         ),
     ),
@@ -4952,7 +2129,7 @@ impl<'de> serde::de::Visitor<'de> for ColorOrArrayOfColorVisitor {
             "interpolate-hcl" => {
                 let interpolation_type: Interpolation =
                     visit_seq_field(&mut seq, "interpolation_type")?;
-                let input: NumberLiteralOrNumberAsUnion = visit_seq_field(&mut seq, "input")?;
+                let input: NumberLiteralOrNumberOrAnyAsUnion = visit_seq_field(&mut seq, "input")?;
                 let mut stops = Vec::new();
                 while let Some(stop_input_i) = seq.next_element::<NumberLiteral>()? {
                     let stop_output_i: StringLiteralOrColorOrArrayOfColorAsUnion =
@@ -4972,7 +2149,7 @@ impl<'de> serde::de::Visitor<'de> for ColorOrArrayOfColorVisitor {
             "interpolate-lab" => {
                 let interpolation_type: Interpolation =
                     visit_seq_field(&mut seq, "interpolation_type")?;
-                let input: NumberLiteralOrNumberAsUnion = visit_seq_field(&mut seq, "input")?;
+                let input: NumberLiteralOrNumberOrAnyAsUnion = visit_seq_field(&mut seq, "input")?;
                 let mut stops = Vec::new();
                 while let Some(stop_input_i) = seq.next_element::<NumberLiteral>()? {
                     let stop_output_i: StringLiteralOrColorOrArrayOfColorAsUnion =
@@ -5077,23 +2254,25 @@ impl serde::Serialize for ColorOrArrayOfColor {
 /// Either of the below variants
 #[derive(PartialEq, Debug, Clone)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum StringLiteralOrStringOrImageAsUnion {
+pub enum StringLiteralOrStringOrImageOrAnyAsUnion {
     StringLiteral(StringLiteral),
     String(Box<String>),
     Image(Image),
+    Any(Box<Any>),
 }
 
-impl serde::Serialize for StringLiteralOrStringOrImageAsUnion {
+impl serde::Serialize for StringLiteralOrStringOrImageOrAnyAsUnion {
     fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         match self {
             Self::StringLiteral(v) => v.serialize(serializer),
             Self::String(v) => v.serialize(serializer),
             Self::Image(v) => v.serialize(serializer),
+            Self::Any(v) => v.serialize(serializer),
         }
     }
 }
 
-impl<'de> serde::Deserialize<'de> for StringLiteralOrStringOrImageAsUnion {
+impl<'de> serde::Deserialize<'de> for StringLiteralOrStringOrImageOrAnyAsUnion {
     fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
         let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
         let mut errors: Vec<(&str, std::string::String)> = Vec::new();
@@ -5109,11 +2288,15 @@ impl<'de> serde::Deserialize<'de> for StringLiteralOrStringOrImageAsUnion {
             Ok(v) => return Ok(Self::Image(v)),
             Err(e) => errors.push(("Image", e.to_string())),
         }
+        match <Box<Any> as serde::Deserialize>::deserialize(&value) {
+            Ok(v) => return Ok(Self::Any(v)),
+            Err(e) => errors.push(("Any", e.to_string())),
+        }
 
         let details: Vec<std::string::String> =
             errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
         Err(serde::de::Error::custom(format!(
-            "StringLiteralOrStringOrImageAsUnion: no variant matched. Expected StringLiteral(StringLiteral) | String(Box<String>) | Image(Image). Errors: [{}]",
+            "StringLiteralOrStringOrImageOrAnyAsUnion: no variant matched. Expected StringLiteral(StringLiteral) | String(Box<String>) | Image(Image) | Any(Box<Any>). Errors: [{}]",
             details.join("; ")
         )))
     }
@@ -5123,7 +2306,7 @@ impl<'de> serde::Deserialize<'de> for StringLiteralOrStringOrImageAsUnion {
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct FormattedFormatVariadicRow(
-    StringLiteralOrStringOrImageAsUnion,
+    StringLiteralOrStringOrImageOrAnyAsUnion,
     #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_option_json_map))]
     Option<serde_json::Map<std::string::String, serde_json::Value>>,
 );
@@ -5132,79 +2315,12 @@ pub struct FormattedFormatVariadicRow(
 #[derive(PartialEq, Debug, Clone)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum Formatted {
-    /// Gets the value of a cluster property accumulated so far. Can only be used in the `clusterProperties` option of a clustered GeoJSON source.
-    Accumulated,
-    /// Retrieves an item from an array.
-    At(NumberLiteralOrNumberAsUnion, ExprOrLiteral),
-    /// Selects the first output whose corresponding test condition evaluates to true, or the fallback value otherwise.
-    ///
-    ///  - [Create a hover effect](https://maplibre.org/maplibre-gl-js/docs/examples/create-a-hover-effect/)
-    ///
-    ///  - [Display HTML clusters with custom properties](https://maplibre.org/maplibre-gl-js/docs/examples/display-html-clusters-with-custom-properties/)
-    Case((Vec<(Boolean, ExprOrLiteral)>, ExprOrLiteral)),
-    /// Evaluates each expression in turn until the first non-null value is obtained, and returns that value.
-    ///
-    ///  - [Use a fallback image](https://maplibre.org/maplibre-gl-js/docs/examples/use-a-fallback-image/)
-    Coalesce(Vec<ExprOrLiteral>),
-    /// Retrieves a property value from the current feature's state. Returns null if the requested property is not present on the feature's state. A feature's state is not part of the GeoJSON or vector tile data, and must be set programmatically on each feature. When `source.promoteId` is not provided, features are identified by their `id` attribute, which must be an integer or a string that can be cast to an integer. When `source.promoteId` is provided, features are identified by their `promoteId` property, which may be a number, string, or any primitive data type. Note that ["feature-state"] can only be used with paint properties that support data-driven styling.
-    ///
-    ///  - [Create a hover effect](https://maplibre.org/maplibre-gl-js/docs/examples/create-a-hover-effect/)
-    FeatureState(StringLiteralOrStringAsUnion),
     /// Returns a `formatted` string for displaying mixed-format text in the `text-field` property. The input may contain a string literal or expression, including an [`'image'`](#image) expression. Strings may be followed by a style override object.
     ///
     ///  - [Change the case of labels](https://maplibre.org/maplibre-gl-js/docs/examples/change-case-of-labels/)
     ///
     ///  - [Display and style rich text labels](https://maplibre.org/maplibre-gl-js/docs/examples/display-and-style-rich-text-labels/)
     Format(Vec<FormattedFormatVariadicRow>),
-    /// Retrieves a property value from the current feature's properties, or from another object if a second argument is provided. Returns null if the requested property is missing.
-    ///
-    ///  - [Change the case of labels](https://maplibre.org/maplibre-gl-js/docs/examples/change-case-of-labels/)
-    ///
-    ///  - [Display HTML clusters with custom properties](https://maplibre.org/maplibre-gl-js/docs/examples/display-html-clusters-with-custom-properties/)
-    ///
-    ///  - [Extrude polygons for 3D indoor mapping](https://maplibre.org/maplibre-gl-js/docs/examples/extrude-polygons-for-3d-indoor-mapping/)
-    Get(StringLiteralOrStringAsUnion, Option<Object>),
-    /// Retrieves a property value from global state that can be set with platform-specific APIs. Defaults can be provided using the [`state`](https://maplibre.org/maplibre-style-spec/root/#state) root property. Returns `null` if no value nor default value is set for the retrieved property.
-    GlobalState(StringLiteral),
-    /// Gets the feature's id, if it has one.
-    Id,
-    /// Binds expressions to named variables, which can then be referenced in the result expression using `["var", "variable_name"]`.
-    ///
-    ///  - [Visualize population density](https://maplibre.org/maplibre-gl-js/docs/examples/visualize-population-density/)
-    Let((Vec<(StringLiteral, ExprOrLiteral)>, ExprOrLiteral)),
-    /// Selects the output whose label value matches the input value, or the fallback value if no match is found. The input can be any expression (e.g. `["get", "building_type"]`). Each label must be either:
-    ///
-    ///  - a single literal value; or
-    ///
-    ///  - an array of literal values, whose values must be all strings or all numbers (e.g. `[100, 101]` or `["c", "b"]`). The input matches if any of the values in the array matches, similar to the `"in"` operator.
-    ///
-    /// Each label must be unique. If the input type does not match the type of the labels, the result will be the fallback value.
-    Match(
-        (
-            ExprOrLiteral,
-            Vec<(
-                StringOrNumberOrArrayOfStringOrArrayOfNumberAsUnion,
-                ExprOrLiteral,
-            )>,
-            ExprOrLiteral,
-        ),
-    ),
-    /// Produces discrete, stepped results by evaluating a piecewise-constant function defined by pairs of input and output values ("stops"). The `input` may be any numeric expression (e.g., `["get", "population"]`). Stop inputs must be numeric literals in strictly ascending order.
-    ///
-    /// Returns the output value of the stop just less than the input, or the first output if the input is less than the first stop.
-    ///
-    ///  - [Create and style clusters](https://maplibre.org/maplibre-gl-js/docs/examples/create-and-style-clusters/)
-    Step(
-        (
-            NumberLiteralOrNumberAsUnion,
-            ExprOrLiteral,
-            Vec<(NumberLiteral, ExprOrLiteral)>,
-        ),
-    ),
-    /// References variable bound using `let`.
-    ///
-    ///  - [Visualize population density](https://maplibre.org/maplibre-gl-js/docs/examples/visualize-population-density/)
-    Var(StringLiteral),
 }
 
 impl<'de> serde::Deserialize<'de> for Formatted {
@@ -5223,7 +2339,7 @@ impl<'de> serde::de::Visitor<'de> for FormattedVisitor {
     type Value = Formatted;
 
     fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
-        formatter.write_str("an Formatted expression (example: [\"accumulated\"])")
+        formatter.write_str("an Formatted expression (example: [\"format\",[\"upcase\",[\"get\",\"FacilityName\"]],{\"font-scale\":0.8},\"\\n\\n\",{},[\"downcase\",[\"get\",\"Comments\"]],{\"font-scale\":0.6,\"vertical-align\":\"center\"}])")
     }
 
     fn visit_seq<A: serde::de::SeqAccess<'de>>(self, mut seq: A) -> Result<Self::Value, A::Error> {
@@ -5243,52 +2359,6 @@ impl<'de> serde::de::Visitor<'de> for FormattedVisitor {
             .next_element()?
             .ok_or_else(|| serde::de::Error::custom("missing operator"))?;
         match op.as_str() {
-            "accumulated" => Ok(Formatted::Accumulated),
-            "at" => {
-                let index = visit_seq_field(&mut seq, "index")?;
-                let array = visit_seq_field(&mut seq, "array")?;
-                Ok(Formatted::At(index, array))
-            }
-            "case" => {
-                let mut inputs = Vec::new();
-                let mut rest: Vec<serde_json::Value> = Vec::new();
-                while let Some(v) = seq.next_element()? {
-                    rest.push(v);
-                }
-                if rest.is_empty() {
-                    return Err(serde::de::Error::custom(
-                        "{name}::{variant_name}: too few arguments",
-                    ));
-                }
-                if !(rest.len() - 1).is_multiple_of(2) {
-                    return Err(serde::de::Error::custom(
-                        "Formatted::Case: malformed template/suffix layout",
-                    ));
-                }
-                let inputs_len = (rest.len() - 1) / 2;
-                for i in 0..inputs_len {
-                    let condition_i = serde_json::from_value(rest[i * 2].clone())
-                        .map_err(serde::de::Error::custom)?;
-                    let output_i = serde_json::from_value(rest[i * 2 + 1].clone())
-                        .map_err(serde::de::Error::custom)?;
-                    let element = (condition_i, output_i);
-                    inputs.push(element);
-                }
-                let fallback = serde_json::from_value(rest[inputs_len * 2].clone())
-                    .map_err(serde::de::Error::custom)?;
-                Ok(Formatted::Case((inputs, fallback)))
-            }
-            "coalesce" => {
-                let mut inputs = Vec::new();
-                while let Some(element) = seq.next_element()? {
-                    inputs.push(element);
-                }
-                Ok(Formatted::Coalesce(inputs))
-            }
-            "feature-state" => {
-                let property_name = visit_seq_field(&mut seq, "property_name")?;
-                Ok(Formatted::FeatureState(property_name))
-            }
             "format" => {
                 let mut inputs = Vec::new();
                 while let Some(input_i) = seq.next_element()? {
@@ -5298,110 +2368,7 @@ impl<'de> serde::de::Visitor<'de> for FormattedVisitor {
                 }
                 Ok(Formatted::Format(inputs))
             }
-            "get" => {
-                let property_name = visit_seq_field(&mut seq, "property_name")?;
-                let object = seq.next_element()?;
-                Ok(Formatted::Get(property_name, object))
-            }
-            "global-state" => {
-                let property_name = visit_seq_field(&mut seq, "property_name")?;
-                Ok(Formatted::GlobalState(property_name))
-            }
-            "id" => Ok(Formatted::Id),
-            "let" => {
-                let mut inputs = Vec::new();
-                let mut rest: Vec<serde_json::Value> = Vec::new();
-                while let Some(v) = seq.next_element()? {
-                    rest.push(v);
-                }
-                if rest.is_empty() {
-                    return Err(serde::de::Error::custom(
-                        "{name}::{variant_name}: too few arguments",
-                    ));
-                }
-                if !(rest.len() - 1).is_multiple_of(2) {
-                    return Err(serde::de::Error::custom(
-                        "Formatted::Let: malformed template/suffix layout",
-                    ));
-                }
-                let inputs_len = (rest.len() - 1) / 2;
-                for i in 0..inputs_len {
-                    let var_name_i = serde_json::from_value(rest[i * 2].clone())
-                        .map_err(serde::de::Error::custom)?;
-                    let var_value_i = serde_json::from_value(rest[i * 2 + 1].clone())
-                        .map_err(serde::de::Error::custom)?;
-                    let element = (var_name_i, var_value_i);
-                    inputs.push(element);
-                }
-                let expression = serde_json::from_value(rest[inputs_len * 2].clone())
-                    .map_err(serde::de::Error::custom)?;
-                Ok(Formatted::Let((inputs, expression)))
-            }
-            "match" => {
-                let mut rest: Vec<serde_json::Value> = Vec::new();
-                while let Some(v) = seq.next_element()? {
-                    rest.push(v);
-                }
-                if rest.len() < 2 {
-                    return Err(serde::de::Error::custom(
-                        "Formatted::Match: too few arguments",
-                    ));
-                }
-                if !rest.len().is_multiple_of(2) {
-                    return Err(serde::de::Error::custom(
-                        "Formatted::Match: expected an even number of arguments after operator (input + label/output pairs + fallback)",
-                    ));
-                }
-                let fallback_v = rest.pop().unwrap();
-                let input: ExprOrLiteral =
-                    serde_json::from_value(rest.remove(0)).map_err(serde::de::Error::custom)?;
-                let mut pairs = Vec::new();
-                for chunk in rest.chunks_exact(2) {
-                    let label_i: StringOrNumberOrArrayOfStringOrArrayOfNumberAsUnion =
-                        serde_json::from_value(chunk[0].clone())
-                            .map_err(serde::de::Error::custom)?;
-                    let output_i: ExprOrLiteral = serde_json::from_value(chunk[1].clone())
-                        .map_err(serde::de::Error::custom)?;
-                    pairs.push((label_i, output_i));
-                }
-                let fallback: ExprOrLiteral =
-                    serde_json::from_value(fallback_v).map_err(serde::de::Error::custom)?;
-                Ok(Formatted::Match((input, pairs, fallback)))
-            }
-            "step" => {
-                let input: NumberLiteralOrNumberAsUnion = visit_seq_field(&mut seq, "input")?;
-                let output_0: ExprOrLiteral = visit_seq_field(&mut seq, "output_0")?;
-                let mut stops = Vec::new();
-                while let Some(stop_input_i) = seq.next_element::<NumberLiteral>()? {
-                    let stop_output_i: ExprOrLiteral = seq.next_element()?.ok_or_else(|| {
-                        serde::de::Error::custom("expected stop_output_i in Formatted::Step")
-                    })?;
-                    stops.push((stop_input_i, stop_output_i));
-                }
-                Ok(Formatted::Step((input, output_0, stops)))
-            }
-            "var" => {
-                let var_name = visit_seq_field(&mut seq, "var_name")?;
-                Ok(Formatted::Var(var_name))
-            }
-            _ => Err(serde::de::Error::unknown_variant(
-                &op,
-                &[
-                    "accumulated",
-                    "at",
-                    "case",
-                    "coalesce",
-                    "feature-state",
-                    "format",
-                    "get",
-                    "global-state",
-                    "id",
-                    "let",
-                    "match",
-                    "step",
-                    "var",
-                ],
-            )),
+            _ => Err(serde::de::Error::unknown_variant(&op, &["format"])),
         }
     }
 }
@@ -5413,91 +2380,6 @@ impl serde::Serialize for Formatted {
     {
         use serde::ser::SerializeSeq;
         match self {
-            Formatted::Accumulated => {
-                let mut elems = vec![];
-                while !elems.is_empty() && elems.last().is_some_and(serde_json::Value::is_null) {
-                    elems.pop();
-                }
-                let mut seq = serializer.serialize_seq(None)?;
-                seq.serialize_element("accumulated")?;
-                for elem in &elems {
-                    seq.serialize_element(elem)?;
-                }
-                seq.end()
-            }
-            Formatted::At(f0, f1) => {
-                let mut elems = vec![
-                    serde_json::to_value(f0).map_err(serde::ser::Error::custom)?,
-                    serde_json::to_value(f1).map_err(serde::ser::Error::custom)?,
-                ];
-                while elems.len() > 2 && elems.last().is_some_and(serde_json::Value::is_null) {
-                    elems.pop();
-                }
-                let mut seq = serializer.serialize_seq(None)?;
-                seq.serialize_element("at")?;
-                for elem in &elems {
-                    seq.serialize_element(elem)?;
-                }
-                seq.end()
-            }
-            Formatted::Case(inner) => {
-                let inner_val = serde_json::to_value(inner).map_err(serde::ser::Error::custom)?;
-                let mut seq = serializer.serialize_seq(None)?;
-                seq.serialize_element("case")?;
-                if let serde_json::Value::Array(top) = &inner_val {
-                    for elem in top {
-                        if let serde_json::Value::Array(sub) = elem {
-                            if sub.is_empty() {
-                                // Empty Vec — nothing to flatten.
-                            } else if sub[0].is_array() {
-                                // An array-of-arrays is the Vec<(A,B)> — flatten it.
-                                for pair in sub {
-                                    if let serde_json::Value::Array(pair_elems) = pair {
-                                        for pe in pair_elems {
-                                            seq.serialize_element(pe)?;
-                                        }
-                                    } else {
-                                        seq.serialize_element(pair)?;
-                                    }
-                                }
-                            } else {
-                                // Plain array value (e.g. a sub-expression like ["zoom"]).
-                                seq.serialize_element(elem)?;
-                            }
-                        } else {
-                            seq.serialize_element(elem)?;
-                        }
-                    }
-                } else {
-                    seq.serialize_element(&inner_val)?;
-                }
-                seq.end()
-            }
-            Formatted::Coalesce(inner) => {
-                let inner_val = serde_json::to_value(inner).map_err(serde::ser::Error::custom)?;
-                let mut seq = serializer.serialize_seq(None)?;
-                seq.serialize_element("coalesce")?;
-                if let serde_json::Value::Array(top) = &inner_val {
-                    for elem in top {
-                        seq.serialize_element(elem)?;
-                    }
-                } else {
-                    seq.serialize_element(&inner_val)?;
-                }
-                seq.end()
-            }
-            Formatted::FeatureState(f0) => {
-                let mut elems = vec![serde_json::to_value(f0).map_err(serde::ser::Error::custom)?];
-                while elems.len() > 1 && elems.last().is_some_and(serde_json::Value::is_null) {
-                    elems.pop();
-                }
-                let mut seq = serializer.serialize_seq(None)?;
-                seq.serialize_element("feature-state")?;
-                for elem in &elems {
-                    seq.serialize_element(elem)?;
-                }
-                seq.end()
-            }
             Formatted::Format(inner) => {
                 let inner_val = serde_json::to_value(inner).map_err(serde::ser::Error::custom)?;
                 let mut seq = serializer.serialize_seq(None)?;
@@ -5521,156 +2403,6 @@ impl serde::Serialize for Formatted {
                 }
                 seq.end()
             }
-            Formatted::Get(f0, f1) => {
-                let mut elems = vec![
-                    serde_json::to_value(f0).map_err(serde::ser::Error::custom)?,
-                    serde_json::to_value(f1).map_err(serde::ser::Error::custom)?,
-                ];
-                while elems.len() > 1 && elems.last().is_some_and(serde_json::Value::is_null) {
-                    elems.pop();
-                }
-                let mut seq = serializer.serialize_seq(None)?;
-                seq.serialize_element("get")?;
-                for elem in &elems {
-                    seq.serialize_element(elem)?;
-                }
-                seq.end()
-            }
-            Formatted::GlobalState(f0) => {
-                let mut elems = vec![serde_json::to_value(f0).map_err(serde::ser::Error::custom)?];
-                while elems.len() > 1 && elems.last().is_some_and(serde_json::Value::is_null) {
-                    elems.pop();
-                }
-                let mut seq = serializer.serialize_seq(None)?;
-                seq.serialize_element("global-state")?;
-                for elem in &elems {
-                    seq.serialize_element(elem)?;
-                }
-                seq.end()
-            }
-            Formatted::Id => {
-                let mut elems = vec![];
-                while !elems.is_empty() && elems.last().is_some_and(serde_json::Value::is_null) {
-                    elems.pop();
-                }
-                let mut seq = serializer.serialize_seq(None)?;
-                seq.serialize_element("id")?;
-                for elem in &elems {
-                    seq.serialize_element(elem)?;
-                }
-                seq.end()
-            }
-            Formatted::Let(inner) => {
-                let inner_val = serde_json::to_value(inner).map_err(serde::ser::Error::custom)?;
-                let mut seq = serializer.serialize_seq(None)?;
-                seq.serialize_element("let")?;
-                if let serde_json::Value::Array(top) = &inner_val {
-                    for elem in top {
-                        if let serde_json::Value::Array(sub) = elem {
-                            if sub.is_empty() {
-                                // Empty Vec — nothing to flatten.
-                            } else if sub[0].is_array() {
-                                // An array-of-arrays is the Vec<(A,B)> — flatten it.
-                                for pair in sub {
-                                    if let serde_json::Value::Array(pair_elems) = pair {
-                                        for pe in pair_elems {
-                                            seq.serialize_element(pe)?;
-                                        }
-                                    } else {
-                                        seq.serialize_element(pair)?;
-                                    }
-                                }
-                            } else {
-                                // Plain array value (e.g. a sub-expression like ["zoom"]).
-                                seq.serialize_element(elem)?;
-                            }
-                        } else {
-                            seq.serialize_element(elem)?;
-                        }
-                    }
-                } else {
-                    seq.serialize_element(&inner_val)?;
-                }
-                seq.end()
-            }
-            Formatted::Match(inner) => {
-                let inner_val = serde_json::to_value(inner).map_err(serde::ser::Error::custom)?;
-                let mut seq = serializer.serialize_seq(None)?;
-                seq.serialize_element("match")?;
-                if let serde_json::Value::Array(top) = &inner_val {
-                    for elem in top {
-                        if let serde_json::Value::Array(sub) = elem {
-                            if sub.is_empty() {
-                                // Empty Vec — nothing to flatten.
-                            } else if sub[0].is_array() {
-                                // An array-of-arrays is the Vec<(A,B)> — flatten it.
-                                for pair in sub {
-                                    if let serde_json::Value::Array(pair_elems) = pair {
-                                        for pe in pair_elems {
-                                            seq.serialize_element(pe)?;
-                                        }
-                                    } else {
-                                        seq.serialize_element(pair)?;
-                                    }
-                                }
-                            } else {
-                                // Plain array value (e.g. a sub-expression like ["zoom"]).
-                                seq.serialize_element(elem)?;
-                            }
-                        } else {
-                            seq.serialize_element(elem)?;
-                        }
-                    }
-                } else {
-                    seq.serialize_element(&inner_val)?;
-                }
-                seq.end()
-            }
-            Formatted::Step(inner) => {
-                let inner_val = serde_json::to_value(inner).map_err(serde::ser::Error::custom)?;
-                let mut seq = serializer.serialize_seq(None)?;
-                seq.serialize_element("step")?;
-                if let serde_json::Value::Array(top) = &inner_val {
-                    for elem in top {
-                        if let serde_json::Value::Array(sub) = elem {
-                            if sub.is_empty() {
-                                // Empty Vec — nothing to flatten.
-                            } else if sub[0].is_array() {
-                                // An array-of-arrays is the Vec<(A,B)> — flatten it.
-                                for pair in sub {
-                                    if let serde_json::Value::Array(pair_elems) = pair {
-                                        for pe in pair_elems {
-                                            seq.serialize_element(pe)?;
-                                        }
-                                    } else {
-                                        seq.serialize_element(pair)?;
-                                    }
-                                }
-                            } else {
-                                // Plain array value (e.g. a sub-expression like ["zoom"]).
-                                seq.serialize_element(elem)?;
-                            }
-                        } else {
-                            seq.serialize_element(elem)?;
-                        }
-                    }
-                } else {
-                    seq.serialize_element(&inner_val)?;
-                }
-                seq.end()
-            }
-            Formatted::Var(f0) => {
-                let mut elems = vec![serde_json::to_value(f0).map_err(serde::ser::Error::custom)?];
-                while elems.len() > 1 && elems.last().is_some_and(serde_json::Value::is_null) {
-                    elems.pop();
-                }
-                let mut seq = serializer.serialize_seq(None)?;
-                seq.serialize_element("var")?;
-                for elem in &elems {
-                    seq.serialize_element(elem)?;
-                }
-                seq.end()
-            }
         }
     }
 }
@@ -5679,77 +2411,10 @@ impl serde::Serialize for Formatted {
 #[derive(PartialEq, Debug, Clone)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum Image {
-    /// Gets the value of a cluster property accumulated so far. Can only be used in the `clusterProperties` option of a clustered GeoJSON source.
-    Accumulated,
-    /// Retrieves an item from an array.
-    At(NumberLiteralOrNumberAsUnion, ExprOrLiteral),
-    /// Selects the first output whose corresponding test condition evaluates to true, or the fallback value otherwise.
-    ///
-    ///  - [Create a hover effect](https://maplibre.org/maplibre-gl-js/docs/examples/create-a-hover-effect/)
-    ///
-    ///  - [Display HTML clusters with custom properties](https://maplibre.org/maplibre-gl-js/docs/examples/display-html-clusters-with-custom-properties/)
-    Case((Vec<(Boolean, ExprOrLiteral)>, ExprOrLiteral)),
-    /// Evaluates each expression in turn until the first non-null value is obtained, and returns that value.
-    ///
-    ///  - [Use a fallback image](https://maplibre.org/maplibre-gl-js/docs/examples/use-a-fallback-image/)
-    Coalesce(Vec<ExprOrLiteral>),
-    /// Retrieves a property value from the current feature's state. Returns null if the requested property is not present on the feature's state. A feature's state is not part of the GeoJSON or vector tile data, and must be set programmatically on each feature. When `source.promoteId` is not provided, features are identified by their `id` attribute, which must be an integer or a string that can be cast to an integer. When `source.promoteId` is provided, features are identified by their `promoteId` property, which may be a number, string, or any primitive data type. Note that ["feature-state"] can only be used with paint properties that support data-driven styling.
-    ///
-    ///  - [Create a hover effect](https://maplibre.org/maplibre-gl-js/docs/examples/create-a-hover-effect/)
-    FeatureState(StringLiteralOrStringAsUnion),
-    /// Retrieves a property value from the current feature's properties, or from another object if a second argument is provided. Returns null if the requested property is missing.
-    ///
-    ///  - [Change the case of labels](https://maplibre.org/maplibre-gl-js/docs/examples/change-case-of-labels/)
-    ///
-    ///  - [Display HTML clusters with custom properties](https://maplibre.org/maplibre-gl-js/docs/examples/display-html-clusters-with-custom-properties/)
-    ///
-    ///  - [Extrude polygons for 3D indoor mapping](https://maplibre.org/maplibre-gl-js/docs/examples/extrude-polygons-for-3d-indoor-mapping/)
-    Get(StringLiteralOrStringAsUnion, Option<Object>),
-    /// Retrieves a property value from global state that can be set with platform-specific APIs. Defaults can be provided using the [`state`](https://maplibre.org/maplibre-style-spec/root/#state) root property. Returns `null` if no value nor default value is set for the retrieved property.
-    GlobalState(StringLiteral),
-    /// Gets the feature's id, if it has one.
-    Id,
     /// Returns an `image` type for use in `icon-image`, `*-pattern` entries and as a section in the `format` expression. If set, the `image` argument will check that the requested image exists in the style and will return either the resolved image name or `null`, depending on whether or not the image is currently in the style. This validation process is synchronous and requires the image to have been added to the style before requesting it in the `image` argument.
     ///
     ///  - [Use a fallback image](https://maplibre.org/maplibre-gl-js/docs/examples/use-a-fallback-image/)
-    Op(StringLiteralOrStringAsUnion),
-    /// Binds expressions to named variables, which can then be referenced in the result expression using `["var", "variable_name"]`.
-    ///
-    ///  - [Visualize population density](https://maplibre.org/maplibre-gl-js/docs/examples/visualize-population-density/)
-    Let((Vec<(StringLiteral, ExprOrLiteral)>, ExprOrLiteral)),
-    /// Selects the output whose label value matches the input value, or the fallback value if no match is found. The input can be any expression (e.g. `["get", "building_type"]`). Each label must be either:
-    ///
-    ///  - a single literal value; or
-    ///
-    ///  - an array of literal values, whose values must be all strings or all numbers (e.g. `[100, 101]` or `["c", "b"]`). The input matches if any of the values in the array matches, similar to the `"in"` operator.
-    ///
-    /// Each label must be unique. If the input type does not match the type of the labels, the result will be the fallback value.
-    Match(
-        (
-            ExprOrLiteral,
-            Vec<(
-                StringOrNumberOrArrayOfStringOrArrayOfNumberAsUnion,
-                ExprOrLiteral,
-            )>,
-            ExprOrLiteral,
-        ),
-    ),
-    /// Produces discrete, stepped results by evaluating a piecewise-constant function defined by pairs of input and output values ("stops"). The `input` may be any numeric expression (e.g., `["get", "population"]`). Stop inputs must be numeric literals in strictly ascending order.
-    ///
-    /// Returns the output value of the stop just less than the input, or the first output if the input is less than the first stop.
-    ///
-    ///  - [Create and style clusters](https://maplibre.org/maplibre-gl-js/docs/examples/create-and-style-clusters/)
-    Step(
-        (
-            NumberLiteralOrNumberAsUnion,
-            ExprOrLiteral,
-            Vec<(NumberLiteral, ExprOrLiteral)>,
-        ),
-    ),
-    /// References variable bound using `let`.
-    ///
-    ///  - [Visualize population density](https://maplibre.org/maplibre-gl-js/docs/examples/visualize-population-density/)
-    Var(StringLiteral),
+    Op(StringLiteralOrStringOrAnyAsUnion),
 }
 
 impl<'de> serde::Deserialize<'de> for Image {
@@ -5768,7 +2433,7 @@ impl<'de> serde::de::Visitor<'de> for ImageVisitor {
     type Value = Image;
 
     fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
-        formatter.write_str("an Image expression (example: [\"accumulated\"])")
+        formatter.write_str("an Image expression (example: [\"image\",\"marker_15\"])")
     }
 
     fn visit_seq<A: serde::de::SeqAccess<'de>>(self, mut seq: A) -> Result<Self::Value, A::Error> {
@@ -5788,158 +2453,11 @@ impl<'de> serde::de::Visitor<'de> for ImageVisitor {
             .next_element()?
             .ok_or_else(|| serde::de::Error::custom("missing operator"))?;
         match op.as_str() {
-            "accumulated" => Ok(Image::Accumulated),
-            "at" => {
-                let index = visit_seq_field(&mut seq, "index")?;
-                let array = visit_seq_field(&mut seq, "array")?;
-                Ok(Image::At(index, array))
-            }
-            "case" => {
-                let mut inputs = Vec::new();
-                let mut rest: Vec<serde_json::Value> = Vec::new();
-                while let Some(v) = seq.next_element()? {
-                    rest.push(v);
-                }
-                if rest.is_empty() {
-                    return Err(serde::de::Error::custom(
-                        "{name}::{variant_name}: too few arguments",
-                    ));
-                }
-                if !(rest.len() - 1).is_multiple_of(2) {
-                    return Err(serde::de::Error::custom(
-                        "Image::Case: malformed template/suffix layout",
-                    ));
-                }
-                let inputs_len = (rest.len() - 1) / 2;
-                for i in 0..inputs_len {
-                    let condition_i = serde_json::from_value(rest[i * 2].clone())
-                        .map_err(serde::de::Error::custom)?;
-                    let output_i = serde_json::from_value(rest[i * 2 + 1].clone())
-                        .map_err(serde::de::Error::custom)?;
-                    let element = (condition_i, output_i);
-                    inputs.push(element);
-                }
-                let fallback = serde_json::from_value(rest[inputs_len * 2].clone())
-                    .map_err(serde::de::Error::custom)?;
-                Ok(Image::Case((inputs, fallback)))
-            }
-            "coalesce" => {
-                let mut inputs = Vec::new();
-                while let Some(element) = seq.next_element()? {
-                    inputs.push(element);
-                }
-                Ok(Image::Coalesce(inputs))
-            }
-            "feature-state" => {
-                let property_name = visit_seq_field(&mut seq, "property_name")?;
-                Ok(Image::FeatureState(property_name))
-            }
-            "get" => {
-                let property_name = visit_seq_field(&mut seq, "property_name")?;
-                let object = seq.next_element()?;
-                Ok(Image::Get(property_name, object))
-            }
-            "global-state" => {
-                let property_name = visit_seq_field(&mut seq, "property_name")?;
-                Ok(Image::GlobalState(property_name))
-            }
-            "id" => Ok(Image::Id),
             "image" => {
                 let image_name = visit_seq_field(&mut seq, "image_name")?;
                 Ok(Image::Op(image_name))
             }
-            "let" => {
-                let mut inputs = Vec::new();
-                let mut rest: Vec<serde_json::Value> = Vec::new();
-                while let Some(v) = seq.next_element()? {
-                    rest.push(v);
-                }
-                if rest.is_empty() {
-                    return Err(serde::de::Error::custom(
-                        "{name}::{variant_name}: too few arguments",
-                    ));
-                }
-                if !(rest.len() - 1).is_multiple_of(2) {
-                    return Err(serde::de::Error::custom(
-                        "Image::Let: malformed template/suffix layout",
-                    ));
-                }
-                let inputs_len = (rest.len() - 1) / 2;
-                for i in 0..inputs_len {
-                    let var_name_i = serde_json::from_value(rest[i * 2].clone())
-                        .map_err(serde::de::Error::custom)?;
-                    let var_value_i = serde_json::from_value(rest[i * 2 + 1].clone())
-                        .map_err(serde::de::Error::custom)?;
-                    let element = (var_name_i, var_value_i);
-                    inputs.push(element);
-                }
-                let expression = serde_json::from_value(rest[inputs_len * 2].clone())
-                    .map_err(serde::de::Error::custom)?;
-                Ok(Image::Let((inputs, expression)))
-            }
-            "match" => {
-                let mut rest: Vec<serde_json::Value> = Vec::new();
-                while let Some(v) = seq.next_element()? {
-                    rest.push(v);
-                }
-                if rest.len() < 2 {
-                    return Err(serde::de::Error::custom("Image::Match: too few arguments"));
-                }
-                if !rest.len().is_multiple_of(2) {
-                    return Err(serde::de::Error::custom(
-                        "Image::Match: expected an even number of arguments after operator (input + label/output pairs + fallback)",
-                    ));
-                }
-                let fallback_v = rest.pop().unwrap();
-                let input: ExprOrLiteral =
-                    serde_json::from_value(rest.remove(0)).map_err(serde::de::Error::custom)?;
-                let mut pairs = Vec::new();
-                for chunk in rest.chunks_exact(2) {
-                    let label_i: StringOrNumberOrArrayOfStringOrArrayOfNumberAsUnion =
-                        serde_json::from_value(chunk[0].clone())
-                            .map_err(serde::de::Error::custom)?;
-                    let output_i: ExprOrLiteral = serde_json::from_value(chunk[1].clone())
-                        .map_err(serde::de::Error::custom)?;
-                    pairs.push((label_i, output_i));
-                }
-                let fallback: ExprOrLiteral =
-                    serde_json::from_value(fallback_v).map_err(serde::de::Error::custom)?;
-                Ok(Image::Match((input, pairs, fallback)))
-            }
-            "step" => {
-                let input: NumberLiteralOrNumberAsUnion = visit_seq_field(&mut seq, "input")?;
-                let output_0: ExprOrLiteral = visit_seq_field(&mut seq, "output_0")?;
-                let mut stops = Vec::new();
-                while let Some(stop_input_i) = seq.next_element::<NumberLiteral>()? {
-                    let stop_output_i: ExprOrLiteral = seq.next_element()?.ok_or_else(|| {
-                        serde::de::Error::custom("expected stop_output_i in Image::Step")
-                    })?;
-                    stops.push((stop_input_i, stop_output_i));
-                }
-                Ok(Image::Step((input, output_0, stops)))
-            }
-            "var" => {
-                let var_name = visit_seq_field(&mut seq, "var_name")?;
-                Ok(Image::Var(var_name))
-            }
-            _ => Err(serde::de::Error::unknown_variant(
-                &op,
-                &[
-                    "accumulated",
-                    "at",
-                    "case",
-                    "coalesce",
-                    "feature-state",
-                    "get",
-                    "global-state",
-                    "id",
-                    "image",
-                    "let",
-                    "match",
-                    "step",
-                    "var",
-                ],
-            )),
+            _ => Err(serde::de::Error::unknown_variant(&op, &["image"])),
         }
     }
 }
@@ -5951,130 +2469,6 @@ impl serde::Serialize for Image {
     {
         use serde::ser::SerializeSeq;
         match self {
-            Image::Accumulated => {
-                let mut elems = vec![];
-                while !elems.is_empty() && elems.last().is_some_and(serde_json::Value::is_null) {
-                    elems.pop();
-                }
-                let mut seq = serializer.serialize_seq(None)?;
-                seq.serialize_element("accumulated")?;
-                for elem in &elems {
-                    seq.serialize_element(elem)?;
-                }
-                seq.end()
-            }
-            Image::At(f0, f1) => {
-                let mut elems = vec![
-                    serde_json::to_value(f0).map_err(serde::ser::Error::custom)?,
-                    serde_json::to_value(f1).map_err(serde::ser::Error::custom)?,
-                ];
-                while elems.len() > 2 && elems.last().is_some_and(serde_json::Value::is_null) {
-                    elems.pop();
-                }
-                let mut seq = serializer.serialize_seq(None)?;
-                seq.serialize_element("at")?;
-                for elem in &elems {
-                    seq.serialize_element(elem)?;
-                }
-                seq.end()
-            }
-            Image::Case(inner) => {
-                let inner_val = serde_json::to_value(inner).map_err(serde::ser::Error::custom)?;
-                let mut seq = serializer.serialize_seq(None)?;
-                seq.serialize_element("case")?;
-                if let serde_json::Value::Array(top) = &inner_val {
-                    for elem in top {
-                        if let serde_json::Value::Array(sub) = elem {
-                            if sub.is_empty() {
-                                // Empty Vec — nothing to flatten.
-                            } else if sub[0].is_array() {
-                                // An array-of-arrays is the Vec<(A,B)> — flatten it.
-                                for pair in sub {
-                                    if let serde_json::Value::Array(pair_elems) = pair {
-                                        for pe in pair_elems {
-                                            seq.serialize_element(pe)?;
-                                        }
-                                    } else {
-                                        seq.serialize_element(pair)?;
-                                    }
-                                }
-                            } else {
-                                // Plain array value (e.g. a sub-expression like ["zoom"]).
-                                seq.serialize_element(elem)?;
-                            }
-                        } else {
-                            seq.serialize_element(elem)?;
-                        }
-                    }
-                } else {
-                    seq.serialize_element(&inner_val)?;
-                }
-                seq.end()
-            }
-            Image::Coalesce(inner) => {
-                let inner_val = serde_json::to_value(inner).map_err(serde::ser::Error::custom)?;
-                let mut seq = serializer.serialize_seq(None)?;
-                seq.serialize_element("coalesce")?;
-                if let serde_json::Value::Array(top) = &inner_val {
-                    for elem in top {
-                        seq.serialize_element(elem)?;
-                    }
-                } else {
-                    seq.serialize_element(&inner_val)?;
-                }
-                seq.end()
-            }
-            Image::FeatureState(f0) => {
-                let mut elems = vec![serde_json::to_value(f0).map_err(serde::ser::Error::custom)?];
-                while elems.len() > 1 && elems.last().is_some_and(serde_json::Value::is_null) {
-                    elems.pop();
-                }
-                let mut seq = serializer.serialize_seq(None)?;
-                seq.serialize_element("feature-state")?;
-                for elem in &elems {
-                    seq.serialize_element(elem)?;
-                }
-                seq.end()
-            }
-            Image::Get(f0, f1) => {
-                let mut elems = vec![
-                    serde_json::to_value(f0).map_err(serde::ser::Error::custom)?,
-                    serde_json::to_value(f1).map_err(serde::ser::Error::custom)?,
-                ];
-                while elems.len() > 1 && elems.last().is_some_and(serde_json::Value::is_null) {
-                    elems.pop();
-                }
-                let mut seq = serializer.serialize_seq(None)?;
-                seq.serialize_element("get")?;
-                for elem in &elems {
-                    seq.serialize_element(elem)?;
-                }
-                seq.end()
-            }
-            Image::GlobalState(f0) => {
-                let mut elems = vec![serde_json::to_value(f0).map_err(serde::ser::Error::custom)?];
-                while elems.len() > 1 && elems.last().is_some_and(serde_json::Value::is_null) {
-                    elems.pop();
-                }
-                let mut seq = serializer.serialize_seq(None)?;
-                seq.serialize_element("global-state")?;
-                for elem in &elems {
-                    seq.serialize_element(elem)?;
-                }
-                seq.end()
-            }
-            Image::Id => {
-                let mut elems = vec![];
-                while !elems.is_empty() && elems.last().is_some_and(serde_json::Value::is_null) {
-                    elems.pop();
-                }
-                let mut seq = serializer.serialize_seq(None)?;
-                seq.serialize_element("id")?;
-                for elem in &elems {
-                    seq.serialize_element(elem)?;
-                }
-                seq.end()
-            }
             Image::Op(f0) => {
                 let mut elems = vec![serde_json::to_value(f0).map_err(serde::ser::Error::custom)?];
                 while elems.len() > 1 && elems.last().is_some_and(serde_json::Value::is_null) {
@@ -6087,117 +2481,6 @@ impl serde::Serialize for Image {
                 }
                 seq.end()
             }
-            Image::Let(inner) => {
-                let inner_val = serde_json::to_value(inner).map_err(serde::ser::Error::custom)?;
-                let mut seq = serializer.serialize_seq(None)?;
-                seq.serialize_element("let")?;
-                if let serde_json::Value::Array(top) = &inner_val {
-                    for elem in top {
-                        if let serde_json::Value::Array(sub) = elem {
-                            if sub.is_empty() {
-                                // Empty Vec — nothing to flatten.
-                            } else if sub[0].is_array() {
-                                // An array-of-arrays is the Vec<(A,B)> — flatten it.
-                                for pair in sub {
-                                    if let serde_json::Value::Array(pair_elems) = pair {
-                                        for pe in pair_elems {
-                                            seq.serialize_element(pe)?;
-                                        }
-                                    } else {
-                                        seq.serialize_element(pair)?;
-                                    }
-                                }
-                            } else {
-                                // Plain array value (e.g. a sub-expression like ["zoom"]).
-                                seq.serialize_element(elem)?;
-                            }
-                        } else {
-                            seq.serialize_element(elem)?;
-                        }
-                    }
-                } else {
-                    seq.serialize_element(&inner_val)?;
-                }
-                seq.end()
-            }
-            Image::Match(inner) => {
-                let inner_val = serde_json::to_value(inner).map_err(serde::ser::Error::custom)?;
-                let mut seq = serializer.serialize_seq(None)?;
-                seq.serialize_element("match")?;
-                if let serde_json::Value::Array(top) = &inner_val {
-                    for elem in top {
-                        if let serde_json::Value::Array(sub) = elem {
-                            if sub.is_empty() {
-                                // Empty Vec — nothing to flatten.
-                            } else if sub[0].is_array() {
-                                // An array-of-arrays is the Vec<(A,B)> — flatten it.
-                                for pair in sub {
-                                    if let serde_json::Value::Array(pair_elems) = pair {
-                                        for pe in pair_elems {
-                                            seq.serialize_element(pe)?;
-                                        }
-                                    } else {
-                                        seq.serialize_element(pair)?;
-                                    }
-                                }
-                            } else {
-                                // Plain array value (e.g. a sub-expression like ["zoom"]).
-                                seq.serialize_element(elem)?;
-                            }
-                        } else {
-                            seq.serialize_element(elem)?;
-                        }
-                    }
-                } else {
-                    seq.serialize_element(&inner_val)?;
-                }
-                seq.end()
-            }
-            Image::Step(inner) => {
-                let inner_val = serde_json::to_value(inner).map_err(serde::ser::Error::custom)?;
-                let mut seq = serializer.serialize_seq(None)?;
-                seq.serialize_element("step")?;
-                if let serde_json::Value::Array(top) = &inner_val {
-                    for elem in top {
-                        if let serde_json::Value::Array(sub) = elem {
-                            if sub.is_empty() {
-                                // Empty Vec — nothing to flatten.
-                            } else if sub[0].is_array() {
-                                // An array-of-arrays is the Vec<(A,B)> — flatten it.
-                                for pair in sub {
-                                    if let serde_json::Value::Array(pair_elems) = pair {
-                                        for pe in pair_elems {
-                                            seq.serialize_element(pe)?;
-                                        }
-                                    } else {
-                                        seq.serialize_element(pair)?;
-                                    }
-                                }
-                            } else {
-                                // Plain array value (e.g. a sub-expression like ["zoom"]).
-                                seq.serialize_element(elem)?;
-                            }
-                        } else {
-                            seq.serialize_element(elem)?;
-                        }
-                    }
-                } else {
-                    seq.serialize_element(&inner_val)?;
-                }
-                seq.end()
-            }
-            Image::Var(f0) => {
-                let mut elems = vec![serde_json::to_value(f0).map_err(serde::ser::Error::custom)?];
-                while elems.len() > 1 && elems.last().is_some_and(serde_json::Value::is_null) {
-                    elems.pop();
-                }
-                let mut seq = serializer.serialize_seq(None)?;
-                seq.serialize_element("var")?;
-                for elem in &elems {
-                    seq.serialize_element(elem)?;
-                }
-                seq.end()
-            }
         }
     }
 }
@@ -6205,23 +2488,25 @@ impl serde::Serialize for Image {
 /// Either of the below variants
 #[derive(PartialEq, Debug, Clone)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum StringLiteralOrArrayOrStringAsUnion {
+pub enum StringLiteralOrArrayOrStringOrAnyAsUnion {
     StringLiteral(StringLiteral),
     Array(Array),
     String(Box<String>),
+    Any(Box<Any>),
 }
 
-impl serde::Serialize for StringLiteralOrArrayOrStringAsUnion {
+impl serde::Serialize for StringLiteralOrArrayOrStringOrAnyAsUnion {
     fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         match self {
             Self::StringLiteral(v) => v.serialize(serializer),
             Self::Array(v) => v.serialize(serializer),
             Self::String(v) => v.serialize(serializer),
+            Self::Any(v) => v.serialize(serializer),
         }
     }
 }
 
-impl<'de> serde::Deserialize<'de> for StringLiteralOrArrayOrStringAsUnion {
+impl<'de> serde::Deserialize<'de> for StringLiteralOrArrayOrStringOrAnyAsUnion {
     fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
         let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
         let mut errors: Vec<(&str, std::string::String)> = Vec::new();
@@ -6237,11 +2522,15 @@ impl<'de> serde::Deserialize<'de> for StringLiteralOrArrayOrStringAsUnion {
             Ok(v) => return Ok(Self::String(v)),
             Err(e) => errors.push(("String", e.to_string())),
         }
+        match <Box<Any> as serde::Deserialize>::deserialize(&value) {
+            Ok(v) => return Ok(Self::Any(v)),
+            Err(e) => errors.push(("Any", e.to_string())),
+        }
 
         let details: Vec<std::string::String> =
             errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
         Err(serde::de::Error::custom(format!(
-            "StringLiteralOrArrayOrStringAsUnion: no variant matched. Expected StringLiteral(StringLiteral) | Array(Array) | String(Box<String>). Errors: [{}]",
+            "StringLiteralOrArrayOrStringOrAnyAsUnion: no variant matched. Expected StringLiteral(StringLiteral) | Array(Array) | String(Box<String>) | Any(Box<Any>). Errors: [{}]",
             details.join("; ")
         )))
     }
@@ -6252,140 +2541,82 @@ impl<'de> serde::Deserialize<'de> for StringLiteralOrArrayOrStringAsUnion {
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum Number {
     /// Returns the remainder after integer division of the first input by the second.
-    Percentage(NumberLiteralOrNumberAsUnion, NumberLiteralOrNumberAsUnion),
+    Percentage(
+        NumberLiteralOrNumberOrAnyAsUnion,
+        NumberLiteralOrNumberOrAnyAsUnion,
+    ),
     /// Returns the product of the inputs.
-    Star(Vec<NumberLiteralOrNumberAsUnion>),
+    Star(Vec<NumberLiteralOrNumberOrAnyAsUnion>),
     /// Returns the sum of the inputs.
-    Plus(Vec<NumberLiteralOrNumberAsUnion>),
+    Plus(Vec<NumberLiteralOrNumberOrAnyAsUnion>),
     /// For two inputs, returns the result of subtracting the second input from the first. For a single input, returns the result of subtracting it from 0.
     Minus(MinusOptions),
     /// Returns the result of floating point division of the first input by the second.
     ///
     ///  - [Visualize population density](https://maplibre.org/maplibre-gl-js/docs/examples/visualize-population-density/)
-    Slash(NumberLiteralOrNumberAsUnion, NumberLiteralOrNumberAsUnion),
+    Slash(
+        NumberLiteralOrNumberOrAnyAsUnion,
+        NumberLiteralOrNumberOrAnyAsUnion,
+    ),
     /// Returns the result of raising the first input to the power specified by the second.
-    Power(NumberLiteralOrNumberAsUnion, NumberLiteralOrNumberAsUnion),
+    Power(
+        NumberLiteralOrNumberOrAnyAsUnion,
+        NumberLiteralOrNumberOrAnyAsUnion,
+    ),
     /// Returns the absolute value of the input.
-    Absolute(NumberLiteralOrNumberAsUnion),
-    /// Gets the value of a cluster property accumulated so far. Can only be used in the `clusterProperties` option of a clustered GeoJSON source.
-    Accumulated,
+    Absolute(NumberLiteralOrNumberOrAnyAsUnion),
     /// Returns the arccosine of the input.
-    Arccosine(NumberLiteralOrNumberAsUnion),
+    Arccosine(NumberLiteralOrNumberOrAnyAsUnion),
     /// Returns the arcsine of the input.
-    Asin(NumberLiteralOrNumberAsUnion),
-    /// Retrieves an item from an array.
-    At(NumberLiteralOrNumberAsUnion, ExprOrLiteral),
+    Asin(NumberLiteralOrNumberOrAnyAsUnion),
     /// Returns the arctangent of the input.
-    Atan(NumberLiteralOrNumberAsUnion),
-    /// Selects the first output whose corresponding test condition evaluates to true, or the fallback value otherwise.
-    ///
-    ///  - [Create a hover effect](https://maplibre.org/maplibre-gl-js/docs/examples/create-a-hover-effect/)
-    ///
-    ///  - [Display HTML clusters with custom properties](https://maplibre.org/maplibre-gl-js/docs/examples/display-html-clusters-with-custom-properties/)
-    Case((Vec<(Boolean, ExprOrLiteral)>, ExprOrLiteral)),
+    Atan(NumberLiteralOrNumberOrAnyAsUnion),
     /// Returns the smallest integer that is greater than or equal to the input.
-    Ceil(NumberLiteralOrNumberAsUnion),
-    /// Evaluates each expression in turn until the first non-null value is obtained, and returns that value.
-    ///
-    ///  - [Use a fallback image](https://maplibre.org/maplibre-gl-js/docs/examples/use-a-fallback-image/)
-    Coalesce(Vec<ExprOrLiteral>),
+    Ceil(NumberLiteralOrNumberOrAnyAsUnion),
     /// Returns the cosine of the input.
-    Cos(NumberLiteralOrNumberAsUnion),
+    Cos(NumberLiteralOrNumberOrAnyAsUnion),
     /// Returns the shortest distance in meters between the evaluated feature and the input geometry. The input value can be a valid GeoJSON of type `Point`, `MultiPoint`, `LineString`, `MultiLineString`, `Polygon`, `MultiPolygon`, `Feature`, or `FeatureCollection`. Distance values returned may vary in precision due to loss in precision from encoding geometries, particularly below zoom level 13.
     Distance(GeoJSONObjectLiteral),
     /// Returns the mathematical constant e.
     E,
     /// Gets the elevation of a pixel (in meters above the vertical datum reference of the `raster-dem` tiles) from a `raster-dem` source. Can only be used in the `color-relief-color` property of a `color-relief` layer.
     Elevation,
-    /// Retrieves a property value from the current feature's state. Returns null if the requested property is not present on the feature's state. A feature's state is not part of the GeoJSON or vector tile data, and must be set programmatically on each feature. When `source.promoteId` is not provided, features are identified by their `id` attribute, which must be an integer or a string that can be cast to an integer. When `source.promoteId` is provided, features are identified by their `promoteId` property, which may be a number, string, or any primitive data type. Note that ["feature-state"] can only be used with paint properties that support data-driven styling.
-    ///
-    ///  - [Create a hover effect](https://maplibre.org/maplibre-gl-js/docs/examples/create-a-hover-effect/)
-    FeatureState(StringLiteralOrStringAsUnion),
     /// Returns the largest integer that is less than or equal to the input.
-    Floor(NumberLiteralOrNumberAsUnion),
-    /// Retrieves a property value from the current feature's properties, or from another object if a second argument is provided. Returns null if the requested property is missing.
-    ///
-    ///  - [Change the case of labels](https://maplibre.org/maplibre-gl-js/docs/examples/change-case-of-labels/)
-    ///
-    ///  - [Display HTML clusters with custom properties](https://maplibre.org/maplibre-gl-js/docs/examples/display-html-clusters-with-custom-properties/)
-    ///
-    ///  - [Extrude polygons for 3D indoor mapping](https://maplibre.org/maplibre-gl-js/docs/examples/extrude-polygons-for-3d-indoor-mapping/)
-    Get(StringLiteralOrStringAsUnion, Option<Object>),
-    /// Retrieves a property value from global state that can be set with platform-specific APIs. Defaults can be provided using the [`state`](https://maplibre.org/maplibre-style-spec/root/#state) root property. Returns `null` if no value nor default value is set for the retrieved property.
-    GlobalState(StringLiteral),
+    Floor(NumberLiteralOrNumberOrAnyAsUnion),
     /// Gets the kernel density estimation of a pixel in a heatmap layer, which is a relative measure of how many data points are crowded around a particular pixel. Can only be used in the `heatmap-color` property.
     HeatmapDensity,
-    /// Gets the feature's id, if it has one.
-    Id,
     /// Returns the first position at which an item can be found in an array or a substring can be found in a string, or `-1` if the input cannot be found. Accepts an optional index from where to begin the search. In a string, a UTF-16 surrogate pair counts as a single position.
     IndexOf(IndexOfOptions),
     /// Gets the length of an array or string. In a string, a UTF-16 surrogate pair counts as a single position.
-    Length(StringLiteralOrArrayOrStringAsUnion),
-    /// Binds expressions to named variables, which can then be referenced in the result expression using `["var", "variable_name"]`.
-    ///
-    ///  - [Visualize population density](https://maplibre.org/maplibre-gl-js/docs/examples/visualize-population-density/)
-    Let((Vec<(StringLiteral, ExprOrLiteral)>, ExprOrLiteral)),
+    Length(StringLiteralOrArrayOrStringOrAnyAsUnion),
     /// Gets the progress along a gradient line. Can only be used in the `line-gradient` property.
     LineProgress,
     /// Returns the natural logarithm of the input.
-    Ln(NumberLiteralOrNumberAsUnion),
+    Ln(NumberLiteralOrNumberOrAnyAsUnion),
     /// Returns the mathematical constant ln(2).
     Ln2,
     /// Returns the base-ten logarithm of the input.
-    Log10(NumberLiteralOrNumberAsUnion),
+    Log10(NumberLiteralOrNumberOrAnyAsUnion),
     /// Returns the base-two logarithm of the input.
-    Log2(NumberLiteralOrNumberAsUnion),
-    /// Selects the output whose label value matches the input value, or the fallback value if no match is found. The input can be any expression (e.g. `["get", "building_type"]`). Each label must be either:
-    ///
-    ///  - a single literal value; or
-    ///
-    ///  - an array of literal values, whose values must be all strings or all numbers (e.g. `[100, 101]` or `["c", "b"]`). The input matches if any of the values in the array matches, similar to the `"in"` operator.
-    ///
-    /// Each label must be unique. If the input type does not match the type of the labels, the result will be the fallback value.
-    Match(
-        (
-            ExprOrLiteral,
-            Vec<(
-                StringOrNumberOrArrayOfStringOrArrayOfNumberAsUnion,
-                ExprOrLiteral,
-            )>,
-            ExprOrLiteral,
-        ),
-    ),
+    Log2(NumberLiteralOrNumberOrAnyAsUnion),
     /// Returns the maximum value of the inputs.
-    Max(Vec<NumberLiteralOrNumberAsUnion>),
+    Max(Vec<NumberLiteralOrNumberOrAnyAsUnion>),
     /// Returns the minimum value of the inputs.
-    Min(Vec<NumberLiteralOrNumberAsUnion>),
+    Min(Vec<NumberLiteralOrNumberOrAnyAsUnion>),
     /// Asserts that the input value is a number. If multiple values are provided, each one is evaluated in order until a number is obtained. If none of the inputs are numbers, the expression is an error.
     Op(Vec<ExprOrLiteral>),
     /// Returns the mathematical constant pi.
     Pi,
     /// Rounds the input to the nearest integer. Halfway values are rounded away from zero. For example, `["round", -1.5]` evaluates to -2.
-    Round(NumberLiteralOrNumberAsUnion),
+    Round(NumberLiteralOrNumberOrAnyAsUnion),
     /// Returns the sine of the input.
-    Sin(NumberLiteralOrNumberAsUnion),
+    Sin(NumberLiteralOrNumberOrAnyAsUnion),
     /// Returns the square root of the input.
-    Sqrt(NumberLiteralOrNumberAsUnion),
-    /// Produces discrete, stepped results by evaluating a piecewise-constant function defined by pairs of input and output values ("stops"). The `input` may be any numeric expression (e.g., `["get", "population"]`). Stop inputs must be numeric literals in strictly ascending order.
-    ///
-    /// Returns the output value of the stop just less than the input, or the first output if the input is less than the first stop.
-    ///
-    ///  - [Create and style clusters](https://maplibre.org/maplibre-gl-js/docs/examples/create-and-style-clusters/)
-    Step(
-        (
-            NumberLiteralOrNumberAsUnion,
-            ExprOrLiteral,
-            Vec<(NumberLiteral, ExprOrLiteral)>,
-        ),
-    ),
+    Sqrt(NumberLiteralOrNumberOrAnyAsUnion),
     /// Returns the tangent of the input.
-    Tan(NumberLiteralOrNumberAsUnion),
+    Tan(NumberLiteralOrNumberOrAnyAsUnion),
     /// Converts the input value to a number, if possible. If the input is `null` or `false`, the result is 0. If the input is `true`, the result is 1. If the input is a string, it is converted to a number as specified by the ["ToNumber Applied to the String Type" algorithm](https://tc39.github.io/ecma262/#sec-tonumber-applied-to-the-string-type) of the ECMAScript Language Specification. If multiple values are provided, each one is evaluated in order until the first successful conversion is obtained. If none of the inputs can be converted, the expression is an error.
     To(Vec<ExprOrLiteral>),
-    /// References variable bound using `let`.
-    ///
-    ///  - [Visualize population density](https://maplibre.org/maplibre-gl-js/docs/examples/visualize-population-density/)
-    Var(StringLiteral),
     /// Gets the current zoom level.  Note that in style layout and paint properties, ["zoom"] may only appear as the input to a top-level "step" or "interpolate" expression.
     Zoom,
 }
@@ -6395,8 +2626,11 @@ pub enum Number {
 #[serde(untagged)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum MinusOptions {
-    TwoParams(NumberLiteralOrNumberAsUnion, NumberLiteralOrNumberAsUnion),
-    OneParams(NumberLiteralOrNumberAsUnion),
+    TwoParams(
+        NumberLiteralOrNumberOrAnyAsUnion,
+        NumberLiteralOrNumberOrAnyAsUnion,
+    ),
+    OneParams(NumberLiteralOrNumberOrAnyAsUnion),
 }
 
 /// Options for deserializing the syntax enum variant [`Number::IndexOf`]
@@ -6412,8 +2646,8 @@ pub enum IndexOfOptions {
         Option<serde_json::Value>,
     ),
     Substring(
-        StringLiteralOrStringAsUnion,
-        StringLiteralOrStringAsUnion,
+        StringLiteralOrStringOrAnyAsUnion,
+        StringLiteralOrStringOrAnyAsUnion,
         #[serde(default)]
         #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_option_json_value))]
         Option<serde_json::Value>,
@@ -6482,14 +2716,20 @@ impl<'de> serde::de::Visitor<'de> for NumberVisitor {
                 }
                 match rest.len() {
                     2 => Ok(Number::Minus(MinusOptions::TwoParams(
-                        serde_json::from_value::<NumberLiteralOrNumberAsUnion>(rest[0].clone())
-                            .map_err(serde::de::Error::custom)?,
-                        serde_json::from_value::<NumberLiteralOrNumberAsUnion>(rest[1].clone())
-                            .map_err(serde::de::Error::custom)?,
+                        serde_json::from_value::<NumberLiteralOrNumberOrAnyAsUnion>(
+                            rest[0].clone(),
+                        )
+                        .map_err(serde::de::Error::custom)?,
+                        serde_json::from_value::<NumberLiteralOrNumberOrAnyAsUnion>(
+                            rest[1].clone(),
+                        )
+                        .map_err(serde::de::Error::custom)?,
                     ))),
                     1 => Ok(Number::Minus(MinusOptions::OneParams(
-                        serde_json::from_value::<NumberLiteralOrNumberAsUnion>(rest[0].clone())
-                            .map_err(serde::de::Error::custom)?,
+                        serde_json::from_value::<NumberLiteralOrNumberOrAnyAsUnion>(
+                            rest[0].clone(),
+                        )
+                        .map_err(serde::de::Error::custom)?,
                     ))),
                     len => Err(serde::de::Error::custom(format!(
                         "'-': expected 1 or 2 arguments, got {len}"
@@ -6510,7 +2750,6 @@ impl<'de> serde::de::Visitor<'de> for NumberVisitor {
                 let input = visit_seq_field(&mut seq, "input")?;
                 Ok(Number::Absolute(input))
             }
-            "accumulated" => Ok(Number::Accumulated),
             "acos" => {
                 let input = visit_seq_field(&mut seq, "input")?;
                 Ok(Number::Arccosine(input))
@@ -6519,54 +2758,13 @@ impl<'de> serde::de::Visitor<'de> for NumberVisitor {
                 let input = visit_seq_field(&mut seq, "input")?;
                 Ok(Number::Asin(input))
             }
-            "at" => {
-                let index = visit_seq_field(&mut seq, "index")?;
-                let array = visit_seq_field(&mut seq, "array")?;
-                Ok(Number::At(index, array))
-            }
             "atan" => {
                 let input = visit_seq_field(&mut seq, "input")?;
                 Ok(Number::Atan(input))
             }
-            "case" => {
-                let mut inputs = Vec::new();
-                let mut rest: Vec<serde_json::Value> = Vec::new();
-                while let Some(v) = seq.next_element()? {
-                    rest.push(v);
-                }
-                if rest.is_empty() {
-                    return Err(serde::de::Error::custom(
-                        "{name}::{variant_name}: too few arguments",
-                    ));
-                }
-                if !(rest.len() - 1).is_multiple_of(2) {
-                    return Err(serde::de::Error::custom(
-                        "Number::Case: malformed template/suffix layout",
-                    ));
-                }
-                let inputs_len = (rest.len() - 1) / 2;
-                for i in 0..inputs_len {
-                    let condition_i = serde_json::from_value(rest[i * 2].clone())
-                        .map_err(serde::de::Error::custom)?;
-                    let output_i = serde_json::from_value(rest[i * 2 + 1].clone())
-                        .map_err(serde::de::Error::custom)?;
-                    let element = (condition_i, output_i);
-                    inputs.push(element);
-                }
-                let fallback = serde_json::from_value(rest[inputs_len * 2].clone())
-                    .map_err(serde::de::Error::custom)?;
-                Ok(Number::Case((inputs, fallback)))
-            }
             "ceil" => {
                 let input = visit_seq_field(&mut seq, "input")?;
                 Ok(Number::Ceil(input))
-            }
-            "coalesce" => {
-                let mut inputs = Vec::new();
-                while let Some(element) = seq.next_element()? {
-                    inputs.push(element);
-                }
-                Ok(Number::Coalesce(inputs))
             }
             "cos" => {
                 let input = visit_seq_field(&mut seq, "input")?;
@@ -6578,25 +2776,11 @@ impl<'de> serde::de::Visitor<'de> for NumberVisitor {
             }
             "e" => Ok(Number::E),
             "elevation" => Ok(Number::Elevation),
-            "feature-state" => {
-                let property_name = visit_seq_field(&mut seq, "property_name")?;
-                Ok(Number::FeatureState(property_name))
-            }
             "floor" => {
                 let input = visit_seq_field(&mut seq, "input")?;
                 Ok(Number::Floor(input))
             }
-            "get" => {
-                let property_name = visit_seq_field(&mut seq, "property_name")?;
-                let object = seq.next_element()?;
-                Ok(Number::Get(property_name, object))
-            }
-            "global-state" => {
-                let property_name = visit_seq_field(&mut seq, "property_name")?;
-                Ok(Number::GlobalState(property_name))
-            }
             "heatmap-density" => Ok(Number::HeatmapDensity),
-            "id" => Ok(Number::Id),
             "index-of" => {
                 // Delegate the remainder of the sequence to IndexOfOptions deserialization
                 let remainder_of_sequence = serde::de::value::SeqAccessDeserializer::new(seq);
@@ -6607,35 +2791,6 @@ impl<'de> serde::de::Visitor<'de> for NumberVisitor {
             "length" => {
                 let array_or_string = visit_seq_field(&mut seq, "array_or_string")?;
                 Ok(Number::Length(array_or_string))
-            }
-            "let" => {
-                let mut inputs = Vec::new();
-                let mut rest: Vec<serde_json::Value> = Vec::new();
-                while let Some(v) = seq.next_element()? {
-                    rest.push(v);
-                }
-                if rest.is_empty() {
-                    return Err(serde::de::Error::custom(
-                        "{name}::{variant_name}: too few arguments",
-                    ));
-                }
-                if !(rest.len() - 1).is_multiple_of(2) {
-                    return Err(serde::de::Error::custom(
-                        "Number::Let: malformed template/suffix layout",
-                    ));
-                }
-                let inputs_len = (rest.len() - 1) / 2;
-                for i in 0..inputs_len {
-                    let var_name_i = serde_json::from_value(rest[i * 2].clone())
-                        .map_err(serde::de::Error::custom)?;
-                    let var_value_i = serde_json::from_value(rest[i * 2 + 1].clone())
-                        .map_err(serde::de::Error::custom)?;
-                    let element = (var_name_i, var_value_i);
-                    inputs.push(element);
-                }
-                let expression = serde_json::from_value(rest[inputs_len * 2].clone())
-                    .map_err(serde::de::Error::custom)?;
-                Ok(Number::Let((inputs, expression)))
             }
             "line-progress" => Ok(Number::LineProgress),
             "ln" => {
@@ -6650,35 +2805,6 @@ impl<'de> serde::de::Visitor<'de> for NumberVisitor {
             "log2" => {
                 let input = visit_seq_field(&mut seq, "input")?;
                 Ok(Number::Log2(input))
-            }
-            "match" => {
-                let mut rest: Vec<serde_json::Value> = Vec::new();
-                while let Some(v) = seq.next_element()? {
-                    rest.push(v);
-                }
-                if rest.len() < 2 {
-                    return Err(serde::de::Error::custom("Number::Match: too few arguments"));
-                }
-                if !rest.len().is_multiple_of(2) {
-                    return Err(serde::de::Error::custom(
-                        "Number::Match: expected an even number of arguments after operator (input + label/output pairs + fallback)",
-                    ));
-                }
-                let fallback_v = rest.pop().unwrap();
-                let input: ExprOrLiteral =
-                    serde_json::from_value(rest.remove(0)).map_err(serde::de::Error::custom)?;
-                let mut pairs = Vec::new();
-                for chunk in rest.chunks_exact(2) {
-                    let label_i: StringOrNumberOrArrayOfStringOrArrayOfNumberAsUnion =
-                        serde_json::from_value(chunk[0].clone())
-                            .map_err(serde::de::Error::custom)?;
-                    let output_i: ExprOrLiteral = serde_json::from_value(chunk[1].clone())
-                        .map_err(serde::de::Error::custom)?;
-                    pairs.push((label_i, output_i));
-                }
-                let fallback: ExprOrLiteral =
-                    serde_json::from_value(fallback_v).map_err(serde::de::Error::custom)?;
-                Ok(Number::Match((input, pairs, fallback)))
             }
             "max" => {
                 let mut inputs = Vec::new();
@@ -6714,18 +2840,6 @@ impl<'de> serde::de::Visitor<'de> for NumberVisitor {
                 let input = visit_seq_field(&mut seq, "input")?;
                 Ok(Number::Sqrt(input))
             }
-            "step" => {
-                let input: NumberLiteralOrNumberAsUnion = visit_seq_field(&mut seq, "input")?;
-                let output_0: ExprOrLiteral = visit_seq_field(&mut seq, "output_0")?;
-                let mut stops = Vec::new();
-                while let Some(stop_input_i) = seq.next_element::<NumberLiteral>()? {
-                    let stop_output_i: ExprOrLiteral = seq.next_element()?.ok_or_else(|| {
-                        serde::de::Error::custom("expected stop_output_i in Number::Step")
-                    })?;
-                    stops.push((stop_input_i, stop_output_i));
-                }
-                Ok(Number::Step((input, output_0, stops)))
-            }
             "tan" => {
                 let input = visit_seq_field(&mut seq, "input")?;
                 Ok(Number::Tan(input))
@@ -6736,10 +2850,6 @@ impl<'de> serde::de::Visitor<'de> for NumberVisitor {
                     inputs.push(element);
                 }
                 Ok(Number::To(inputs))
-            }
-            "var" => {
-                let var_name = visit_seq_field(&mut seq, "var_name")?;
-                Ok(Number::Var(var_name))
             }
             "zoom" => Ok(Number::Zoom),
             _ => Err(serde::de::Error::unknown_variant(
@@ -6752,33 +2862,23 @@ impl<'de> serde::de::Visitor<'de> for NumberVisitor {
                     "/",
                     "^",
                     "abs",
-                    "accumulated",
                     "acos",
                     "asin",
-                    "at",
                     "atan",
-                    "case",
                     "ceil",
-                    "coalesce",
                     "cos",
                     "distance",
                     "e",
                     "elevation",
-                    "feature-state",
                     "floor",
-                    "get",
-                    "global-state",
                     "heatmap-density",
-                    "id",
                     "index-of",
                     "length",
-                    "let",
                     "line-progress",
                     "ln",
                     "ln2",
                     "log10",
                     "log2",
-                    "match",
                     "max",
                     "min",
                     "number",
@@ -6786,10 +2886,8 @@ impl<'de> serde::de::Visitor<'de> for NumberVisitor {
                     "round",
                     "sin",
                     "sqrt",
-                    "step",
                     "tan",
                     "to-number",
-                    "var",
                     "zoom",
                 ],
             )),
@@ -6903,18 +3001,6 @@ impl serde::Serialize for Number {
                 }
                 seq.end()
             }
-            Number::Accumulated => {
-                let mut elems = vec![];
-                while !elems.is_empty() && elems.last().is_some_and(serde_json::Value::is_null) {
-                    elems.pop();
-                }
-                let mut seq = serializer.serialize_seq(None)?;
-                seq.serialize_element("accumulated")?;
-                for elem in &elems {
-                    seq.serialize_element(elem)?;
-                }
-                seq.end()
-            }
             Number::Arccosine(f0) => {
                 let mut elems = vec![serde_json::to_value(f0).map_err(serde::ser::Error::custom)?];
                 while elems.len() > 1 && elems.last().is_some_and(serde_json::Value::is_null) {
@@ -6939,21 +3025,6 @@ impl serde::Serialize for Number {
                 }
                 seq.end()
             }
-            Number::At(f0, f1) => {
-                let mut elems = vec![
-                    serde_json::to_value(f0).map_err(serde::ser::Error::custom)?,
-                    serde_json::to_value(f1).map_err(serde::ser::Error::custom)?,
-                ];
-                while elems.len() > 2 && elems.last().is_some_and(serde_json::Value::is_null) {
-                    elems.pop();
-                }
-                let mut seq = serializer.serialize_seq(None)?;
-                seq.serialize_element("at")?;
-                for elem in &elems {
-                    seq.serialize_element(elem)?;
-                }
-                seq.end()
-            }
             Number::Atan(f0) => {
                 let mut elems = vec![serde_json::to_value(f0).map_err(serde::ser::Error::custom)?];
                 while elems.len() > 1 && elems.last().is_some_and(serde_json::Value::is_null) {
@@ -6966,39 +3037,6 @@ impl serde::Serialize for Number {
                 }
                 seq.end()
             }
-            Number::Case(inner) => {
-                let inner_val = serde_json::to_value(inner).map_err(serde::ser::Error::custom)?;
-                let mut seq = serializer.serialize_seq(None)?;
-                seq.serialize_element("case")?;
-                if let serde_json::Value::Array(top) = &inner_val {
-                    for elem in top {
-                        if let serde_json::Value::Array(sub) = elem {
-                            if sub.is_empty() {
-                                // Empty Vec — nothing to flatten.
-                            } else if sub[0].is_array() {
-                                // An array-of-arrays is the Vec<(A,B)> — flatten it.
-                                for pair in sub {
-                                    if let serde_json::Value::Array(pair_elems) = pair {
-                                        for pe in pair_elems {
-                                            seq.serialize_element(pe)?;
-                                        }
-                                    } else {
-                                        seq.serialize_element(pair)?;
-                                    }
-                                }
-                            } else {
-                                // Plain array value (e.g. a sub-expression like ["zoom"]).
-                                seq.serialize_element(elem)?;
-                            }
-                        } else {
-                            seq.serialize_element(elem)?;
-                        }
-                    }
-                } else {
-                    seq.serialize_element(&inner_val)?;
-                }
-                seq.end()
-            }
             Number::Ceil(f0) => {
                 let mut elems = vec![serde_json::to_value(f0).map_err(serde::ser::Error::custom)?];
                 while elems.len() > 1 && elems.last().is_some_and(serde_json::Value::is_null) {
@@ -7008,19 +3046,6 @@ impl serde::Serialize for Number {
                 seq.serialize_element("ceil")?;
                 for elem in &elems {
                     seq.serialize_element(elem)?;
-                }
-                seq.end()
-            }
-            Number::Coalesce(inner) => {
-                let inner_val = serde_json::to_value(inner).map_err(serde::ser::Error::custom)?;
-                let mut seq = serializer.serialize_seq(None)?;
-                seq.serialize_element("coalesce")?;
-                if let serde_json::Value::Array(top) = &inner_val {
-                    for elem in top {
-                        seq.serialize_element(elem)?;
-                    }
-                } else {
-                    seq.serialize_element(&inner_val)?;
                 }
                 seq.end()
             }
@@ -7072,18 +3097,6 @@ impl serde::Serialize for Number {
                 }
                 seq.end()
             }
-            Number::FeatureState(f0) => {
-                let mut elems = vec![serde_json::to_value(f0).map_err(serde::ser::Error::custom)?];
-                while elems.len() > 1 && elems.last().is_some_and(serde_json::Value::is_null) {
-                    elems.pop();
-                }
-                let mut seq = serializer.serialize_seq(None)?;
-                seq.serialize_element("feature-state")?;
-                for elem in &elems {
-                    seq.serialize_element(elem)?;
-                }
-                seq.end()
-            }
             Number::Floor(f0) => {
                 let mut elems = vec![serde_json::to_value(f0).map_err(serde::ser::Error::custom)?];
                 while elems.len() > 1 && elems.last().is_some_and(serde_json::Value::is_null) {
@@ -7096,33 +3109,6 @@ impl serde::Serialize for Number {
                 }
                 seq.end()
             }
-            Number::Get(f0, f1) => {
-                let mut elems = vec![
-                    serde_json::to_value(f0).map_err(serde::ser::Error::custom)?,
-                    serde_json::to_value(f1).map_err(serde::ser::Error::custom)?,
-                ];
-                while elems.len() > 1 && elems.last().is_some_and(serde_json::Value::is_null) {
-                    elems.pop();
-                }
-                let mut seq = serializer.serialize_seq(None)?;
-                seq.serialize_element("get")?;
-                for elem in &elems {
-                    seq.serialize_element(elem)?;
-                }
-                seq.end()
-            }
-            Number::GlobalState(f0) => {
-                let mut elems = vec![serde_json::to_value(f0).map_err(serde::ser::Error::custom)?];
-                while elems.len() > 1 && elems.last().is_some_and(serde_json::Value::is_null) {
-                    elems.pop();
-                }
-                let mut seq = serializer.serialize_seq(None)?;
-                seq.serialize_element("global-state")?;
-                for elem in &elems {
-                    seq.serialize_element(elem)?;
-                }
-                seq.end()
-            }
             Number::HeatmapDensity => {
                 let mut elems = vec![];
                 while !elems.is_empty() && elems.last().is_some_and(serde_json::Value::is_null) {
@@ -7130,18 +3116,6 @@ impl serde::Serialize for Number {
                 }
                 let mut seq = serializer.serialize_seq(None)?;
                 seq.serialize_element("heatmap-density")?;
-                for elem in &elems {
-                    seq.serialize_element(elem)?;
-                }
-                seq.end()
-            }
-            Number::Id => {
-                let mut elems = vec![];
-                while !elems.is_empty() && elems.last().is_some_and(serde_json::Value::is_null) {
-                    elems.pop();
-                }
-                let mut seq = serializer.serialize_seq(None)?;
-                seq.serialize_element("id")?;
                 for elem in &elems {
                     seq.serialize_element(elem)?;
                 }
@@ -7172,39 +3146,6 @@ impl serde::Serialize for Number {
                 seq.serialize_element("length")?;
                 for elem in &elems {
                     seq.serialize_element(elem)?;
-                }
-                seq.end()
-            }
-            Number::Let(inner) => {
-                let inner_val = serde_json::to_value(inner).map_err(serde::ser::Error::custom)?;
-                let mut seq = serializer.serialize_seq(None)?;
-                seq.serialize_element("let")?;
-                if let serde_json::Value::Array(top) = &inner_val {
-                    for elem in top {
-                        if let serde_json::Value::Array(sub) = elem {
-                            if sub.is_empty() {
-                                // Empty Vec — nothing to flatten.
-                            } else if sub[0].is_array() {
-                                // An array-of-arrays is the Vec<(A,B)> — flatten it.
-                                for pair in sub {
-                                    if let serde_json::Value::Array(pair_elems) = pair {
-                                        for pe in pair_elems {
-                                            seq.serialize_element(pe)?;
-                                        }
-                                    } else {
-                                        seq.serialize_element(pair)?;
-                                    }
-                                }
-                            } else {
-                                // Plain array value (e.g. a sub-expression like ["zoom"]).
-                                seq.serialize_element(elem)?;
-                            }
-                        } else {
-                            seq.serialize_element(elem)?;
-                        }
-                    }
-                } else {
-                    seq.serialize_element(&inner_val)?;
                 }
                 seq.end()
             }
@@ -7265,39 +3206,6 @@ impl serde::Serialize for Number {
                 seq.serialize_element("log2")?;
                 for elem in &elems {
                     seq.serialize_element(elem)?;
-                }
-                seq.end()
-            }
-            Number::Match(inner) => {
-                let inner_val = serde_json::to_value(inner).map_err(serde::ser::Error::custom)?;
-                let mut seq = serializer.serialize_seq(None)?;
-                seq.serialize_element("match")?;
-                if let serde_json::Value::Array(top) = &inner_val {
-                    for elem in top {
-                        if let serde_json::Value::Array(sub) = elem {
-                            if sub.is_empty() {
-                                // Empty Vec — nothing to flatten.
-                            } else if sub[0].is_array() {
-                                // An array-of-arrays is the Vec<(A,B)> — flatten it.
-                                for pair in sub {
-                                    if let serde_json::Value::Array(pair_elems) = pair {
-                                        for pe in pair_elems {
-                                            seq.serialize_element(pe)?;
-                                        }
-                                    } else {
-                                        seq.serialize_element(pair)?;
-                                    }
-                                }
-                            } else {
-                                // Plain array value (e.g. a sub-expression like ["zoom"]).
-                                seq.serialize_element(elem)?;
-                            }
-                        } else {
-                            seq.serialize_element(elem)?;
-                        }
-                    }
-                } else {
-                    seq.serialize_element(&inner_val)?;
                 }
                 seq.end()
             }
@@ -7388,39 +3296,6 @@ impl serde::Serialize for Number {
                 }
                 seq.end()
             }
-            Number::Step(inner) => {
-                let inner_val = serde_json::to_value(inner).map_err(serde::ser::Error::custom)?;
-                let mut seq = serializer.serialize_seq(None)?;
-                seq.serialize_element("step")?;
-                if let serde_json::Value::Array(top) = &inner_val {
-                    for elem in top {
-                        if let serde_json::Value::Array(sub) = elem {
-                            if sub.is_empty() {
-                                // Empty Vec — nothing to flatten.
-                            } else if sub[0].is_array() {
-                                // An array-of-arrays is the Vec<(A,B)> — flatten it.
-                                for pair in sub {
-                                    if let serde_json::Value::Array(pair_elems) = pair {
-                                        for pe in pair_elems {
-                                            seq.serialize_element(pe)?;
-                                        }
-                                    } else {
-                                        seq.serialize_element(pair)?;
-                                    }
-                                }
-                            } else {
-                                // Plain array value (e.g. a sub-expression like ["zoom"]).
-                                seq.serialize_element(elem)?;
-                            }
-                        } else {
-                            seq.serialize_element(elem)?;
-                        }
-                    }
-                } else {
-                    seq.serialize_element(&inner_val)?;
-                }
-                seq.end()
-            }
             Number::Tan(f0) => {
                 let mut elems = vec![serde_json::to_value(f0).map_err(serde::ser::Error::custom)?];
                 while elems.len() > 1 && elems.last().is_some_and(serde_json::Value::is_null) {
@@ -7443,18 +3318,6 @@ impl serde::Serialize for Number {
                     }
                 } else {
                     seq.serialize_element(&inner_val)?;
-                }
-                seq.end()
-            }
-            Number::Var(f0) => {
-                let mut elems = vec![serde_json::to_value(f0).map_err(serde::ser::Error::custom)?];
-                while elems.len() > 1 && elems.last().is_some_and(serde_json::Value::is_null) {
-                    elems.pop();
-                }
-                let mut seq = serializer.serialize_seq(None)?;
-                seq.serialize_element("var")?;
-                for elem in &elems {
-                    seq.serialize_element(elem)?;
                 }
                 seq.end()
             }
@@ -7552,7 +3415,7 @@ pub enum NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection {
     Interpolate(
         (
             Interpolation,
-            NumberLiteralOrNumberAsUnion,
+            NumberLiteralOrNumberOrAnyAsUnion,
             Vec<(
                 NumberLiteral,
                 NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjectionAsUnion,
@@ -7602,7 +3465,7 @@ impl<'de> serde::de::Visitor<'de>
             "interpolate" => {
                 let interpolation_type: Interpolation =
                     visit_seq_field(&mut seq, "interpolation_type")?;
-                let input: NumberLiteralOrNumberAsUnion = visit_seq_field(&mut seq, "input")?;
+                let input: NumberLiteralOrNumberOrAnyAsUnion = visit_seq_field(&mut seq, "input")?;
                 let mut stops = Vec::new();
                 while let Some(stop_input_i) = seq.next_element::<NumberLiteral>()? {
                     let stop_output_i: NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjectionAsUnion = seq.next_element()?.ok_or_else(|| serde::de::Error::custom("expected stop_output_i in NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection::Interpolate"))?;
@@ -7669,81 +3532,14 @@ impl serde::Serialize for NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection
 #[derive(PartialEq, Debug, Clone)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum Object {
-    /// Gets the value of a cluster property accumulated so far. Can only be used in the `clusterProperties` option of a clustered GeoJSON source.
-    Accumulated,
-    /// Retrieves an item from an array.
-    At(NumberLiteralOrNumberAsUnion, ExprOrLiteral),
-    /// Selects the first output whose corresponding test condition evaluates to true, or the fallback value otherwise.
-    ///
-    ///  - [Create a hover effect](https://maplibre.org/maplibre-gl-js/docs/examples/create-a-hover-effect/)
-    ///
-    ///  - [Display HTML clusters with custom properties](https://maplibre.org/maplibre-gl-js/docs/examples/display-html-clusters-with-custom-properties/)
-    Case((Vec<(Boolean, ExprOrLiteral)>, ExprOrLiteral)),
-    /// Evaluates each expression in turn until the first non-null value is obtained, and returns that value.
-    ///
-    ///  - [Use a fallback image](https://maplibre.org/maplibre-gl-js/docs/examples/use-a-fallback-image/)
-    Coalesce(Vec<ExprOrLiteral>),
-    /// Retrieves a property value from the current feature's state. Returns null if the requested property is not present on the feature's state. A feature's state is not part of the GeoJSON or vector tile data, and must be set programmatically on each feature. When `source.promoteId` is not provided, features are identified by their `id` attribute, which must be an integer or a string that can be cast to an integer. When `source.promoteId` is provided, features are identified by their `promoteId` property, which may be a number, string, or any primitive data type. Note that ["feature-state"] can only be used with paint properties that support data-driven styling.
-    ///
-    ///  - [Create a hover effect](https://maplibre.org/maplibre-gl-js/docs/examples/create-a-hover-effect/)
-    FeatureState(StringLiteralOrStringAsUnion),
-    /// Retrieves a property value from the current feature's properties, or from another object if a second argument is provided. Returns null if the requested property is missing.
-    ///
-    ///  - [Change the case of labels](https://maplibre.org/maplibre-gl-js/docs/examples/change-case-of-labels/)
-    ///
-    ///  - [Display HTML clusters with custom properties](https://maplibre.org/maplibre-gl-js/docs/examples/display-html-clusters-with-custom-properties/)
-    ///
-    ///  - [Extrude polygons for 3D indoor mapping](https://maplibre.org/maplibre-gl-js/docs/examples/extrude-polygons-for-3d-indoor-mapping/)
-    Get(StringLiteralOrStringAsUnion, Option<Box<Object>>),
-    /// Retrieves a property value from global state that can be set with platform-specific APIs. Defaults can be provided using the [`state`](https://maplibre.org/maplibre-style-spec/root/#state) root property. Returns `null` if no value nor default value is set for the retrieved property.
-    GlobalState(StringLiteral),
-    /// Gets the feature's id, if it has one.
-    Id,
-    /// Binds expressions to named variables, which can then be referenced in the result expression using `["var", "variable_name"]`.
-    ///
-    ///  - [Visualize population density](https://maplibre.org/maplibre-gl-js/docs/examples/visualize-population-density/)
-    Let((Vec<(StringLiteral, ExprOrLiteral)>, ExprOrLiteral)),
     /// Provides a literal array or object value.
     ///
     ///  - [Display and style rich text labels](https://maplibre.org/maplibre-gl-js/docs/examples/display-and-style-rich-text-labels/)
     Literal(JSONObjectLiteral),
-    /// Selects the output whose label value matches the input value, or the fallback value if no match is found. The input can be any expression (e.g. `["get", "building_type"]`). Each label must be either:
-    ///
-    ///  - a single literal value; or
-    ///
-    ///  - an array of literal values, whose values must be all strings or all numbers (e.g. `[100, 101]` or `["c", "b"]`). The input matches if any of the values in the array matches, similar to the `"in"` operator.
-    ///
-    /// Each label must be unique. If the input type does not match the type of the labels, the result will be the fallback value.
-    Match(
-        (
-            ExprOrLiteral,
-            Vec<(
-                StringOrNumberOrArrayOfStringOrArrayOfNumberAsUnion,
-                ExprOrLiteral,
-            )>,
-            ExprOrLiteral,
-        ),
-    ),
     /// Asserts that the input value is an object. If multiple values are provided, each one is evaluated in order until an object is obtained. If none of the inputs are objects, the expression is an error.
     Op(Vec<ExprOrLiteral>),
     /// Gets the feature properties object.  Note that in some cases, it may be more efficient to use ["get", "property_name"] directly.
     Properties,
-    /// Produces discrete, stepped results by evaluating a piecewise-constant function defined by pairs of input and output values ("stops"). The `input` may be any numeric expression (e.g., `["get", "population"]`). Stop inputs must be numeric literals in strictly ascending order.
-    ///
-    /// Returns the output value of the stop just less than the input, or the first output if the input is less than the first stop.
-    ///
-    ///  - [Create and style clusters](https://maplibre.org/maplibre-gl-js/docs/examples/create-and-style-clusters/)
-    Step(
-        (
-            NumberLiteralOrNumberAsUnion,
-            ExprOrLiteral,
-            Vec<(NumberLiteral, ExprOrLiteral)>,
-        ),
-    ),
-    /// References variable bound using `let`.
-    ///
-    ///  - [Visualize population density](https://maplibre.org/maplibre-gl-js/docs/examples/visualize-population-density/)
-    Var(StringLiteral),
 }
 
 impl<'de> serde::Deserialize<'de> for Object {
@@ -7762,7 +3558,7 @@ impl<'de> serde::de::Visitor<'de> for ObjectVisitor {
     type Value = Object;
 
     fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
-        formatter.write_str("an Object expression (example: [\"accumulated\"])")
+        formatter.write_str("an Object expression (example: [\"literal\",[\"DIN Offc Pro Italic\",\"Arial Unicode MS Regular\"]])")
     }
 
     fn visit_seq<A: serde::de::SeqAccess<'de>>(self, mut seq: A) -> Result<Self::Value, A::Error> {
@@ -7782,123 +3578,9 @@ impl<'de> serde::de::Visitor<'de> for ObjectVisitor {
             .next_element()?
             .ok_or_else(|| serde::de::Error::custom("missing operator"))?;
         match op.as_str() {
-            "accumulated" => Ok(Object::Accumulated),
-            "at" => {
-                let index = visit_seq_field(&mut seq, "index")?;
-                let array = visit_seq_field(&mut seq, "array")?;
-                Ok(Object::At(index, array))
-            }
-            "case" => {
-                let mut inputs = Vec::new();
-                let mut rest: Vec<serde_json::Value> = Vec::new();
-                while let Some(v) = seq.next_element()? {
-                    rest.push(v);
-                }
-                if rest.is_empty() {
-                    return Err(serde::de::Error::custom(
-                        "{name}::{variant_name}: too few arguments",
-                    ));
-                }
-                if !(rest.len() - 1).is_multiple_of(2) {
-                    return Err(serde::de::Error::custom(
-                        "Object::Case: malformed template/suffix layout",
-                    ));
-                }
-                let inputs_len = (rest.len() - 1) / 2;
-                for i in 0..inputs_len {
-                    let condition_i = serde_json::from_value(rest[i * 2].clone())
-                        .map_err(serde::de::Error::custom)?;
-                    let output_i = serde_json::from_value(rest[i * 2 + 1].clone())
-                        .map_err(serde::de::Error::custom)?;
-                    let element = (condition_i, output_i);
-                    inputs.push(element);
-                }
-                let fallback = serde_json::from_value(rest[inputs_len * 2].clone())
-                    .map_err(serde::de::Error::custom)?;
-                Ok(Object::Case((inputs, fallback)))
-            }
-            "coalesce" => {
-                let mut inputs = Vec::new();
-                while let Some(element) = seq.next_element()? {
-                    inputs.push(element);
-                }
-                Ok(Object::Coalesce(inputs))
-            }
-            "feature-state" => {
-                let property_name = visit_seq_field(&mut seq, "property_name")?;
-                Ok(Object::FeatureState(property_name))
-            }
-            "get" => {
-                let property_name = visit_seq_field(&mut seq, "property_name")?;
-                let object = seq.next_element()?;
-                Ok(Object::Get(property_name, object))
-            }
-            "global-state" => {
-                let property_name = visit_seq_field(&mut seq, "property_name")?;
-                Ok(Object::GlobalState(property_name))
-            }
-            "id" => Ok(Object::Id),
-            "let" => {
-                let mut inputs = Vec::new();
-                let mut rest: Vec<serde_json::Value> = Vec::new();
-                while let Some(v) = seq.next_element()? {
-                    rest.push(v);
-                }
-                if rest.is_empty() {
-                    return Err(serde::de::Error::custom(
-                        "{name}::{variant_name}: too few arguments",
-                    ));
-                }
-                if !(rest.len() - 1).is_multiple_of(2) {
-                    return Err(serde::de::Error::custom(
-                        "Object::Let: malformed template/suffix layout",
-                    ));
-                }
-                let inputs_len = (rest.len() - 1) / 2;
-                for i in 0..inputs_len {
-                    let var_name_i = serde_json::from_value(rest[i * 2].clone())
-                        .map_err(serde::de::Error::custom)?;
-                    let var_value_i = serde_json::from_value(rest[i * 2 + 1].clone())
-                        .map_err(serde::de::Error::custom)?;
-                    let element = (var_name_i, var_value_i);
-                    inputs.push(element);
-                }
-                let expression = serde_json::from_value(rest[inputs_len * 2].clone())
-                    .map_err(serde::de::Error::custom)?;
-                Ok(Object::Let((inputs, expression)))
-            }
             "literal" => {
                 let json_object = visit_seq_field(&mut seq, "json_object")?;
                 Ok(Object::Literal(json_object))
-            }
-            "match" => {
-                let mut rest: Vec<serde_json::Value> = Vec::new();
-                while let Some(v) = seq.next_element()? {
-                    rest.push(v);
-                }
-                if rest.len() < 2 {
-                    return Err(serde::de::Error::custom("Object::Match: too few arguments"));
-                }
-                if !rest.len().is_multiple_of(2) {
-                    return Err(serde::de::Error::custom(
-                        "Object::Match: expected an even number of arguments after operator (input + label/output pairs + fallback)",
-                    ));
-                }
-                let fallback_v = rest.pop().unwrap();
-                let input: ExprOrLiteral =
-                    serde_json::from_value(rest.remove(0)).map_err(serde::de::Error::custom)?;
-                let mut pairs = Vec::new();
-                for chunk in rest.chunks_exact(2) {
-                    let label_i: StringOrNumberOrArrayOfStringOrArrayOfNumberAsUnion =
-                        serde_json::from_value(chunk[0].clone())
-                            .map_err(serde::de::Error::custom)?;
-                    let output_i: ExprOrLiteral = serde_json::from_value(chunk[1].clone())
-                        .map_err(serde::de::Error::custom)?;
-                    pairs.push((label_i, output_i));
-                }
-                let fallback: ExprOrLiteral =
-                    serde_json::from_value(fallback_v).map_err(serde::de::Error::custom)?;
-                Ok(Object::Match((input, pairs, fallback)))
             }
             "object" => {
                 let mut inputs = Vec::new();
@@ -7908,41 +3590,9 @@ impl<'de> serde::de::Visitor<'de> for ObjectVisitor {
                 Ok(Object::Op(inputs))
             }
             "properties" => Ok(Object::Properties),
-            "step" => {
-                let input: NumberLiteralOrNumberAsUnion = visit_seq_field(&mut seq, "input")?;
-                let output_0: ExprOrLiteral = visit_seq_field(&mut seq, "output_0")?;
-                let mut stops = Vec::new();
-                while let Some(stop_input_i) = seq.next_element::<NumberLiteral>()? {
-                    let stop_output_i: ExprOrLiteral = seq.next_element()?.ok_or_else(|| {
-                        serde::de::Error::custom("expected stop_output_i in Object::Step")
-                    })?;
-                    stops.push((stop_input_i, stop_output_i));
-                }
-                Ok(Object::Step((input, output_0, stops)))
-            }
-            "var" => {
-                let var_name = visit_seq_field(&mut seq, "var_name")?;
-                Ok(Object::Var(var_name))
-            }
             _ => Err(serde::de::Error::unknown_variant(
                 &op,
-                &[
-                    "accumulated",
-                    "at",
-                    "case",
-                    "coalesce",
-                    "feature-state",
-                    "get",
-                    "global-state",
-                    "id",
-                    "let",
-                    "literal",
-                    "match",
-                    "object",
-                    "properties",
-                    "step",
-                    "var",
-                ],
+                &["literal", "object", "properties"],
             )),
         }
     }
@@ -7955,163 +3605,6 @@ impl serde::Serialize for Object {
     {
         use serde::ser::SerializeSeq;
         match self {
-            Object::Accumulated => {
-                let mut elems = vec![];
-                while !elems.is_empty() && elems.last().is_some_and(serde_json::Value::is_null) {
-                    elems.pop();
-                }
-                let mut seq = serializer.serialize_seq(None)?;
-                seq.serialize_element("accumulated")?;
-                for elem in &elems {
-                    seq.serialize_element(elem)?;
-                }
-                seq.end()
-            }
-            Object::At(f0, f1) => {
-                let mut elems = vec![
-                    serde_json::to_value(f0).map_err(serde::ser::Error::custom)?,
-                    serde_json::to_value(f1).map_err(serde::ser::Error::custom)?,
-                ];
-                while elems.len() > 2 && elems.last().is_some_and(serde_json::Value::is_null) {
-                    elems.pop();
-                }
-                let mut seq = serializer.serialize_seq(None)?;
-                seq.serialize_element("at")?;
-                for elem in &elems {
-                    seq.serialize_element(elem)?;
-                }
-                seq.end()
-            }
-            Object::Case(inner) => {
-                let inner_val = serde_json::to_value(inner).map_err(serde::ser::Error::custom)?;
-                let mut seq = serializer.serialize_seq(None)?;
-                seq.serialize_element("case")?;
-                if let serde_json::Value::Array(top) = &inner_val {
-                    for elem in top {
-                        if let serde_json::Value::Array(sub) = elem {
-                            if sub.is_empty() {
-                                // Empty Vec — nothing to flatten.
-                            } else if sub[0].is_array() {
-                                // An array-of-arrays is the Vec<(A,B)> — flatten it.
-                                for pair in sub {
-                                    if let serde_json::Value::Array(pair_elems) = pair {
-                                        for pe in pair_elems {
-                                            seq.serialize_element(pe)?;
-                                        }
-                                    } else {
-                                        seq.serialize_element(pair)?;
-                                    }
-                                }
-                            } else {
-                                // Plain array value (e.g. a sub-expression like ["zoom"]).
-                                seq.serialize_element(elem)?;
-                            }
-                        } else {
-                            seq.serialize_element(elem)?;
-                        }
-                    }
-                } else {
-                    seq.serialize_element(&inner_val)?;
-                }
-                seq.end()
-            }
-            Object::Coalesce(inner) => {
-                let inner_val = serde_json::to_value(inner).map_err(serde::ser::Error::custom)?;
-                let mut seq = serializer.serialize_seq(None)?;
-                seq.serialize_element("coalesce")?;
-                if let serde_json::Value::Array(top) = &inner_val {
-                    for elem in top {
-                        seq.serialize_element(elem)?;
-                    }
-                } else {
-                    seq.serialize_element(&inner_val)?;
-                }
-                seq.end()
-            }
-            Object::FeatureState(f0) => {
-                let mut elems = vec![serde_json::to_value(f0).map_err(serde::ser::Error::custom)?];
-                while elems.len() > 1 && elems.last().is_some_and(serde_json::Value::is_null) {
-                    elems.pop();
-                }
-                let mut seq = serializer.serialize_seq(None)?;
-                seq.serialize_element("feature-state")?;
-                for elem in &elems {
-                    seq.serialize_element(elem)?;
-                }
-                seq.end()
-            }
-            Object::Get(f0, f1) => {
-                let mut elems = vec![
-                    serde_json::to_value(f0).map_err(serde::ser::Error::custom)?,
-                    serde_json::to_value(f1).map_err(serde::ser::Error::custom)?,
-                ];
-                while elems.len() > 1 && elems.last().is_some_and(serde_json::Value::is_null) {
-                    elems.pop();
-                }
-                let mut seq = serializer.serialize_seq(None)?;
-                seq.serialize_element("get")?;
-                for elem in &elems {
-                    seq.serialize_element(elem)?;
-                }
-                seq.end()
-            }
-            Object::GlobalState(f0) => {
-                let mut elems = vec![serde_json::to_value(f0).map_err(serde::ser::Error::custom)?];
-                while elems.len() > 1 && elems.last().is_some_and(serde_json::Value::is_null) {
-                    elems.pop();
-                }
-                let mut seq = serializer.serialize_seq(None)?;
-                seq.serialize_element("global-state")?;
-                for elem in &elems {
-                    seq.serialize_element(elem)?;
-                }
-                seq.end()
-            }
-            Object::Id => {
-                let mut elems = vec![];
-                while !elems.is_empty() && elems.last().is_some_and(serde_json::Value::is_null) {
-                    elems.pop();
-                }
-                let mut seq = serializer.serialize_seq(None)?;
-                seq.serialize_element("id")?;
-                for elem in &elems {
-                    seq.serialize_element(elem)?;
-                }
-                seq.end()
-            }
-            Object::Let(inner) => {
-                let inner_val = serde_json::to_value(inner).map_err(serde::ser::Error::custom)?;
-                let mut seq = serializer.serialize_seq(None)?;
-                seq.serialize_element("let")?;
-                if let serde_json::Value::Array(top) = &inner_val {
-                    for elem in top {
-                        if let serde_json::Value::Array(sub) = elem {
-                            if sub.is_empty() {
-                                // Empty Vec — nothing to flatten.
-                            } else if sub[0].is_array() {
-                                // An array-of-arrays is the Vec<(A,B)> — flatten it.
-                                for pair in sub {
-                                    if let serde_json::Value::Array(pair_elems) = pair {
-                                        for pe in pair_elems {
-                                            seq.serialize_element(pe)?;
-                                        }
-                                    } else {
-                                        seq.serialize_element(pair)?;
-                                    }
-                                }
-                            } else {
-                                // Plain array value (e.g. a sub-expression like ["zoom"]).
-                                seq.serialize_element(elem)?;
-                            }
-                        } else {
-                            seq.serialize_element(elem)?;
-                        }
-                    }
-                } else {
-                    seq.serialize_element(&inner_val)?;
-                }
-                seq.end()
-            }
             Object::Literal(f0) => {
                 let mut elems = vec![serde_json::to_value(f0).map_err(serde::ser::Error::custom)?];
                 while elems.len() > 1 && elems.last().is_some_and(serde_json::Value::is_null) {
@@ -8121,39 +3614,6 @@ impl serde::Serialize for Object {
                 seq.serialize_element("literal")?;
                 for elem in &elems {
                     seq.serialize_element(elem)?;
-                }
-                seq.end()
-            }
-            Object::Match(inner) => {
-                let inner_val = serde_json::to_value(inner).map_err(serde::ser::Error::custom)?;
-                let mut seq = serializer.serialize_seq(None)?;
-                seq.serialize_element("match")?;
-                if let serde_json::Value::Array(top) = &inner_val {
-                    for elem in top {
-                        if let serde_json::Value::Array(sub) = elem {
-                            if sub.is_empty() {
-                                // Empty Vec — nothing to flatten.
-                            } else if sub[0].is_array() {
-                                // An array-of-arrays is the Vec<(A,B)> — flatten it.
-                                for pair in sub {
-                                    if let serde_json::Value::Array(pair_elems) = pair {
-                                        for pe in pair_elems {
-                                            seq.serialize_element(pe)?;
-                                        }
-                                    } else {
-                                        seq.serialize_element(pair)?;
-                                    }
-                                }
-                            } else {
-                                // Plain array value (e.g. a sub-expression like ["zoom"]).
-                                seq.serialize_element(elem)?;
-                            }
-                        } else {
-                            seq.serialize_element(elem)?;
-                        }
-                    }
-                } else {
-                    seq.serialize_element(&inner_val)?;
                 }
                 seq.end()
             }
@@ -8182,51 +3642,6 @@ impl serde::Serialize for Object {
                 }
                 seq.end()
             }
-            Object::Step(inner) => {
-                let inner_val = serde_json::to_value(inner).map_err(serde::ser::Error::custom)?;
-                let mut seq = serializer.serialize_seq(None)?;
-                seq.serialize_element("step")?;
-                if let serde_json::Value::Array(top) = &inner_val {
-                    for elem in top {
-                        if let serde_json::Value::Array(sub) = elem {
-                            if sub.is_empty() {
-                                // Empty Vec — nothing to flatten.
-                            } else if sub[0].is_array() {
-                                // An array-of-arrays is the Vec<(A,B)> — flatten it.
-                                for pair in sub {
-                                    if let serde_json::Value::Array(pair_elems) = pair {
-                                        for pe in pair_elems {
-                                            seq.serialize_element(pe)?;
-                                        }
-                                    } else {
-                                        seq.serialize_element(pair)?;
-                                    }
-                                }
-                            } else {
-                                // Plain array value (e.g. a sub-expression like ["zoom"]).
-                                seq.serialize_element(elem)?;
-                            }
-                        } else {
-                            seq.serialize_element(elem)?;
-                        }
-                    }
-                } else {
-                    seq.serialize_element(&inner_val)?;
-                }
-                seq.end()
-            }
-            Object::Var(f0) => {
-                let mut elems = vec![serde_json::to_value(f0).map_err(serde::ser::Error::custom)?];
-                while elems.len() > 1 && elems.last().is_some_and(serde_json::Value::is_null) {
-                    elems.pop();
-                }
-                let mut seq = serializer.serialize_seq(None)?;
-                seq.serialize_element("var")?;
-                for elem in &elems {
-                    seq.serialize_element(elem)?;
-                }
-                seq.end()
-            }
         }
     }
 }
@@ -8235,20 +3650,6 @@ impl serde::Serialize for Object {
 #[derive(PartialEq, Debug, Clone)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum String {
-    /// Gets the value of a cluster property accumulated so far. Can only be used in the `clusterProperties` option of a clustered GeoJSON source.
-    Accumulated,
-    /// Retrieves an item from an array.
-    At(NumberLiteralOrNumberAsUnion, ExprOrLiteral),
-    /// Selects the first output whose corresponding test condition evaluates to true, or the fallback value otherwise.
-    ///
-    ///  - [Create a hover effect](https://maplibre.org/maplibre-gl-js/docs/examples/create-a-hover-effect/)
-    ///
-    ///  - [Display HTML clusters with custom properties](https://maplibre.org/maplibre-gl-js/docs/examples/display-html-clusters-with-custom-properties/)
-    Case((Vec<(Boolean, ExprOrLiteral)>, ExprOrLiteral)),
-    /// Evaluates each expression in turn until the first non-null value is obtained, and returns that value.
-    ///
-    ///  - [Use a fallback image](https://maplibre.org/maplibre-gl-js/docs/examples/use-a-fallback-image/)
-    Coalesce(Vec<ExprOrLiteral>),
     /// Returns a `string` consisting of the concatenation of the inputs. Each input is converted to a string as if by `to-string`.
     ///
     ///  - [Add a generated icon to the map](https://maplibre.org/maplibre-gl-js/docs/examples/add-a-generated-icon-to-the-map/)
@@ -8262,51 +3663,14 @@ pub enum String {
     /// Returns the input string converted to lowercase. Follows the Unicode Default Case Conversion algorithm and the locale-insensitive case mappings in the Unicode Character Database.
     ///
     ///  - [Change the case of labels](https://maplibre.org/maplibre-gl-js/docs/examples/change-case-of-labels/)
-    Downcase(StringLiteralOrStringAsUnion),
-    /// Retrieves a property value from the current feature's state. Returns null if the requested property is not present on the feature's state. A feature's state is not part of the GeoJSON or vector tile data, and must be set programmatically on each feature. When `source.promoteId` is not provided, features are identified by their `id` attribute, which must be an integer or a string that can be cast to an integer. When `source.promoteId` is provided, features are identified by their `promoteId` property, which may be a number, string, or any primitive data type. Note that ["feature-state"] can only be used with paint properties that support data-driven styling.
-    ///
-    ///  - [Create a hover effect](https://maplibre.org/maplibre-gl-js/docs/examples/create-a-hover-effect/)
-    FeatureState(StringLiteralOrStringAsUnion),
+    Downcase(StringLiteralOrStringOrAnyAsUnion),
     /// Returns the feature's simple geometry type: `Point`, `LineString`, or `Polygon`. `MultiPoint`, `MultiLineString`, and `MultiPolygon` are returned as `Point`, `LineString`, and `Polygon`, respectively.
     GeometryType,
-    /// Retrieves a property value from the current feature's properties, or from another object if a second argument is provided. Returns null if the requested property is missing.
-    ///
-    ///  - [Change the case of labels](https://maplibre.org/maplibre-gl-js/docs/examples/change-case-of-labels/)
-    ///
-    ///  - [Display HTML clusters with custom properties](https://maplibre.org/maplibre-gl-js/docs/examples/display-html-clusters-with-custom-properties/)
-    ///
-    ///  - [Extrude polygons for 3D indoor mapping](https://maplibre.org/maplibre-gl-js/docs/examples/extrude-polygons-for-3d-indoor-mapping/)
-    Get(StringLiteralOrStringAsUnion, Option<Object>),
-    /// Retrieves a property value from global state that can be set with platform-specific APIs. Defaults can be provided using the [`state`](https://maplibre.org/maplibre-style-spec/root/#state) root property. Returns `null` if no value nor default value is set for the retrieved property.
-    GlobalState(StringLiteral),
-    /// Gets the feature's id, if it has one.
-    Id,
-    /// Binds expressions to named variables, which can then be referenced in the result expression using `["var", "variable_name"]`.
-    ///
-    ///  - [Visualize population density](https://maplibre.org/maplibre-gl-js/docs/examples/visualize-population-density/)
-    Let((Vec<(StringLiteral, ExprOrLiteral)>, ExprOrLiteral)),
-    /// Selects the output whose label value matches the input value, or the fallback value if no match is found. The input can be any expression (e.g. `["get", "building_type"]`). Each label must be either:
-    ///
-    ///  - a single literal value; or
-    ///
-    ///  - an array of literal values, whose values must be all strings or all numbers (e.g. `[100, 101]` or `["c", "b"]`). The input matches if any of the values in the array matches, similar to the `"in"` operator.
-    ///
-    /// Each label must be unique. If the input type does not match the type of the labels, the result will be the fallback value.
-    Match(
-        (
-            ExprOrLiteral,
-            Vec<(
-                StringOrNumberOrArrayOfStringOrArrayOfNumberAsUnion,
-                ExprOrLiteral,
-            )>,
-            ExprOrLiteral,
-        ),
-    ),
     /// Converts the input number into a string representation using the provided format_options.
     ///
     ///  - [Display HTML clusters with custom properties](https://maplibre.org/maplibre-gl-js/docs/examples/display-html-clusters-with-custom-properties/)
     NumberFormat(
-        NumberLiteralOrNumberAsUnion,
+        NumberLiteralOrNumberOrAnyAsUnion,
         #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_map))]
         serde_json::Map<std::string::String, serde_json::Value>,
     ),
@@ -8314,21 +3678,9 @@ pub enum String {
     ResolvedLocale(Collator),
     /// Returns a subarray from an array or a substring from a string from a specified start index, or between a start index and an end index if set. The return value is inclusive of the start index but not of the end index. In a string, a UTF-16 surrogate pair counts as a single position.
     Slice(
-        StringLiteralOrStringAsUnion,
-        NumberLiteralOrNumberAsUnion,
-        Option<NumberLiteralOrNumberAsUnion>,
-    ),
-    /// Produces discrete, stepped results by evaluating a piecewise-constant function defined by pairs of input and output values ("stops"). The `input` may be any numeric expression (e.g., `["get", "population"]`). Stop inputs must be numeric literals in strictly ascending order.
-    ///
-    /// Returns the output value of the stop just less than the input, or the first output if the input is less than the first stop.
-    ///
-    ///  - [Create and style clusters](https://maplibre.org/maplibre-gl-js/docs/examples/create-and-style-clusters/)
-    Step(
-        (
-            NumberLiteralOrNumberAsUnion,
-            ExprOrLiteral,
-            Vec<(NumberLiteral, ExprOrLiteral)>,
-        ),
+        StringLiteralOrStringOrAnyAsUnion,
+        NumberLiteralOrNumberOrAnyAsUnion,
+        Option<NumberLiteralOrNumberOrAnyAsUnion>,
     ),
     /// Asserts that the input value is a string. If multiple values are provided, each one is evaluated in order until a string is obtained. If none of the inputs are strings, the expression is an error.
     Op(Vec<ExprOrLiteral>),
@@ -8341,11 +3693,7 @@ pub enum String {
     /// Returns the input string converted to uppercase. Follows the Unicode Default Case Conversion algorithm and the locale-insensitive case mappings in the Unicode Character Database.
     ///
     ///  - [Change the case of labels](https://maplibre.org/maplibre-gl-js/docs/examples/change-case-of-labels/)
-    Upcase(StringLiteralOrStringAsUnion),
-    /// References variable bound using `let`.
-    ///
-    ///  - [Visualize population density](https://maplibre.org/maplibre-gl-js/docs/examples/visualize-population-density/)
-    Var(StringLiteral),
+    Upcase(StringLiteralOrStringOrAnyAsUnion),
 }
 
 impl<'de> serde::Deserialize<'de> for String {
@@ -8364,7 +3712,9 @@ impl<'de> serde::de::Visitor<'de> for StringVisitor {
     type Value = String;
 
     fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
-        formatter.write_str("an String expression (example: [\"accumulated\"])")
+        formatter.write_str(
+            "an String expression (example: [\"concat\",\"square-rgb-\",[\"get\",\"color\"]])",
+        )
     }
 
     fn visit_seq<A: serde::de::SeqAccess<'de>>(self, mut seq: A) -> Result<Self::Value, A::Error> {
@@ -8384,48 +3734,6 @@ impl<'de> serde::de::Visitor<'de> for StringVisitor {
             .next_element()?
             .ok_or_else(|| serde::de::Error::custom("missing operator"))?;
         match op.as_str() {
-            "accumulated" => Ok(String::Accumulated),
-            "at" => {
-                let index = visit_seq_field(&mut seq, "index")?;
-                let array = visit_seq_field(&mut seq, "array")?;
-                Ok(String::At(index, array))
-            }
-            "case" => {
-                let mut inputs = Vec::new();
-                let mut rest: Vec<serde_json::Value> = Vec::new();
-                while let Some(v) = seq.next_element()? {
-                    rest.push(v);
-                }
-                if rest.is_empty() {
-                    return Err(serde::de::Error::custom(
-                        "{name}::{variant_name}: too few arguments",
-                    ));
-                }
-                if !(rest.len() - 1).is_multiple_of(2) {
-                    return Err(serde::de::Error::custom(
-                        "String::Case: malformed template/suffix layout",
-                    ));
-                }
-                let inputs_len = (rest.len() - 1) / 2;
-                for i in 0..inputs_len {
-                    let condition_i = serde_json::from_value(rest[i * 2].clone())
-                        .map_err(serde::de::Error::custom)?;
-                    let output_i = serde_json::from_value(rest[i * 2 + 1].clone())
-                        .map_err(serde::de::Error::custom)?;
-                    let element = (condition_i, output_i);
-                    inputs.push(element);
-                }
-                let fallback = serde_json::from_value(rest[inputs_len * 2].clone())
-                    .map_err(serde::de::Error::custom)?;
-                Ok(String::Case((inputs, fallback)))
-            }
-            "coalesce" => {
-                let mut inputs = Vec::new();
-                while let Some(element) = seq.next_element()? {
-                    inputs.push(element);
-                }
-                Ok(String::Coalesce(inputs))
-            }
             "concat" => {
                 let mut inputs = Vec::new();
                 while let Some(element) = seq.next_element()? {
@@ -8437,79 +3745,7 @@ impl<'de> serde::de::Visitor<'de> for StringVisitor {
                 let input = visit_seq_field(&mut seq, "input")?;
                 Ok(String::Downcase(input))
             }
-            "feature-state" => {
-                let property_name = visit_seq_field(&mut seq, "property_name")?;
-                Ok(String::FeatureState(property_name))
-            }
             "geometry-type" => Ok(String::GeometryType),
-            "get" => {
-                let property_name = visit_seq_field(&mut seq, "property_name")?;
-                let object = seq.next_element()?;
-                Ok(String::Get(property_name, object))
-            }
-            "global-state" => {
-                let property_name = visit_seq_field(&mut seq, "property_name")?;
-                Ok(String::GlobalState(property_name))
-            }
-            "id" => Ok(String::Id),
-            "let" => {
-                let mut inputs = Vec::new();
-                let mut rest: Vec<serde_json::Value> = Vec::new();
-                while let Some(v) = seq.next_element()? {
-                    rest.push(v);
-                }
-                if rest.is_empty() {
-                    return Err(serde::de::Error::custom(
-                        "{name}::{variant_name}: too few arguments",
-                    ));
-                }
-                if !(rest.len() - 1).is_multiple_of(2) {
-                    return Err(serde::de::Error::custom(
-                        "String::Let: malformed template/suffix layout",
-                    ));
-                }
-                let inputs_len = (rest.len() - 1) / 2;
-                for i in 0..inputs_len {
-                    let var_name_i = serde_json::from_value(rest[i * 2].clone())
-                        .map_err(serde::de::Error::custom)?;
-                    let var_value_i = serde_json::from_value(rest[i * 2 + 1].clone())
-                        .map_err(serde::de::Error::custom)?;
-                    let element = (var_name_i, var_value_i);
-                    inputs.push(element);
-                }
-                let expression = serde_json::from_value(rest[inputs_len * 2].clone())
-                    .map_err(serde::de::Error::custom)?;
-                Ok(String::Let((inputs, expression)))
-            }
-            "match" => {
-                let mut rest: Vec<serde_json::Value> = Vec::new();
-                while let Some(v) = seq.next_element()? {
-                    rest.push(v);
-                }
-                if rest.len() < 2 {
-                    return Err(serde::de::Error::custom("String::Match: too few arguments"));
-                }
-                if !rest.len().is_multiple_of(2) {
-                    return Err(serde::de::Error::custom(
-                        "String::Match: expected an even number of arguments after operator (input + label/output pairs + fallback)",
-                    ));
-                }
-                let fallback_v = rest.pop().unwrap();
-                let input: ExprOrLiteral =
-                    serde_json::from_value(rest.remove(0)).map_err(serde::de::Error::custom)?;
-                let mut pairs = Vec::new();
-                for chunk in rest.chunks_exact(2) {
-                    let label_i: StringOrNumberOrArrayOfStringOrArrayOfNumberAsUnion =
-                        serde_json::from_value(chunk[0].clone())
-                            .map_err(serde::de::Error::custom)?;
-                    let output_i: ExprOrLiteral = serde_json::from_value(chunk[1].clone())
-                        .map_err(serde::de::Error::custom)?;
-                    pairs.push((label_i, output_i));
-                }
-                let fallback: ExprOrLiteral =
-                    serde_json::from_value(fallback_v).map_err(serde::de::Error::custom)?;
-                Ok(String::Match((input, pairs, fallback)))
-            }
             "number-format" => {
                 let input = visit_seq_field(&mut seq, "input")?;
                 let format_options = visit_seq_field(&mut seq, "format_options")?;
@@ -8524,18 +3760,6 @@ impl<'de> serde::de::Visitor<'de> for StringVisitor {
                 let start_index = visit_seq_field(&mut seq, "start_index")?;
                 let end_index = seq.next_element()?;
                 Ok(String::Slice(string, start_index, end_index))
-            }
-            "step" => {
-                let input: NumberLiteralOrNumberAsUnion = visit_seq_field(&mut seq, "input")?;
-                let output_0: ExprOrLiteral = visit_seq_field(&mut seq, "output_0")?;
-                let mut stops = Vec::new();
-                while let Some(stop_input_i) = seq.next_element::<NumberLiteral>()? {
-                    let stop_output_i: ExprOrLiteral = seq.next_element()?.ok_or_else(|| {
-                        serde::de::Error::custom("expected stop_output_i in String::Step")
-                    })?;
-                    stops.push((stop_input_i, stop_output_i));
-                }
-                Ok(String::Step((input, output_0, stops)))
             }
             "string" => {
                 let mut inputs = Vec::new();
@@ -8556,35 +3780,19 @@ impl<'de> serde::de::Visitor<'de> for StringVisitor {
                 let input = visit_seq_field(&mut seq, "input")?;
                 Ok(String::Upcase(input))
             }
-            "var" => {
-                let var_name = visit_seq_field(&mut seq, "var_name")?;
-                Ok(String::Var(var_name))
-            }
             _ => Err(serde::de::Error::unknown_variant(
                 &op,
                 &[
-                    "accumulated",
-                    "at",
-                    "case",
-                    "coalesce",
                     "concat",
                     "downcase",
-                    "feature-state",
                     "geometry-type",
-                    "get",
-                    "global-state",
-                    "id",
-                    "let",
-                    "match",
                     "number-format",
                     "resolved-locale",
                     "slice",
-                    "step",
                     "string",
                     "to-string",
                     "typeof",
                     "upcase",
-                    "var",
                 ],
             )),
         }
@@ -8598,79 +3806,6 @@ impl serde::Serialize for String {
     {
         use serde::ser::SerializeSeq;
         match self {
-            String::Accumulated => {
-                let mut elems = vec![];
-                while !elems.is_empty() && elems.last().is_some_and(serde_json::Value::is_null) {
-                    elems.pop();
-                }
-                let mut seq = serializer.serialize_seq(None)?;
-                seq.serialize_element("accumulated")?;
-                for elem in &elems {
-                    seq.serialize_element(elem)?;
-                }
-                seq.end()
-            }
-            String::At(f0, f1) => {
-                let mut elems = vec![
-                    serde_json::to_value(f0).map_err(serde::ser::Error::custom)?,
-                    serde_json::to_value(f1).map_err(serde::ser::Error::custom)?,
-                ];
-                while elems.len() > 2 && elems.last().is_some_and(serde_json::Value::is_null) {
-                    elems.pop();
-                }
-                let mut seq = serializer.serialize_seq(None)?;
-                seq.serialize_element("at")?;
-                for elem in &elems {
-                    seq.serialize_element(elem)?;
-                }
-                seq.end()
-            }
-            String::Case(inner) => {
-                let inner_val = serde_json::to_value(inner).map_err(serde::ser::Error::custom)?;
-                let mut seq = serializer.serialize_seq(None)?;
-                seq.serialize_element("case")?;
-                if let serde_json::Value::Array(top) = &inner_val {
-                    for elem in top {
-                        if let serde_json::Value::Array(sub) = elem {
-                            if sub.is_empty() {
-                                // Empty Vec — nothing to flatten.
-                            } else if sub[0].is_array() {
-                                // An array-of-arrays is the Vec<(A,B)> — flatten it.
-                                for pair in sub {
-                                    if let serde_json::Value::Array(pair_elems) = pair {
-                                        for pe in pair_elems {
-                                            seq.serialize_element(pe)?;
-                                        }
-                                    } else {
-                                        seq.serialize_element(pair)?;
-                                    }
-                                }
-                            } else {
-                                // Plain array value (e.g. a sub-expression like ["zoom"]).
-                                seq.serialize_element(elem)?;
-                            }
-                        } else {
-                            seq.serialize_element(elem)?;
-                        }
-                    }
-                } else {
-                    seq.serialize_element(&inner_val)?;
-                }
-                seq.end()
-            }
-            String::Coalesce(inner) => {
-                let inner_val = serde_json::to_value(inner).map_err(serde::ser::Error::custom)?;
-                let mut seq = serializer.serialize_seq(None)?;
-                seq.serialize_element("coalesce")?;
-                if let serde_json::Value::Array(top) = &inner_val {
-                    for elem in top {
-                        seq.serialize_element(elem)?;
-                    }
-                } else {
-                    seq.serialize_element(&inner_val)?;
-                }
-                seq.end()
-            }
             String::Concat(inner) => {
                 let inner_val = serde_json::to_value(inner).map_err(serde::ser::Error::custom)?;
                 let mut seq = serializer.serialize_seq(None)?;
@@ -8696,18 +3831,6 @@ impl serde::Serialize for String {
                 }
                 seq.end()
             }
-            String::FeatureState(f0) => {
-                let mut elems = vec![serde_json::to_value(f0).map_err(serde::ser::Error::custom)?];
-                while elems.len() > 1 && elems.last().is_some_and(serde_json::Value::is_null) {
-                    elems.pop();
-                }
-                let mut seq = serializer.serialize_seq(None)?;
-                seq.serialize_element("feature-state")?;
-                for elem in &elems {
-                    seq.serialize_element(elem)?;
-                }
-                seq.end()
-            }
             String::GeometryType => {
                 let mut elems = vec![];
                 while !elems.is_empty() && elems.last().is_some_and(serde_json::Value::is_null) {
@@ -8717,111 +3840,6 @@ impl serde::Serialize for String {
                 seq.serialize_element("geometry-type")?;
                 for elem in &elems {
                     seq.serialize_element(elem)?;
-                }
-                seq.end()
-            }
-            String::Get(f0, f1) => {
-                let mut elems = vec![
-                    serde_json::to_value(f0).map_err(serde::ser::Error::custom)?,
-                    serde_json::to_value(f1).map_err(serde::ser::Error::custom)?,
-                ];
-                while elems.len() > 1 && elems.last().is_some_and(serde_json::Value::is_null) {
-                    elems.pop();
-                }
-                let mut seq = serializer.serialize_seq(None)?;
-                seq.serialize_element("get")?;
-                for elem in &elems {
-                    seq.serialize_element(elem)?;
-                }
-                seq.end()
-            }
-            String::GlobalState(f0) => {
-                let mut elems = vec![serde_json::to_value(f0).map_err(serde::ser::Error::custom)?];
-                while elems.len() > 1 && elems.last().is_some_and(serde_json::Value::is_null) {
-                    elems.pop();
-                }
-                let mut seq = serializer.serialize_seq(None)?;
-                seq.serialize_element("global-state")?;
-                for elem in &elems {
-                    seq.serialize_element(elem)?;
-                }
-                seq.end()
-            }
-            String::Id => {
-                let mut elems = vec![];
-                while !elems.is_empty() && elems.last().is_some_and(serde_json::Value::is_null) {
-                    elems.pop();
-                }
-                let mut seq = serializer.serialize_seq(None)?;
-                seq.serialize_element("id")?;
-                for elem in &elems {
-                    seq.serialize_element(elem)?;
-                }
-                seq.end()
-            }
-            String::Let(inner) => {
-                let inner_val = serde_json::to_value(inner).map_err(serde::ser::Error::custom)?;
-                let mut seq = serializer.serialize_seq(None)?;
-                seq.serialize_element("let")?;
-                if let serde_json::Value::Array(top) = &inner_val {
-                    for elem in top {
-                        if let serde_json::Value::Array(sub) = elem {
-                            if sub.is_empty() {
-                                // Empty Vec — nothing to flatten.
-                            } else if sub[0].is_array() {
-                                // An array-of-arrays is the Vec<(A,B)> — flatten it.
-                                for pair in sub {
-                                    if let serde_json::Value::Array(pair_elems) = pair {
-                                        for pe in pair_elems {
-                                            seq.serialize_element(pe)?;
-                                        }
-                                    } else {
-                                        seq.serialize_element(pair)?;
-                                    }
-                                }
-                            } else {
-                                // Plain array value (e.g. a sub-expression like ["zoom"]).
-                                seq.serialize_element(elem)?;
-                            }
-                        } else {
-                            seq.serialize_element(elem)?;
-                        }
-                    }
-                } else {
-                    seq.serialize_element(&inner_val)?;
-                }
-                seq.end()
-            }
-            String::Match(inner) => {
-                let inner_val = serde_json::to_value(inner).map_err(serde::ser::Error::custom)?;
-                let mut seq = serializer.serialize_seq(None)?;
-                seq.serialize_element("match")?;
-                if let serde_json::Value::Array(top) = &inner_val {
-                    for elem in top {
-                        if let serde_json::Value::Array(sub) = elem {
-                            if sub.is_empty() {
-                                // Empty Vec — nothing to flatten.
-                            } else if sub[0].is_array() {
-                                // An array-of-arrays is the Vec<(A,B)> — flatten it.
-                                for pair in sub {
-                                    if let serde_json::Value::Array(pair_elems) = pair {
-                                        for pe in pair_elems {
-                                            seq.serialize_element(pe)?;
-                                        }
-                                    } else {
-                                        seq.serialize_element(pair)?;
-                                    }
-                                }
-                            } else {
-                                // Plain array value (e.g. a sub-expression like ["zoom"]).
-                                seq.serialize_element(elem)?;
-                            }
-                        } else {
-                            seq.serialize_element(elem)?;
-                        }
-                    }
-                } else {
-                    seq.serialize_element(&inner_val)?;
                 }
                 seq.end()
             }
@@ -8865,39 +3883,6 @@ impl serde::Serialize for String {
                 seq.serialize_element("slice")?;
                 for elem in &elems {
                     seq.serialize_element(elem)?;
-                }
-                seq.end()
-            }
-            String::Step(inner) => {
-                let inner_val = serde_json::to_value(inner).map_err(serde::ser::Error::custom)?;
-                let mut seq = serializer.serialize_seq(None)?;
-                seq.serialize_element("step")?;
-                if let serde_json::Value::Array(top) = &inner_val {
-                    for elem in top {
-                        if let serde_json::Value::Array(sub) = elem {
-                            if sub.is_empty() {
-                                // Empty Vec — nothing to flatten.
-                            } else if sub[0].is_array() {
-                                // An array-of-arrays is the Vec<(A,B)> — flatten it.
-                                for pair in sub {
-                                    if let serde_json::Value::Array(pair_elems) = pair {
-                                        for pe in pair_elems {
-                                            seq.serialize_element(pe)?;
-                                        }
-                                    } else {
-                                        seq.serialize_element(pair)?;
-                                    }
-                                }
-                            } else {
-                                // Plain array value (e.g. a sub-expression like ["zoom"]).
-                                seq.serialize_element(elem)?;
-                            }
-                        } else {
-                            seq.serialize_element(elem)?;
-                        }
-                    }
-                } else {
-                    seq.serialize_element(&inner_val)?;
                 }
                 seq.end()
             }
@@ -8945,18 +3930,6 @@ impl serde::Serialize for String {
                 }
                 let mut seq = serializer.serialize_seq(None)?;
                 seq.serialize_element("upcase")?;
-                for elem in &elems {
-                    seq.serialize_element(elem)?;
-                }
-                seq.end()
-            }
-            String::Var(f0) => {
-                let mut elems = vec![serde_json::to_value(f0).map_err(serde::ser::Error::custom)?];
-                while elems.len() > 1 && elems.last().is_some_and(serde_json::Value::is_null) {
-                    elems.pop();
-                }
-                let mut seq = serializer.serialize_seq(None)?;
-                seq.serialize_element("var")?;
                 for elem in &elems {
                     seq.serialize_element(elem)?;
                 }

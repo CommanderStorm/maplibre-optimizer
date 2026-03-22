@@ -57,23 +57,25 @@ pub struct MaplibreStyleSpecification;
 /// Either of the below variants
 #[derive(PartialEq, Debug, Clone)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum StringLiteralOrStringOrImageAsUnion {
+pub enum StringLiteralOrStringOrImageOrAnyAsUnion {
     StringLiteral(StringLiteral),
     String(Box<String>),
     Image(Image),
+    Any(Box<Any>),
 }
 
-impl serde::Serialize for StringLiteralOrStringOrImageAsUnion {
+impl serde::Serialize for StringLiteralOrStringOrImageOrAnyAsUnion {
     fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         match self {
             Self::StringLiteral(v) => v.serialize(serializer),
             Self::String(v) => v.serialize(serializer),
             Self::Image(v) => v.serialize(serializer),
+            Self::Any(v) => v.serialize(serializer),
         }
     }
 }
 
-impl<'de> serde::Deserialize<'de> for StringLiteralOrStringOrImageAsUnion {
+impl<'de> serde::Deserialize<'de> for StringLiteralOrStringOrImageOrAnyAsUnion {
     fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
         let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
         let mut errors: Vec<(&str, std::string::String)> = Vec::new();
@@ -89,11 +91,15 @@ impl<'de> serde::Deserialize<'de> for StringLiteralOrStringOrImageAsUnion {
             Ok(v) => return Ok(Self::Image(v)),
             Err(e) => errors.push(("Image", e.to_string())),
         }
+        match <Box<Any> as serde::Deserialize>::deserialize(&value) {
+            Ok(v) => return Ok(Self::Any(v)),
+            Err(e) => errors.push(("Any", e.to_string())),
+        }
 
         let details: Vec<std::string::String> =
             errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
         Err(serde::de::Error::custom(format!(
-            "StringLiteralOrStringOrImageAsUnion: no variant matched. Expected StringLiteral(StringLiteral) | String(Box<String>) | Image(Image). Errors: [{}]",
+            "StringLiteralOrStringOrImageOrAnyAsUnion: no variant matched. Expected StringLiteral(StringLiteral) | String(Box<String>) | Image(Image) | Any(Box<Any>). Errors: [{}]",
             details.join("; ")
         )))
     }
@@ -103,7 +109,7 @@ impl<'de> serde::Deserialize<'de> for StringLiteralOrStringOrImageAsUnion {
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct ExpressionNameFormatVariadicRow(
-    StringLiteralOrStringOrImageAsUnion,
+    StringLiteralOrStringOrImageOrAnyAsUnion,
     #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_option_json_map))]
     Option<serde_json::Map<std::string::String, serde_json::Value>>,
 );

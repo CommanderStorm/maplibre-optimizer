@@ -1494,8 +1494,9 @@ fn generate_syntax_enum_deserializer(
                     .get(key.as_str())
                     .map(String::as_str);
                 if name == "Any" && key == "match" {
-                    let (lt, ot, ft) =
-                        any_match_types.as_ref().expect("Any::Match precomputed types");
+                    let (lt, ot, ft) = any_match_types
+                        .as_ref()
+                        .expect("Any::Match precomputed types");
                     emit_match_deserializer_arm(
                         visit_seq,
                         name,

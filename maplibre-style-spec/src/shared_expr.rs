@@ -161,6 +161,16 @@ pub enum NumericPropInner {
     ),
 }
 
+impl NumericPropInner {
+    /// If this is a literal number, return it as `f64`.
+    pub fn as_f64(&self) -> Option<f64> {
+        match self {
+            Self::Literal(n) => n.as_f64(),
+            Self::Expr(_) => None,
+        }
+    }
+}
+
 impl serde::Serialize for NumericPropInner {
     fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         match self {

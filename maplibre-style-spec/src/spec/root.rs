@@ -289,7 +289,7 @@ pub struct RootFontFaces(std::collections::BTreeMap<std::string::String, FontFac
 /// The global light source.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub struct RootLight(Light);
+pub struct RootLight(pub Light);
 
 /// Arbitrary properties useful to track with the stylesheet, but do not influence rendering. Properties should be prefixed to avoid collisions, like 'maplibre:'.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
@@ -324,7 +324,7 @@ impl Default for RootPitch {
 /// The projection configuration
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub struct RootProjection(Projection);
+pub struct RootProjection(pub Projection);
 
 /// Default roll, in degrees. The roll angle is measured counterclockwise about the camera boresight. The style roll will be used only if the map has not been positioned by other means (e.g. map options or user interaction).
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
@@ -346,14 +346,14 @@ impl Default for RootRoll {
 /// The map's sky configuration. **Note:** this definition is still experimental and is under development in maplibre-gl-js.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub struct RootSky(Sky);
+pub struct RootSky(pub Sky);
 
 /// Sources state which data the map should display. Specify the type of source with the `type` property. Adding a source isn't enough to make data appear on the map because sources don't contain styling details like color or width. Layers refer to a source and give it a visual representation. This makes it possible to style the same source in different ways, like differentiating between types of roads in a highways layer.
 ///
 /// Tiled sources (vector and raster) must specify their details according to the [TileJSON specification](https://github.com/mapbox/tilejson-spec).
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub struct RootSources(std::collections::BTreeMap<std::string::String, Source>);
+pub struct RootSources(pub std::collections::BTreeMap<std::string::String, Source>);
 
 /// An object used to define default values when using the [`global-state`](https://maplibre.org/maplibre-style-spec/expressions/#global-state) expression.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
@@ -372,12 +372,12 @@ impl Default for RootState {
 /// The terrain configuration.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub struct RootTerrain(Terrain);
+pub struct RootTerrain(pub Terrain);
 
 /// A global transition definition to use as a default across properties, to be used for timing transitions between one value and the next when no property-specific transition is set. Collision-based symbol fading is controlled independently of the style's `transition` property.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub struct RootTransition(Transition);
+pub struct RootTransition(pub Transition);
 
 /// Style specification version number. Must be 8.
 #[derive(

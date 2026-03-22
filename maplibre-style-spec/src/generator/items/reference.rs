@@ -19,7 +19,7 @@ pub fn generate(scope: &mut Scope, name: &str, field: &MirReferenceField) {
         .doc(&field.meta.doc)
         .derive("serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone")
         .attr(fuzz::CFG_DERIVE_ARBITRARY)
-        .tuple_field(rust_inner);
+        .tuple_field(format!("pub {rust_inner}"));
 
     generate_test_from_example_if_present(scope, name, field.meta.example.as_ref());
 }
@@ -43,7 +43,7 @@ mod tests {
         insta::assert_snapshot!(scope.to_string(), @r#"
         #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
         #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-        pub struct Foo(Sky);
+        pub struct Foo(pub Sky);
         "#)
     }
 }
