@@ -100,7 +100,7 @@ fn has_next_lower(s: &str, idx: usize) -> bool {
 
 fn prefilter_names(name: impl ToString) -> String {
     let mut name = name.to_string();
-    // these are tricky because they may consivably occur in the middle of a word
+    // these are tricky because they may conceivably occur in the middle of a word
     for (val, absolute_replacement) in [
         ("abs", " Absolute "),
         ("acos", " Arccosine "),
