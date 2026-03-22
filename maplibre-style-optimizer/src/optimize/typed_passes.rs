@@ -5,10 +5,9 @@
 
 use std::collections::{HashMap, HashSet};
 
-use maplibre_style_spec::spec::{AnyLayer, MaplibreStyleSpecification, TypedLayer};
+use maplibre_style_spec::spec::{AnyLayer, LayerFilter, MaplibreStyleSpecification, TypedLayer};
 use serde_json::Value;
 
-use super::expr::bool_literal;
 use super::source_util::VectorLayerInfo;
 use crate::stats::TileStatistics;
 
@@ -40,7 +39,7 @@ pub(crate) fn dead_elimination_typed(
         if let AnyLayer::Typed(t) = layer {
             // Filter is always false.
             if let Some(ref filter) = t.common().filter
-                && filter_is_always_false(filter.as_value())
+                && filter.is_always_false()
             {
                 to_drop.push(i);
                 continue;
@@ -63,10 +62,6 @@ pub(crate) fn dead_elimination_typed(
     // Prune unused sources.
     let used = collect_used_sources_typed(&style.layers);
     prune_sources(style, &used);
-}
-
-fn filter_is_always_false(f: &Value) -> bool {
-    bool_literal(f) == Some(false)
 }
 
 /// Prune unused sources by roundtripping through JSON.
@@ -185,8 +180,8 @@ fn refine_typed_layer(
 
     // Filter-based zoom extraction.
     if let Some(ref filter) = common.filter {
-        let filter_val = filter.as_value();
-        let (lb_raw, ub_raw) = super::metadata::zoom_bounds_from_expression(filter_val);
+        let filter_json = filter.to_json_value();
+        let (lb_raw, ub_raw) = super::metadata::zoom_bounds_from_expression(&filter_json);
         let lb = lb_raw.map(f64::ceil);
         let ub = ub_raw.map(f64::floor);
 
@@ -230,11 +225,15 @@ fn refine_typed_layer(
         if (adopted_min.is_some() || adopted_max.is_some())
             && let Some(ref mut filter) = common.filter
         {
+            let mut filter_json = filter.to_json_value();
             super::metadata::remove_consumed_zoom_predicates(
-                filter.as_value_mut(),
+                &mut filter_json,
                 adopted_min,
                 adopted_max,
             );
+            if let Some(new_filter) = LayerFilter::from_value(filter_json) {
+                *filter = new_filter;
+            }
         }
     }
 

@@ -2,16 +2,17 @@
 //!
 //! Two entry points:
 //!
-//! - [`optimize_style`] is the typed entry point.  All passes operate on
-//!   `&mut MaplibreStyleSpecification` as the canonical representation.
-//!   Expression passes temporarily serialize to JSON for the schema-guided
-//!   walker, then deserialize back.  All generated expression types accept
-//!   an `Any` fallback variant, so optimizer-produced forms like
-//!   `["literal", x]` round-trip correctly.
+//! - [`optimize_style`] is the typed entry point.  Structural passes work
+//!   directly on `&mut MaplibreStyleSpecification`; expression passes
+//!   temporarily serialize to JSON for the schema-guided walker and sync
+//!   only filter changes back (paint/layout in the typed struct is left as-is
+//!   because `["literal", x]` produced by constant-folding is not accepted by
+//!   the generated numeric paint property types).
 //!
 //! - [`optimize_style_json_value`] / [`optimize_style_json_value_with_stats`]
-//!   are thin wrappers: they deserialize the JSON into a typed struct, call
-//!   the same [`run_pipeline`], and serialize back.
+//!   run expression passes directly on the JSON (no typed round-trip, so all
+//!   optimizer-produced forms survive).  Structural passes then run in one
+//!   batch: one deserialize → all structural passes → one `sync_typed_to_json`.
 
 mod defaults;
 pub(crate) mod expr;
@@ -24,7 +25,7 @@ mod walk;
 use defaults::StripDefaultsVisitor;
 use expr::{NormalizeFoldVisitor, ReorderSelectivityVisitor};
 use maplibre_style_spec::mir::MirSpec;
-use maplibre_style_spec::spec::MaplibreStyleSpecification;
+use maplibre_style_spec::spec::{AnyLayer, LayerFilter, MaplibreStyleSpecification};
 use serde_json::Value;
 use source_util::precompute_vector_layer_info;
 use typed_passes::{
@@ -78,6 +79,14 @@ fn wants_normalize_fold(passes: &OptPasses) -> bool {
         || passes.simplify_expressions
 }
 
+fn wants_expression_passes(passes: &OptPasses) -> bool {
+    wants_normalize_fold(passes) || passes.strip_defaults || passes.selectivity_reorder
+}
+
+fn wants_structural_passes(passes: &OptPasses) -> bool {
+    passes.strip_metadata || passes.dead_elimination || passes.metadata_refinement || passes.cleanup
+}
+
 // ── Public entry points ─────────────────────────────────────────────────────
 
 /// Convenience wrapper (no stats).
@@ -85,25 +94,37 @@ pub fn optimize_style_json_value(v: &mut Value, mir: &MirSpec, passes: &OptPasse
     optimize_style_json_value_with_stats(v, mir, passes, None);
 }
 
-/// JSON entry point.  Deserializes `v` into a typed struct, runs the typed
-/// pipeline, and serializes back.
+/// JSON entry point.  Expression passes run directly on the JSON so that all
+/// optimizer-produced forms (e.g. `["literal", 0.5]` from constant-folding a
+/// numeric paint property) are preserved verbatim.  Structural passes then run
+/// in a single deserialize → run → `sync_typed_to_json` cycle.
 pub fn optimize_style_json_value_with_stats(
     v: &mut Value,
     mir: &MirSpec,
     passes: &OptPasses,
     stats: Option<&TileStatistics>,
 ) {
-    let Ok(mut style) = serde_json::from_value::<MaplibreStyleSpecification>(v.clone()) else {
+    if !wants_expression_passes(passes) && !wants_structural_passes(passes) {
         return;
-    };
-    run_pipeline(&mut style, mir, passes, stats);
-    if let Ok(updated) = serde_json::to_value(&style) {
-        *v = updated;
+    }
+
+    // 1. Expression passes directly on JSON (no typed round-trip).
+    run_json_expression_passes(v, mir, passes, stats);
+
+    // 2. Structural passes — one deserialize + run all + one sync.
+    if wants_structural_passes(passes)
+        && let Ok(mut style) = serde_json::from_value::<MaplibreStyleSpecification>(v.clone())
+    {
+        run_structural_passes(&mut style, passes, stats);
+        sync_typed_to_json(&style, v);
     }
 }
 
-/// Primary typed entry point.  The typed struct is the canonical
-/// representation; no whole-style JSON roundtrip is performed.
+/// Typed entry point.  Structural passes work directly on the typed struct.
+/// Expression passes serialize to JSON, run the walker, then sync only filter
+/// changes back; paint/layout simplification results in the typed output are
+/// dropped because `["literal", x]` is not a valid form for generated numeric
+/// paint types.  This limitation will be resolved in Phase 3.
 pub fn optimize_style(
     style: &mut MaplibreStyleSpecification,
     mir: &MirSpec,
@@ -115,61 +136,143 @@ pub fn optimize_style(
 
 // ── Pipeline implementation ─────────────────────────────────────────────────
 
-/// Typed-primary pipeline shared by both entry points.
-///
-/// Structural passes (`strip_metadata`, `dead_elimination`, `metadata_refinement`,
-/// `cleanup`) work directly on the typed struct.  Expression passes temporarily
-/// serialize to JSON for the schema-guided walker, then deserialize back; the
-/// `Any` fallback variants on all generated expression types guarantee that
-/// optimizer-produced forms (e.g. `["literal", x]`) survive the round-trip.
+/// Typed-primary pipeline used by [`optimize_style`].
 fn run_pipeline(
     style: &mut MaplibreStyleSpecification,
     mir: &MirSpec,
     passes: &OptPasses,
     stats: Option<&TileStatistics>,
 ) {
-    if !passes.strip_metadata
-        && !wants_normalize_fold(passes)
-        && !passes.dead_elimination
-        && !passes.metadata_refinement
-        && !passes.strip_defaults
-        && !passes.selectivity_reorder
-        && !passes.cleanup
-    {
+    if !wants_expression_passes(passes) && !wants_structural_passes(passes) {
         return;
     }
 
-    // 1. Strip metadata (typed, direct).
+    // 1. Strip metadata (typed, direct) — before expression passes so that the
+    //    serialized JSON excludes metadata.
     if passes.strip_metadata {
         strip_metadata_typed(style);
     }
 
-    // 2. Expression passes: serialize → JSON walker → deserialize back.
-    if (wants_normalize_fold(passes) || passes.strip_defaults || passes.selectivity_reorder)
+    // 2. Expression passes: serialize → JSON walker → sync only filter changes back.
+    if wants_expression_passes(passes)
         && let Ok(mut v) = serde_json::to_value(&*style)
     {
         run_json_expression_passes(&mut v, mir, passes, stats);
-        if let Ok(updated) = serde_json::from_value(v) {
-            *style = updated;
-        }
+        sync_filters_from_json(style, &v);
     }
 
-    // 3. Dead elimination (typed, direct).
+    // 3–5. Remaining structural passes (typed, direct).
+    run_structural_passes(style, passes, stats);
+}
+
+/// Run structural passes in order.  `strip_metadata` is idempotent and
+/// harmless to call even if it already ran in [`run_pipeline`].
+fn run_structural_passes(
+    style: &mut MaplibreStyleSpecification,
+    passes: &OptPasses,
+    stats: Option<&TileStatistics>,
+) {
+    if passes.strip_metadata {
+        strip_metadata_typed(style);
+    }
+
     if passes.dead_elimination {
         let layer_info = stats.map(|_| precompute_vector_layer_info_typed(style));
         dead_elimination_typed(style, stats, layer_info.as_deref());
     }
 
-    // 4. Metadata refinement (typed, direct).
     if passes.metadata_refinement {
         let layer_info = stats.map(|_| precompute_vector_layer_info_typed(style));
         metadata_refinement_typed(style, stats, layer_info.as_deref());
     }
 
-    // 5. Cleanup (typed, direct).
     if passes.cleanup {
         cleanup_typed(style);
     }
+}
+
+/// Sync only the `filter` field of each layer from a post-expression-pass JSON
+/// value back into the typed struct.  Filters that fail to deserialize (should
+/// not happen with well-formed expression-pass output) are silently dropped.
+fn sync_filters_from_json(style: &mut MaplibreStyleSpecification, v: &Value) {
+    let Some(json_layers) = v.get("layers").and_then(Value::as_array) else {
+        return;
+    };
+    for (typed_layer, json_layer) in style.layers.iter_mut().zip(json_layers.iter()) {
+        let new_filter = json_layer
+            .get("filter")
+            .filter(|f| !f.is_null())
+            .cloned()
+            .and_then(LayerFilter::from_value);
+        match typed_layer {
+            AnyLayer::Typed(t) => t.common_mut().filter = new_filter,
+            AnyLayer::Ref(r) => r.filter = new_filter,
+        }
+    }
+}
+
+// ── Sync helpers (JSON entry point only) ────────────────────────────────────
+
+/// Sync typed struct → JSON.  Merges typed scalar fields into the JSON while
+/// preserving paint/layout from the JSON side (which has expression-pass results).
+fn sync_typed_to_json(style: &MaplibreStyleSpecification, v: &mut Value) {
+    let Some(obj) = v.as_object_mut() else { return };
+
+    if style.metadata.is_none() {
+        obj.remove("metadata");
+    }
+
+    if let Ok(sources_val) = serde_json::to_value(&style.sources) {
+        obj.insert("sources".to_string(), sources_val);
+    }
+
+    if let Ok(typed_layers_val) = serde_json::to_value(&style.layers) {
+        if let (Some(json_layers), Some(typed_layers)) = (
+            obj.get("layers").and_then(Value::as_array).cloned(),
+            typed_layers_val.as_array(),
+        ) {
+            if json_layers.len() == typed_layers.len() {
+                let merged: Vec<Value> = json_layers
+                    .into_iter()
+                    .zip(typed_layers)
+                    .map(|(jl, tl)| merge_layer_json(jl, tl))
+                    .collect();
+                obj.insert("layers".to_string(), Value::Array(merged));
+            } else {
+                obj.insert("layers".to_string(), typed_layers_val);
+            }
+        } else {
+            obj.insert("layers".to_string(), typed_layers_val);
+        }
+    }
+}
+
+/// Merge typed scalar fields into a JSON layer, keeping original paint/layout.
+fn merge_layer_json(mut original: Value, typed: &Value) -> Value {
+    let (Some(orig_obj), Some(typed_obj)) = (original.as_object_mut(), typed.as_object()) else {
+        return original;
+    };
+    for key in &[
+        "id",
+        "type",
+        "source",
+        "source-layer",
+        "filter",
+        "minzoom",
+        "maxzoom",
+        "metadata",
+        "ref",
+    ] {
+        match typed_obj.get(*key) {
+            Some(val) if !val.is_null() => {
+                orig_obj.insert((*key).to_string(), val.clone());
+            }
+            _ => {
+                orig_obj.remove(*key);
+            }
+        }
+    }
+    original
 }
 
 /// Run expression-level passes on the JSON value.
