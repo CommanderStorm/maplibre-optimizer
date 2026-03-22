@@ -28,3 +28,5 @@ serde_repr.workspace = true
 [dev-dependencies]
 insta.workspace = true
 rstest.workspace = true
+reqwest.workspace = true
+tokio.workspace = true
