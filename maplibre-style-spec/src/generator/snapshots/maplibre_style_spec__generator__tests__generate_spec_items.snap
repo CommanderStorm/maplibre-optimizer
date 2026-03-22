@@ -15,6 +15,12 @@ pub struct NumberLiteral(
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct StringLiteral(std::string::String);
 
+impl From<std::string::String> for StringLiteral {
+    fn from(s: std::string::String) -> Self {
+        Self(s)
+    }
+}
+
 /// GeoJSON object literal
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]

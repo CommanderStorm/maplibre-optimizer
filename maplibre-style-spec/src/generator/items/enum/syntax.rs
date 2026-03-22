@@ -834,7 +834,7 @@ fn generate_syntax_enum_body(
         }
     }
 
-    // Boolean gets built-in Literal and AnyExpr variants so it can represent
+    // Expression enums get built-in Literal and AnyExpr variants so they can represent
     // folded constants and polymorphic sub-expressions (case/match/get/…) directly
     // without an intermediate union type.
     if name == "Boolean" {
@@ -843,6 +843,14 @@ fn generate_syntax_enum_body(
             .tuple("bool");
         enu.new_variant("AnyExpr")
             .doc("A polymorphic expression (`case`, `match`, `get`, …) in a boolean position.")
+            .tuple("Box<Any>");
+    }
+    if name == "String" {
+        enu.new_variant("Literal")
+            .doc("A string literal value.")
+            .tuple("StringLiteral");
+        enu.new_variant("AnyExpr")
+            .doc("A polymorphic expression (`case`, `match`, `get`, …) in a string position.")
             .tuple("Box<Any>");
     }
 
@@ -1195,15 +1203,9 @@ fn generate_parameter_variant(scope: &mut Scope, param: &MirParameterType) -> St
                     MirParameterType::Expression(Box::new(MirExpression::Number)),
                 ],
             ),
-            // `"string"` in the style spec means "a string value or expression", so plain
-            // string literals (e.g. `"hover"`, `"myProp"`) must also be accepted.
-            MirExpression::String => generate_expression_any_of(
-                scope,
-                &[
-                    MirParameterType::Literal(MirLiteral::String),
-                    MirParameterType::Expression(Box::new(MirExpression::String)),
-                ],
-            ),
+            // `String` now has `Literal(StringLiteral)` and `AnyExpr(Box<Any>)` variants directly,
+            // so string parameter positions just use `String` — no union wrapper needed.
+            MirExpression::String => "String".to_string(),
             // `"color"` can be a CSS color string literal (e.g. `"#ff0000"`) or a Color expression.
             MirExpression::Color => generate_expression_any_of(
                 scope,
@@ -1570,8 +1572,8 @@ fn generate_syntax_enum_deserializer(
     }
 
     let variants = values.keys().cloned().collect::<Vec<_>>();
-    if name == "Boolean" {
-        // Boolean: unknown operators may be polymorphic Any expressions (case, match, get, …).
+    if matches!(name, "Boolean" | "String") {
+        // Unknown operators may be polymorphic Any expressions (case, match, get, …).
         // Collect remaining elements, reconstruct the full array, and try parsing as Any.
         visit_seq.line("_ => {");
         visit_seq.line("let mut elems = vec![serde_json::Value::String(op)];");
@@ -1582,7 +1584,7 @@ fn generate_syntax_enum_deserializer(
         visit_seq.line(
             "let any_expr = serde_json::from_value::<Any>(arr).map_err(serde::de::Error::custom)?;",
         );
-        visit_seq.line("Ok(Boolean::AnyExpr(Box::new(any_expr)))");
+        visit_seq.line(format!("Ok({name}::AnyExpr(Box::new(any_expr)))"));
         visit_seq.line("}");
     } else {
         visit_seq.line(format!(
@@ -1596,9 +1598,9 @@ fn generate_syntax_enum_deserializer(
 fn generate_visitor<'a>(scope: &'a mut Scope, name: &str, example: &Value) -> &'a mut Impl {
     let visitor_name = format!("{name}Visitor");
 
-    // Boolean uses `deserialize_any` so bare `true`/`false` map to `Boolean::Literal`.
+    // Boolean and String use `deserialize_any` so bare literals map to their `Literal` variant.
     // Other expression enums use `deserialize_seq` (only arrays).
-    let deserialize_method = if name == "Boolean" {
+    let deserialize_method = if matches!(name, "Boolean" | "String") {
         "deserialize_any"
     } else {
         "deserialize_seq"
@@ -1640,6 +1642,22 @@ fn generate_visitor<'a>(scope: &'a mut Scope, name: &str, example: &Value) -> &'
             .arg("v", "bool")
             .ret("Result<Self::Value, E>")
             .line("Ok(Boolean::Literal(v))");
+    }
+
+    // String: accept bare string values as Literal variant.
+    if name == "String" {
+        vis.new_fn("visit_str")
+            .generic("E: serde::de::Error")
+            .arg_self()
+            .arg("v", "&str")
+            .ret("Result<Self::Value, E>")
+            .line("Ok(String::Literal(StringLiteral::from(v.to_string())))");
+        vis.new_fn("visit_string")
+            .generic("E: serde::de::Error")
+            .arg_self()
+            .arg("v", "std::string::String")
+            .ret("Result<Self::Value, E>")
+            .line("Ok(String::Literal(StringLiteral::from(v)))");
     }
 
     vis
@@ -1963,10 +1981,14 @@ fn generate_syntax_enum_serializer(
         }
     }
 
-    // Boolean: add Literal and AnyExpr serializer arms.
+    // Add Literal and AnyExpr serializer arms for expression enums that have them.
     if name == "Boolean" {
         arms.push_str("            Boolean::Literal(b) => serializer.serialize_bool(*b),\n");
         arms.push_str("            Boolean::AnyExpr(a) => a.serialize(serializer),\n");
+    }
+    if name == "String" {
+        arms.push_str("            String::Literal(s) => s.serialize(serializer),\n");
+        arms.push_str("            String::AnyExpr(a) => a.serialize(serializer),\n");
     }
 
     scope.raw(format!(

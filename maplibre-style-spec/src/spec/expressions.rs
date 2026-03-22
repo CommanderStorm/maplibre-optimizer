@@ -240,51 +240,6 @@ impl<'de> serde::Deserialize<'de> for NumberLiteralOrNumberOrAnyAsUnion {
     }
 }
 
-/// Either of the below variants
-#[derive(PartialEq, Debug, Clone)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum StringLiteralOrStringOrAnyAsUnion {
-    StringLiteral(StringLiteral),
-    String(Box<String>),
-    Any(Box<Any>),
-}
-
-impl serde::Serialize for StringLiteralOrStringOrAnyAsUnion {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        match self {
-            Self::StringLiteral(v) => v.serialize(serializer),
-            Self::String(v) => v.serialize(serializer),
-            Self::Any(v) => v.serialize(serializer),
-        }
-    }
-}
-
-impl<'de> serde::Deserialize<'de> for StringLiteralOrStringOrAnyAsUnion {
-    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
-        let mut errors: Vec<(&str, std::string::String)> = Vec::new();
-        match <StringLiteral as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::StringLiteral(v)),
-            Err(e) => errors.push(("StringLiteral", e.to_string())),
-        }
-        match <Box<String> as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::String(v)),
-            Err(e) => errors.push(("String", e.to_string())),
-        }
-        match <Box<Any> as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Any(v)),
-            Err(e) => errors.push(("Any", e.to_string())),
-        }
-
-        let details: Vec<std::string::String> =
-            errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
-        Err(serde::de::Error::custom(format!(
-            "StringLiteralOrStringOrAnyAsUnion: no variant matched. Expected StringLiteral(StringLiteral) | String(Box<String>) | Any(Box<Any>). Errors: [{}]",
-            details.join("; ")
-        )))
-    }
-}
-
 /// "Any"
 #[derive(PartialEq, Debug, Clone)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
@@ -294,51 +249,51 @@ pub enum Any {
     /// Retrieves an item from an array.
     At(NumberLiteralOrNumberOrAnyAsUnion, ExprOrLiteral),
     /// Selects the first output whose corresponding test condition evaluates to true, or the fallback value otherwise.
-    ///
+    /// 
     ///  - [Create a hover effect](https://maplibre.org/maplibre-gl-js/docs/examples/create-a-hover-effect/)
-    ///
+    /// 
     ///  - [Display HTML clusters with custom properties](https://maplibre.org/maplibre-gl-js/docs/examples/display-html-clusters-with-custom-properties/)
     Case((Vec<(Boolean,ExprOrLiteral)>,ExprOrLiteral)),
     /// Evaluates each expression in turn until the first non-null value is obtained, and returns that value.
-    ///
+    /// 
     ///  - [Use a fallback image](https://maplibre.org/maplibre-gl-js/docs/examples/use-a-fallback-image/)
     Coalesce(Vec<ExprOrLiteral>),
     /// Retrieves a property value from the current feature's state. Returns null if the requested property is not present on the feature's state. A feature's state is not part of the GeoJSON or vector tile data, and must be set programmatically on each feature. When `source.promoteId` is not provided, features are identified by their `id` attribute, which must be an integer or a string that can be cast to an integer. When `source.promoteId` is provided, features are identified by their `promoteId` property, which may be a number, string, or any primitive data type. Note that ["feature-state"] can only be used with paint properties that support data-driven styling.
-    ///
+    /// 
     ///  - [Create a hover effect](https://maplibre.org/maplibre-gl-js/docs/examples/create-a-hover-effect/)
-    FeatureState(StringLiteralOrStringOrAnyAsUnion),
+    FeatureState(String),
     /// Retrieves a property value from the current feature's properties, or from another object if a second argument is provided. Returns null if the requested property is missing.
-    ///
+    /// 
     ///  - [Change the case of labels](https://maplibre.org/maplibre-gl-js/docs/examples/change-case-of-labels/)
-    ///
+    /// 
     ///  - [Display HTML clusters with custom properties](https://maplibre.org/maplibre-gl-js/docs/examples/display-html-clusters-with-custom-properties/)
-    ///
+    /// 
     ///  - [Extrude polygons for 3D indoor mapping](https://maplibre.org/maplibre-gl-js/docs/examples/extrude-polygons-for-3d-indoor-mapping/)
-    Get(StringLiteralOrStringOrAnyAsUnion, Option<Object>),
+    Get(String, Option<Object>),
     /// Retrieves a property value from global state that can be set with platform-specific APIs. Defaults can be provided using the [`state`](https://maplibre.org/maplibre-style-spec/root/#state) root property. Returns `null` if no value nor default value is set for the retrieved property.
     GlobalState(StringLiteral),
     /// Gets the feature's id, if it has one.
     Id,
     /// Binds expressions to named variables, which can then be referenced in the result expression using `["var", "variable_name"]`.
-    ///
+    /// 
     ///  - [Visualize population density](https://maplibre.org/maplibre-gl-js/docs/examples/visualize-population-density/)
     Let((Vec<(StringLiteral,ExprOrLiteral)>,ExprOrLiteral)),
     /// Selects the output whose label value matches the input value, or the fallback value if no match is found. The input can be any expression (e.g. `["get", "building_type"]`). Each label must be either:
-    ///
+    /// 
     ///  - a single literal value; or
-    ///
+    /// 
     ///  - an array of literal values, whose values must be all strings or all numbers (e.g. `[100, 101]` or `["c", "b"]`). The input matches if any of the values in the array matches, similar to the `"in"` operator.
-    ///
+    /// 
     /// Each label must be unique. If the input type does not match the type of the labels, the result will be the fallback value.
     Match((ExprOrLiteral, Vec<(StringLiteralOrNumberLiteralOrArrayOfStringLiteralOrArrayOfNumberLiteralOrAnyAsUnion,ExprOrLiteral)>, ExprOrLiteral)),
     /// Produces discrete, stepped results by evaluating a piecewise-constant function defined by pairs of input and output values ("stops"). The `input` may be any numeric expression (e.g., `["get", "population"]`). Stop inputs must be numeric literals in strictly ascending order.
-    ///
+    /// 
     /// Returns the output value of the stop just less than the input, or the first output if the input is less than the first stop.
-    ///
+    /// 
     ///  - [Create and style clusters](https://maplibre.org/maplibre-gl-js/docs/examples/create-and-style-clusters/)
     Step((NumberLiteralOrNumberOrAnyAsUnion,ExprOrLiteral,Vec<(NumberLiteral,ExprOrLiteral)>)),
     /// References variable bound using `let`.
-    ///
+    /// 
     ///  - [Visualize population density](https://maplibre.org/maplibre-gl-js/docs/examples/visualize-population-density/)
     Var(StringLiteral),
 }
@@ -1354,13 +1309,13 @@ pub enum Boolean {
     /// Tests for the presence of a property value in the current feature's properties, or from another object if a second argument is provided.
     ///
     ///  - [Create and style clusters](https://maplibre.org/maplibre-gl-js/docs/examples/create-and-style-clusters/)
-    Has(StringLiteralOrStringOrAnyAsUnion, Option<Object>),
+    Has(String, Option<Object>),
     /// Determines whether an item exists in an array or a substring exists in a string.
     ///
     ///  - [Measure distances](https://maplibre.org/maplibre-gl-js/docs/examples/measure-distances/)
     In(ExprOrLiteral, ExprOrLiteral),
     /// Returns `true` if the input string is expected to render legibly. Returns `false` if the input string contains sections that cannot be rendered without potential loss of meaning (e.g. Indic scripts that require complex text shaping, or right-to-left scripts if the `mapbox-gl-rtl-text` plugin is not in use in MapLibre GL JS).
-    IsSupportedScript(StringLiteralOrStringOrAnyAsUnion),
+    IsSupportedScript(String),
     /// Converts the input value to a boolean. The result is `false` when the input is an empty string, 0, `false`, `null`, or `NaN`; otherwise it is `true`.
     To(ExprOrLiteral),
     /// Returns `true` if the evaluated feature is fully contained inside a boundary of the input geometry, `false` otherwise. The input value can be a valid GeoJSON of type `Polygon`, `MultiPolygon`, `Feature`, or `FeatureCollection`. Supported features for evaluation:
@@ -2425,7 +2380,7 @@ pub enum Image {
     /// Returns an `image` type for use in `icon-image`, `*-pattern` entries and as a section in the `format` expression. If set, the `image` argument will check that the requested image exists in the style and will return either the resolved image name or `null`, depending on whether or not the image is currently in the style. This validation process is synchronous and requires the image to have been added to the style before requesting it in the `image` argument.
     ///
     ///  - [Use a fallback image](https://maplibre.org/maplibre-gl-js/docs/examples/use-a-fallback-image/)
-    Op(StringLiteralOrStringOrAnyAsUnion),
+    Op(String),
 }
 
 impl<'de> serde::Deserialize<'de> for Image {
@@ -2657,8 +2612,8 @@ pub enum IndexOfOptions {
         Option<serde_json::Value>,
     ),
     Substring(
-        StringLiteralOrStringOrAnyAsUnion,
-        StringLiteralOrStringOrAnyAsUnion,
+        String,
+        String,
         #[serde(default)]
         #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_option_json_value))]
         Option<serde_json::Value>,
@@ -3688,7 +3643,7 @@ pub enum String {
     /// Returns the input string converted to lowercase. Follows the Unicode Default Case Conversion algorithm and the locale-insensitive case mappings in the Unicode Character Database.
     ///
     ///  - [Change the case of labels](https://maplibre.org/maplibre-gl-js/docs/examples/change-case-of-labels/)
-    Downcase(StringLiteralOrStringOrAnyAsUnion),
+    Downcase(Box<String>),
     /// Returns the feature's simple geometry type: `Point`, `LineString`, or `Polygon`. `MultiPoint`, `MultiLineString`, and `MultiPolygon` are returned as `Point`, `LineString`, and `Polygon`, respectively.
     GeometryType,
     /// Converts the input number into a string representation using the provided format_options.
@@ -3703,7 +3658,7 @@ pub enum String {
     ResolvedLocale(Collator),
     /// Returns a subarray from an array or a substring from a string from a specified start index, or between a start index and an end index if set. The return value is inclusive of the start index but not of the end index. In a string, a UTF-16 surrogate pair counts as a single position.
     Slice(
-        StringLiteralOrStringOrAnyAsUnion,
+        Box<String>,
         NumberLiteralOrNumberOrAnyAsUnion,
         Option<NumberLiteralOrNumberOrAnyAsUnion>,
     ),
@@ -3718,7 +3673,11 @@ pub enum String {
     /// Returns the input string converted to uppercase. Follows the Unicode Default Case Conversion algorithm and the locale-insensitive case mappings in the Unicode Character Database.
     ///
     ///  - [Change the case of labels](https://maplibre.org/maplibre-gl-js/docs/examples/change-case-of-labels/)
-    Upcase(StringLiteralOrStringOrAnyAsUnion),
+    Upcase(Box<String>),
+    /// A string literal value.
+    Literal(StringLiteral),
+    /// A polymorphic expression (`case`, `match`, `get`, …) in a string position.
+    AnyExpr(Box<Any>),
 }
 
 impl<'de> serde::Deserialize<'de> for String {
@@ -3726,7 +3685,7 @@ impl<'de> serde::Deserialize<'de> for String {
     where
         D: serde::Deserializer<'de>,
     {
-        deserializer.deserialize_seq(StringVisitor)
+        deserializer.deserialize_any(StringVisitor)
     }
 }
 
@@ -3740,6 +3699,14 @@ impl<'de> serde::de::Visitor<'de> for StringVisitor {
         formatter.write_str(
             "an String expression (example: [\"concat\",\"square-rgb-\",[\"get\",\"color\"]])",
         )
+    }
+
+    fn visit_str<E: serde::de::Error>(self, v: &str) -> Result<Self::Value, E> {
+        Ok(String::Literal(StringLiteral::from(v.to_string())))
+    }
+
+    fn visit_string<E: serde::de::Error>(self, v: std::string::String) -> Result<Self::Value, E> {
+        Ok(String::Literal(StringLiteral::from(v)))
     }
 
     fn visit_seq<A: serde::de::SeqAccess<'de>>(self, mut seq: A) -> Result<Self::Value, A::Error> {
@@ -3805,21 +3772,16 @@ impl<'de> serde::de::Visitor<'de> for StringVisitor {
                 let input = visit_seq_field(&mut seq, "input")?;
                 Ok(String::Upcase(input))
             }
-            _ => Err(serde::de::Error::unknown_variant(
-                &op,
-                &[
-                    "concat",
-                    "downcase",
-                    "geometry-type",
-                    "number-format",
-                    "resolved-locale",
-                    "slice",
-                    "string",
-                    "to-string",
-                    "typeof",
-                    "upcase",
-                ],
-            )),
+            _ => {
+                let mut elems = vec![serde_json::Value::String(op)];
+                while let Some(v) = seq.next_element::<serde_json::Value>()? {
+                    elems.push(v);
+                }
+                let arr = serde_json::Value::Array(elems);
+                let any_expr =
+                    serde_json::from_value::<Any>(arr).map_err(serde::de::Error::custom)?;
+                Ok(String::AnyExpr(Box::new(any_expr)))
+            }
         }
     }
 }
@@ -3960,6 +3922,8 @@ impl serde::Serialize for String {
                 }
                 seq.end()
             }
+            String::Literal(s) => s.serialize(serializer),
+            String::AnyExpr(a) => a.serialize(serializer),
         }
     }
 }

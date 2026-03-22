@@ -21,6 +21,14 @@ pub fn generate_literals(scope: &mut Scope) {
         .attr(fuzz::CFG_DERIVE_ARBITRARY)
         .tuple_field("std::string::String");
 
+    scope.raw(
+        r"impl From<std::string::String> for StringLiteral {
+    fn from(s: std::string::String) -> Self {
+        Self(s)
+    }
+}",
+    );
+
     scope
         .new_struct("GeoJSONObjectLiteral")
         .vis("pub")

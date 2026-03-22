@@ -128,7 +128,7 @@ mod tests {
             }]
         });
         walk_style_mut(&mut v, &mir, &mut StripDefaultsVisitor { mir: &mir });
-        // After stripping, layout should be empty and then removed
+        // After stripping, the layout should be empty and then removed
         assert!(v["layers"][0].get("layout").is_none());
     }
 
