@@ -2,14 +2,16 @@
 //!
 //! Two entry points:
 //!
-//! - [`optimize_style`] operates on the typed [`MaplibreStyleSpecification`] as
-//!   the canonical representation.  All structural passes work directly on the
-//!   typed struct; expression passes temporarily serialize to JSON for the
-//!   schema-guided walker, then deserialize back.
+//! - [`optimize_style`] is the typed entry point.  All passes operate on
+//!   `&mut MaplibreStyleSpecification` as the canonical representation.
+//!   Expression passes temporarily serialize to JSON for the schema-guided
+//!   walker, then deserialize back.  All generated expression types accept
+//!   an `Any` fallback variant, so optimizer-produced forms like
+//!   `["literal", x]` round-trip correctly.
 //!
 //! - [`optimize_style_json_value`] / [`optimize_style_json_value_with_stats`]
-//!   operate on raw `serde_json::Value` by deserializing into a typed struct,
-//!   running the same typed pipeline, and serializing back.
+//!   are thin wrappers: they deserialize the JSON into a typed struct, call
+//!   the same [`run_pipeline`], and serialize back.
 
 mod defaults;
 pub(crate) mod expr;
@@ -83,7 +85,7 @@ pub fn optimize_style_json_value(v: &mut Value, mir: &MirSpec, passes: &OptPasse
     optimize_style_json_value_with_stats(v, mir, passes, None);
 }
 
-/// JSON entry point.  Deserializes into a typed struct, runs the typed
+/// JSON entry point.  Deserializes `v` into a typed struct, runs the typed
 /// pipeline, and serializes back.
 pub fn optimize_style_json_value_with_stats(
     v: &mut Value,
@@ -101,7 +103,7 @@ pub fn optimize_style_json_value_with_stats(
 }
 
 /// Primary typed entry point.  The typed struct is the canonical
-/// representation; no JSON roundtrip of the whole style is needed.
+/// representation; no whole-style JSON roundtrip is performed.
 pub fn optimize_style(
     style: &mut MaplibreStyleSpecification,
     mir: &MirSpec,
@@ -113,9 +115,13 @@ pub fn optimize_style(
 
 // ── Pipeline implementation ─────────────────────────────────────────────────
 
-/// Typed pipeline.  All structural passes operate directly on the typed struct.
-/// Expression passes temporarily serialize to JSON for the schema-guided
-/// walker, then deserialize back.
+/// Typed-primary pipeline shared by both entry points.
+///
+/// Structural passes (`strip_metadata`, `dead_elimination`, `metadata_refinement`,
+/// `cleanup`) work directly on the typed struct.  Expression passes temporarily
+/// serialize to JSON for the schema-guided walker, then deserialize back; the
+/// `Any` fallback variants on all generated expression types guarantee that
+/// optimizer-produced forms (e.g. `["literal", x]`) survive the round-trip.
 fn run_pipeline(
     style: &mut MaplibreStyleSpecification,
     mir: &MirSpec,
