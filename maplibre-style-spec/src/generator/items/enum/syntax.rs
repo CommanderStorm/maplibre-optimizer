@@ -833,6 +833,19 @@ fn generate_syntax_enum_body(
             var.tuple(&options_name);
         }
     }
+
+    // Boolean gets built-in Literal and AnyExpr variants so it can represent
+    // folded constants and polymorphic sub-expressions (case/match/get/…) directly
+    // without an intermediate union type.
+    if name == "Boolean" {
+        enu.new_variant("Literal")
+            .doc("A boolean literal value (`true` or `false`).")
+            .tuple("bool");
+        enu.new_variant("AnyExpr")
+            .doc("A polymorphic expression (`case`, `match`, `get`, …) in a boolean position.")
+            .tuple("Box<Any>");
+    }
+
     variadic_row_struct_names
 }
 
@@ -1199,15 +1212,9 @@ fn generate_parameter_variant(scope: &mut Scope, param: &MirParameterType) -> St
                     MirParameterType::Expression(Box::new(MirExpression::Color)),
                 ],
             ),
-            // `"boolean"` in parameter positions can receive polymorphic operators (`match`, `case`,
-            // `get`, …) that return Any, so route through `generate_expression_any_of` to get the
-            // `Any(Box<Any>)` fallback arm.
-            MirExpression::Boolean => generate_expression_any_of(
-                scope,
-                &[MirParameterType::Expression(Box::new(
-                    MirExpression::Boolean,
-                ))],
-            ),
+            // `Boolean` now has `Literal(bool)` and `AnyExpr(Box<Any>)` variants directly,
+            // so boolean parameter positions just use `Boolean` — no union wrapper needed.
+            MirExpression::Boolean => "Boolean".to_string(),
             // `array<T>` with a type variable means any expression that evaluates to an array is valid.
             MirExpression::Array { r#type, .. }
                 if r#type
@@ -1563,15 +1570,40 @@ fn generate_syntax_enum_deserializer(
     }
 
     let variants = values.keys().cloned().collect::<Vec<_>>();
-    visit_seq.line(format!(
-        "_ => Err(serde::de::Error::unknown_variant(&op, &[\"{}\"]))",
-        variants.join("\", \"")
-    ));
+    if name == "Boolean" {
+        // Boolean: unknown operators may be polymorphic Any expressions (case, match, get, …).
+        // Collect remaining elements, reconstruct the full array, and try parsing as Any.
+        visit_seq.line("_ => {");
+        visit_seq.line("let mut elems = vec![serde_json::Value::String(op)];");
+        visit_seq.line(
+            "while let Some(v) = seq.next_element::<serde_json::Value>()? { elems.push(v); }",
+        );
+        visit_seq.line("let arr = serde_json::Value::Array(elems);");
+        visit_seq.line(
+            "let any_expr = serde_json::from_value::<Any>(arr).map_err(serde::de::Error::custom)?;",
+        );
+        visit_seq.line("Ok(Boolean::AnyExpr(Box::new(any_expr)))");
+        visit_seq.line("}");
+    } else {
+        visit_seq.line(format!(
+            "_ => Err(serde::de::Error::unknown_variant(&op, &[\"{}\"]))",
+            variants.join("\", \"")
+        ));
+    }
     visit_seq.line("}");
 }
 
 fn generate_visitor<'a>(scope: &'a mut Scope, name: &str, example: &Value) -> &'a mut Impl {
     let visitor_name = format!("{name}Visitor");
+
+    // Boolean uses `deserialize_any` so bare `true`/`false` map to `Boolean::Literal`.
+    // Other expression enums use `deserialize_seq` (only arrays).
+    let deserialize_method = if name == "Boolean" {
+        "deserialize_any"
+    } else {
+        "deserialize_seq"
+    };
+
     scope
         .new_impl(name)
         .generic("'de")
@@ -1581,7 +1613,7 @@ fn generate_visitor<'a>(scope: &'a mut Scope, name: &str, example: &Value) -> &'
         .generic("D")
         .bound("D", "serde::Deserializer<'de>")
         .ret("Result<Self, D::Error>")
-        .line(format!("deserializer.deserialize_seq({visitor_name})"));
+        .line(format!("deserializer.{deserialize_method}({visitor_name})"));
 
     scope.new_struct(&visitor_name).doc(format!(
         "Visitor for deserializing the syntax enum [`{name}`]"
@@ -1599,6 +1631,17 @@ fn generate_visitor<'a>(scope: &'a mut Scope, name: &str, example: &Value) -> &'
         .arg("formatter", "&mut std::fmt::Formatter")
         .ret("std::fmt::Result")
         .line(format!("formatter.write_str({expecting_msg:?})"));
+
+    // Boolean: accept bare true/false as Literal variant.
+    if name == "Boolean" {
+        vis.new_fn("visit_bool")
+            .generic("E: serde::de::Error")
+            .arg_self()
+            .arg("v", "bool")
+            .ret("Result<Self::Value, E>")
+            .line("Ok(Boolean::Literal(v))");
+    }
+
     vis
 }
 
@@ -1918,6 +1961,12 @@ fn generate_syntax_enum_serializer(
             // We need to serialize as ["op", ...options_fields].
             arms.push_str(&generate_ser_arm_options(name, key, &var_name));
         }
+    }
+
+    // Boolean: add Literal and AnyExpr serializer arms.
+    if name == "Boolean" {
+        arms.push_str("            Boolean::Literal(b) => serializer.serialize_bool(*b),\n");
+        arms.push_str("            Boolean::AnyExpr(a) => a.serialize(serializer),\n");
     }
 
     scope.raw(format!(

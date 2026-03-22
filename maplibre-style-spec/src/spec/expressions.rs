@@ -198,45 +198,6 @@ impl<'de> serde::Deserialize<'de>
 /// Either of the below variants
 #[derive(PartialEq, Debug, Clone)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum BooleanOrAnyAsUnion {
-    Boolean(Box<Boolean>),
-    Any(Box<Any>),
-}
-
-impl serde::Serialize for BooleanOrAnyAsUnion {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        match self {
-            Self::Boolean(v) => v.serialize(serializer),
-            Self::Any(v) => v.serialize(serializer),
-        }
-    }
-}
-
-impl<'de> serde::Deserialize<'de> for BooleanOrAnyAsUnion {
-    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
-        let mut errors: Vec<(&str, std::string::String)> = Vec::new();
-        match <Box<Boolean> as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Boolean(v)),
-            Err(e) => errors.push(("Boolean", e.to_string())),
-        }
-        match <Box<Any> as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Any(v)),
-            Err(e) => errors.push(("Any", e.to_string())),
-        }
-
-        let details: Vec<std::string::String> =
-            errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
-        Err(serde::de::Error::custom(format!(
-            "BooleanOrAnyAsUnion: no variant matched. Expected Boolean(Box<Boolean>) | Any(Box<Any>). Errors: [{}]",
-            details.join("; ")
-        )))
-    }
-}
-
-/// Either of the below variants
-#[derive(PartialEq, Debug, Clone)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum NumberLiteralOrNumberOrAnyAsUnion {
     NumberLiteral(NumberLiteral),
     Number(Box<Number>),
@@ -337,7 +298,7 @@ pub enum Any {
     ///  - [Create a hover effect](https://maplibre.org/maplibre-gl-js/docs/examples/create-a-hover-effect/)
     ///
     ///  - [Display HTML clusters with custom properties](https://maplibre.org/maplibre-gl-js/docs/examples/display-html-clusters-with-custom-properties/)
-    Case((Vec<(BooleanOrAnyAsUnion,ExprOrLiteral)>,ExprOrLiteral)),
+    Case((Vec<(Boolean,ExprOrLiteral)>,ExprOrLiteral)),
     /// Evaluates each expression in turn until the first non-null value is obtained, and returns that value.
     ///
     ///  - [Use a fallback image](https://maplibre.org/maplibre-gl-js/docs/examples/use-a-fallback-image/)
@@ -1353,7 +1314,7 @@ pub enum Boolean {
     /// Logical negation. Returns `true` if the input is `false`, and `false` if the input is `true`.
     ///
     ///  - [Create and style clusters](https://maplibre.org/maplibre-gl-js/docs/examples/create-and-style-clusters/)
-    Not(BooleanOrAnyAsUnion),
+    Not(Box<Boolean>),
     /// Returns `true` if the input values are not equal, `false` otherwise. The comparison is strictly typed: values of different runtime types are always considered unequal. Cases where the types are known to be different at parse time are considered invalid and will produce a parse error. Accepts an optional `collator` argument to control locale-dependent string comparisons.
     ///
     ///  - [Display HTML clusters with custom properties](https://maplibre.org/maplibre-gl-js/docs/examples/display-html-clusters-with-custom-properties/)
@@ -1383,9 +1344,9 @@ pub enum Boolean {
     /// Returns `true` if all the inputs are `true`, `false` otherwise. The inputs are evaluated in order, and evaluation is short-circuiting: once an input expression evaluates to `false`, the result is `false` and no further input expressions are evaluated.
     ///
     ///  - [Display HTML clusters with custom properties](https://maplibre.org/maplibre-gl-js/docs/examples/display-html-clusters-with-custom-properties/)
-    All(Vec<BooleanOrAnyAsUnion>),
+    All(Vec<Boolean>),
     /// Returns `true` if any of the inputs are `true`, `false` otherwise. The inputs are evaluated in order, and evaluation is short-circuiting: once an input expression evaluates to `true`, the result is `true` and no further input expressions are evaluated.
-    Any(Vec<BooleanOrAnyAsUnion>),
+    Any(Vec<Boolean>),
     /// Asserts that the input value is a boolean. If multiple values are provided, each one is evaluated in order until a boolean is obtained. If none of the inputs are booleans, the expression is an error.
     ///
     ///  - [Create a hover effect](https://maplibre.org/maplibre-gl-js/docs/examples/create-a-hover-effect/)
@@ -1408,6 +1369,10 @@ pub enum Boolean {
     ///
     /// - `LineString`: Returns `false` if any part of a line falls outside the boundary, the line intersects the boundary, or a line's endpoint is on the boundary.
     Within(GeoJSONObjectLiteral),
+    /// A boolean literal value (`true` or `false`).
+    Literal(bool),
+    /// A polymorphic expression (`case`, `match`, `get`, …) in a boolean position.
+    AnyExpr(Box<Any>),
 }
 
 /// Options for deserializing the syntax enum variant [`Boolean::Less`]
@@ -1471,7 +1436,7 @@ impl<'de> serde::Deserialize<'de> for Boolean {
     where
         D: serde::Deserializer<'de>,
     {
-        deserializer.deserialize_seq(BooleanVisitor)
+        deserializer.deserialize_any(BooleanVisitor)
     }
 }
 
@@ -1483,6 +1448,10 @@ impl<'de> serde::de::Visitor<'de> for BooleanVisitor {
 
     fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
         formatter.write_str("an Boolean expression (example: [\"!\",[\"has\",\"point_count\"]])")
+    }
+
+    fn visit_bool<E: serde::de::Error>(self, v: bool) -> Result<Self::Value, E> {
+        Ok(Boolean::Literal(v))
     }
 
     fn visit_seq<A: serde::de::SeqAccess<'de>>(self, mut seq: A) -> Result<Self::Value, A::Error> {
@@ -1590,26 +1559,16 @@ impl<'de> serde::de::Visitor<'de> for BooleanVisitor {
                 let geojson = visit_seq_field(&mut seq, "geojson")?;
                 Ok(Boolean::Within(geojson))
             }
-            _ => Err(serde::de::Error::unknown_variant(
-                &op,
-                &[
-                    "!",
-                    "!=",
-                    "<",
-                    "<=",
-                    "==",
-                    ">",
-                    ">=",
-                    "all",
-                    "any",
-                    "boolean",
-                    "has",
-                    "in",
-                    "is-supported-script",
-                    "to-boolean",
-                    "within",
-                ],
-            )),
+            _ => {
+                let mut elems = vec![serde_json::Value::String(op)];
+                while let Some(v) = seq.next_element::<serde_json::Value>()? {
+                    elems.push(v);
+                }
+                let arr = serde_json::Value::Array(elems);
+                let any_expr =
+                    serde_json::from_value::<Any>(arr).map_err(serde::de::Error::custom)?;
+                Ok(Boolean::AnyExpr(Box::new(any_expr)))
+            }
         }
     }
 }
@@ -1834,6 +1793,8 @@ impl serde::Serialize for Boolean {
                 }
                 seq.end()
             }
+            Boolean::Literal(b) => serializer.serialize_bool(*b),
+            Boolean::AnyExpr(a) => a.serialize(serializer),
         }
     }
 }
