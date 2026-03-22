@@ -186,23 +186,21 @@ impl<'de> serde::Deserialize<'de> for StringOrNumberOrArrayOfStringOrArrayOfNumb
 /// Either of the below variants
 #[derive(PartialEq, Debug, Clone)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum NumberLiteralOrNumberOrAnyAsUnion {
+pub enum NumberLiteralOrNumberAsUnion {
     NumberLiteral(NumberLiteral),
     Number(Box<Number>),
-    Any(Box<Any>),
 }
 
-impl serde::Serialize for NumberLiteralOrNumberOrAnyAsUnion {
+impl serde::Serialize for NumberLiteralOrNumberAsUnion {
     fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         match self {
             Self::NumberLiteral(v) => v.serialize(serializer),
             Self::Number(v) => v.serialize(serializer),
-            Self::Any(v) => v.serialize(serializer),
         }
     }
 }
 
-impl<'de> serde::Deserialize<'de> for NumberLiteralOrNumberOrAnyAsUnion {
+impl<'de> serde::Deserialize<'de> for NumberLiteralOrNumberAsUnion {
     fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
         let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
         let mut errors: Vec<(&str, std::string::String)> = Vec::new();
@@ -214,15 +212,11 @@ impl<'de> serde::Deserialize<'de> for NumberLiteralOrNumberOrAnyAsUnion {
             Ok(v) => return Ok(Self::Number(v)),
             Err(e) => errors.push(("Number", e.to_string())),
         }
-        match <Box<Any> as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Any(v)),
-            Err(e) => errors.push(("Any", e.to_string())),
-        }
 
         let details: Vec<std::string::String> =
             errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
         Err(serde::de::Error::custom(format!(
-            "NumberLiteralOrNumberOrAnyAsUnion: no variant matched. Expected NumberLiteral(NumberLiteral) | Number(Box<Number>) | Any(Box<Any>). Errors: [{}]",
+            "NumberLiteralOrNumberAsUnion: no variant matched. Expected NumberLiteral(NumberLiteral) | Number(Box<Number>). Errors: [{}]",
             details.join("; ")
         )))
     }
@@ -231,23 +225,21 @@ impl<'de> serde::Deserialize<'de> for NumberLiteralOrNumberOrAnyAsUnion {
 /// Either of the below variants
 #[derive(PartialEq, Debug, Clone)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum StringLiteralOrStringOrAnyAsUnion {
+pub enum StringLiteralOrStringAsUnion {
     StringLiteral(StringLiteral),
     String(Box<String>),
-    Any(Box<Any>),
 }
 
-impl serde::Serialize for StringLiteralOrStringOrAnyAsUnion {
+impl serde::Serialize for StringLiteralOrStringAsUnion {
     fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         match self {
             Self::StringLiteral(v) => v.serialize(serializer),
             Self::String(v) => v.serialize(serializer),
-            Self::Any(v) => v.serialize(serializer),
         }
     }
 }
 
-impl<'de> serde::Deserialize<'de> for StringLiteralOrStringOrAnyAsUnion {
+impl<'de> serde::Deserialize<'de> for StringLiteralOrStringAsUnion {
     fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
         let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
         let mut errors: Vec<(&str, std::string::String)> = Vec::new();
@@ -259,15 +251,11 @@ impl<'de> serde::Deserialize<'de> for StringLiteralOrStringOrAnyAsUnion {
             Ok(v) => return Ok(Self::String(v)),
             Err(e) => errors.push(("String", e.to_string())),
         }
-        match <Box<Any> as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Any(v)),
-            Err(e) => errors.push(("Any", e.to_string())),
-        }
 
         let details: Vec<std::string::String> =
             errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
         Err(serde::de::Error::custom(format!(
-            "StringLiteralOrStringOrAnyAsUnion: no variant matched. Expected StringLiteral(StringLiteral) | String(Box<String>) | Any(Box<Any>). Errors: [{}]",
+            "StringLiteralOrStringAsUnion: no variant matched. Expected StringLiteral(StringLiteral) | String(Box<String>). Errors: [{}]",
             details.join("; ")
         )))
     }
@@ -280,7 +268,7 @@ pub enum Any {
     /// Gets the value of a cluster property accumulated so far. Can only be used in the `clusterProperties` option of a clustered GeoJSON source.
     Accumulated,
     /// Retrieves an item from an array.
-    At(NumberLiteralOrNumberOrAnyAsUnion, ExprOrLiteral),
+    At(NumberLiteralOrNumberAsUnion, ExprOrLiteral),
     /// Selects the first output whose corresponding test condition evaluates to true, or the fallback value otherwise.
     ///
     ///  - [Create a hover effect](https://maplibre.org/maplibre-gl-js/docs/examples/create-a-hover-effect/)
@@ -294,7 +282,7 @@ pub enum Any {
     /// Retrieves a property value from the current feature's state. Returns null if the requested property is not present on the feature's state. A feature's state is not part of the GeoJSON or vector tile data, and must be set programmatically on each feature. When `source.promoteId` is not provided, features are identified by their `id` attribute, which must be an integer or a string that can be cast to an integer. When `source.promoteId` is provided, features are identified by their `promoteId` property, which may be a number, string, or any primitive data type. Note that ["feature-state"] can only be used with paint properties that support data-driven styling.
     ///
     ///  - [Create a hover effect](https://maplibre.org/maplibre-gl-js/docs/examples/create-a-hover-effect/)
-    FeatureState(StringLiteralOrStringOrAnyAsUnion),
+    FeatureState(StringLiteralOrStringAsUnion),
     /// Retrieves a property value from the current feature's properties, or from another object if a second argument is provided. Returns null if the requested property is missing.
     ///
     ///  - [Change the case of labels](https://maplibre.org/maplibre-gl-js/docs/examples/change-case-of-labels/)
@@ -302,7 +290,7 @@ pub enum Any {
     ///  - [Display HTML clusters with custom properties](https://maplibre.org/maplibre-gl-js/docs/examples/display-html-clusters-with-custom-properties/)
     ///
     ///  - [Extrude polygons for 3D indoor mapping](https://maplibre.org/maplibre-gl-js/docs/examples/extrude-polygons-for-3d-indoor-mapping/)
-    Get(StringLiteralOrStringOrAnyAsUnion, Option<Object>),
+    Get(StringLiteralOrStringAsUnion, Option<Object>),
     /// Retrieves a property value from global state that can be set with platform-specific APIs. Defaults can be provided using the [`state`](https://maplibre.org/maplibre-style-spec/root/#state) root property. Returns `null` if no value nor default value is set for the retrieved property.
     GlobalState(StringLiteral),
     /// Gets the feature's id, if it has one.
@@ -335,7 +323,7 @@ pub enum Any {
     ///  - [Create and style clusters](https://maplibre.org/maplibre-gl-js/docs/examples/create-and-style-clusters/)
     Step(
         (
-            NumberLiteralOrNumberOrAnyAsUnion,
+            NumberLiteralOrNumberAsUnion,
             ExprOrLiteral,
             Vec<(NumberLiteral, ExprOrLiteral)>,
         ),
@@ -497,7 +485,7 @@ impl<'de> serde::de::Visitor<'de> for AnyVisitor {
                 Ok(Any::Match((input, pairs, fallback)))
             }
             "step" => {
-                let input: NumberLiteralOrNumberOrAnyAsUnion = visit_seq_field(&mut seq, "input")?;
+                let input: NumberLiteralOrNumberAsUnion = visit_seq_field(&mut seq, "input")?;
                 let output_0: ExprOrLiteral = visit_seq_field(&mut seq, "output_0")?;
                 let mut stops = Vec::new();
                 while let Some(stop_input_i) = seq.next_element::<NumberLiteral>()? {
@@ -928,20 +916,8 @@ mod test {
     }
 
     #[rstest::rstest]
-    #[case::t_accumulated(serde_json::json!(["accumulated"]))]
-    #[case::t_at(serde_json::json!(["at",1,["literal",["a","b","c"]]]))]
-    #[case::t_case(serde_json::json!(["case",["boolean",["feature-state","hover"],false],1,0.5]))]
-    #[case::t_coalesce(serde_json::json!(["coalesce",["image",["concat",["get","icon"],"_15"]],["image","marker_15"]]))]
-    #[case::t_feature_state(serde_json::json!(["feature-state","hover"]))]
-    #[case::t_get(serde_json::json!(["get","someProperty"]))]
-    #[case::t_global_state(serde_json::json!(["global-state","someProperty"]))]
-    #[case::t_id(serde_json::json!(["id"]))]
     #[case::t_interpolate_hcl(serde_json::json!(["interpolate-hcl",["linear"],["zoom"],15,"#f00",15.05,"#00f"]))]
     #[case::t_interpolate_lab(serde_json::json!(["interpolate-lab",["linear"],["zoom"],15,"#f00",15.05,"#00f"]))]
-    #[case::t_let(serde_json::json!(["let","someNumber",500,["interpolate",["linear"],["var","someNumber"],274,"#edf8e9",1551,"#006d2c"]]))]
-    #[case::t_match(serde_json::json!(["match",["get","building_type"],"residential","#f00","commercial","#0f0","#000"]))]
-    #[case::t_step(serde_json::json!(["step",["get","point_count"],20,100,30,750,40]))]
-    #[case::t_var(serde_json::json!(["var","density"]))]
     fn test_example_color_or_array_of_color_decodes(#[case] example: serde_json::Value) {
         let _ =
             serde_json::from_value::<ColorOrArrayOfColor>(example).expect("example should decode");
@@ -1034,19 +1010,7 @@ mod test {
     }
 
     #[rstest::rstest]
-    #[case::t_accumulated(serde_json::json!(["accumulated"]))]
-    #[case::t_at(serde_json::json!(["at",1,["literal",["a","b","c"]]]))]
-    #[case::t_case(serde_json::json!(["case",["boolean",["feature-state","hover"],false],1,0.5]))]
-    #[case::t_coalesce(serde_json::json!(["coalesce",["image",["concat",["get","icon"],"_15"]],["image","marker_15"]]))]
-    #[case::t_feature_state(serde_json::json!(["feature-state","hover"]))]
-    #[case::t_get(serde_json::json!(["get","someProperty"]))]
-    #[case::t_global_state(serde_json::json!(["global-state","someProperty"]))]
-    #[case::t_id(serde_json::json!(["id"]))]
     #[case::t_interpolate(serde_json::json!(["interpolate",["linear"],["zoom"],15,0,15.05,["get","height"]]))]
-    #[case::t_let(serde_json::json!(["let","someNumber",500,["interpolate",["linear"],["var","someNumber"],274,"#edf8e9",1551,"#006d2c"]]))]
-    #[case::t_match(serde_json::json!(["match",["get","building_type"],"residential","#f00","commercial","#0f0","#000"]))]
-    #[case::t_step(serde_json::json!(["step",["get","point_count"],20,100,30,750,40]))]
-    #[case::t_var(serde_json::json!(["var","density"]))]
     fn test_example_number_or_array_of_number_or_color_or_array_of_color_or_projection_decodes(
         #[case] example: serde_json::Value,
     ) {
@@ -1151,7 +1115,7 @@ pub enum Array {
     /// Asserts that the input is an array (optionally with a specific item type and length). If, when the input expression is evaluated, it is not of the asserted type or length, then this assertion will cause the whole expression to be aborted.
     Op(ExprOrLiteral),
     /// Retrieves an item from an array.
-    At(NumberLiteralOrNumberOrAnyAsUnion, ExprOrLiteral),
+    At(NumberLiteralOrNumberAsUnion, ExprOrLiteral),
     /// Selects the first output whose corresponding test condition evaluates to true, or the fallback value otherwise.
     ///
     ///  - [Create a hover effect](https://maplibre.org/maplibre-gl-js/docs/examples/create-a-hover-effect/)
@@ -1165,7 +1129,7 @@ pub enum Array {
     /// Retrieves a property value from the current feature's state. Returns null if the requested property is not present on the feature's state. A feature's state is not part of the GeoJSON or vector tile data, and must be set programmatically on each feature. When `source.promoteId` is not provided, features are identified by their `id` attribute, which must be an integer or a string that can be cast to an integer. When `source.promoteId` is provided, features are identified by their `promoteId` property, which may be a number, string, or any primitive data type. Note that ["feature-state"] can only be used with paint properties that support data-driven styling.
     ///
     ///  - [Create a hover effect](https://maplibre.org/maplibre-gl-js/docs/examples/create-a-hover-effect/)
-    FeatureState(StringLiteralOrStringOrAnyAsUnion),
+    FeatureState(StringLiteralOrStringAsUnion),
     /// Retrieves a property value from the current feature's properties, or from another object if a second argument is provided. Returns null if the requested property is missing.
     ///
     ///  - [Change the case of labels](https://maplibre.org/maplibre-gl-js/docs/examples/change-case-of-labels/)
@@ -1173,7 +1137,7 @@ pub enum Array {
     ///  - [Display HTML clusters with custom properties](https://maplibre.org/maplibre-gl-js/docs/examples/display-html-clusters-with-custom-properties/)
     ///
     ///  - [Extrude polygons for 3D indoor mapping](https://maplibre.org/maplibre-gl-js/docs/examples/extrude-polygons-for-3d-indoor-mapping/)
-    Get(StringLiteralOrStringOrAnyAsUnion, Option<Object>),
+    Get(StringLiteralOrStringAsUnion, Option<Object>),
     /// Retrieves a property value from global state that can be set with platform-specific APIs. Defaults can be provided using the [`state`](https://maplibre.org/maplibre-style-spec/root/#state) root property. Returns `null` if no value nor default value is set for the retrieved property.
     GlobalState(StringLiteral),
     /// Gets the feature's id, if it has one.
@@ -1195,8 +1159,8 @@ pub enum Array {
     /// Each label must be unique. If the input type does not match the type of the labels, the result will be the fallback value.
     Match(
         (
+            ExprOrLiteral,
             Vec<(
-                ExprOrLiteral,
                 StringOrNumberOrArrayOfStringOrArrayOfNumberAsUnion,
                 ExprOrLiteral,
             )>,
@@ -1206,8 +1170,8 @@ pub enum Array {
     /// Returns a subarray from an array or a substring from a string from a specified start index, or between a start index and an end index if set. The return value is inclusive of the start index but not of the end index. In a string, a UTF-16 surrogate pair counts as a single position.
     Slice(
         ExprOrLiteral,
-        NumberLiteralOrNumberOrAnyAsUnion,
-        Option<NumberLiteralOrNumberOrAnyAsUnion>,
+        NumberLiteralOrNumberAsUnion,
+        Option<NumberLiteralOrNumberAsUnion>,
     ),
     /// Produces discrete, stepped results by evaluating a piecewise-constant function defined by pairs of input and output values ("stops"). The `input` may be any numeric expression (e.g., `["get", "population"]`). Stop inputs must be numeric literals in strictly ascending order.
     ///
@@ -1216,7 +1180,7 @@ pub enum Array {
     ///  - [Create and style clusters](https://maplibre.org/maplibre-gl-js/docs/examples/create-and-style-clusters/)
     Step(
         (
-            NumberLiteralOrNumberOrAnyAsUnion,
+            NumberLiteralOrNumberAsUnion,
             ExprOrLiteral,
             Vec<(NumberLiteral, ExprOrLiteral)>,
         ),
@@ -1359,35 +1323,33 @@ impl<'de> serde::de::Visitor<'de> for ArrayVisitor {
                 Ok(Array::Literal(json_array))
             }
             "match" => {
-                let mut inputs = Vec::new();
                 let mut rest: Vec<serde_json::Value> = Vec::new();
                 while let Some(v) = seq.next_element()? {
                     rest.push(v);
                 }
-                if rest.is_empty() {
+                if rest.len() < 2 {
+                    return Err(serde::de::Error::custom("Array::Match: too few arguments"));
+                }
+                if !rest.len().is_multiple_of(2) {
                     return Err(serde::de::Error::custom(
-                        "{name}::{variant_name}: too few arguments",
+                        "Array::Match: expected an even number of arguments after operator (input + label/output pairs + fallback)",
                     ));
                 }
-                if !(rest.len() - 1).is_multiple_of(3) {
-                    return Err(serde::de::Error::custom(
-                        "Array::Match: malformed template/suffix layout",
-                    ));
+                let fallback_v = rest.pop().unwrap();
+                let input: ExprOrLiteral =
+                    serde_json::from_value(rest.remove(0)).map_err(serde::de::Error::custom)?;
+                let mut pairs = Vec::new();
+                for chunk in rest.chunks_exact(2) {
+                    let label_i: StringOrNumberOrArrayOfStringOrArrayOfNumberAsUnion =
+                        serde_json::from_value(chunk[0].clone())
+                            .map_err(serde::de::Error::custom)?;
+                    let output_i: ExprOrLiteral = serde_json::from_value(chunk[1].clone())
+                        .map_err(serde::de::Error::custom)?;
+                    pairs.push((label_i, output_i));
                 }
-                let inputs_len = (rest.len() - 1) / 3;
-                for i in 0..inputs_len {
-                    let input = serde_json::from_value(rest[i * 3].clone())
-                        .map_err(serde::de::Error::custom)?;
-                    let label_i = serde_json::from_value(rest[i * 3 + 1].clone())
-                        .map_err(serde::de::Error::custom)?;
-                    let output_i = serde_json::from_value(rest[i * 3 + 2].clone())
-                        .map_err(serde::de::Error::custom)?;
-                    let element = (input, label_i, output_i);
-                    inputs.push(element);
-                }
-                let fallback = serde_json::from_value(rest[inputs_len * 3].clone())
-                    .map_err(serde::de::Error::custom)?;
-                Ok(Array::Match((inputs, fallback)))
+                let fallback: ExprOrLiteral =
+                    serde_json::from_value(fallback_v).map_err(serde::de::Error::custom)?;
+                Ok(Array::Match((input, pairs, fallback)))
             }
             "slice" => {
                 let array = visit_seq_field(&mut seq, "array")?;
@@ -1396,7 +1358,7 @@ impl<'de> serde::de::Visitor<'de> for ArrayVisitor {
                 Ok(Array::Slice(array, start_index, end_index))
             }
             "step" => {
-                let input: NumberLiteralOrNumberOrAnyAsUnion = visit_seq_field(&mut seq, "input")?;
+                let input: NumberLiteralOrNumberAsUnion = visit_seq_field(&mut seq, "input")?;
                 let output_0: ExprOrLiteral = visit_seq_field(&mut seq, "output_0")?;
                 let mut stops = Vec::new();
                 while let Some(stop_input_i) = seq.next_element::<NumberLiteral>()? {
@@ -1765,7 +1727,7 @@ pub enum ArrayLessTypeLengthGreater {
         ExprOrLiteral,
     ),
     /// Retrieves an item from an array.
-    At(NumberLiteralOrNumberOrAnyAsUnion, ExprOrLiteral),
+    At(NumberLiteralOrNumberAsUnion, ExprOrLiteral),
     /// Selects the first output whose corresponding test condition evaluates to true, or the fallback value otherwise.
     ///
     ///  - [Create a hover effect](https://maplibre.org/maplibre-gl-js/docs/examples/create-a-hover-effect/)
@@ -1779,7 +1741,7 @@ pub enum ArrayLessTypeLengthGreater {
     /// Retrieves a property value from the current feature's state. Returns null if the requested property is not present on the feature's state. A feature's state is not part of the GeoJSON or vector tile data, and must be set programmatically on each feature. When `source.promoteId` is not provided, features are identified by their `id` attribute, which must be an integer or a string that can be cast to an integer. When `source.promoteId` is provided, features are identified by their `promoteId` property, which may be a number, string, or any primitive data type. Note that ["feature-state"] can only be used with paint properties that support data-driven styling.
     ///
     ///  - [Create a hover effect](https://maplibre.org/maplibre-gl-js/docs/examples/create-a-hover-effect/)
-    FeatureState(StringLiteralOrStringOrAnyAsUnion),
+    FeatureState(StringLiteralOrStringAsUnion),
     /// Retrieves a property value from the current feature's properties, or from another object if a second argument is provided. Returns null if the requested property is missing.
     ///
     ///  - [Change the case of labels](https://maplibre.org/maplibre-gl-js/docs/examples/change-case-of-labels/)
@@ -1787,7 +1749,7 @@ pub enum ArrayLessTypeLengthGreater {
     ///  - [Display HTML clusters with custom properties](https://maplibre.org/maplibre-gl-js/docs/examples/display-html-clusters-with-custom-properties/)
     ///
     ///  - [Extrude polygons for 3D indoor mapping](https://maplibre.org/maplibre-gl-js/docs/examples/extrude-polygons-for-3d-indoor-mapping/)
-    Get(StringLiteralOrStringOrAnyAsUnion, Option<Object>),
+    Get(StringLiteralOrStringAsUnion, Option<Object>),
     /// Retrieves a property value from global state that can be set with platform-specific APIs. Defaults can be provided using the [`state`](https://maplibre.org/maplibre-style-spec/root/#state) root property. Returns `null` if no value nor default value is set for the retrieved property.
     GlobalState(StringLiteral),
     /// Gets the feature's id, if it has one.
@@ -1805,8 +1767,8 @@ pub enum ArrayLessTypeLengthGreater {
     /// Each label must be unique. If the input type does not match the type of the labels, the result will be the fallback value.
     Match(
         (
+            ExprOrLiteral,
             Vec<(
-                ExprOrLiteral,
                 StringOrNumberOrArrayOfStringOrArrayOfNumberAsUnion,
                 ExprOrLiteral,
             )>,
@@ -1820,7 +1782,7 @@ pub enum ArrayLessTypeLengthGreater {
     ///  - [Create and style clusters](https://maplibre.org/maplibre-gl-js/docs/examples/create-and-style-clusters/)
     Step(
         (
-            NumberLiteralOrNumberOrAnyAsUnion,
+            NumberLiteralOrNumberAsUnion,
             ExprOrLiteral,
             Vec<(NumberLiteral, ExprOrLiteral)>,
         ),
@@ -1959,38 +1921,38 @@ impl<'de> serde::de::Visitor<'de> for ArrayLessTypeLengthGreaterVisitor {
                 Ok(ArrayLessTypeLengthGreater::Let((inputs, expression)))
             }
             "match" => {
-                let mut inputs = Vec::new();
                 let mut rest: Vec<serde_json::Value> = Vec::new();
                 while let Some(v) = seq.next_element()? {
                     rest.push(v);
                 }
-                if rest.is_empty() {
+                if rest.len() < 2 {
                     return Err(serde::de::Error::custom(
-                        "{name}::{variant_name}: too few arguments",
+                        "ArrayLessTypeLengthGreater::Match: too few arguments",
                     ));
                 }
-                if !(rest.len() - 1).is_multiple_of(3) {
+                if !rest.len().is_multiple_of(2) {
                     return Err(serde::de::Error::custom(
-                        "ArrayLessTypeLengthGreater::Match: malformed template/suffix layout",
+                        "ArrayLessTypeLengthGreater::Match: expected an even number of arguments after operator (input + label/output pairs + fallback)",
                     ));
                 }
-                let inputs_len = (rest.len() - 1) / 3;
-                for i in 0..inputs_len {
-                    let input = serde_json::from_value(rest[i * 3].clone())
+                let fallback_v = rest.pop().unwrap();
+                let input: ExprOrLiteral =
+                    serde_json::from_value(rest.remove(0)).map_err(serde::de::Error::custom)?;
+                let mut pairs = Vec::new();
+                for chunk in rest.chunks_exact(2) {
+                    let label_i: StringOrNumberOrArrayOfStringOrArrayOfNumberAsUnion =
+                        serde_json::from_value(chunk[0].clone())
+                            .map_err(serde::de::Error::custom)?;
+                    let output_i: ExprOrLiteral = serde_json::from_value(chunk[1].clone())
                         .map_err(serde::de::Error::custom)?;
-                    let label_i = serde_json::from_value(rest[i * 3 + 1].clone())
-                        .map_err(serde::de::Error::custom)?;
-                    let output_i = serde_json::from_value(rest[i * 3 + 2].clone())
-                        .map_err(serde::de::Error::custom)?;
-                    let element = (input, label_i, output_i);
-                    inputs.push(element);
+                    pairs.push((label_i, output_i));
                 }
-                let fallback = serde_json::from_value(rest[inputs_len * 3].clone())
-                    .map_err(serde::de::Error::custom)?;
-                Ok(ArrayLessTypeLengthGreater::Match((inputs, fallback)))
+                let fallback: ExprOrLiteral =
+                    serde_json::from_value(fallback_v).map_err(serde::de::Error::custom)?;
+                Ok(ArrayLessTypeLengthGreater::Match((input, pairs, fallback)))
             }
             "step" => {
-                let input: NumberLiteralOrNumberOrAnyAsUnion = visit_seq_field(&mut seq, "input")?;
+                let input: NumberLiteralOrNumberAsUnion = visit_seq_field(&mut seq, "input")?;
                 let output_0: ExprOrLiteral = visit_seq_field(&mut seq, "output_0")?;
                 let mut stops = Vec::new();
                 while let Some(stop_input_i) = seq.next_element::<NumberLiteral>()? {
@@ -2300,7 +2262,7 @@ pub enum ArrayOfType {
     /// Asserts that the input is an array (optionally with a specific item type and length). If, when the input expression is evaluated, it is not of the asserted type or length, then this assertion will cause the whole expression to be aborted.
     Array(StringOrNumberOrBooleanOrColorAsEnum, ExprOrLiteral),
     /// Retrieves an item from an array.
-    At(NumberLiteralOrNumberOrAnyAsUnion, ExprOrLiteral),
+    At(NumberLiteralOrNumberAsUnion, ExprOrLiteral),
     /// Selects the first output whose corresponding test condition evaluates to true, or the fallback value otherwise.
     ///
     ///  - [Create a hover effect](https://maplibre.org/maplibre-gl-js/docs/examples/create-a-hover-effect/)
@@ -2314,7 +2276,7 @@ pub enum ArrayOfType {
     /// Retrieves a property value from the current feature's state. Returns null if the requested property is not present on the feature's state. A feature's state is not part of the GeoJSON or vector tile data, and must be set programmatically on each feature. When `source.promoteId` is not provided, features are identified by their `id` attribute, which must be an integer or a string that can be cast to an integer. When `source.promoteId` is provided, features are identified by their `promoteId` property, which may be a number, string, or any primitive data type. Note that ["feature-state"] can only be used with paint properties that support data-driven styling.
     ///
     ///  - [Create a hover effect](https://maplibre.org/maplibre-gl-js/docs/examples/create-a-hover-effect/)
-    FeatureState(StringLiteralOrStringOrAnyAsUnion),
+    FeatureState(StringLiteralOrStringAsUnion),
     /// Retrieves a property value from the current feature's properties, or from another object if a second argument is provided. Returns null if the requested property is missing.
     ///
     ///  - [Change the case of labels](https://maplibre.org/maplibre-gl-js/docs/examples/change-case-of-labels/)
@@ -2322,7 +2284,7 @@ pub enum ArrayOfType {
     ///  - [Display HTML clusters with custom properties](https://maplibre.org/maplibre-gl-js/docs/examples/display-html-clusters-with-custom-properties/)
     ///
     ///  - [Extrude polygons for 3D indoor mapping](https://maplibre.org/maplibre-gl-js/docs/examples/extrude-polygons-for-3d-indoor-mapping/)
-    Get(StringLiteralOrStringOrAnyAsUnion, Option<Object>),
+    Get(StringLiteralOrStringAsUnion, Option<Object>),
     /// Retrieves a property value from global state that can be set with platform-specific APIs. Defaults can be provided using the [`state`](https://maplibre.org/maplibre-style-spec/root/#state) root property. Returns `null` if no value nor default value is set for the retrieved property.
     GlobalState(StringLiteral),
     /// Gets the feature's id, if it has one.
@@ -2340,8 +2302,8 @@ pub enum ArrayOfType {
     /// Each label must be unique. If the input type does not match the type of the labels, the result will be the fallback value.
     Match(
         (
+            ExprOrLiteral,
             Vec<(
-                ExprOrLiteral,
                 StringOrNumberOrArrayOfStringOrArrayOfNumberAsUnion,
                 ExprOrLiteral,
             )>,
@@ -2355,7 +2317,7 @@ pub enum ArrayOfType {
     ///  - [Create and style clusters](https://maplibre.org/maplibre-gl-js/docs/examples/create-and-style-clusters/)
     Step(
         (
-            NumberLiteralOrNumberOrAnyAsUnion,
+            NumberLiteralOrNumberAsUnion,
             ExprOrLiteral,
             Vec<(NumberLiteral, ExprOrLiteral)>,
         ),
@@ -2493,38 +2455,38 @@ impl<'de> serde::de::Visitor<'de> for ArrayOfTypeVisitor {
                 Ok(ArrayOfType::Let((inputs, expression)))
             }
             "match" => {
-                let mut inputs = Vec::new();
                 let mut rest: Vec<serde_json::Value> = Vec::new();
                 while let Some(v) = seq.next_element()? {
                     rest.push(v);
                 }
-                if rest.is_empty() {
+                if rest.len() < 2 {
                     return Err(serde::de::Error::custom(
-                        "{name}::{variant_name}: too few arguments",
+                        "ArrayOfType::Match: too few arguments",
                     ));
                 }
-                if !(rest.len() - 1).is_multiple_of(3) {
+                if !rest.len().is_multiple_of(2) {
                     return Err(serde::de::Error::custom(
-                        "ArrayOfType::Match: malformed template/suffix layout",
+                        "ArrayOfType::Match: expected an even number of arguments after operator (input + label/output pairs + fallback)",
                     ));
                 }
-                let inputs_len = (rest.len() - 1) / 3;
-                for i in 0..inputs_len {
-                    let input = serde_json::from_value(rest[i * 3].clone())
+                let fallback_v = rest.pop().unwrap();
+                let input: ExprOrLiteral =
+                    serde_json::from_value(rest.remove(0)).map_err(serde::de::Error::custom)?;
+                let mut pairs = Vec::new();
+                for chunk in rest.chunks_exact(2) {
+                    let label_i: StringOrNumberOrArrayOfStringOrArrayOfNumberAsUnion =
+                        serde_json::from_value(chunk[0].clone())
+                            .map_err(serde::de::Error::custom)?;
+                    let output_i: ExprOrLiteral = serde_json::from_value(chunk[1].clone())
                         .map_err(serde::de::Error::custom)?;
-                    let label_i = serde_json::from_value(rest[i * 3 + 1].clone())
-                        .map_err(serde::de::Error::custom)?;
-                    let output_i = serde_json::from_value(rest[i * 3 + 2].clone())
-                        .map_err(serde::de::Error::custom)?;
-                    let element = (input, label_i, output_i);
-                    inputs.push(element);
+                    pairs.push((label_i, output_i));
                 }
-                let fallback = serde_json::from_value(rest[inputs_len * 3].clone())
-                    .map_err(serde::de::Error::custom)?;
-                Ok(ArrayOfType::Match((inputs, fallback)))
+                let fallback: ExprOrLiteral =
+                    serde_json::from_value(fallback_v).map_err(serde::de::Error::custom)?;
+                Ok(ArrayOfType::Match((input, pairs, fallback)))
             }
             "step" => {
-                let input: NumberLiteralOrNumberOrAnyAsUnion = visit_seq_field(&mut seq, "input")?;
+                let input: NumberLiteralOrNumberAsUnion = visit_seq_field(&mut seq, "input")?;
                 let output_0: ExprOrLiteral = visit_seq_field(&mut seq, "output_0")?;
                 let mut stops = Vec::new();
                 while let Some(stop_input_i) = seq.next_element::<NumberLiteral>()? {
@@ -2865,7 +2827,7 @@ pub enum Boolean {
     /// Returns `true` if any of the inputs are `true`, `false` otherwise. The inputs are evaluated in order, and evaluation is short-circuiting: once an input expression evaluates to `true`, the result is `true` and no further input expressions are evaluated.
     Any(Vec<Boolean>),
     /// Retrieves an item from an array.
-    At(NumberLiteralOrNumberOrAnyAsUnion, ExprOrLiteral),
+    At(NumberLiteralOrNumberAsUnion, ExprOrLiteral),
     /// Asserts that the input value is a boolean. If multiple values are provided, each one is evaluated in order until a boolean is obtained. If none of the inputs are booleans, the expression is an error.
     ///
     ///  - [Create a hover effect](https://maplibre.org/maplibre-gl-js/docs/examples/create-a-hover-effect/)
@@ -2883,7 +2845,7 @@ pub enum Boolean {
     /// Retrieves a property value from the current feature's state. Returns null if the requested property is not present on the feature's state. A feature's state is not part of the GeoJSON or vector tile data, and must be set programmatically on each feature. When `source.promoteId` is not provided, features are identified by their `id` attribute, which must be an integer or a string that can be cast to an integer. When `source.promoteId` is provided, features are identified by their `promoteId` property, which may be a number, string, or any primitive data type. Note that ["feature-state"] can only be used with paint properties that support data-driven styling.
     ///
     ///  - [Create a hover effect](https://maplibre.org/maplibre-gl-js/docs/examples/create-a-hover-effect/)
-    FeatureState(StringLiteralOrStringOrAnyAsUnion),
+    FeatureState(StringLiteralOrStringAsUnion),
     /// Retrieves a property value from the current feature's properties, or from another object if a second argument is provided. Returns null if the requested property is missing.
     ///
     ///  - [Change the case of labels](https://maplibre.org/maplibre-gl-js/docs/examples/change-case-of-labels/)
@@ -2891,13 +2853,13 @@ pub enum Boolean {
     ///  - [Display HTML clusters with custom properties](https://maplibre.org/maplibre-gl-js/docs/examples/display-html-clusters-with-custom-properties/)
     ///
     ///  - [Extrude polygons for 3D indoor mapping](https://maplibre.org/maplibre-gl-js/docs/examples/extrude-polygons-for-3d-indoor-mapping/)
-    Get(StringLiteralOrStringOrAnyAsUnion, Option<Object>),
+    Get(StringLiteralOrStringAsUnion, Option<Object>),
     /// Retrieves a property value from global state that can be set with platform-specific APIs. Defaults can be provided using the [`state`](https://maplibre.org/maplibre-style-spec/root/#state) root property. Returns `null` if no value nor default value is set for the retrieved property.
     GlobalState(StringLiteral),
     /// Tests for the presence of a property value in the current feature's properties, or from another object if a second argument is provided.
     ///
     ///  - [Create and style clusters](https://maplibre.org/maplibre-gl-js/docs/examples/create-and-style-clusters/)
-    Has(StringLiteralOrStringOrAnyAsUnion, Option<Object>),
+    Has(StringLiteralOrStringAsUnion, Option<Object>),
     /// Gets the feature's id, if it has one.
     Id,
     /// Determines whether an item exists in an array or a substring exists in a string.
@@ -2905,7 +2867,7 @@ pub enum Boolean {
     ///  - [Measure distances](https://maplibre.org/maplibre-gl-js/docs/examples/measure-distances/)
     In(ExprOrLiteral, ExprOrLiteral),
     /// Returns `true` if the input string is expected to render legibly. Returns `false` if the input string contains sections that cannot be rendered without potential loss of meaning (e.g. Indic scripts that require complex text shaping, or right-to-left scripts if the `mapbox-gl-rtl-text` plugin is not in use in MapLibre GL JS).
-    IsSupportedScript(StringLiteralOrStringOrAnyAsUnion),
+    IsSupportedScript(StringLiteralOrStringAsUnion),
     /// Binds expressions to named variables, which can then be referenced in the result expression using `["var", "variable_name"]`.
     ///
     ///  - [Visualize population density](https://maplibre.org/maplibre-gl-js/docs/examples/visualize-population-density/)
@@ -2919,8 +2881,8 @@ pub enum Boolean {
     /// Each label must be unique. If the input type does not match the type of the labels, the result will be the fallback value.
     Match(
         (
+            ExprOrLiteral,
             Vec<(
-                ExprOrLiteral,
                 StringOrNumberOrArrayOfStringOrArrayOfNumberAsUnion,
                 ExprOrLiteral,
             )>,
@@ -2934,7 +2896,7 @@ pub enum Boolean {
     ///  - [Create and style clusters](https://maplibre.org/maplibre-gl-js/docs/examples/create-and-style-clusters/)
     Step(
         (
-            NumberLiteralOrNumberOrAnyAsUnion,
+            NumberLiteralOrNumberAsUnion,
             ExprOrLiteral,
             Vec<(NumberLiteral, ExprOrLiteral)>,
         ),
@@ -3211,38 +3173,38 @@ impl<'de> serde::de::Visitor<'de> for BooleanVisitor {
                 Ok(Boolean::Let((inputs, expression)))
             }
             "match" => {
-                let mut inputs = Vec::new();
                 let mut rest: Vec<serde_json::Value> = Vec::new();
                 while let Some(v) = seq.next_element()? {
                     rest.push(v);
                 }
-                if rest.is_empty() {
+                if rest.len() < 2 {
                     return Err(serde::de::Error::custom(
-                        "{name}::{variant_name}: too few arguments",
+                        "Boolean::Match: too few arguments",
                     ));
                 }
-                if !(rest.len() - 1).is_multiple_of(3) {
+                if !rest.len().is_multiple_of(2) {
                     return Err(serde::de::Error::custom(
-                        "Boolean::Match: malformed template/suffix layout",
+                        "Boolean::Match: expected an even number of arguments after operator (input + label/output pairs + fallback)",
                     ));
                 }
-                let inputs_len = (rest.len() - 1) / 3;
-                for i in 0..inputs_len {
-                    let input = serde_json::from_value(rest[i * 3].clone())
+                let fallback_v = rest.pop().unwrap();
+                let input: ExprOrLiteral =
+                    serde_json::from_value(rest.remove(0)).map_err(serde::de::Error::custom)?;
+                let mut pairs = Vec::new();
+                for chunk in rest.chunks_exact(2) {
+                    let label_i: StringOrNumberOrArrayOfStringOrArrayOfNumberAsUnion =
+                        serde_json::from_value(chunk[0].clone())
+                            .map_err(serde::de::Error::custom)?;
+                    let output_i: ExprOrLiteral = serde_json::from_value(chunk[1].clone())
                         .map_err(serde::de::Error::custom)?;
-                    let label_i = serde_json::from_value(rest[i * 3 + 1].clone())
-                        .map_err(serde::de::Error::custom)?;
-                    let output_i = serde_json::from_value(rest[i * 3 + 2].clone())
-                        .map_err(serde::de::Error::custom)?;
-                    let element = (input, label_i, output_i);
-                    inputs.push(element);
+                    pairs.push((label_i, output_i));
                 }
-                let fallback = serde_json::from_value(rest[inputs_len * 3].clone())
-                    .map_err(serde::de::Error::custom)?;
-                Ok(Boolean::Match((inputs, fallback)))
+                let fallback: ExprOrLiteral =
+                    serde_json::from_value(fallback_v).map_err(serde::de::Error::custom)?;
+                Ok(Boolean::Match((input, pairs, fallback)))
             }
             "step" => {
-                let input: NumberLiteralOrNumberOrAnyAsUnion = visit_seq_field(&mut seq, "input")?;
+                let input: NumberLiteralOrNumberAsUnion = visit_seq_field(&mut seq, "input")?;
                 let output_0: ExprOrLiteral = visit_seq_field(&mut seq, "output_0")?;
                 let mut stops = Vec::new();
                 while let Some(stop_input_i) = seq.next_element::<NumberLiteral>()? {
@@ -3767,7 +3729,7 @@ pub enum Collator {
     /// Gets the value of a cluster property accumulated so far. Can only be used in the `clusterProperties` option of a clustered GeoJSON source.
     Accumulated,
     /// Retrieves an item from an array.
-    At(NumberLiteralOrNumberOrAnyAsUnion, ExprOrLiteral),
+    At(NumberLiteralOrNumberAsUnion, ExprOrLiteral),
     /// Selects the first output whose corresponding test condition evaluates to true, or the fallback value otherwise.
     ///
     ///  - [Create a hover effect](https://maplibre.org/maplibre-gl-js/docs/examples/create-a-hover-effect/)
@@ -3786,7 +3748,7 @@ pub enum Collator {
     /// Retrieves a property value from the current feature's state. Returns null if the requested property is not present on the feature's state. A feature's state is not part of the GeoJSON or vector tile data, and must be set programmatically on each feature. When `source.promoteId` is not provided, features are identified by their `id` attribute, which must be an integer or a string that can be cast to an integer. When `source.promoteId` is provided, features are identified by their `promoteId` property, which may be a number, string, or any primitive data type. Note that ["feature-state"] can only be used with paint properties that support data-driven styling.
     ///
     ///  - [Create a hover effect](https://maplibre.org/maplibre-gl-js/docs/examples/create-a-hover-effect/)
-    FeatureState(StringLiteralOrStringOrAnyAsUnion),
+    FeatureState(StringLiteralOrStringAsUnion),
     /// Retrieves a property value from the current feature's properties, or from another object if a second argument is provided. Returns null if the requested property is missing.
     ///
     ///  - [Change the case of labels](https://maplibre.org/maplibre-gl-js/docs/examples/change-case-of-labels/)
@@ -3794,7 +3756,7 @@ pub enum Collator {
     ///  - [Display HTML clusters with custom properties](https://maplibre.org/maplibre-gl-js/docs/examples/display-html-clusters-with-custom-properties/)
     ///
     ///  - [Extrude polygons for 3D indoor mapping](https://maplibre.org/maplibre-gl-js/docs/examples/extrude-polygons-for-3d-indoor-mapping/)
-    Get(StringLiteralOrStringOrAnyAsUnion, Option<Object>),
+    Get(StringLiteralOrStringAsUnion, Option<Object>),
     /// Retrieves a property value from global state that can be set with platform-specific APIs. Defaults can be provided using the [`state`](https://maplibre.org/maplibre-style-spec/root/#state) root property. Returns `null` if no value nor default value is set for the retrieved property.
     GlobalState(StringLiteral),
     /// Gets the feature's id, if it has one.
@@ -3812,8 +3774,8 @@ pub enum Collator {
     /// Each label must be unique. If the input type does not match the type of the labels, the result will be the fallback value.
     Match(
         (
+            ExprOrLiteral,
             Vec<(
-                ExprOrLiteral,
                 StringOrNumberOrArrayOfStringOrArrayOfNumberAsUnion,
                 ExprOrLiteral,
             )>,
@@ -3827,7 +3789,7 @@ pub enum Collator {
     ///  - [Create and style clusters](https://maplibre.org/maplibre-gl-js/docs/examples/create-and-style-clusters/)
     Step(
         (
-            NumberLiteralOrNumberOrAnyAsUnion,
+            NumberLiteralOrNumberAsUnion,
             ExprOrLiteral,
             Vec<(NumberLiteral, ExprOrLiteral)>,
         ),
@@ -3964,38 +3926,38 @@ impl<'de> serde::de::Visitor<'de> for CollatorVisitor {
                 Ok(Collator::Let((inputs, expression)))
             }
             "match" => {
-                let mut inputs = Vec::new();
                 let mut rest: Vec<serde_json::Value> = Vec::new();
                 while let Some(v) = seq.next_element()? {
                     rest.push(v);
                 }
-                if rest.is_empty() {
+                if rest.len() < 2 {
                     return Err(serde::de::Error::custom(
-                        "{name}::{variant_name}: too few arguments",
+                        "Collator::Match: too few arguments",
                     ));
                 }
-                if !(rest.len() - 1).is_multiple_of(3) {
+                if !rest.len().is_multiple_of(2) {
                     return Err(serde::de::Error::custom(
-                        "Collator::Match: malformed template/suffix layout",
+                        "Collator::Match: expected an even number of arguments after operator (input + label/output pairs + fallback)",
                     ));
                 }
-                let inputs_len = (rest.len() - 1) / 3;
-                for i in 0..inputs_len {
-                    let input = serde_json::from_value(rest[i * 3].clone())
+                let fallback_v = rest.pop().unwrap();
+                let input: ExprOrLiteral =
+                    serde_json::from_value(rest.remove(0)).map_err(serde::de::Error::custom)?;
+                let mut pairs = Vec::new();
+                for chunk in rest.chunks_exact(2) {
+                    let label_i: StringOrNumberOrArrayOfStringOrArrayOfNumberAsUnion =
+                        serde_json::from_value(chunk[0].clone())
+                            .map_err(serde::de::Error::custom)?;
+                    let output_i: ExprOrLiteral = serde_json::from_value(chunk[1].clone())
                         .map_err(serde::de::Error::custom)?;
-                    let label_i = serde_json::from_value(rest[i * 3 + 1].clone())
-                        .map_err(serde::de::Error::custom)?;
-                    let output_i = serde_json::from_value(rest[i * 3 + 2].clone())
-                        .map_err(serde::de::Error::custom)?;
-                    let element = (input, label_i, output_i);
-                    inputs.push(element);
+                    pairs.push((label_i, output_i));
                 }
-                let fallback = serde_json::from_value(rest[inputs_len * 3].clone())
-                    .map_err(serde::de::Error::custom)?;
-                Ok(Collator::Match((inputs, fallback)))
+                let fallback: ExprOrLiteral =
+                    serde_json::from_value(fallback_v).map_err(serde::de::Error::custom)?;
+                Ok(Collator::Match((input, pairs, fallback)))
             }
             "step" => {
-                let input: NumberLiteralOrNumberOrAnyAsUnion = visit_seq_field(&mut seq, "input")?;
+                let input: NumberLiteralOrNumberAsUnion = visit_seq_field(&mut seq, "input")?;
                 let output_0: ExprOrLiteral = visit_seq_field(&mut seq, "output_0")?;
                 let mut stops = Vec::new();
                 while let Some(stop_input_i) = seq.next_element::<NumberLiteral>()? {
@@ -4297,7 +4259,7 @@ pub enum Color {
     /// Gets the value of a cluster property accumulated so far. Can only be used in the `clusterProperties` option of a clustered GeoJSON source.
     Accumulated,
     /// Retrieves an item from an array.
-    At(NumberLiteralOrNumberOrAnyAsUnion, ExprOrLiteral),
+    At(NumberLiteralOrNumberAsUnion, ExprOrLiteral),
     /// Selects the first output whose corresponding test condition evaluates to true, or the fallback value otherwise.
     ///
     ///  - [Create a hover effect](https://maplibre.org/maplibre-gl-js/docs/examples/create-a-hover-effect/)
@@ -4311,7 +4273,7 @@ pub enum Color {
     /// Retrieves a property value from the current feature's state. Returns null if the requested property is not present on the feature's state. A feature's state is not part of the GeoJSON or vector tile data, and must be set programmatically on each feature. When `source.promoteId` is not provided, features are identified by their `id` attribute, which must be an integer or a string that can be cast to an integer. When `source.promoteId` is provided, features are identified by their `promoteId` property, which may be a number, string, or any primitive data type. Note that ["feature-state"] can only be used with paint properties that support data-driven styling.
     ///
     ///  - [Create a hover effect](https://maplibre.org/maplibre-gl-js/docs/examples/create-a-hover-effect/)
-    FeatureState(StringLiteralOrStringOrAnyAsUnion),
+    FeatureState(StringLiteralOrStringAsUnion),
     /// Retrieves a property value from the current feature's properties, or from another object if a second argument is provided. Returns null if the requested property is missing.
     ///
     ///  - [Change the case of labels](https://maplibre.org/maplibre-gl-js/docs/examples/change-case-of-labels/)
@@ -4319,7 +4281,7 @@ pub enum Color {
     ///  - [Display HTML clusters with custom properties](https://maplibre.org/maplibre-gl-js/docs/examples/display-html-clusters-with-custom-properties/)
     ///
     ///  - [Extrude polygons for 3D indoor mapping](https://maplibre.org/maplibre-gl-js/docs/examples/extrude-polygons-for-3d-indoor-mapping/)
-    Get(StringLiteralOrStringOrAnyAsUnion, Option<Object>),
+    Get(StringLiteralOrStringAsUnion, Option<Object>),
     /// Retrieves a property value from global state that can be set with platform-specific APIs. Defaults can be provided using the [`state`](https://maplibre.org/maplibre-style-spec/root/#state) root property. Returns `null` if no value nor default value is set for the retrieved property.
     GlobalState(StringLiteral),
     /// Gets the feature's id, if it has one.
@@ -4337,8 +4299,8 @@ pub enum Color {
     /// Each label must be unique. If the input type does not match the type of the labels, the result will be the fallback value.
     Match(
         (
+            ExprOrLiteral,
             Vec<(
-                ExprOrLiteral,
                 StringOrNumberOrArrayOfStringOrArrayOfNumberAsUnion,
                 ExprOrLiteral,
             )>,
@@ -4347,16 +4309,16 @@ pub enum Color {
     ),
     /// Creates a color value from red, green, and blue components, which must range between 0 and 255, and an alpha component of 1. If any component is out of range, the expression is an error.
     Rgb(
-        NumberLiteralOrNumberOrAnyAsUnion,
-        NumberLiteralOrNumberOrAnyAsUnion,
-        NumberLiteralOrNumberOrAnyAsUnion,
+        NumberLiteralOrNumberAsUnion,
+        NumberLiteralOrNumberAsUnion,
+        NumberLiteralOrNumberAsUnion,
     ),
     /// Creates a color value from red, green, blue components, which must range between 0 and 255, and an alpha component which must range between zero and one. If any component is out of range, the expression is an error.
     Rgba(
-        NumberLiteralOrNumberOrAnyAsUnion,
-        NumberLiteralOrNumberOrAnyAsUnion,
-        NumberLiteralOrNumberOrAnyAsUnion,
-        NumberLiteralOrNumberOrAnyAsUnion,
+        NumberLiteralOrNumberAsUnion,
+        NumberLiteralOrNumberAsUnion,
+        NumberLiteralOrNumberAsUnion,
+        NumberLiteralOrNumberAsUnion,
     ),
     /// Produces discrete, stepped results by evaluating a piecewise-constant function defined by pairs of input and output values ("stops"). The `input` may be any numeric expression (e.g., `["get", "population"]`). Stop inputs must be numeric literals in strictly ascending order.
     ///
@@ -4365,7 +4327,7 @@ pub enum Color {
     ///  - [Create and style clusters](https://maplibre.org/maplibre-gl-js/docs/examples/create-and-style-clusters/)
     Step(
         (
-            NumberLiteralOrNumberOrAnyAsUnion,
+            NumberLiteralOrNumberAsUnion,
             ExprOrLiteral,
             Vec<(NumberLiteral, ExprOrLiteral)>,
         ),
@@ -4502,35 +4464,33 @@ impl<'de> serde::de::Visitor<'de> for ColorVisitor {
                 Ok(Color::Let((inputs, expression)))
             }
             "match" => {
-                let mut inputs = Vec::new();
                 let mut rest: Vec<serde_json::Value> = Vec::new();
                 while let Some(v) = seq.next_element()? {
                     rest.push(v);
                 }
-                if rest.is_empty() {
+                if rest.len() < 2 {
+                    return Err(serde::de::Error::custom("Color::Match: too few arguments"));
+                }
+                if !rest.len().is_multiple_of(2) {
                     return Err(serde::de::Error::custom(
-                        "{name}::{variant_name}: too few arguments",
+                        "Color::Match: expected an even number of arguments after operator (input + label/output pairs + fallback)",
                     ));
                 }
-                if !(rest.len() - 1).is_multiple_of(3) {
-                    return Err(serde::de::Error::custom(
-                        "Color::Match: malformed template/suffix layout",
-                    ));
+                let fallback_v = rest.pop().unwrap();
+                let input: ExprOrLiteral =
+                    serde_json::from_value(rest.remove(0)).map_err(serde::de::Error::custom)?;
+                let mut pairs = Vec::new();
+                for chunk in rest.chunks_exact(2) {
+                    let label_i: StringOrNumberOrArrayOfStringOrArrayOfNumberAsUnion =
+                        serde_json::from_value(chunk[0].clone())
+                            .map_err(serde::de::Error::custom)?;
+                    let output_i: ExprOrLiteral = serde_json::from_value(chunk[1].clone())
+                        .map_err(serde::de::Error::custom)?;
+                    pairs.push((label_i, output_i));
                 }
-                let inputs_len = (rest.len() - 1) / 3;
-                for i in 0..inputs_len {
-                    let input = serde_json::from_value(rest[i * 3].clone())
-                        .map_err(serde::de::Error::custom)?;
-                    let label_i = serde_json::from_value(rest[i * 3 + 1].clone())
-                        .map_err(serde::de::Error::custom)?;
-                    let output_i = serde_json::from_value(rest[i * 3 + 2].clone())
-                        .map_err(serde::de::Error::custom)?;
-                    let element = (input, label_i, output_i);
-                    inputs.push(element);
-                }
-                let fallback = serde_json::from_value(rest[inputs_len * 3].clone())
-                    .map_err(serde::de::Error::custom)?;
-                Ok(Color::Match((inputs, fallback)))
+                let fallback: ExprOrLiteral =
+                    serde_json::from_value(fallback_v).map_err(serde::de::Error::custom)?;
+                Ok(Color::Match((input, pairs, fallback)))
             }
             "rgb" => {
                 let red = visit_seq_field(&mut seq, "red")?;
@@ -4546,7 +4506,7 @@ impl<'de> serde::de::Visitor<'de> for ColorVisitor {
                 Ok(Color::Rgba(red, green, blue, alpha))
             }
             "step" => {
-                let input: NumberLiteralOrNumberOrAnyAsUnion = visit_seq_field(&mut seq, "input")?;
+                let input: NumberLiteralOrNumberAsUnion = visit_seq_field(&mut seq, "input")?;
                 let output_0: ExprOrLiteral = visit_seq_field(&mut seq, "output_0")?;
                 let mut stops = Vec::new();
                 while let Some(stop_input_i) = seq.next_element::<NumberLiteral>()? {
@@ -4933,41 +4893,11 @@ impl<'de> serde::Deserialize<'de> for StringLiteralOrColorOrArrayOfColorAsUnion 
 #[derive(PartialEq, Debug, Clone)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum ColorOrArrayOfColor {
-    /// Gets the value of a cluster property accumulated so far. Can only be used in the `clusterProperties` option of a clustered GeoJSON source.
-    Accumulated,
-    /// Retrieves an item from an array.
-    At(NumberLiteralOrNumberOrAnyAsUnion, ExprOrLiteral),
-    /// Selects the first output whose corresponding test condition evaluates to true, or the fallback value otherwise.
-    ///
-    ///  - [Create a hover effect](https://maplibre.org/maplibre-gl-js/docs/examples/create-a-hover-effect/)
-    ///
-    ///  - [Display HTML clusters with custom properties](https://maplibre.org/maplibre-gl-js/docs/examples/display-html-clusters-with-custom-properties/)
-    Case((Vec<(Boolean, ExprOrLiteral)>, ExprOrLiteral)),
-    /// Evaluates each expression in turn until the first non-null value is obtained, and returns that value.
-    ///
-    ///  - [Use a fallback image](https://maplibre.org/maplibre-gl-js/docs/examples/use-a-fallback-image/)
-    Coalesce(Vec<ExprOrLiteral>),
-    /// Retrieves a property value from the current feature's state. Returns null if the requested property is not present on the feature's state. A feature's state is not part of the GeoJSON or vector tile data, and must be set programmatically on each feature. When `source.promoteId` is not provided, features are identified by their `id` attribute, which must be an integer or a string that can be cast to an integer. When `source.promoteId` is provided, features are identified by their `promoteId` property, which may be a number, string, or any primitive data type. Note that ["feature-state"] can only be used with paint properties that support data-driven styling.
-    ///
-    ///  - [Create a hover effect](https://maplibre.org/maplibre-gl-js/docs/examples/create-a-hover-effect/)
-    FeatureState(StringLiteralOrStringOrAnyAsUnion),
-    /// Retrieves a property value from the current feature's properties, or from another object if a second argument is provided. Returns null if the requested property is missing.
-    ///
-    ///  - [Change the case of labels](https://maplibre.org/maplibre-gl-js/docs/examples/change-case-of-labels/)
-    ///
-    ///  - [Display HTML clusters with custom properties](https://maplibre.org/maplibre-gl-js/docs/examples/display-html-clusters-with-custom-properties/)
-    ///
-    ///  - [Extrude polygons for 3D indoor mapping](https://maplibre.org/maplibre-gl-js/docs/examples/extrude-polygons-for-3d-indoor-mapping/)
-    Get(StringLiteralOrStringOrAnyAsUnion, Option<Object>),
-    /// Retrieves a property value from global state that can be set with platform-specific APIs. Defaults can be provided using the [`state`](https://maplibre.org/maplibre-style-spec/root/#state) root property. Returns `null` if no value nor default value is set for the retrieved property.
-    GlobalState(StringLiteral),
-    /// Gets the feature's id, if it has one.
-    Id,
     /// Produces continuous, smooth results by interpolating between pairs of input and output values ("stops"). Works like `interpolate`, but the output type must be `color` or `array<color>`, and the interpolation is performed in the Hue-Chroma-Luminance color space.
     InterpolateHcl(
         (
             Interpolation,
-            NumberLiteralOrNumberOrAnyAsUnion,
+            NumberLiteralOrNumberAsUnion,
             Vec<(NumberLiteral, StringLiteralOrColorOrArrayOfColorAsUnion)>,
         ),
     ),
@@ -4975,47 +4905,10 @@ pub enum ColorOrArrayOfColor {
     InterpolateLab(
         (
             Interpolation,
-            NumberLiteralOrNumberOrAnyAsUnion,
+            NumberLiteralOrNumberAsUnion,
             Vec<(NumberLiteral, StringLiteralOrColorOrArrayOfColorAsUnion)>,
         ),
     ),
-    /// Binds expressions to named variables, which can then be referenced in the result expression using `["var", "variable_name"]`.
-    ///
-    ///  - [Visualize population density](https://maplibre.org/maplibre-gl-js/docs/examples/visualize-population-density/)
-    Let((Vec<(StringLiteral, ExprOrLiteral)>, ExprOrLiteral)),
-    /// Selects the output whose label value matches the input value, or the fallback value if no match is found. The input can be any expression (e.g. `["get", "building_type"]`). Each label must be either:
-    ///
-    ///  - a single literal value; or
-    ///
-    ///  - an array of literal values, whose values must be all strings or all numbers (e.g. `[100, 101]` or `["c", "b"]`). The input matches if any of the values in the array matches, similar to the `"in"` operator.
-    ///
-    /// Each label must be unique. If the input type does not match the type of the labels, the result will be the fallback value.
-    Match(
-        (
-            Vec<(
-                ExprOrLiteral,
-                StringOrNumberOrArrayOfStringOrArrayOfNumberAsUnion,
-                ExprOrLiteral,
-            )>,
-            ExprOrLiteral,
-        ),
-    ),
-    /// Produces discrete, stepped results by evaluating a piecewise-constant function defined by pairs of input and output values ("stops"). The `input` may be any numeric expression (e.g., `["get", "population"]`). Stop inputs must be numeric literals in strictly ascending order.
-    ///
-    /// Returns the output value of the stop just less than the input, or the first output if the input is less than the first stop.
-    ///
-    ///  - [Create and style clusters](https://maplibre.org/maplibre-gl-js/docs/examples/create-and-style-clusters/)
-    Step(
-        (
-            NumberLiteralOrNumberOrAnyAsUnion,
-            ExprOrLiteral,
-            Vec<(NumberLiteral, ExprOrLiteral)>,
-        ),
-    ),
-    /// References variable bound using `let`.
-    ///
-    ///  - [Visualize population density](https://maplibre.org/maplibre-gl-js/docs/examples/visualize-population-density/)
-    Var(StringLiteral),
 }
 
 impl<'de> serde::Deserialize<'de> for ColorOrArrayOfColor {
@@ -5034,7 +4927,7 @@ impl<'de> serde::de::Visitor<'de> for ColorOrArrayOfColorVisitor {
     type Value = ColorOrArrayOfColor;
 
     fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
-        formatter.write_str("an ColorOrArrayOfColor expression (example: [\"accumulated\"])")
+        formatter.write_str("an ColorOrArrayOfColor expression (example: [\"interpolate-hcl\",[\"linear\"],[\"zoom\"],15,\"#f00\",15.05,\"#00f\"])")
     }
 
     fn visit_seq<A: serde::de::SeqAccess<'de>>(self, mut seq: A) -> Result<Self::Value, A::Error> {
@@ -5054,66 +4947,10 @@ impl<'de> serde::de::Visitor<'de> for ColorOrArrayOfColorVisitor {
             .next_element()?
             .ok_or_else(|| serde::de::Error::custom("missing operator"))?;
         match op.as_str() {
-            "accumulated" => Ok(ColorOrArrayOfColor::Accumulated),
-            "at" => {
-                let index = visit_seq_field(&mut seq, "index")?;
-                let array = visit_seq_field(&mut seq, "array")?;
-                Ok(ColorOrArrayOfColor::At(index, array))
-            }
-            "case" => {
-                let mut inputs = Vec::new();
-                let mut rest: Vec<serde_json::Value> = Vec::new();
-                while let Some(v) = seq.next_element()? {
-                    rest.push(v);
-                }
-                if rest.is_empty() {
-                    return Err(serde::de::Error::custom(
-                        "{name}::{variant_name}: too few arguments",
-                    ));
-                }
-                if !(rest.len() - 1).is_multiple_of(2) {
-                    return Err(serde::de::Error::custom(
-                        "ColorOrArrayOfColor::Case: malformed template/suffix layout",
-                    ));
-                }
-                let inputs_len = (rest.len() - 1) / 2;
-                for i in 0..inputs_len {
-                    let condition_i = serde_json::from_value(rest[i * 2].clone())
-                        .map_err(serde::de::Error::custom)?;
-                    let output_i = serde_json::from_value(rest[i * 2 + 1].clone())
-                        .map_err(serde::de::Error::custom)?;
-                    let element = (condition_i, output_i);
-                    inputs.push(element);
-                }
-                let fallback = serde_json::from_value(rest[inputs_len * 2].clone())
-                    .map_err(serde::de::Error::custom)?;
-                Ok(ColorOrArrayOfColor::Case((inputs, fallback)))
-            }
-            "coalesce" => {
-                let mut inputs = Vec::new();
-                while let Some(element) = seq.next_element()? {
-                    inputs.push(element);
-                }
-                Ok(ColorOrArrayOfColor::Coalesce(inputs))
-            }
-            "feature-state" => {
-                let property_name = visit_seq_field(&mut seq, "property_name")?;
-                Ok(ColorOrArrayOfColor::FeatureState(property_name))
-            }
-            "get" => {
-                let property_name = visit_seq_field(&mut seq, "property_name")?;
-                let object = seq.next_element()?;
-                Ok(ColorOrArrayOfColor::Get(property_name, object))
-            }
-            "global-state" => {
-                let property_name = visit_seq_field(&mut seq, "property_name")?;
-                Ok(ColorOrArrayOfColor::GlobalState(property_name))
-            }
-            "id" => Ok(ColorOrArrayOfColor::Id),
             "interpolate-hcl" => {
                 let interpolation_type: Interpolation =
                     visit_seq_field(&mut seq, "interpolation_type")?;
-                let input: NumberLiteralOrNumberOrAnyAsUnion = visit_seq_field(&mut seq, "input")?;
+                let input: NumberLiteralOrNumberAsUnion = visit_seq_field(&mut seq, "input")?;
                 let mut stops = Vec::new();
                 while let Some(stop_input_i) = seq.next_element::<NumberLiteral>()? {
                     let stop_output_i: StringLiteralOrColorOrArrayOfColorAsUnion =
@@ -5133,7 +4970,7 @@ impl<'de> serde::de::Visitor<'de> for ColorOrArrayOfColorVisitor {
             "interpolate-lab" => {
                 let interpolation_type: Interpolation =
                     visit_seq_field(&mut seq, "interpolation_type")?;
-                let input: NumberLiteralOrNumberOrAnyAsUnion = visit_seq_field(&mut seq, "input")?;
+                let input: NumberLiteralOrNumberAsUnion = visit_seq_field(&mut seq, "input")?;
                 let mut stops = Vec::new();
                 while let Some(stop_input_i) = seq.next_element::<NumberLiteral>()? {
                     let stop_output_i: StringLiteralOrColorOrArrayOfColorAsUnion =
@@ -5150,102 +4987,9 @@ impl<'de> serde::de::Visitor<'de> for ColorOrArrayOfColorVisitor {
                     stops,
                 )))
             }
-            "let" => {
-                let mut inputs = Vec::new();
-                let mut rest: Vec<serde_json::Value> = Vec::new();
-                while let Some(v) = seq.next_element()? {
-                    rest.push(v);
-                }
-                if rest.is_empty() {
-                    return Err(serde::de::Error::custom(
-                        "{name}::{variant_name}: too few arguments",
-                    ));
-                }
-                if !(rest.len() - 1).is_multiple_of(2) {
-                    return Err(serde::de::Error::custom(
-                        "ColorOrArrayOfColor::Let: malformed template/suffix layout",
-                    ));
-                }
-                let inputs_len = (rest.len() - 1) / 2;
-                for i in 0..inputs_len {
-                    let var_name_i = serde_json::from_value(rest[i * 2].clone())
-                        .map_err(serde::de::Error::custom)?;
-                    let var_value_i = serde_json::from_value(rest[i * 2 + 1].clone())
-                        .map_err(serde::de::Error::custom)?;
-                    let element = (var_name_i, var_value_i);
-                    inputs.push(element);
-                }
-                let expression = serde_json::from_value(rest[inputs_len * 2].clone())
-                    .map_err(serde::de::Error::custom)?;
-                Ok(ColorOrArrayOfColor::Let((inputs, expression)))
-            }
-            "match" => {
-                let mut inputs = Vec::new();
-                let mut rest: Vec<serde_json::Value> = Vec::new();
-                while let Some(v) = seq.next_element()? {
-                    rest.push(v);
-                }
-                if rest.is_empty() {
-                    return Err(serde::de::Error::custom(
-                        "{name}::{variant_name}: too few arguments",
-                    ));
-                }
-                if !(rest.len() - 1).is_multiple_of(3) {
-                    return Err(serde::de::Error::custom(
-                        "ColorOrArrayOfColor::Match: malformed template/suffix layout",
-                    ));
-                }
-                let inputs_len = (rest.len() - 1) / 3;
-                for i in 0..inputs_len {
-                    let input = serde_json::from_value(rest[i * 3].clone())
-                        .map_err(serde::de::Error::custom)?;
-                    let label_i = serde_json::from_value(rest[i * 3 + 1].clone())
-                        .map_err(serde::de::Error::custom)?;
-                    let output_i = serde_json::from_value(rest[i * 3 + 2].clone())
-                        .map_err(serde::de::Error::custom)?;
-                    let element = (input, label_i, output_i);
-                    inputs.push(element);
-                }
-                let fallback = serde_json::from_value(rest[inputs_len * 3].clone())
-                    .map_err(serde::de::Error::custom)?;
-                Ok(ColorOrArrayOfColor::Match((inputs, fallback)))
-            }
-            "step" => {
-                let input: NumberLiteralOrNumberOrAnyAsUnion = visit_seq_field(&mut seq, "input")?;
-                let output_0: ExprOrLiteral = visit_seq_field(&mut seq, "output_0")?;
-                let mut stops = Vec::new();
-                while let Some(stop_input_i) = seq.next_element::<NumberLiteral>()? {
-                    let stop_output_i: ExprOrLiteral = seq.next_element()?.ok_or_else(|| {
-                        serde::de::Error::custom(
-                            "expected stop_output_i in ColorOrArrayOfColor::Step",
-                        )
-                    })?;
-                    stops.push((stop_input_i, stop_output_i));
-                }
-                Ok(ColorOrArrayOfColor::Step((input, output_0, stops)))
-            }
-            "var" => {
-                let var_name = visit_seq_field(&mut seq, "var_name")?;
-                Ok(ColorOrArrayOfColor::Var(var_name))
-            }
             _ => Err(serde::de::Error::unknown_variant(
                 &op,
-                &[
-                    "accumulated",
-                    "at",
-                    "case",
-                    "coalesce",
-                    "feature-state",
-                    "get",
-                    "global-state",
-                    "id",
-                    "interpolate-hcl",
-                    "interpolate-lab",
-                    "let",
-                    "match",
-                    "step",
-                    "var",
-                ],
+                &["interpolate-hcl", "interpolate-lab"],
             )),
         }
     }
@@ -5258,130 +5002,6 @@ impl serde::Serialize for ColorOrArrayOfColor {
     {
         use serde::ser::SerializeSeq;
         match self {
-            ColorOrArrayOfColor::Accumulated => {
-                let mut elems = vec![];
-                while !elems.is_empty() && elems.last().is_some_and(serde_json::Value::is_null) {
-                    elems.pop();
-                }
-                let mut seq = serializer.serialize_seq(None)?;
-                seq.serialize_element("accumulated")?;
-                for elem in &elems {
-                    seq.serialize_element(elem)?;
-                }
-                seq.end()
-            }
-            ColorOrArrayOfColor::At(f0, f1) => {
-                let mut elems = vec![
-                    serde_json::to_value(f0).map_err(serde::ser::Error::custom)?,
-                    serde_json::to_value(f1).map_err(serde::ser::Error::custom)?,
-                ];
-                while elems.len() > 2 && elems.last().is_some_and(serde_json::Value::is_null) {
-                    elems.pop();
-                }
-                let mut seq = serializer.serialize_seq(None)?;
-                seq.serialize_element("at")?;
-                for elem in &elems {
-                    seq.serialize_element(elem)?;
-                }
-                seq.end()
-            }
-            ColorOrArrayOfColor::Case(inner) => {
-                let inner_val = serde_json::to_value(inner).map_err(serde::ser::Error::custom)?;
-                let mut seq = serializer.serialize_seq(None)?;
-                seq.serialize_element("case")?;
-                if let serde_json::Value::Array(top) = &inner_val {
-                    for elem in top {
-                        if let serde_json::Value::Array(sub) = elem {
-                            if sub.is_empty() {
-                                // Empty Vec — nothing to flatten.
-                            } else if sub[0].is_array() {
-                                // An array-of-arrays is the Vec<(A,B)> — flatten it.
-                                for pair in sub {
-                                    if let serde_json::Value::Array(pair_elems) = pair {
-                                        for pe in pair_elems {
-                                            seq.serialize_element(pe)?;
-                                        }
-                                    } else {
-                                        seq.serialize_element(pair)?;
-                                    }
-                                }
-                            } else {
-                                // Plain array value (e.g. a sub-expression like ["zoom"]).
-                                seq.serialize_element(elem)?;
-                            }
-                        } else {
-                            seq.serialize_element(elem)?;
-                        }
-                    }
-                } else {
-                    seq.serialize_element(&inner_val)?;
-                }
-                seq.end()
-            }
-            ColorOrArrayOfColor::Coalesce(inner) => {
-                let inner_val = serde_json::to_value(inner).map_err(serde::ser::Error::custom)?;
-                let mut seq = serializer.serialize_seq(None)?;
-                seq.serialize_element("coalesce")?;
-                if let serde_json::Value::Array(top) = &inner_val {
-                    for elem in top {
-                        seq.serialize_element(elem)?;
-                    }
-                } else {
-                    seq.serialize_element(&inner_val)?;
-                }
-                seq.end()
-            }
-            ColorOrArrayOfColor::FeatureState(f0) => {
-                let mut elems = vec![serde_json::to_value(f0).map_err(serde::ser::Error::custom)?];
-                while elems.len() > 1 && elems.last().is_some_and(serde_json::Value::is_null) {
-                    elems.pop();
-                }
-                let mut seq = serializer.serialize_seq(None)?;
-                seq.serialize_element("feature-state")?;
-                for elem in &elems {
-                    seq.serialize_element(elem)?;
-                }
-                seq.end()
-            }
-            ColorOrArrayOfColor::Get(f0, f1) => {
-                let mut elems = vec![
-                    serde_json::to_value(f0).map_err(serde::ser::Error::custom)?,
-                    serde_json::to_value(f1).map_err(serde::ser::Error::custom)?,
-                ];
-                while elems.len() > 1 && elems.last().is_some_and(serde_json::Value::is_null) {
-                    elems.pop();
-                }
-                let mut seq = serializer.serialize_seq(None)?;
-                seq.serialize_element("get")?;
-                for elem in &elems {
-                    seq.serialize_element(elem)?;
-                }
-                seq.end()
-            }
-            ColorOrArrayOfColor::GlobalState(f0) => {
-                let mut elems = vec![serde_json::to_value(f0).map_err(serde::ser::Error::custom)?];
-                while elems.len() > 1 && elems.last().is_some_and(serde_json::Value::is_null) {
-                    elems.pop();
-                }
-                let mut seq = serializer.serialize_seq(None)?;
-                seq.serialize_element("global-state")?;
-                for elem in &elems {
-                    seq.serialize_element(elem)?;
-                }
-                seq.end()
-            }
-            ColorOrArrayOfColor::Id => {
-                let mut elems = vec![];
-                while !elems.is_empty() && elems.last().is_some_and(serde_json::Value::is_null) {
-                    elems.pop();
-                }
-                let mut seq = serializer.serialize_seq(None)?;
-                seq.serialize_element("id")?;
-                for elem in &elems {
-                    seq.serialize_element(elem)?;
-                }
-                seq.end()
-            }
             ColorOrArrayOfColor::InterpolateHcl(inner) => {
                 let inner_val = serde_json::to_value(inner).map_err(serde::ser::Error::custom)?;
                 let mut seq = serializer.serialize_seq(None)?;
@@ -5448,117 +5068,6 @@ impl serde::Serialize for ColorOrArrayOfColor {
                 }
                 seq.end()
             }
-            ColorOrArrayOfColor::Let(inner) => {
-                let inner_val = serde_json::to_value(inner).map_err(serde::ser::Error::custom)?;
-                let mut seq = serializer.serialize_seq(None)?;
-                seq.serialize_element("let")?;
-                if let serde_json::Value::Array(top) = &inner_val {
-                    for elem in top {
-                        if let serde_json::Value::Array(sub) = elem {
-                            if sub.is_empty() {
-                                // Empty Vec — nothing to flatten.
-                            } else if sub[0].is_array() {
-                                // An array-of-arrays is the Vec<(A,B)> — flatten it.
-                                for pair in sub {
-                                    if let serde_json::Value::Array(pair_elems) = pair {
-                                        for pe in pair_elems {
-                                            seq.serialize_element(pe)?;
-                                        }
-                                    } else {
-                                        seq.serialize_element(pair)?;
-                                    }
-                                }
-                            } else {
-                                // Plain array value (e.g. a sub-expression like ["zoom"]).
-                                seq.serialize_element(elem)?;
-                            }
-                        } else {
-                            seq.serialize_element(elem)?;
-                        }
-                    }
-                } else {
-                    seq.serialize_element(&inner_val)?;
-                }
-                seq.end()
-            }
-            ColorOrArrayOfColor::Match(inner) => {
-                let inner_val = serde_json::to_value(inner).map_err(serde::ser::Error::custom)?;
-                let mut seq = serializer.serialize_seq(None)?;
-                seq.serialize_element("match")?;
-                if let serde_json::Value::Array(top) = &inner_val {
-                    for elem in top {
-                        if let serde_json::Value::Array(sub) = elem {
-                            if sub.is_empty() {
-                                // Empty Vec — nothing to flatten.
-                            } else if sub[0].is_array() {
-                                // An array-of-arrays is the Vec<(A,B)> — flatten it.
-                                for pair in sub {
-                                    if let serde_json::Value::Array(pair_elems) = pair {
-                                        for pe in pair_elems {
-                                            seq.serialize_element(pe)?;
-                                        }
-                                    } else {
-                                        seq.serialize_element(pair)?;
-                                    }
-                                }
-                            } else {
-                                // Plain array value (e.g. a sub-expression like ["zoom"]).
-                                seq.serialize_element(elem)?;
-                            }
-                        } else {
-                            seq.serialize_element(elem)?;
-                        }
-                    }
-                } else {
-                    seq.serialize_element(&inner_val)?;
-                }
-                seq.end()
-            }
-            ColorOrArrayOfColor::Step(inner) => {
-                let inner_val = serde_json::to_value(inner).map_err(serde::ser::Error::custom)?;
-                let mut seq = serializer.serialize_seq(None)?;
-                seq.serialize_element("step")?;
-                if let serde_json::Value::Array(top) = &inner_val {
-                    for elem in top {
-                        if let serde_json::Value::Array(sub) = elem {
-                            if sub.is_empty() {
-                                // Empty Vec — nothing to flatten.
-                            } else if sub[0].is_array() {
-                                // An array-of-arrays is the Vec<(A,B)> — flatten it.
-                                for pair in sub {
-                                    if let serde_json::Value::Array(pair_elems) = pair {
-                                        for pe in pair_elems {
-                                            seq.serialize_element(pe)?;
-                                        }
-                                    } else {
-                                        seq.serialize_element(pair)?;
-                                    }
-                                }
-                            } else {
-                                // Plain array value (e.g. a sub-expression like ["zoom"]).
-                                seq.serialize_element(elem)?;
-                            }
-                        } else {
-                            seq.serialize_element(elem)?;
-                        }
-                    }
-                } else {
-                    seq.serialize_element(&inner_val)?;
-                }
-                seq.end()
-            }
-            ColorOrArrayOfColor::Var(f0) => {
-                let mut elems = vec![serde_json::to_value(f0).map_err(serde::ser::Error::custom)?];
-                while elems.len() > 1 && elems.last().is_some_and(serde_json::Value::is_null) {
-                    elems.pop();
-                }
-                let mut seq = serializer.serialize_seq(None)?;
-                seq.serialize_element("var")?;
-                for elem in &elems {
-                    seq.serialize_element(elem)?;
-                }
-                seq.end()
-            }
         }
     }
 }
@@ -5566,25 +5075,23 @@ impl serde::Serialize for ColorOrArrayOfColor {
 /// Either of the below variants
 #[derive(PartialEq, Debug, Clone)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum StringLiteralOrStringOrImageOrAnyAsUnion {
+pub enum StringLiteralOrStringOrImageAsUnion {
     StringLiteral(StringLiteral),
     String(Box<String>),
     Image(Image),
-    Any(Box<Any>),
 }
 
-impl serde::Serialize for StringLiteralOrStringOrImageOrAnyAsUnion {
+impl serde::Serialize for StringLiteralOrStringOrImageAsUnion {
     fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         match self {
             Self::StringLiteral(v) => v.serialize(serializer),
             Self::String(v) => v.serialize(serializer),
             Self::Image(v) => v.serialize(serializer),
-            Self::Any(v) => v.serialize(serializer),
         }
     }
 }
 
-impl<'de> serde::Deserialize<'de> for StringLiteralOrStringOrImageOrAnyAsUnion {
+impl<'de> serde::Deserialize<'de> for StringLiteralOrStringOrImageAsUnion {
     fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
         let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
         let mut errors: Vec<(&str, std::string::String)> = Vec::new();
@@ -5600,15 +5107,11 @@ impl<'de> serde::Deserialize<'de> for StringLiteralOrStringOrImageOrAnyAsUnion {
             Ok(v) => return Ok(Self::Image(v)),
             Err(e) => errors.push(("Image", e.to_string())),
         }
-        match <Box<Any> as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Any(v)),
-            Err(e) => errors.push(("Any", e.to_string())),
-        }
 
         let details: Vec<std::string::String> =
             errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
         Err(serde::de::Error::custom(format!(
-            "StringLiteralOrStringOrImageOrAnyAsUnion: no variant matched. Expected StringLiteral(StringLiteral) | String(Box<String>) | Image(Image) | Any(Box<Any>). Errors: [{}]",
+            "StringLiteralOrStringOrImageAsUnion: no variant matched. Expected StringLiteral(StringLiteral) | String(Box<String>) | Image(Image). Errors: [{}]",
             details.join("; ")
         )))
     }
@@ -5618,7 +5121,7 @@ impl<'de> serde::Deserialize<'de> for StringLiteralOrStringOrImageOrAnyAsUnion {
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct FormattedFormatVariadicRow(
-    StringLiteralOrStringOrImageOrAnyAsUnion,
+    StringLiteralOrStringOrImageAsUnion,
     #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_option_json_map))]
     Option<serde_json::Map<std::string::String, serde_json::Value>>,
 );
@@ -5630,7 +5133,7 @@ pub enum Formatted {
     /// Gets the value of a cluster property accumulated so far. Can only be used in the `clusterProperties` option of a clustered GeoJSON source.
     Accumulated,
     /// Retrieves an item from an array.
-    At(NumberLiteralOrNumberOrAnyAsUnion, ExprOrLiteral),
+    At(NumberLiteralOrNumberAsUnion, ExprOrLiteral),
     /// Selects the first output whose corresponding test condition evaluates to true, or the fallback value otherwise.
     ///
     ///  - [Create a hover effect](https://maplibre.org/maplibre-gl-js/docs/examples/create-a-hover-effect/)
@@ -5644,7 +5147,7 @@ pub enum Formatted {
     /// Retrieves a property value from the current feature's state. Returns null if the requested property is not present on the feature's state. A feature's state is not part of the GeoJSON or vector tile data, and must be set programmatically on each feature. When `source.promoteId` is not provided, features are identified by their `id` attribute, which must be an integer or a string that can be cast to an integer. When `source.promoteId` is provided, features are identified by their `promoteId` property, which may be a number, string, or any primitive data type. Note that ["feature-state"] can only be used with paint properties that support data-driven styling.
     ///
     ///  - [Create a hover effect](https://maplibre.org/maplibre-gl-js/docs/examples/create-a-hover-effect/)
-    FeatureState(StringLiteralOrStringOrAnyAsUnion),
+    FeatureState(StringLiteralOrStringAsUnion),
     /// Returns a `formatted` string for displaying mixed-format text in the `text-field` property. The input may contain a string literal or expression, including an [`'image'`](#image) expression. Strings may be followed by a style override object.
     ///
     ///  - [Change the case of labels](https://maplibre.org/maplibre-gl-js/docs/examples/change-case-of-labels/)
@@ -5658,7 +5161,7 @@ pub enum Formatted {
     ///  - [Display HTML clusters with custom properties](https://maplibre.org/maplibre-gl-js/docs/examples/display-html-clusters-with-custom-properties/)
     ///
     ///  - [Extrude polygons for 3D indoor mapping](https://maplibre.org/maplibre-gl-js/docs/examples/extrude-polygons-for-3d-indoor-mapping/)
-    Get(StringLiteralOrStringOrAnyAsUnion, Option<Object>),
+    Get(StringLiteralOrStringAsUnion, Option<Object>),
     /// Retrieves a property value from global state that can be set with platform-specific APIs. Defaults can be provided using the [`state`](https://maplibre.org/maplibre-style-spec/root/#state) root property. Returns `null` if no value nor default value is set for the retrieved property.
     GlobalState(StringLiteral),
     /// Gets the feature's id, if it has one.
@@ -5676,8 +5179,8 @@ pub enum Formatted {
     /// Each label must be unique. If the input type does not match the type of the labels, the result will be the fallback value.
     Match(
         (
+            ExprOrLiteral,
             Vec<(
-                ExprOrLiteral,
                 StringOrNumberOrArrayOfStringOrArrayOfNumberAsUnion,
                 ExprOrLiteral,
             )>,
@@ -5691,7 +5194,7 @@ pub enum Formatted {
     ///  - [Create and style clusters](https://maplibre.org/maplibre-gl-js/docs/examples/create-and-style-clusters/)
     Step(
         (
-            NumberLiteralOrNumberOrAnyAsUnion,
+            NumberLiteralOrNumberAsUnion,
             ExprOrLiteral,
             Vec<(NumberLiteral, ExprOrLiteral)>,
         ),
@@ -5833,38 +5336,38 @@ impl<'de> serde::de::Visitor<'de> for FormattedVisitor {
                 Ok(Formatted::Let((inputs, expression)))
             }
             "match" => {
-                let mut inputs = Vec::new();
                 let mut rest: Vec<serde_json::Value> = Vec::new();
                 while let Some(v) = seq.next_element()? {
                     rest.push(v);
                 }
-                if rest.is_empty() {
+                if rest.len() < 2 {
                     return Err(serde::de::Error::custom(
-                        "{name}::{variant_name}: too few arguments",
+                        "Formatted::Match: too few arguments",
                     ));
                 }
-                if !(rest.len() - 1).is_multiple_of(3) {
+                if !rest.len().is_multiple_of(2) {
                     return Err(serde::de::Error::custom(
-                        "Formatted::Match: malformed template/suffix layout",
+                        "Formatted::Match: expected an even number of arguments after operator (input + label/output pairs + fallback)",
                     ));
                 }
-                let inputs_len = (rest.len() - 1) / 3;
-                for i in 0..inputs_len {
-                    let input = serde_json::from_value(rest[i * 3].clone())
+                let fallback_v = rest.pop().unwrap();
+                let input: ExprOrLiteral =
+                    serde_json::from_value(rest.remove(0)).map_err(serde::de::Error::custom)?;
+                let mut pairs = Vec::new();
+                for chunk in rest.chunks_exact(2) {
+                    let label_i: StringOrNumberOrArrayOfStringOrArrayOfNumberAsUnion =
+                        serde_json::from_value(chunk[0].clone())
+                            .map_err(serde::de::Error::custom)?;
+                    let output_i: ExprOrLiteral = serde_json::from_value(chunk[1].clone())
                         .map_err(serde::de::Error::custom)?;
-                    let label_i = serde_json::from_value(rest[i * 3 + 1].clone())
-                        .map_err(serde::de::Error::custom)?;
-                    let output_i = serde_json::from_value(rest[i * 3 + 2].clone())
-                        .map_err(serde::de::Error::custom)?;
-                    let element = (input, label_i, output_i);
-                    inputs.push(element);
+                    pairs.push((label_i, output_i));
                 }
-                let fallback = serde_json::from_value(rest[inputs_len * 3].clone())
-                    .map_err(serde::de::Error::custom)?;
-                Ok(Formatted::Match((inputs, fallback)))
+                let fallback: ExprOrLiteral =
+                    serde_json::from_value(fallback_v).map_err(serde::de::Error::custom)?;
+                Ok(Formatted::Match((input, pairs, fallback)))
             }
             "step" => {
-                let input: NumberLiteralOrNumberOrAnyAsUnion = visit_seq_field(&mut seq, "input")?;
+                let input: NumberLiteralOrNumberAsUnion = visit_seq_field(&mut seq, "input")?;
                 let output_0: ExprOrLiteral = visit_seq_field(&mut seq, "output_0")?;
                 let mut stops = Vec::new();
                 while let Some(stop_input_i) = seq.next_element::<NumberLiteral>()? {
@@ -6177,7 +5680,7 @@ pub enum Image {
     /// Gets the value of a cluster property accumulated so far. Can only be used in the `clusterProperties` option of a clustered GeoJSON source.
     Accumulated,
     /// Retrieves an item from an array.
-    At(NumberLiteralOrNumberOrAnyAsUnion, ExprOrLiteral),
+    At(NumberLiteralOrNumberAsUnion, ExprOrLiteral),
     /// Selects the first output whose corresponding test condition evaluates to true, or the fallback value otherwise.
     ///
     ///  - [Create a hover effect](https://maplibre.org/maplibre-gl-js/docs/examples/create-a-hover-effect/)
@@ -6191,7 +5694,7 @@ pub enum Image {
     /// Retrieves a property value from the current feature's state. Returns null if the requested property is not present on the feature's state. A feature's state is not part of the GeoJSON or vector tile data, and must be set programmatically on each feature. When `source.promoteId` is not provided, features are identified by their `id` attribute, which must be an integer or a string that can be cast to an integer. When `source.promoteId` is provided, features are identified by their `promoteId` property, which may be a number, string, or any primitive data type. Note that ["feature-state"] can only be used with paint properties that support data-driven styling.
     ///
     ///  - [Create a hover effect](https://maplibre.org/maplibre-gl-js/docs/examples/create-a-hover-effect/)
-    FeatureState(StringLiteralOrStringOrAnyAsUnion),
+    FeatureState(StringLiteralOrStringAsUnion),
     /// Retrieves a property value from the current feature's properties, or from another object if a second argument is provided. Returns null if the requested property is missing.
     ///
     ///  - [Change the case of labels](https://maplibre.org/maplibre-gl-js/docs/examples/change-case-of-labels/)
@@ -6199,7 +5702,7 @@ pub enum Image {
     ///  - [Display HTML clusters with custom properties](https://maplibre.org/maplibre-gl-js/docs/examples/display-html-clusters-with-custom-properties/)
     ///
     ///  - [Extrude polygons for 3D indoor mapping](https://maplibre.org/maplibre-gl-js/docs/examples/extrude-polygons-for-3d-indoor-mapping/)
-    Get(StringLiteralOrStringOrAnyAsUnion, Option<Object>),
+    Get(StringLiteralOrStringAsUnion, Option<Object>),
     /// Retrieves a property value from global state that can be set with platform-specific APIs. Defaults can be provided using the [`state`](https://maplibre.org/maplibre-style-spec/root/#state) root property. Returns `null` if no value nor default value is set for the retrieved property.
     GlobalState(StringLiteral),
     /// Gets the feature's id, if it has one.
@@ -6207,7 +5710,7 @@ pub enum Image {
     /// Returns an `image` type for use in `icon-image`, `*-pattern` entries and as a section in the `format` expression. If set, the `image` argument will check that the requested image exists in the style and will return either the resolved image name or `null`, depending on whether or not the image is currently in the style. This validation process is synchronous and requires the image to have been added to the style before requesting it in the `image` argument.
     ///
     ///  - [Use a fallback image](https://maplibre.org/maplibre-gl-js/docs/examples/use-a-fallback-image/)
-    Op(StringLiteralOrStringOrAnyAsUnion),
+    Op(StringLiteralOrStringAsUnion),
     /// Binds expressions to named variables, which can then be referenced in the result expression using `["var", "variable_name"]`.
     ///
     ///  - [Visualize population density](https://maplibre.org/maplibre-gl-js/docs/examples/visualize-population-density/)
@@ -6221,8 +5724,8 @@ pub enum Image {
     /// Each label must be unique. If the input type does not match the type of the labels, the result will be the fallback value.
     Match(
         (
+            ExprOrLiteral,
             Vec<(
-                ExprOrLiteral,
                 StringOrNumberOrArrayOfStringOrArrayOfNumberAsUnion,
                 ExprOrLiteral,
             )>,
@@ -6236,7 +5739,7 @@ pub enum Image {
     ///  - [Create and style clusters](https://maplibre.org/maplibre-gl-js/docs/examples/create-and-style-clusters/)
     Step(
         (
-            NumberLiteralOrNumberOrAnyAsUnion,
+            NumberLiteralOrNumberAsUnion,
             ExprOrLiteral,
             Vec<(NumberLiteral, ExprOrLiteral)>,
         ),
@@ -6373,38 +5876,36 @@ impl<'de> serde::de::Visitor<'de> for ImageVisitor {
                 Ok(Image::Let((inputs, expression)))
             }
             "match" => {
-                let mut inputs = Vec::new();
                 let mut rest: Vec<serde_json::Value> = Vec::new();
                 while let Some(v) = seq.next_element()? {
                     rest.push(v);
                 }
-                if rest.is_empty() {
+                if rest.len() < 2 {
+                    return Err(serde::de::Error::custom("Image::Match: too few arguments"));
+                }
+                if !rest.len().is_multiple_of(2) {
                     return Err(serde::de::Error::custom(
-                        "{name}::{variant_name}: too few arguments",
+                        "Image::Match: expected an even number of arguments after operator (input + label/output pairs + fallback)",
                     ));
                 }
-                if !(rest.len() - 1).is_multiple_of(3) {
-                    return Err(serde::de::Error::custom(
-                        "Image::Match: malformed template/suffix layout",
-                    ));
+                let fallback_v = rest.pop().unwrap();
+                let input: ExprOrLiteral =
+                    serde_json::from_value(rest.remove(0)).map_err(serde::de::Error::custom)?;
+                let mut pairs = Vec::new();
+                for chunk in rest.chunks_exact(2) {
+                    let label_i: StringOrNumberOrArrayOfStringOrArrayOfNumberAsUnion =
+                        serde_json::from_value(chunk[0].clone())
+                            .map_err(serde::de::Error::custom)?;
+                    let output_i: ExprOrLiteral = serde_json::from_value(chunk[1].clone())
+                        .map_err(serde::de::Error::custom)?;
+                    pairs.push((label_i, output_i));
                 }
-                let inputs_len = (rest.len() - 1) / 3;
-                for i in 0..inputs_len {
-                    let input = serde_json::from_value(rest[i * 3].clone())
-                        .map_err(serde::de::Error::custom)?;
-                    let label_i = serde_json::from_value(rest[i * 3 + 1].clone())
-                        .map_err(serde::de::Error::custom)?;
-                    let output_i = serde_json::from_value(rest[i * 3 + 2].clone())
-                        .map_err(serde::de::Error::custom)?;
-                    let element = (input, label_i, output_i);
-                    inputs.push(element);
-                }
-                let fallback = serde_json::from_value(rest[inputs_len * 3].clone())
-                    .map_err(serde::de::Error::custom)?;
-                Ok(Image::Match((inputs, fallback)))
+                let fallback: ExprOrLiteral =
+                    serde_json::from_value(fallback_v).map_err(serde::de::Error::custom)?;
+                Ok(Image::Match((input, pairs, fallback)))
             }
             "step" => {
-                let input: NumberLiteralOrNumberOrAnyAsUnion = visit_seq_field(&mut seq, "input")?;
+                let input: NumberLiteralOrNumberAsUnion = visit_seq_field(&mut seq, "input")?;
                 let output_0: ExprOrLiteral = visit_seq_field(&mut seq, "output_0")?;
                 let mut stops = Vec::new();
                 while let Some(stop_input_i) = seq.next_element::<NumberLiteral>()? {
@@ -6702,25 +6203,23 @@ impl serde::Serialize for Image {
 /// Either of the below variants
 #[derive(PartialEq, Debug, Clone)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum StringLiteralOrArrayOrStringOrAnyAsUnion {
+pub enum StringLiteralOrArrayOrStringAsUnion {
     StringLiteral(StringLiteral),
     Array(Array),
     String(Box<String>),
-    Any(Box<Any>),
 }
 
-impl serde::Serialize for StringLiteralOrArrayOrStringOrAnyAsUnion {
+impl serde::Serialize for StringLiteralOrArrayOrStringAsUnion {
     fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         match self {
             Self::StringLiteral(v) => v.serialize(serializer),
             Self::Array(v) => v.serialize(serializer),
             Self::String(v) => v.serialize(serializer),
-            Self::Any(v) => v.serialize(serializer),
         }
     }
 }
 
-impl<'de> serde::Deserialize<'de> for StringLiteralOrArrayOrStringOrAnyAsUnion {
+impl<'de> serde::Deserialize<'de> for StringLiteralOrArrayOrStringAsUnion {
     fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
         let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
         let mut errors: Vec<(&str, std::string::String)> = Vec::new();
@@ -6736,15 +6235,11 @@ impl<'de> serde::Deserialize<'de> for StringLiteralOrArrayOrStringOrAnyAsUnion {
             Ok(v) => return Ok(Self::String(v)),
             Err(e) => errors.push(("String", e.to_string())),
         }
-        match <Box<Any> as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Any(v)),
-            Err(e) => errors.push(("Any", e.to_string())),
-        }
 
         let details: Vec<std::string::String> =
             errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
         Err(serde::de::Error::custom(format!(
-            "StringLiteralOrArrayOrStringOrAnyAsUnion: no variant matched. Expected StringLiteral(StringLiteral) | Array(Array) | String(Box<String>) | Any(Box<Any>). Errors: [{}]",
+            "StringLiteralOrArrayOrStringAsUnion: no variant matched. Expected StringLiteral(StringLiteral) | Array(Array) | String(Box<String>). Errors: [{}]",
             details.join("; ")
         )))
     }
@@ -6755,40 +6250,31 @@ impl<'de> serde::Deserialize<'de> for StringLiteralOrArrayOrStringOrAnyAsUnion {
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum Number {
     /// Returns the remainder after integer division of the first input by the second.
-    Percentage(
-        NumberLiteralOrNumberOrAnyAsUnion,
-        NumberLiteralOrNumberOrAnyAsUnion,
-    ),
+    Percentage(NumberLiteralOrNumberAsUnion, NumberLiteralOrNumberAsUnion),
     /// Returns the product of the inputs.
-    Star(Vec<NumberLiteralOrNumberOrAnyAsUnion>),
+    Star(Vec<NumberLiteralOrNumberAsUnion>),
     /// Returns the sum of the inputs.
-    Plus(Vec<NumberLiteralOrNumberOrAnyAsUnion>),
+    Plus(Vec<NumberLiteralOrNumberAsUnion>),
     /// For two inputs, returns the result of subtracting the second input from the first. For a single input, returns the result of subtracting it from 0.
     Minus(MinusOptions),
     /// Returns the result of floating point division of the first input by the second.
     ///
     ///  - [Visualize population density](https://maplibre.org/maplibre-gl-js/docs/examples/visualize-population-density/)
-    Slash(
-        NumberLiteralOrNumberOrAnyAsUnion,
-        NumberLiteralOrNumberOrAnyAsUnion,
-    ),
+    Slash(NumberLiteralOrNumberAsUnion, NumberLiteralOrNumberAsUnion),
     /// Returns the result of raising the first input to the power specified by the second.
-    Power(
-        NumberLiteralOrNumberOrAnyAsUnion,
-        NumberLiteralOrNumberOrAnyAsUnion,
-    ),
+    Power(NumberLiteralOrNumberAsUnion, NumberLiteralOrNumberAsUnion),
     /// Returns the absolute value of the input.
-    Absolute(NumberLiteralOrNumberOrAnyAsUnion),
+    Absolute(NumberLiteralOrNumberAsUnion),
     /// Gets the value of a cluster property accumulated so far. Can only be used in the `clusterProperties` option of a clustered GeoJSON source.
     Accumulated,
     /// Returns the arccosine of the input.
-    Arccosine(NumberLiteralOrNumberOrAnyAsUnion),
+    Arccosine(NumberLiteralOrNumberAsUnion),
     /// Returns the arcsine of the input.
-    Asin(NumberLiteralOrNumberOrAnyAsUnion),
+    Asin(NumberLiteralOrNumberAsUnion),
     /// Retrieves an item from an array.
-    At(NumberLiteralOrNumberOrAnyAsUnion, ExprOrLiteral),
+    At(NumberLiteralOrNumberAsUnion, ExprOrLiteral),
     /// Returns the arctangent of the input.
-    Atan(NumberLiteralOrNumberOrAnyAsUnion),
+    Atan(NumberLiteralOrNumberAsUnion),
     /// Selects the first output whose corresponding test condition evaluates to true, or the fallback value otherwise.
     ///
     ///  - [Create a hover effect](https://maplibre.org/maplibre-gl-js/docs/examples/create-a-hover-effect/)
@@ -6796,13 +6282,13 @@ pub enum Number {
     ///  - [Display HTML clusters with custom properties](https://maplibre.org/maplibre-gl-js/docs/examples/display-html-clusters-with-custom-properties/)
     Case((Vec<(Boolean, ExprOrLiteral)>, ExprOrLiteral)),
     /// Returns the smallest integer that is greater than or equal to the input.
-    Ceil(NumberLiteralOrNumberOrAnyAsUnion),
+    Ceil(NumberLiteralOrNumberAsUnion),
     /// Evaluates each expression in turn until the first non-null value is obtained, and returns that value.
     ///
     ///  - [Use a fallback image](https://maplibre.org/maplibre-gl-js/docs/examples/use-a-fallback-image/)
     Coalesce(Vec<ExprOrLiteral>),
     /// Returns the cosine of the input.
-    Cos(NumberLiteralOrNumberOrAnyAsUnion),
+    Cos(NumberLiteralOrNumberAsUnion),
     /// Returns the shortest distance in meters between the evaluated feature and the input geometry. The input value can be a valid GeoJSON of type `Point`, `MultiPoint`, `LineString`, `MultiLineString`, `Polygon`, `MultiPolygon`, `Feature`, or `FeatureCollection`. Distance values returned may vary in precision due to loss in precision from encoding geometries, particularly below zoom level 13.
     Distance(GeoJSONObjectLiteral),
     /// Returns the mathematical constant e.
@@ -6812,9 +6298,9 @@ pub enum Number {
     /// Retrieves a property value from the current feature's state. Returns null if the requested property is not present on the feature's state. A feature's state is not part of the GeoJSON or vector tile data, and must be set programmatically on each feature. When `source.promoteId` is not provided, features are identified by their `id` attribute, which must be an integer or a string that can be cast to an integer. When `source.promoteId` is provided, features are identified by their `promoteId` property, which may be a number, string, or any primitive data type. Note that ["feature-state"] can only be used with paint properties that support data-driven styling.
     ///
     ///  - [Create a hover effect](https://maplibre.org/maplibre-gl-js/docs/examples/create-a-hover-effect/)
-    FeatureState(StringLiteralOrStringOrAnyAsUnion),
+    FeatureState(StringLiteralOrStringAsUnion),
     /// Returns the largest integer that is less than or equal to the input.
-    Floor(NumberLiteralOrNumberOrAnyAsUnion),
+    Floor(NumberLiteralOrNumberAsUnion),
     /// Retrieves a property value from the current feature's properties, or from another object if a second argument is provided. Returns null if the requested property is missing.
     ///
     ///  - [Change the case of labels](https://maplibre.org/maplibre-gl-js/docs/examples/change-case-of-labels/)
@@ -6822,7 +6308,7 @@ pub enum Number {
     ///  - [Display HTML clusters with custom properties](https://maplibre.org/maplibre-gl-js/docs/examples/display-html-clusters-with-custom-properties/)
     ///
     ///  - [Extrude polygons for 3D indoor mapping](https://maplibre.org/maplibre-gl-js/docs/examples/extrude-polygons-for-3d-indoor-mapping/)
-    Get(StringLiteralOrStringOrAnyAsUnion, Option<Object>),
+    Get(StringLiteralOrStringAsUnion, Option<Object>),
     /// Retrieves a property value from global state that can be set with platform-specific APIs. Defaults can be provided using the [`state`](https://maplibre.org/maplibre-style-spec/root/#state) root property. Returns `null` if no value nor default value is set for the retrieved property.
     GlobalState(StringLiteral),
     /// Gets the kernel density estimation of a pixel in a heatmap layer, which is a relative measure of how many data points are crowded around a particular pixel. Can only be used in the `heatmap-color` property.
@@ -6832,7 +6318,7 @@ pub enum Number {
     /// Returns the first position at which an item can be found in an array or a substring can be found in a string, or `-1` if the input cannot be found. Accepts an optional index from where to begin the search. In a string, a UTF-16 surrogate pair counts as a single position.
     IndexOf(IndexOfOptions),
     /// Gets the length of an array or string. In a string, a UTF-16 surrogate pair counts as a single position.
-    Length(StringLiteralOrArrayOrStringOrAnyAsUnion),
+    Length(StringLiteralOrArrayOrStringAsUnion),
     /// Binds expressions to named variables, which can then be referenced in the result expression using `["var", "variable_name"]`.
     ///
     ///  - [Visualize population density](https://maplibre.org/maplibre-gl-js/docs/examples/visualize-population-density/)
@@ -6840,13 +6326,13 @@ pub enum Number {
     /// Gets the progress along a gradient line. Can only be used in the `line-gradient` property.
     LineProgress,
     /// Returns the natural logarithm of the input.
-    Ln(NumberLiteralOrNumberOrAnyAsUnion),
+    Ln(NumberLiteralOrNumberAsUnion),
     /// Returns the mathematical constant ln(2).
     Ln2,
     /// Returns the base-ten logarithm of the input.
-    Log10(NumberLiteralOrNumberOrAnyAsUnion),
+    Log10(NumberLiteralOrNumberAsUnion),
     /// Returns the base-two logarithm of the input.
-    Log2(NumberLiteralOrNumberOrAnyAsUnion),
+    Log2(NumberLiteralOrNumberAsUnion),
     /// Selects the output whose label value matches the input value, or the fallback value if no match is found. The input can be any expression (e.g. `["get", "building_type"]`). Each label must be either:
     ///
     ///  - a single literal value; or
@@ -6856,8 +6342,8 @@ pub enum Number {
     /// Each label must be unique. If the input type does not match the type of the labels, the result will be the fallback value.
     Match(
         (
+            ExprOrLiteral,
             Vec<(
-                ExprOrLiteral,
                 StringOrNumberOrArrayOfStringOrArrayOfNumberAsUnion,
                 ExprOrLiteral,
             )>,
@@ -6865,19 +6351,19 @@ pub enum Number {
         ),
     ),
     /// Returns the maximum value of the inputs.
-    Max(Vec<NumberLiteralOrNumberOrAnyAsUnion>),
+    Max(Vec<NumberLiteralOrNumberAsUnion>),
     /// Returns the minimum value of the inputs.
-    Min(Vec<NumberLiteralOrNumberOrAnyAsUnion>),
+    Min(Vec<NumberLiteralOrNumberAsUnion>),
     /// Asserts that the input value is a number. If multiple values are provided, each one is evaluated in order until a number is obtained. If none of the inputs are numbers, the expression is an error.
     Op(Vec<ExprOrLiteral>),
     /// Returns the mathematical constant pi.
     Pi,
     /// Rounds the input to the nearest integer. Halfway values are rounded away from zero. For example, `["round", -1.5]` evaluates to -2.
-    Round(NumberLiteralOrNumberOrAnyAsUnion),
+    Round(NumberLiteralOrNumberAsUnion),
     /// Returns the sine of the input.
-    Sin(NumberLiteralOrNumberOrAnyAsUnion),
+    Sin(NumberLiteralOrNumberAsUnion),
     /// Returns the square root of the input.
-    Sqrt(NumberLiteralOrNumberOrAnyAsUnion),
+    Sqrt(NumberLiteralOrNumberAsUnion),
     /// Produces discrete, stepped results by evaluating a piecewise-constant function defined by pairs of input and output values ("stops"). The `input` may be any numeric expression (e.g., `["get", "population"]`). Stop inputs must be numeric literals in strictly ascending order.
     ///
     /// Returns the output value of the stop just less than the input, or the first output if the input is less than the first stop.
@@ -6885,13 +6371,13 @@ pub enum Number {
     ///  - [Create and style clusters](https://maplibre.org/maplibre-gl-js/docs/examples/create-and-style-clusters/)
     Step(
         (
-            NumberLiteralOrNumberOrAnyAsUnion,
+            NumberLiteralOrNumberAsUnion,
             ExprOrLiteral,
             Vec<(NumberLiteral, ExprOrLiteral)>,
         ),
     ),
     /// Returns the tangent of the input.
-    Tan(NumberLiteralOrNumberOrAnyAsUnion),
+    Tan(NumberLiteralOrNumberAsUnion),
     /// Converts the input value to a number, if possible. If the input is `null` or `false`, the result is 0. If the input is `true`, the result is 1. If the input is a string, it is converted to a number as specified by the ["ToNumber Applied to the String Type" algorithm](https://tc39.github.io/ecma262/#sec-tonumber-applied-to-the-string-type) of the ECMAScript Language Specification. If multiple values are provided, each one is evaluated in order until the first successful conversion is obtained. If none of the inputs can be converted, the expression is an error.
     To(Vec<ExprOrLiteral>),
     /// References variable bound using `let`.
@@ -6907,11 +6393,8 @@ pub enum Number {
 #[serde(untagged)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum MinusOptions {
-    TwoParams(
-        NumberLiteralOrNumberOrAnyAsUnion,
-        NumberLiteralOrNumberOrAnyAsUnion,
-    ),
-    OneParams(NumberLiteralOrNumberOrAnyAsUnion),
+    TwoParams(NumberLiteralOrNumberAsUnion, NumberLiteralOrNumberAsUnion),
+    OneParams(NumberLiteralOrNumberAsUnion),
 }
 
 /// Options for deserializing the syntax enum variant [`Number::IndexOf`]
@@ -6927,8 +6410,8 @@ pub enum IndexOfOptions {
         Option<serde_json::Value>,
     ),
     Substring(
-        StringLiteralOrStringOrAnyAsUnion,
-        StringLiteralOrStringOrAnyAsUnion,
+        StringLiteralOrStringAsUnion,
+        StringLiteralOrStringAsUnion,
         #[serde(default)]
         #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_option_json_value))]
         Option<serde_json::Value>,
@@ -6997,20 +6480,14 @@ impl<'de> serde::de::Visitor<'de> for NumberVisitor {
                 }
                 match rest.len() {
                     2 => Ok(Number::Minus(MinusOptions::TwoParams(
-                        serde_json::from_value::<NumberLiteralOrNumberOrAnyAsUnion>(
-                            rest[0].clone(),
-                        )
-                        .map_err(serde::de::Error::custom)?,
-                        serde_json::from_value::<NumberLiteralOrNumberOrAnyAsUnion>(
-                            rest[1].clone(),
-                        )
-                        .map_err(serde::de::Error::custom)?,
+                        serde_json::from_value::<NumberLiteralOrNumberAsUnion>(rest[0].clone())
+                            .map_err(serde::de::Error::custom)?,
+                        serde_json::from_value::<NumberLiteralOrNumberAsUnion>(rest[1].clone())
+                            .map_err(serde::de::Error::custom)?,
                     ))),
                     1 => Ok(Number::Minus(MinusOptions::OneParams(
-                        serde_json::from_value::<NumberLiteralOrNumberOrAnyAsUnion>(
-                            rest[0].clone(),
-                        )
-                        .map_err(serde::de::Error::custom)?,
+                        serde_json::from_value::<NumberLiteralOrNumberAsUnion>(rest[0].clone())
+                            .map_err(serde::de::Error::custom)?,
                     ))),
                     len => Err(serde::de::Error::custom(format!(
                         "'-': expected 1 or 2 arguments, got {len}"
@@ -7173,35 +6650,33 @@ impl<'de> serde::de::Visitor<'de> for NumberVisitor {
                 Ok(Number::Log2(input))
             }
             "match" => {
-                let mut inputs = Vec::new();
                 let mut rest: Vec<serde_json::Value> = Vec::new();
                 while let Some(v) = seq.next_element()? {
                     rest.push(v);
                 }
-                if rest.is_empty() {
+                if rest.len() < 2 {
+                    return Err(serde::de::Error::custom("Number::Match: too few arguments"));
+                }
+                if !rest.len().is_multiple_of(2) {
                     return Err(serde::de::Error::custom(
-                        "{name}::{variant_name}: too few arguments",
+                        "Number::Match: expected an even number of arguments after operator (input + label/output pairs + fallback)",
                     ));
                 }
-                if !(rest.len() - 1).is_multiple_of(3) {
-                    return Err(serde::de::Error::custom(
-                        "Number::Match: malformed template/suffix layout",
-                    ));
+                let fallback_v = rest.pop().unwrap();
+                let input: ExprOrLiteral =
+                    serde_json::from_value(rest.remove(0)).map_err(serde::de::Error::custom)?;
+                let mut pairs = Vec::new();
+                for chunk in rest.chunks_exact(2) {
+                    let label_i: StringOrNumberOrArrayOfStringOrArrayOfNumberAsUnion =
+                        serde_json::from_value(chunk[0].clone())
+                            .map_err(serde::de::Error::custom)?;
+                    let output_i: ExprOrLiteral = serde_json::from_value(chunk[1].clone())
+                        .map_err(serde::de::Error::custom)?;
+                    pairs.push((label_i, output_i));
                 }
-                let inputs_len = (rest.len() - 1) / 3;
-                for i in 0..inputs_len {
-                    let input = serde_json::from_value(rest[i * 3].clone())
-                        .map_err(serde::de::Error::custom)?;
-                    let label_i = serde_json::from_value(rest[i * 3 + 1].clone())
-                        .map_err(serde::de::Error::custom)?;
-                    let output_i = serde_json::from_value(rest[i * 3 + 2].clone())
-                        .map_err(serde::de::Error::custom)?;
-                    let element = (input, label_i, output_i);
-                    inputs.push(element);
-                }
-                let fallback = serde_json::from_value(rest[inputs_len * 3].clone())
-                    .map_err(serde::de::Error::custom)?;
-                Ok(Number::Match((inputs, fallback)))
+                let fallback: ExprOrLiteral =
+                    serde_json::from_value(fallback_v).map_err(serde::de::Error::custom)?;
+                Ok(Number::Match((input, pairs, fallback)))
             }
             "max" => {
                 let mut inputs = Vec::new();
@@ -7238,7 +6713,7 @@ impl<'de> serde::de::Visitor<'de> for NumberVisitor {
                 Ok(Number::Sqrt(input))
             }
             "step" => {
-                let input: NumberLiteralOrNumberOrAnyAsUnion = visit_seq_field(&mut seq, "input")?;
+                let input: NumberLiteralOrNumberAsUnion = visit_seq_field(&mut seq, "input")?;
                 let output_0: ExprOrLiteral = visit_seq_field(&mut seq, "output_0")?;
                 let mut stops = Vec::new();
                 while let Some(stop_input_i) = seq.next_element::<NumberLiteral>()? {
@@ -8063,36 +7538,6 @@ impl<'de> serde::Deserialize<'de>
 #[derive(PartialEq, Debug, Clone)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection {
-    /// Gets the value of a cluster property accumulated so far. Can only be used in the `clusterProperties` option of a clustered GeoJSON source.
-    Accumulated,
-    /// Retrieves an item from an array.
-    At(NumberLiteralOrNumberOrAnyAsUnion, ExprOrLiteral),
-    /// Selects the first output whose corresponding test condition evaluates to true, or the fallback value otherwise.
-    ///
-    ///  - [Create a hover effect](https://maplibre.org/maplibre-gl-js/docs/examples/create-a-hover-effect/)
-    ///
-    ///  - [Display HTML clusters with custom properties](https://maplibre.org/maplibre-gl-js/docs/examples/display-html-clusters-with-custom-properties/)
-    Case((Vec<(Boolean, ExprOrLiteral)>, ExprOrLiteral)),
-    /// Evaluates each expression in turn until the first non-null value is obtained, and returns that value.
-    ///
-    ///  - [Use a fallback image](https://maplibre.org/maplibre-gl-js/docs/examples/use-a-fallback-image/)
-    Coalesce(Vec<ExprOrLiteral>),
-    /// Retrieves a property value from the current feature's state. Returns null if the requested property is not present on the feature's state. A feature's state is not part of the GeoJSON or vector tile data, and must be set programmatically on each feature. When `source.promoteId` is not provided, features are identified by their `id` attribute, which must be an integer or a string that can be cast to an integer. When `source.promoteId` is provided, features are identified by their `promoteId` property, which may be a number, string, or any primitive data type. Note that ["feature-state"] can only be used with paint properties that support data-driven styling.
-    ///
-    ///  - [Create a hover effect](https://maplibre.org/maplibre-gl-js/docs/examples/create-a-hover-effect/)
-    FeatureState(StringLiteralOrStringOrAnyAsUnion),
-    /// Retrieves a property value from the current feature's properties, or from another object if a second argument is provided. Returns null if the requested property is missing.
-    ///
-    ///  - [Change the case of labels](https://maplibre.org/maplibre-gl-js/docs/examples/change-case-of-labels/)
-    ///
-    ///  - [Display HTML clusters with custom properties](https://maplibre.org/maplibre-gl-js/docs/examples/display-html-clusters-with-custom-properties/)
-    ///
-    ///  - [Extrude polygons for 3D indoor mapping](https://maplibre.org/maplibre-gl-js/docs/examples/extrude-polygons-for-3d-indoor-mapping/)
-    Get(StringLiteralOrStringOrAnyAsUnion, Option<Object>),
-    /// Retrieves a property value from global state that can be set with platform-specific APIs. Defaults can be provided using the [`state`](https://maplibre.org/maplibre-style-spec/root/#state) root property. Returns `null` if no value nor default value is set for the retrieved property.
-    GlobalState(StringLiteral),
-    /// Gets the feature's id, if it has one.
-    Id,
     /// Produces continuous, smooth results by interpolating between pairs of input and output values ("stops"). The `input` may be any numeric expression (e.g., `["get", "population"]`). Stop inputs must be numeric literals in strictly ascending order. The output type must be `number`, `array<number>`, `color`, `array<color>`, or `projection`.
     ///
     ///  - [Animate map camera around a point](https://maplibre.org/maplibre-gl-js/docs/examples/animate-camera-around-point/)
@@ -8105,50 +7550,13 @@ pub enum NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection {
     Interpolate(
         (
             Interpolation,
-            NumberLiteralOrNumberOrAnyAsUnion,
+            NumberLiteralOrNumberAsUnion,
             Vec<(
                 NumberLiteral,
                 NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjectionAsUnion,
             )>,
         ),
     ),
-    /// Binds expressions to named variables, which can then be referenced in the result expression using `["var", "variable_name"]`.
-    ///
-    ///  - [Visualize population density](https://maplibre.org/maplibre-gl-js/docs/examples/visualize-population-density/)
-    Let((Vec<(StringLiteral, ExprOrLiteral)>, ExprOrLiteral)),
-    /// Selects the output whose label value matches the input value, or the fallback value if no match is found. The input can be any expression (e.g. `["get", "building_type"]`). Each label must be either:
-    ///
-    ///  - a single literal value; or
-    ///
-    ///  - an array of literal values, whose values must be all strings or all numbers (e.g. `[100, 101]` or `["c", "b"]`). The input matches if any of the values in the array matches, similar to the `"in"` operator.
-    ///
-    /// Each label must be unique. If the input type does not match the type of the labels, the result will be the fallback value.
-    Match(
-        (
-            Vec<(
-                ExprOrLiteral,
-                StringOrNumberOrArrayOfStringOrArrayOfNumberAsUnion,
-                ExprOrLiteral,
-            )>,
-            ExprOrLiteral,
-        ),
-    ),
-    /// Produces discrete, stepped results by evaluating a piecewise-constant function defined by pairs of input and output values ("stops"). The `input` may be any numeric expression (e.g., `["get", "population"]`). Stop inputs must be numeric literals in strictly ascending order.
-    ///
-    /// Returns the output value of the stop just less than the input, or the first output if the input is less than the first stop.
-    ///
-    ///  - [Create and style clusters](https://maplibre.org/maplibre-gl-js/docs/examples/create-and-style-clusters/)
-    Step(
-        (
-            NumberLiteralOrNumberOrAnyAsUnion,
-            ExprOrLiteral,
-            Vec<(NumberLiteral, ExprOrLiteral)>,
-        ),
-    ),
-    /// References variable bound using `let`.
-    ///
-    ///  - [Visualize population density](https://maplibre.org/maplibre-gl-js/docs/examples/visualize-population-density/)
-    Var(StringLiteral),
 }
 
 impl<'de> serde::Deserialize<'de> for NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection {
@@ -8169,7 +7577,7 @@ impl<'de> serde::de::Visitor<'de>
     type Value = NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection;
 
     fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
-        formatter.write_str("an NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection expression (example: [\"accumulated\"])")
+        formatter.write_str("an NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection expression (example: [\"interpolate\",[\"linear\"],[\"zoom\"],15,0,15.05,[\"get\",\"height\"]])")
     }
 
     fn visit_seq<A: serde::de::SeqAccess<'de>>(self, mut seq: A) -> Result<Self::Value, A::Error> {
@@ -8189,85 +7597,10 @@ impl<'de> serde::de::Visitor<'de>
             .next_element()?
             .ok_or_else(|| serde::de::Error::custom("missing operator"))?;
         match op.as_str() {
-            "accumulated" => {
-                Ok(NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection::Accumulated)
-            }
-            "at" => {
-                let index = visit_seq_field(&mut seq, "index")?;
-                let array = visit_seq_field(&mut seq, "array")?;
-                Ok(NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection::At(
-                    index, array,
-                ))
-            }
-            "case" => {
-                let mut inputs = Vec::new();
-                let mut rest: Vec<serde_json::Value> = Vec::new();
-                while let Some(v) = seq.next_element()? {
-                    rest.push(v);
-                }
-                if rest.is_empty() {
-                    return Err(serde::de::Error::custom(
-                        "{name}::{variant_name}: too few arguments",
-                    ));
-                }
-                if !(rest.len() - 1).is_multiple_of(2) {
-                    return Err(serde::de::Error::custom(
-                        "NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection::Case: malformed template/suffix layout",
-                    ));
-                }
-                let inputs_len = (rest.len() - 1) / 2;
-                for i in 0..inputs_len {
-                    let condition_i = serde_json::from_value(rest[i * 2].clone())
-                        .map_err(serde::de::Error::custom)?;
-                    let output_i = serde_json::from_value(rest[i * 2 + 1].clone())
-                        .map_err(serde::de::Error::custom)?;
-                    let element = (condition_i, output_i);
-                    inputs.push(element);
-                }
-                let fallback = serde_json::from_value(rest[inputs_len * 2].clone())
-                    .map_err(serde::de::Error::custom)?;
-                Ok(
-                    NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection::Case((
-                        inputs, fallback,
-                    )),
-                )
-            }
-            "coalesce" => {
-                let mut inputs = Vec::new();
-                while let Some(element) = seq.next_element()? {
-                    inputs.push(element);
-                }
-                Ok(NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection::Coalesce(inputs))
-            }
-            "feature-state" => {
-                let property_name = visit_seq_field(&mut seq, "property_name")?;
-                Ok(
-                    NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection::FeatureState(
-                        property_name,
-                    ),
-                )
-            }
-            "get" => {
-                let property_name = visit_seq_field(&mut seq, "property_name")?;
-                let object = seq.next_element()?;
-                Ok(NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection::Get(
-                    property_name,
-                    object,
-                ))
-            }
-            "global-state" => {
-                let property_name = visit_seq_field(&mut seq, "property_name")?;
-                Ok(
-                    NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection::GlobalState(
-                        property_name,
-                    ),
-                )
-            }
-            "id" => Ok(NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection::Id),
             "interpolate" => {
                 let interpolation_type: Interpolation =
                     visit_seq_field(&mut seq, "interpolation_type")?;
-                let input: NumberLiteralOrNumberOrAnyAsUnion = visit_seq_field(&mut seq, "input")?;
+                let input: NumberLiteralOrNumberAsUnion = visit_seq_field(&mut seq, "input")?;
                 let mut stops = Vec::new();
                 while let Some(stop_input_i) = seq.next_element::<NumberLiteral>()? {
                     let stop_output_i: NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjectionAsUnion = seq.next_element()?.ok_or_else(|| serde::de::Error::custom("expected stop_output_i in NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection::Interpolate"))?;
@@ -8281,110 +7614,7 @@ impl<'de> serde::de::Visitor<'de>
                     )),
                 )
             }
-            "let" => {
-                let mut inputs = Vec::new();
-                let mut rest: Vec<serde_json::Value> = Vec::new();
-                while let Some(v) = seq.next_element()? {
-                    rest.push(v);
-                }
-                if rest.is_empty() {
-                    return Err(serde::de::Error::custom(
-                        "{name}::{variant_name}: too few arguments",
-                    ));
-                }
-                if !(rest.len() - 1).is_multiple_of(2) {
-                    return Err(serde::de::Error::custom(
-                        "NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection::Let: malformed template/suffix layout",
-                    ));
-                }
-                let inputs_len = (rest.len() - 1) / 2;
-                for i in 0..inputs_len {
-                    let var_name_i = serde_json::from_value(rest[i * 2].clone())
-                        .map_err(serde::de::Error::custom)?;
-                    let var_value_i = serde_json::from_value(rest[i * 2 + 1].clone())
-                        .map_err(serde::de::Error::custom)?;
-                    let element = (var_name_i, var_value_i);
-                    inputs.push(element);
-                }
-                let expression = serde_json::from_value(rest[inputs_len * 2].clone())
-                    .map_err(serde::de::Error::custom)?;
-                Ok(NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection::Let(
-                    (inputs, expression),
-                ))
-            }
-            "match" => {
-                let mut inputs = Vec::new();
-                let mut rest: Vec<serde_json::Value> = Vec::new();
-                while let Some(v) = seq.next_element()? {
-                    rest.push(v);
-                }
-                if rest.is_empty() {
-                    return Err(serde::de::Error::custom(
-                        "{name}::{variant_name}: too few arguments",
-                    ));
-                }
-                if !(rest.len() - 1).is_multiple_of(3) {
-                    return Err(serde::de::Error::custom(
-                        "NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection::Match: malformed template/suffix layout",
-                    ));
-                }
-                let inputs_len = (rest.len() - 1) / 3;
-                for i in 0..inputs_len {
-                    let input = serde_json::from_value(rest[i * 3].clone())
-                        .map_err(serde::de::Error::custom)?;
-                    let label_i = serde_json::from_value(rest[i * 3 + 1].clone())
-                        .map_err(serde::de::Error::custom)?;
-                    let output_i = serde_json::from_value(rest[i * 3 + 2].clone())
-                        .map_err(serde::de::Error::custom)?;
-                    let element = (input, label_i, output_i);
-                    inputs.push(element);
-                }
-                let fallback = serde_json::from_value(rest[inputs_len * 3].clone())
-                    .map_err(serde::de::Error::custom)?;
-                Ok(
-                    NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection::Match((
-                        inputs, fallback,
-                    )),
-                )
-            }
-            "step" => {
-                let input: NumberLiteralOrNumberOrAnyAsUnion = visit_seq_field(&mut seq, "input")?;
-                let output_0: ExprOrLiteral = visit_seq_field(&mut seq, "output_0")?;
-                let mut stops = Vec::new();
-                while let Some(stop_input_i) = seq.next_element::<NumberLiteral>()? {
-                    let stop_output_i: ExprOrLiteral = seq.next_element()?.ok_or_else(|| serde::de::Error::custom("expected stop_output_i in NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection::Step"))?;
-                    stops.push((stop_input_i, stop_output_i));
-                }
-                Ok(
-                    NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection::Step((
-                        input, output_0, stops,
-                    )),
-                )
-            }
-            "var" => {
-                let var_name = visit_seq_field(&mut seq, "var_name")?;
-                Ok(NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection::Var(
-                    var_name,
-                ))
-            }
-            _ => Err(serde::de::Error::unknown_variant(
-                &op,
-                &[
-                    "accumulated",
-                    "at",
-                    "case",
-                    "coalesce",
-                    "feature-state",
-                    "get",
-                    "global-state",
-                    "id",
-                    "interpolate",
-                    "let",
-                    "match",
-                    "step",
-                    "var",
-                ],
-            )),
+            _ => Err(serde::de::Error::unknown_variant(&op, &["interpolate"])),
         }
     }
 }
@@ -8396,130 +7626,6 @@ impl serde::Serialize for NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection
     {
         use serde::ser::SerializeSeq;
         match self {
-            NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection::Accumulated => {
-                let mut elems = vec![];
-                while !elems.is_empty() && elems.last().is_some_and(serde_json::Value::is_null) {
-                    elems.pop();
-                }
-                let mut seq = serializer.serialize_seq(None)?;
-                seq.serialize_element("accumulated")?;
-                for elem in &elems {
-                    seq.serialize_element(elem)?;
-                }
-                seq.end()
-            }
-            NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection::At(f0, f1) => {
-                let mut elems = vec![
-                    serde_json::to_value(f0).map_err(serde::ser::Error::custom)?,
-                    serde_json::to_value(f1).map_err(serde::ser::Error::custom)?,
-                ];
-                while elems.len() > 2 && elems.last().is_some_and(serde_json::Value::is_null) {
-                    elems.pop();
-                }
-                let mut seq = serializer.serialize_seq(None)?;
-                seq.serialize_element("at")?;
-                for elem in &elems {
-                    seq.serialize_element(elem)?;
-                }
-                seq.end()
-            }
-            NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection::Case(inner) => {
-                let inner_val = serde_json::to_value(inner).map_err(serde::ser::Error::custom)?;
-                let mut seq = serializer.serialize_seq(None)?;
-                seq.serialize_element("case")?;
-                if let serde_json::Value::Array(top) = &inner_val {
-                    for elem in top {
-                        if let serde_json::Value::Array(sub) = elem {
-                            if sub.is_empty() {
-                                // Empty Vec — nothing to flatten.
-                            } else if sub[0].is_array() {
-                                // An array-of-arrays is the Vec<(A,B)> — flatten it.
-                                for pair in sub {
-                                    if let serde_json::Value::Array(pair_elems) = pair {
-                                        for pe in pair_elems {
-                                            seq.serialize_element(pe)?;
-                                        }
-                                    } else {
-                                        seq.serialize_element(pair)?;
-                                    }
-                                }
-                            } else {
-                                // Plain array value (e.g. a sub-expression like ["zoom"]).
-                                seq.serialize_element(elem)?;
-                            }
-                        } else {
-                            seq.serialize_element(elem)?;
-                        }
-                    }
-                } else {
-                    seq.serialize_element(&inner_val)?;
-                }
-                seq.end()
-            }
-            NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection::Coalesce(inner) => {
-                let inner_val = serde_json::to_value(inner).map_err(serde::ser::Error::custom)?;
-                let mut seq = serializer.serialize_seq(None)?;
-                seq.serialize_element("coalesce")?;
-                if let serde_json::Value::Array(top) = &inner_val {
-                    for elem in top {
-                        seq.serialize_element(elem)?;
-                    }
-                } else {
-                    seq.serialize_element(&inner_val)?;
-                }
-                seq.end()
-            }
-            NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection::FeatureState(f0) => {
-                let mut elems = vec![serde_json::to_value(f0).map_err(serde::ser::Error::custom)?];
-                while elems.len() > 1 && elems.last().is_some_and(serde_json::Value::is_null) {
-                    elems.pop();
-                }
-                let mut seq = serializer.serialize_seq(None)?;
-                seq.serialize_element("feature-state")?;
-                for elem in &elems {
-                    seq.serialize_element(elem)?;
-                }
-                seq.end()
-            }
-            NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection::Get(f0, f1) => {
-                let mut elems = vec![
-                    serde_json::to_value(f0).map_err(serde::ser::Error::custom)?,
-                    serde_json::to_value(f1).map_err(serde::ser::Error::custom)?,
-                ];
-                while elems.len() > 1 && elems.last().is_some_and(serde_json::Value::is_null) {
-                    elems.pop();
-                }
-                let mut seq = serializer.serialize_seq(None)?;
-                seq.serialize_element("get")?;
-                for elem in &elems {
-                    seq.serialize_element(elem)?;
-                }
-                seq.end()
-            }
-            NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection::GlobalState(f0) => {
-                let mut elems = vec![serde_json::to_value(f0).map_err(serde::ser::Error::custom)?];
-                while elems.len() > 1 && elems.last().is_some_and(serde_json::Value::is_null) {
-                    elems.pop();
-                }
-                let mut seq = serializer.serialize_seq(None)?;
-                seq.serialize_element("global-state")?;
-                for elem in &elems {
-                    seq.serialize_element(elem)?;
-                }
-                seq.end()
-            }
-            NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection::Id => {
-                let mut elems = vec![];
-                while !elems.is_empty() && elems.last().is_some_and(serde_json::Value::is_null) {
-                    elems.pop();
-                }
-                let mut seq = serializer.serialize_seq(None)?;
-                seq.serialize_element("id")?;
-                for elem in &elems {
-                    seq.serialize_element(elem)?;
-                }
-                seq.end()
-            }
             NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection::Interpolate(inner) => {
                 let inner_val = serde_json::to_value(inner).map_err(serde::ser::Error::custom)?;
                 let mut seq = serializer.serialize_seq(None)?;
@@ -8553,117 +7659,6 @@ impl serde::Serialize for NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection
                 }
                 seq.end()
             }
-            NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection::Let(inner) => {
-                let inner_val = serde_json::to_value(inner).map_err(serde::ser::Error::custom)?;
-                let mut seq = serializer.serialize_seq(None)?;
-                seq.serialize_element("let")?;
-                if let serde_json::Value::Array(top) = &inner_val {
-                    for elem in top {
-                        if let serde_json::Value::Array(sub) = elem {
-                            if sub.is_empty() {
-                                // Empty Vec — nothing to flatten.
-                            } else if sub[0].is_array() {
-                                // An array-of-arrays is the Vec<(A,B)> — flatten it.
-                                for pair in sub {
-                                    if let serde_json::Value::Array(pair_elems) = pair {
-                                        for pe in pair_elems {
-                                            seq.serialize_element(pe)?;
-                                        }
-                                    } else {
-                                        seq.serialize_element(pair)?;
-                                    }
-                                }
-                            } else {
-                                // Plain array value (e.g. a sub-expression like ["zoom"]).
-                                seq.serialize_element(elem)?;
-                            }
-                        } else {
-                            seq.serialize_element(elem)?;
-                        }
-                    }
-                } else {
-                    seq.serialize_element(&inner_val)?;
-                }
-                seq.end()
-            }
-            NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection::Match(inner) => {
-                let inner_val = serde_json::to_value(inner).map_err(serde::ser::Error::custom)?;
-                let mut seq = serializer.serialize_seq(None)?;
-                seq.serialize_element("match")?;
-                if let serde_json::Value::Array(top) = &inner_val {
-                    for elem in top {
-                        if let serde_json::Value::Array(sub) = elem {
-                            if sub.is_empty() {
-                                // Empty Vec — nothing to flatten.
-                            } else if sub[0].is_array() {
-                                // An array-of-arrays is the Vec<(A,B)> — flatten it.
-                                for pair in sub {
-                                    if let serde_json::Value::Array(pair_elems) = pair {
-                                        for pe in pair_elems {
-                                            seq.serialize_element(pe)?;
-                                        }
-                                    } else {
-                                        seq.serialize_element(pair)?;
-                                    }
-                                }
-                            } else {
-                                // Plain array value (e.g. a sub-expression like ["zoom"]).
-                                seq.serialize_element(elem)?;
-                            }
-                        } else {
-                            seq.serialize_element(elem)?;
-                        }
-                    }
-                } else {
-                    seq.serialize_element(&inner_val)?;
-                }
-                seq.end()
-            }
-            NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection::Step(inner) => {
-                let inner_val = serde_json::to_value(inner).map_err(serde::ser::Error::custom)?;
-                let mut seq = serializer.serialize_seq(None)?;
-                seq.serialize_element("step")?;
-                if let serde_json::Value::Array(top) = &inner_val {
-                    for elem in top {
-                        if let serde_json::Value::Array(sub) = elem {
-                            if sub.is_empty() {
-                                // Empty Vec — nothing to flatten.
-                            } else if sub[0].is_array() {
-                                // An array-of-arrays is the Vec<(A,B)> — flatten it.
-                                for pair in sub {
-                                    if let serde_json::Value::Array(pair_elems) = pair {
-                                        for pe in pair_elems {
-                                            seq.serialize_element(pe)?;
-                                        }
-                                    } else {
-                                        seq.serialize_element(pair)?;
-                                    }
-                                }
-                            } else {
-                                // Plain array value (e.g. a sub-expression like ["zoom"]).
-                                seq.serialize_element(elem)?;
-                            }
-                        } else {
-                            seq.serialize_element(elem)?;
-                        }
-                    }
-                } else {
-                    seq.serialize_element(&inner_val)?;
-                }
-                seq.end()
-            }
-            NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection::Var(f0) => {
-                let mut elems = vec![serde_json::to_value(f0).map_err(serde::ser::Error::custom)?];
-                while elems.len() > 1 && elems.last().is_some_and(serde_json::Value::is_null) {
-                    elems.pop();
-                }
-                let mut seq = serializer.serialize_seq(None)?;
-                seq.serialize_element("var")?;
-                for elem in &elems {
-                    seq.serialize_element(elem)?;
-                }
-                seq.end()
-            }
         }
     }
 }
@@ -8675,7 +7670,7 @@ pub enum Object {
     /// Gets the value of a cluster property accumulated so far. Can only be used in the `clusterProperties` option of a clustered GeoJSON source.
     Accumulated,
     /// Retrieves an item from an array.
-    At(NumberLiteralOrNumberOrAnyAsUnion, ExprOrLiteral),
+    At(NumberLiteralOrNumberAsUnion, ExprOrLiteral),
     /// Selects the first output whose corresponding test condition evaluates to true, or the fallback value otherwise.
     ///
     ///  - [Create a hover effect](https://maplibre.org/maplibre-gl-js/docs/examples/create-a-hover-effect/)
@@ -8689,7 +7684,7 @@ pub enum Object {
     /// Retrieves a property value from the current feature's state. Returns null if the requested property is not present on the feature's state. A feature's state is not part of the GeoJSON or vector tile data, and must be set programmatically on each feature. When `source.promoteId` is not provided, features are identified by their `id` attribute, which must be an integer or a string that can be cast to an integer. When `source.promoteId` is provided, features are identified by their `promoteId` property, which may be a number, string, or any primitive data type. Note that ["feature-state"] can only be used with paint properties that support data-driven styling.
     ///
     ///  - [Create a hover effect](https://maplibre.org/maplibre-gl-js/docs/examples/create-a-hover-effect/)
-    FeatureState(StringLiteralOrStringOrAnyAsUnion),
+    FeatureState(StringLiteralOrStringAsUnion),
     /// Retrieves a property value from the current feature's properties, or from another object if a second argument is provided. Returns null if the requested property is missing.
     ///
     ///  - [Change the case of labels](https://maplibre.org/maplibre-gl-js/docs/examples/change-case-of-labels/)
@@ -8697,7 +7692,7 @@ pub enum Object {
     ///  - [Display HTML clusters with custom properties](https://maplibre.org/maplibre-gl-js/docs/examples/display-html-clusters-with-custom-properties/)
     ///
     ///  - [Extrude polygons for 3D indoor mapping](https://maplibre.org/maplibre-gl-js/docs/examples/extrude-polygons-for-3d-indoor-mapping/)
-    Get(StringLiteralOrStringOrAnyAsUnion, Option<Box<Object>>),
+    Get(StringLiteralOrStringAsUnion, Option<Box<Object>>),
     /// Retrieves a property value from global state that can be set with platform-specific APIs. Defaults can be provided using the [`state`](https://maplibre.org/maplibre-style-spec/root/#state) root property. Returns `null` if no value nor default value is set for the retrieved property.
     GlobalState(StringLiteral),
     /// Gets the feature's id, if it has one.
@@ -8719,8 +7714,8 @@ pub enum Object {
     /// Each label must be unique. If the input type does not match the type of the labels, the result will be the fallback value.
     Match(
         (
+            ExprOrLiteral,
             Vec<(
-                ExprOrLiteral,
                 StringOrNumberOrArrayOfStringOrArrayOfNumberAsUnion,
                 ExprOrLiteral,
             )>,
@@ -8738,7 +7733,7 @@ pub enum Object {
     ///  - [Create and style clusters](https://maplibre.org/maplibre-gl-js/docs/examples/create-and-style-clusters/)
     Step(
         (
-            NumberLiteralOrNumberOrAnyAsUnion,
+            NumberLiteralOrNumberAsUnion,
             ExprOrLiteral,
             Vec<(NumberLiteral, ExprOrLiteral)>,
         ),
@@ -8875,35 +7870,33 @@ impl<'de> serde::de::Visitor<'de> for ObjectVisitor {
                 Ok(Object::Literal(json_object))
             }
             "match" => {
-                let mut inputs = Vec::new();
                 let mut rest: Vec<serde_json::Value> = Vec::new();
                 while let Some(v) = seq.next_element()? {
                     rest.push(v);
                 }
-                if rest.is_empty() {
+                if rest.len() < 2 {
+                    return Err(serde::de::Error::custom("Object::Match: too few arguments"));
+                }
+                if !rest.len().is_multiple_of(2) {
                     return Err(serde::de::Error::custom(
-                        "{name}::{variant_name}: too few arguments",
+                        "Object::Match: expected an even number of arguments after operator (input + label/output pairs + fallback)",
                     ));
                 }
-                if !(rest.len() - 1).is_multiple_of(3) {
-                    return Err(serde::de::Error::custom(
-                        "Object::Match: malformed template/suffix layout",
-                    ));
+                let fallback_v = rest.pop().unwrap();
+                let input: ExprOrLiteral =
+                    serde_json::from_value(rest.remove(0)).map_err(serde::de::Error::custom)?;
+                let mut pairs = Vec::new();
+                for chunk in rest.chunks_exact(2) {
+                    let label_i: StringOrNumberOrArrayOfStringOrArrayOfNumberAsUnion =
+                        serde_json::from_value(chunk[0].clone())
+                            .map_err(serde::de::Error::custom)?;
+                    let output_i: ExprOrLiteral = serde_json::from_value(chunk[1].clone())
+                        .map_err(serde::de::Error::custom)?;
+                    pairs.push((label_i, output_i));
                 }
-                let inputs_len = (rest.len() - 1) / 3;
-                for i in 0..inputs_len {
-                    let input = serde_json::from_value(rest[i * 3].clone())
-                        .map_err(serde::de::Error::custom)?;
-                    let label_i = serde_json::from_value(rest[i * 3 + 1].clone())
-                        .map_err(serde::de::Error::custom)?;
-                    let output_i = serde_json::from_value(rest[i * 3 + 2].clone())
-                        .map_err(serde::de::Error::custom)?;
-                    let element = (input, label_i, output_i);
-                    inputs.push(element);
-                }
-                let fallback = serde_json::from_value(rest[inputs_len * 3].clone())
-                    .map_err(serde::de::Error::custom)?;
-                Ok(Object::Match((inputs, fallback)))
+                let fallback: ExprOrLiteral =
+                    serde_json::from_value(fallback_v).map_err(serde::de::Error::custom)?;
+                Ok(Object::Match((input, pairs, fallback)))
             }
             "object" => {
                 let mut inputs = Vec::new();
@@ -8914,7 +7907,7 @@ impl<'de> serde::de::Visitor<'de> for ObjectVisitor {
             }
             "properties" => Ok(Object::Properties),
             "step" => {
-                let input: NumberLiteralOrNumberOrAnyAsUnion = visit_seq_field(&mut seq, "input")?;
+                let input: NumberLiteralOrNumberAsUnion = visit_seq_field(&mut seq, "input")?;
                 let output_0: ExprOrLiteral = visit_seq_field(&mut seq, "output_0")?;
                 let mut stops = Vec::new();
                 while let Some(stop_input_i) = seq.next_element::<NumberLiteral>()? {
@@ -9243,7 +8236,7 @@ pub enum String {
     /// Gets the value of a cluster property accumulated so far. Can only be used in the `clusterProperties` option of a clustered GeoJSON source.
     Accumulated,
     /// Retrieves an item from an array.
-    At(NumberLiteralOrNumberOrAnyAsUnion, ExprOrLiteral),
+    At(NumberLiteralOrNumberAsUnion, ExprOrLiteral),
     /// Selects the first output whose corresponding test condition evaluates to true, or the fallback value otherwise.
     ///
     ///  - [Create a hover effect](https://maplibre.org/maplibre-gl-js/docs/examples/create-a-hover-effect/)
@@ -9267,11 +8260,11 @@ pub enum String {
     /// Returns the input string converted to lowercase. Follows the Unicode Default Case Conversion algorithm and the locale-insensitive case mappings in the Unicode Character Database.
     ///
     ///  - [Change the case of labels](https://maplibre.org/maplibre-gl-js/docs/examples/change-case-of-labels/)
-    Downcase(StringLiteralOrStringOrAnyAsUnion),
+    Downcase(StringLiteralOrStringAsUnion),
     /// Retrieves a property value from the current feature's state. Returns null if the requested property is not present on the feature's state. A feature's state is not part of the GeoJSON or vector tile data, and must be set programmatically on each feature. When `source.promoteId` is not provided, features are identified by their `id` attribute, which must be an integer or a string that can be cast to an integer. When `source.promoteId` is provided, features are identified by their `promoteId` property, which may be a number, string, or any primitive data type. Note that ["feature-state"] can only be used with paint properties that support data-driven styling.
     ///
     ///  - [Create a hover effect](https://maplibre.org/maplibre-gl-js/docs/examples/create-a-hover-effect/)
-    FeatureState(StringLiteralOrStringOrAnyAsUnion),
+    FeatureState(StringLiteralOrStringAsUnion),
     /// Returns the feature's simple geometry type: `Point`, `LineString`, or `Polygon`. `MultiPoint`, `MultiLineString`, and `MultiPolygon` are returned as `Point`, `LineString`, and `Polygon`, respectively.
     GeometryType,
     /// Retrieves a property value from the current feature's properties, or from another object if a second argument is provided. Returns null if the requested property is missing.
@@ -9281,7 +8274,7 @@ pub enum String {
     ///  - [Display HTML clusters with custom properties](https://maplibre.org/maplibre-gl-js/docs/examples/display-html-clusters-with-custom-properties/)
     ///
     ///  - [Extrude polygons for 3D indoor mapping](https://maplibre.org/maplibre-gl-js/docs/examples/extrude-polygons-for-3d-indoor-mapping/)
-    Get(StringLiteralOrStringOrAnyAsUnion, Option<Object>),
+    Get(StringLiteralOrStringAsUnion, Option<Object>),
     /// Retrieves a property value from global state that can be set with platform-specific APIs. Defaults can be provided using the [`state`](https://maplibre.org/maplibre-style-spec/root/#state) root property. Returns `null` if no value nor default value is set for the retrieved property.
     GlobalState(StringLiteral),
     /// Gets the feature's id, if it has one.
@@ -9299,8 +8292,8 @@ pub enum String {
     /// Each label must be unique. If the input type does not match the type of the labels, the result will be the fallback value.
     Match(
         (
+            ExprOrLiteral,
             Vec<(
-                ExprOrLiteral,
                 StringOrNumberOrArrayOfStringOrArrayOfNumberAsUnion,
                 ExprOrLiteral,
             )>,
@@ -9311,7 +8304,7 @@ pub enum String {
     ///
     ///  - [Display HTML clusters with custom properties](https://maplibre.org/maplibre-gl-js/docs/examples/display-html-clusters-with-custom-properties/)
     NumberFormat(
-        NumberLiteralOrNumberOrAnyAsUnion,
+        NumberLiteralOrNumberAsUnion,
         #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_map))]
         serde_json::Map<std::string::String, serde_json::Value>,
     ),
@@ -9319,9 +8312,9 @@ pub enum String {
     ResolvedLocale(Collator),
     /// Returns a subarray from an array or a substring from a string from a specified start index, or between a start index and an end index if set. The return value is inclusive of the start index but not of the end index. In a string, a UTF-16 surrogate pair counts as a single position.
     Slice(
-        StringLiteralOrStringOrAnyAsUnion,
-        NumberLiteralOrNumberOrAnyAsUnion,
-        Option<NumberLiteralOrNumberOrAnyAsUnion>,
+        StringLiteralOrStringAsUnion,
+        NumberLiteralOrNumberAsUnion,
+        Option<NumberLiteralOrNumberAsUnion>,
     ),
     /// Produces discrete, stepped results by evaluating a piecewise-constant function defined by pairs of input and output values ("stops"). The `input` may be any numeric expression (e.g., `["get", "population"]`). Stop inputs must be numeric literals in strictly ascending order.
     ///
@@ -9330,7 +8323,7 @@ pub enum String {
     ///  - [Create and style clusters](https://maplibre.org/maplibre-gl-js/docs/examples/create-and-style-clusters/)
     Step(
         (
-            NumberLiteralOrNumberOrAnyAsUnion,
+            NumberLiteralOrNumberAsUnion,
             ExprOrLiteral,
             Vec<(NumberLiteral, ExprOrLiteral)>,
         ),
@@ -9346,7 +8339,7 @@ pub enum String {
     /// Returns the input string converted to uppercase. Follows the Unicode Default Case Conversion algorithm and the locale-insensitive case mappings in the Unicode Character Database.
     ///
     ///  - [Change the case of labels](https://maplibre.org/maplibre-gl-js/docs/examples/change-case-of-labels/)
-    Upcase(StringLiteralOrStringOrAnyAsUnion),
+    Upcase(StringLiteralOrStringAsUnion),
     /// References variable bound using `let`.
     ///
     ///  - [Visualize population density](https://maplibre.org/maplibre-gl-js/docs/examples/visualize-population-density/)
@@ -9487,35 +8480,33 @@ impl<'de> serde::de::Visitor<'de> for StringVisitor {
                 Ok(String::Let((inputs, expression)))
             }
             "match" => {
-                let mut inputs = Vec::new();
                 let mut rest: Vec<serde_json::Value> = Vec::new();
                 while let Some(v) = seq.next_element()? {
                     rest.push(v);
                 }
-                if rest.is_empty() {
+                if rest.len() < 2 {
+                    return Err(serde::de::Error::custom("String::Match: too few arguments"));
+                }
+                if !rest.len().is_multiple_of(2) {
                     return Err(serde::de::Error::custom(
-                        "{name}::{variant_name}: too few arguments",
+                        "String::Match: expected an even number of arguments after operator (input + label/output pairs + fallback)",
                     ));
                 }
-                if !(rest.len() - 1).is_multiple_of(3) {
-                    return Err(serde::de::Error::custom(
-                        "String::Match: malformed template/suffix layout",
-                    ));
+                let fallback_v = rest.pop().unwrap();
+                let input: ExprOrLiteral =
+                    serde_json::from_value(rest.remove(0)).map_err(serde::de::Error::custom)?;
+                let mut pairs = Vec::new();
+                for chunk in rest.chunks_exact(2) {
+                    let label_i: StringOrNumberOrArrayOfStringOrArrayOfNumberAsUnion =
+                        serde_json::from_value(chunk[0].clone())
+                            .map_err(serde::de::Error::custom)?;
+                    let output_i: ExprOrLiteral = serde_json::from_value(chunk[1].clone())
+                        .map_err(serde::de::Error::custom)?;
+                    pairs.push((label_i, output_i));
                 }
-                let inputs_len = (rest.len() - 1) / 3;
-                for i in 0..inputs_len {
-                    let input = serde_json::from_value(rest[i * 3].clone())
-                        .map_err(serde::de::Error::custom)?;
-                    let label_i = serde_json::from_value(rest[i * 3 + 1].clone())
-                        .map_err(serde::de::Error::custom)?;
-                    let output_i = serde_json::from_value(rest[i * 3 + 2].clone())
-                        .map_err(serde::de::Error::custom)?;
-                    let element = (input, label_i, output_i);
-                    inputs.push(element);
-                }
-                let fallback = serde_json::from_value(rest[inputs_len * 3].clone())
-                    .map_err(serde::de::Error::custom)?;
-                Ok(String::Match((inputs, fallback)))
+                let fallback: ExprOrLiteral =
+                    serde_json::from_value(fallback_v).map_err(serde::de::Error::custom)?;
+                Ok(String::Match((input, pairs, fallback)))
             }
             "number-format" => {
                 let input = visit_seq_field(&mut seq, "input")?;
@@ -9533,7 +8524,7 @@ impl<'de> serde::de::Visitor<'de> for StringVisitor {
                 Ok(String::Slice(string, start_index, end_index))
             }
             "step" => {
-                let input: NumberLiteralOrNumberOrAnyAsUnion = visit_seq_field(&mut seq, "input")?;
+                let input: NumberLiteralOrNumberAsUnion = visit_seq_field(&mut seq, "input")?;
                 let output_0: ExprOrLiteral = visit_seq_field(&mut seq, "output_0")?;
                 let mut stops = Vec::new();
                 while let Some(stop_input_i) = seq.next_element::<NumberLiteral>()? {

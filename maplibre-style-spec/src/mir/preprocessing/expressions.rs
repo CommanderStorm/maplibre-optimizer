@@ -153,7 +153,10 @@ fn build_by_output_type(
     if let Some(any_group) = by_output_type.get("Any").cloned() {
         let concrete_types: Vec<(String, MirParameterType)> = possible_expressions
             .iter()
-            .filter(|(k, _)| k.as_str() != "Any")
+            // Compound "or" types (e.g. `ColorOrArrayOfColor`) already have an `AnyExpr`
+            // catch-all variant; expanding `Any` operators into them too would create
+            // JSON-identical variants that break `#[serde(untagged)]` round-trips.
+            .filter(|(k, _)| k.as_str() != "Any" && !k.contains("Or"))
             .map(|(k, v)| (k.clone(), v.clone()))
             .collect();
 
