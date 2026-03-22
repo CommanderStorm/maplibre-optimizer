@@ -19,7 +19,7 @@ pub fn generate(scope: &mut Scope, name: &str, field: &MirFormattedTextField) {
         .impl_trait("Default")
         .new_fn("default")
         .ret("Self")
-        .line(format!("Self(\"{default}\".to_string())"));
+        .line(format!("Self({default:?}.to_string())"));
     generate_test_from_example_if_present(scope, name, field.meta.example.as_ref());
 }
 
