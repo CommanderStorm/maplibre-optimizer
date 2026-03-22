@@ -22,6 +22,14 @@ pub fn generate_literals(scope: &mut Scope) {
         .tuple_field("std::string::String");
 
     scope.raw(
+        r"impl From<serde_json::Number> for NumberLiteral {
+    fn from(n: serde_json::Number) -> Self {
+        Self(n)
+    }
+}",
+    );
+
+    scope.raw(
         r"impl From<std::string::String> for StringLiteral {
     fn from(s: std::string::String) -> Self {
         Self(s)

@@ -853,6 +853,14 @@ fn generate_syntax_enum_body(
             .doc("A polymorphic expression (`case`, `match`, `get`, …) in a string position.")
             .tuple("Box<Any>");
     }
+    if name == "Number" {
+        enu.new_variant("Literal")
+            .doc("A numeric literal value.")
+            .tuple("NumberLiteral");
+        enu.new_variant("AnyExpr")
+            .doc("A polymorphic expression (`case`, `match`, `get`, …) in a numeric position.")
+            .tuple("Box<Any>");
+    }
 
     variadic_row_struct_names
 }
@@ -869,9 +877,25 @@ fn box_recursive_types(parent_syntax_enum: &str, rust_type: &str) -> String {
     if t == parent_syntax_enum {
         return format!("Box<{t}>");
     }
-    // `Number::IndexOf` carries `Any` operands; `Any` can nest `Number` again.
-    if parent_syntax_enum == "Number" && t == "Any" {
-        return "Box<Any>".to_string();
+    // Cross-type recursion: expression enums that can mutually contain each other
+    // need `Box` to break the cycle.
+    // Expression enums can mutually contain each other (e.g. Number ↔ String via
+    // NumberFormat/Slice, Number ↔ Array via Length/Slice, Array ↔ Color via ToRgba).
+    // Box any expression enum type when nested inside a different expression enum.
+    const EXPR_ENUMS: &[&str] = &[
+        "Any",
+        "Boolean",
+        "Number",
+        "String",
+        "Color",
+        "Array",
+        "Collator",
+        "Formatted",
+        "Image",
+        "Object",
+    ];
+    if EXPR_ENUMS.contains(&parent_syntax_enum) && EXPR_ENUMS.contains(&t) {
+        return format!("Box<{t}>");
     }
     if let Some(rest) = t.strip_prefix("Vec<").and_then(|s| s.strip_suffix('>')) {
         let rest = rest.trim();
@@ -1196,13 +1220,9 @@ fn generate_parameter_variant(scope: &mut Scope, param: &MirParameterType) -> St
         MirParameterType::Expression(e) => match e.as_ref() {
             // `any` in the style spec means "expression or JSON literal", not the [`Any`] syntax enum.
             MirExpression::Any => "ExprOrLiteral".to_string(),
-            MirExpression::Number => generate_expression_any_of(
-                scope,
-                &[
-                    MirParameterType::Literal(MirLiteral::Number),
-                    MirParameterType::Expression(Box::new(MirExpression::Number)),
-                ],
-            ),
+            // `Number` now has `Literal(NumberLiteral)` and `AnyExpr(Box<Any>)` variants directly,
+            // so numeric parameter positions just use `Number` — no union wrapper needed.
+            MirExpression::Number => "Number".to_string(),
             // `String` now has `Literal(StringLiteral)` and `AnyExpr(Box<Any>)` variants directly,
             // so string parameter positions just use `String` — no union wrapper needed.
             MirExpression::String => "String".to_string(),
@@ -1488,14 +1508,10 @@ fn generate_syntax_enum_deserializer(
     } else {
         None
     };
+    // Number::Minus operands are just `Number` now (which has Literal + AnyExpr).
+    // Box<Number> is needed for indirection since it's self-recursive.
     let number_minus_union_ty = if name == "Number" {
-        Some(generate_expression_any_of(
-            scope,
-            &[
-                MirParameterType::Literal(MirLiteral::Number),
-                MirParameterType::Expression(Box::new(MirExpression::Number)),
-            ],
-        ))
+        Some("Box<Number>".to_string())
     } else {
         None
     };
@@ -1572,7 +1588,7 @@ fn generate_syntax_enum_deserializer(
     }
 
     let variants = values.keys().cloned().collect::<Vec<_>>();
-    if matches!(name, "Boolean" | "String") {
+    if matches!(name, "Boolean" | "String" | "Number") {
         // Unknown operators may be polymorphic Any expressions (case, match, get, …).
         // Collect remaining elements, reconstruct the full array, and try parsing as Any.
         visit_seq.line("_ => {");
@@ -1598,9 +1614,9 @@ fn generate_syntax_enum_deserializer(
 fn generate_visitor<'a>(scope: &'a mut Scope, name: &str, example: &Value) -> &'a mut Impl {
     let visitor_name = format!("{name}Visitor");
 
-    // Boolean and String use `deserialize_any` so bare literals map to their `Literal` variant.
+    // Boolean, String, and Number use `deserialize_any` so bare literals map to `Literal`.
     // Other expression enums use `deserialize_seq` (only arrays).
-    let deserialize_method = if matches!(name, "Boolean" | "String") {
+    let deserialize_method = if matches!(name, "Boolean" | "String" | "Number") {
         "deserialize_any"
     } else {
         "deserialize_seq"
@@ -1642,6 +1658,28 @@ fn generate_visitor<'a>(scope: &'a mut Scope, name: &str, example: &Value) -> &'
             .arg("v", "bool")
             .ret("Result<Self::Value, E>")
             .line("Ok(Boolean::Literal(v))");
+    }
+
+    // Number: accept bare numeric values as Literal variant.
+    if name == "Number" {
+        vis.new_fn("visit_i64")
+            .generic("E: serde::de::Error")
+            .arg_self()
+            .arg("v", "i64")
+            .ret("Result<Self::Value, E>")
+            .line("Ok(Number::Literal(NumberLiteral::from(serde_json::Number::from(v))))");
+        vis.new_fn("visit_u64")
+            .generic("E: serde::de::Error")
+            .arg_self()
+            .arg("v", "u64")
+            .ret("Result<Self::Value, E>")
+            .line("Ok(Number::Literal(NumberLiteral::from(serde_json::Number::from(v))))");
+        vis.new_fn("visit_f64")
+            .generic("E: serde::de::Error")
+            .arg_self()
+            .arg("v", "f64")
+            .ret("Result<Self::Value, E>")
+            .line("serde_json::Number::from_f64(v).map(|n| Number::Literal(NumberLiteral::from(n))).ok_or_else(|| serde::de::Error::custom(\"non-finite f64\"))");
     }
 
     // String: accept bare string values as Literal variant.
@@ -1989,6 +2027,10 @@ fn generate_syntax_enum_serializer(
     if name == "String" {
         arms.push_str("            String::Literal(s) => s.serialize(serializer),\n");
         arms.push_str("            String::AnyExpr(a) => a.serialize(serializer),\n");
+    }
+    if name == "Number" {
+        arms.push_str("            Number::Literal(n) => n.serialize(serializer),\n");
+        arms.push_str("            Number::AnyExpr(a) => a.serialize(serializer),\n");
     }
 
     scope.raw(format!(

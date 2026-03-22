@@ -327,6 +327,12 @@ mod tests {
         #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
         pub struct StringLiteral(std::string::String);
 
+        impl From<serde_json::Number> for NumberLiteral {
+            fn from(n: serde_json::Number) -> Self {
+                Self(n)
+            }
+        }
+
         impl From<std::string::String> for StringLiteral {
             fn from(s: std::string::String) -> Self {
                 Self(s)
@@ -575,6 +581,12 @@ mod tests {
         #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
         pub struct StringLiteral(std::string::String);
 
+        impl From<serde_json::Number> for NumberLiteral {
+            fn from(n: serde_json::Number) -> Self {
+                Self(n)
+            }
+        }
+
         impl From<std::string::String> for StringLiteral {
             fn from(s: std::string::String) -> Self {
                 Self(s)
@@ -795,6 +807,12 @@ mod tests {
         #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
         #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
         pub struct StringLiteral(std::string::String);
+
+        impl From<serde_json::Number> for NumberLiteral {
+            fn from(n: serde_json::Number) -> Self {
+                Self(n)
+            }
+        }
 
         impl From<std::string::String> for StringLiteral {
             fn from(s: std::string::String) -> Self {

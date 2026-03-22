@@ -195,107 +195,62 @@ impl<'de> serde::Deserialize<'de>
     }
 }
 
-/// Either of the below variants
-#[derive(PartialEq, Debug, Clone)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum NumberLiteralOrNumberOrAnyAsUnion {
-    NumberLiteral(NumberLiteral),
-    Number(Box<Number>),
-    Any(Box<Any>),
-}
-
-impl serde::Serialize for NumberLiteralOrNumberOrAnyAsUnion {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        match self {
-            Self::NumberLiteral(v) => v.serialize(serializer),
-            Self::Number(v) => v.serialize(serializer),
-            Self::Any(v) => v.serialize(serializer),
-        }
-    }
-}
-
-impl<'de> serde::Deserialize<'de> for NumberLiteralOrNumberOrAnyAsUnion {
-    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
-        let mut errors: Vec<(&str, std::string::String)> = Vec::new();
-        match <NumberLiteral as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::NumberLiteral(v)),
-            Err(e) => errors.push(("NumberLiteral", e.to_string())),
-        }
-        match <Box<Number> as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Number(v)),
-            Err(e) => errors.push(("Number", e.to_string())),
-        }
-        match <Box<Any> as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Any(v)),
-            Err(e) => errors.push(("Any", e.to_string())),
-        }
-
-        let details: Vec<std::string::String> =
-            errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
-        Err(serde::de::Error::custom(format!(
-            "NumberLiteralOrNumberOrAnyAsUnion: no variant matched. Expected NumberLiteral(NumberLiteral) | Number(Box<Number>) | Any(Box<Any>). Errors: [{}]",
-            details.join("; ")
-        )))
-    }
-}
-
 /// "Any"
 #[derive(PartialEq, Debug, Clone)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum Any {
     /// Gets the value of a cluster property accumulated so far. Can only be used in the `clusterProperties` option of a clustered GeoJSON source.
-    Accumulated,
-    /// Retrieves an item from an array.
-    At(NumberLiteralOrNumberOrAnyAsUnion, ExprOrLiteral),
-    /// Selects the first output whose corresponding test condition evaluates to true, or the fallback value otherwise.
-    /// 
-    ///  - [Create a hover effect](https://maplibre.org/maplibre-gl-js/docs/examples/create-a-hover-effect/)
-    /// 
-    ///  - [Display HTML clusters with custom properties](https://maplibre.org/maplibre-gl-js/docs/examples/display-html-clusters-with-custom-properties/)
-    Case((Vec<(Boolean,ExprOrLiteral)>,ExprOrLiteral)),
-    /// Evaluates each expression in turn until the first non-null value is obtained, and returns that value.
-    /// 
-    ///  - [Use a fallback image](https://maplibre.org/maplibre-gl-js/docs/examples/use-a-fallback-image/)
-    Coalesce(Vec<ExprOrLiteral>),
-    /// Retrieves a property value from the current feature's state. Returns null if the requested property is not present on the feature's state. A feature's state is not part of the GeoJSON or vector tile data, and must be set programmatically on each feature. When `source.promoteId` is not provided, features are identified by their `id` attribute, which must be an integer or a string that can be cast to an integer. When `source.promoteId` is provided, features are identified by their `promoteId` property, which may be a number, string, or any primitive data type. Note that ["feature-state"] can only be used with paint properties that support data-driven styling.
-    /// 
-    ///  - [Create a hover effect](https://maplibre.org/maplibre-gl-js/docs/examples/create-a-hover-effect/)
-    FeatureState(String),
-    /// Retrieves a property value from the current feature's properties, or from another object if a second argument is provided. Returns null if the requested property is missing.
-    /// 
-    ///  - [Change the case of labels](https://maplibre.org/maplibre-gl-js/docs/examples/change-case-of-labels/)
-    /// 
-    ///  - [Display HTML clusters with custom properties](https://maplibre.org/maplibre-gl-js/docs/examples/display-html-clusters-with-custom-properties/)
-    /// 
-    ///  - [Extrude polygons for 3D indoor mapping](https://maplibre.org/maplibre-gl-js/docs/examples/extrude-polygons-for-3d-indoor-mapping/)
-    Get(String, Option<Object>),
-    /// Retrieves a property value from global state that can be set with platform-specific APIs. Defaults can be provided using the [`state`](https://maplibre.org/maplibre-style-spec/root/#state) root property. Returns `null` if no value nor default value is set for the retrieved property.
-    GlobalState(StringLiteral),
-    /// Gets the feature's id, if it has one.
-    Id,
-    /// Binds expressions to named variables, which can then be referenced in the result expression using `["var", "variable_name"]`.
-    /// 
-    ///  - [Visualize population density](https://maplibre.org/maplibre-gl-js/docs/examples/visualize-population-density/)
-    Let((Vec<(StringLiteral,ExprOrLiteral)>,ExprOrLiteral)),
-    /// Selects the output whose label value matches the input value, or the fallback value if no match is found. The input can be any expression (e.g. `["get", "building_type"]`). Each label must be either:
-    /// 
-    ///  - a single literal value; or
-    /// 
-    ///  - an array of literal values, whose values must be all strings or all numbers (e.g. `[100, 101]` or `["c", "b"]`). The input matches if any of the values in the array matches, similar to the `"in"` operator.
-    /// 
-    /// Each label must be unique. If the input type does not match the type of the labels, the result will be the fallback value.
-    Match((ExprOrLiteral, Vec<(StringLiteralOrNumberLiteralOrArrayOfStringLiteralOrArrayOfNumberLiteralOrAnyAsUnion,ExprOrLiteral)>, ExprOrLiteral)),
-    /// Produces discrete, stepped results by evaluating a piecewise-constant function defined by pairs of input and output values ("stops"). The `input` may be any numeric expression (e.g., `["get", "population"]`). Stop inputs must be numeric literals in strictly ascending order.
-    /// 
-    /// Returns the output value of the stop just less than the input, or the first output if the input is less than the first stop.
-    /// 
-    ///  - [Create and style clusters](https://maplibre.org/maplibre-gl-js/docs/examples/create-and-style-clusters/)
-    Step((NumberLiteralOrNumberOrAnyAsUnion,ExprOrLiteral,Vec<(NumberLiteral,ExprOrLiteral)>)),
-    /// References variable bound using `let`.
-    /// 
-    ///  - [Visualize population density](https://maplibre.org/maplibre-gl-js/docs/examples/visualize-population-density/)
-    Var(StringLiteral),
+Accumulated,
+/// Retrieves an item from an array.
+At(Box<Number>, ExprOrLiteral),
+/// Selects the first output whose corresponding test condition evaluates to true, or the fallback value otherwise.
+/// 
+///  - [Create a hover effect](https://maplibre.org/maplibre-gl-js/docs/examples/create-a-hover-effect/)
+/// 
+///  - [Display HTML clusters with custom properties](https://maplibre.org/maplibre-gl-js/docs/examples/display-html-clusters-with-custom-properties/)
+Case((Vec<(Box<Boolean>,ExprOrLiteral)>,ExprOrLiteral)),
+/// Evaluates each expression in turn until the first non-null value is obtained, and returns that value.
+/// 
+///  - [Use a fallback image](https://maplibre.org/maplibre-gl-js/docs/examples/use-a-fallback-image/)
+Coalesce(Vec<ExprOrLiteral>),
+/// Retrieves a property value from the current feature's state. Returns null if the requested property is not present on the feature's state. A feature's state is not part of the GeoJSON or vector tile data, and must be set programmatically on each feature. When `source.promoteId` is not provided, features are identified by their `id` attribute, which must be an integer or a string that can be cast to an integer. When `source.promoteId` is provided, features are identified by their `promoteId` property, which may be a number, string, or any primitive data type. Note that ["feature-state"] can only be used with paint properties that support data-driven styling.
+/// 
+///  - [Create a hover effect](https://maplibre.org/maplibre-gl-js/docs/examples/create-a-hover-effect/)
+FeatureState(Box<String>),
+/// Retrieves a property value from the current feature's properties, or from another object if a second argument is provided. Returns null if the requested property is missing.
+/// 
+///  - [Change the case of labels](https://maplibre.org/maplibre-gl-js/docs/examples/change-case-of-labels/)
+/// 
+///  - [Display HTML clusters with custom properties](https://maplibre.org/maplibre-gl-js/docs/examples/display-html-clusters-with-custom-properties/)
+/// 
+///  - [Extrude polygons for 3D indoor mapping](https://maplibre.org/maplibre-gl-js/docs/examples/extrude-polygons-for-3d-indoor-mapping/)
+Get(Box<String>, Option<Box<Object>>),
+/// Retrieves a property value from global state that can be set with platform-specific APIs. Defaults can be provided using the [`state`](https://maplibre.org/maplibre-style-spec/root/#state) root property. Returns `null` if no value nor default value is set for the retrieved property.
+GlobalState(StringLiteral),
+/// Gets the feature's id, if it has one.
+Id,
+/// Binds expressions to named variables, which can then be referenced in the result expression using `["var", "variable_name"]`.
+/// 
+///  - [Visualize population density](https://maplibre.org/maplibre-gl-js/docs/examples/visualize-population-density/)
+Let((Vec<(StringLiteral,ExprOrLiteral)>,ExprOrLiteral)),
+/// Selects the output whose label value matches the input value, or the fallback value if no match is found. The input can be any expression (e.g. `["get", "building_type"]`). Each label must be either:
+/// 
+///  - a single literal value; or
+/// 
+///  - an array of literal values, whose values must be all strings or all numbers (e.g. `[100, 101]` or `["c", "b"]`). The input matches if any of the values in the array matches, similar to the `"in"` operator.
+/// 
+/// Each label must be unique. If the input type does not match the type of the labels, the result will be the fallback value.
+Match((ExprOrLiteral, Vec<(StringLiteralOrNumberLiteralOrArrayOfStringLiteralOrArrayOfNumberLiteralOrAnyAsUnion,ExprOrLiteral)>, ExprOrLiteral)),
+/// Produces discrete, stepped results by evaluating a piecewise-constant function defined by pairs of input and output values ("stops"). The `input` may be any numeric expression (e.g., `["get", "population"]`). Stop inputs must be numeric literals in strictly ascending order.
+/// 
+/// Returns the output value of the stop just less than the input, or the first output if the input is less than the first stop.
+/// 
+///  - [Create and style clusters](https://maplibre.org/maplibre-gl-js/docs/examples/create-and-style-clusters/)
+Step((Box<Number>,ExprOrLiteral,Vec<(NumberLiteral,ExprOrLiteral)>)),
+/// References variable bound using `let`.
+/// 
+///  - [Visualize population density](https://maplibre.org/maplibre-gl-js/docs/examples/visualize-population-density/)
+Var(StringLiteral),
 }
 
 impl<'de> serde::Deserialize<'de> for Any {
@@ -447,7 +402,7 @@ impl<'de> serde::de::Visitor<'de> for AnyVisitor {
                 Ok(Any::Match((input, pairs, fallback)))
             }
             "step" => {
-                let input: NumberLiteralOrNumberOrAnyAsUnion = visit_seq_field(&mut seq, "input")?;
+                let input: Box<Number> = visit_seq_field(&mut seq, "input")?;
                 let output_0: ExprOrLiteral = visit_seq_field(&mut seq, "output_0")?;
                 let mut stops = Vec::new();
                 while let Some(stop_input_i) = seq.next_element::<NumberLiteral>()? {
@@ -948,11 +903,7 @@ pub enum Array {
     ///  - [Display and style rich text labels](https://maplibre.org/maplibre-gl-js/docs/examples/display-and-style-rich-text-labels/)
     Literal(JSONArrayLiteral),
     /// Returns a subarray from an array or a substring from a string from a specified start index, or between a start index and an end index if set. The return value is inclusive of the start index but not of the end index. In a string, a UTF-16 surrogate pair counts as a single position.
-    Slice(
-        ExprOrLiteral,
-        NumberLiteralOrNumberOrAnyAsUnion,
-        Option<NumberLiteralOrNumberOrAnyAsUnion>,
-    ),
+    Slice(ExprOrLiteral, Box<Number>, Option<Box<Number>>),
     /// Returns a four-element array containing the input color's red, green, blue, and alpha components, in that order.
     ToRgba(StringLiteralOrColorOrAnyAsUnion),
 }
@@ -1309,13 +1260,13 @@ pub enum Boolean {
     /// Tests for the presence of a property value in the current feature's properties, or from another object if a second argument is provided.
     ///
     ///  - [Create and style clusters](https://maplibre.org/maplibre-gl-js/docs/examples/create-and-style-clusters/)
-    Has(String, Option<Object>),
+    Has(Box<String>, Option<Box<Object>>),
     /// Determines whether an item exists in an array or a substring exists in a string.
     ///
     ///  - [Measure distances](https://maplibre.org/maplibre-gl-js/docs/examples/measure-distances/)
     In(ExprOrLiteral, ExprOrLiteral),
     /// Returns `true` if the input string is expected to render legibly. Returns `false` if the input string contains sections that cannot be rendered without potential loss of meaning (e.g. Indic scripts that require complex text shaping, or right-to-left scripts if the `mapbox-gl-rtl-text` plugin is not in use in MapLibre GL JS).
-    IsSupportedScript(String),
+    IsSupportedScript(Box<String>),
     /// Converts the input value to a boolean. The result is `false` when the input is an empty string, 0, `false`, `null`, or `NaN`; otherwise it is `true`.
     To(ExprOrLiteral),
     /// Returns `true` if the evaluated feature is fully contained inside a boundary of the input geometry, `false` otherwise. The input value can be a valid GeoJSON of type `Polygon`, `MultiPolygon`, `Feature`, or `FeatureCollection`. Supported features for evaluation:
@@ -1838,18 +1789,9 @@ impl serde::Serialize for Collator {
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum Color {
     /// Creates a color value from red, green, and blue components, which must range between 0 and 255, and an alpha component of 1. If any component is out of range, the expression is an error.
-    Rgb(
-        NumberLiteralOrNumberOrAnyAsUnion,
-        NumberLiteralOrNumberOrAnyAsUnion,
-        NumberLiteralOrNumberOrAnyAsUnion,
-    ),
+    Rgb(Box<Number>, Box<Number>, Box<Number>),
     /// Creates a color value from red, green, blue components, which must range between 0 and 255, and an alpha component which must range between zero and one. If any component is out of range, the expression is an error.
-    Rgba(
-        NumberLiteralOrNumberOrAnyAsUnion,
-        NumberLiteralOrNumberOrAnyAsUnion,
-        NumberLiteralOrNumberOrAnyAsUnion,
-        NumberLiteralOrNumberOrAnyAsUnion,
-    ),
+    Rgba(Box<Number>, Box<Number>, Box<Number>, Box<Number>),
     /// Converts the input value to a color. If multiple values are provided, each one is evaluated in order until the first successful conversion is obtained. If none of the inputs can be converted, the expression is an error.
     ///
     ///  - [Visualize population density](https://maplibre.org/maplibre-gl-js/docs/examples/visualize-population-density/)
@@ -2036,7 +1978,7 @@ pub enum ColorOrArrayOfColor {
     InterpolateHcl(
         (
             Interpolation,
-            NumberLiteralOrNumberOrAnyAsUnion,
+            Number,
             Vec<(
                 NumberLiteral,
                 StringLiteralOrColorOrArrayOfColorOrAnyAsUnion,
@@ -2047,7 +1989,7 @@ pub enum ColorOrArrayOfColor {
     InterpolateLab(
         (
             Interpolation,
-            NumberLiteralOrNumberOrAnyAsUnion,
+            Number,
             Vec<(
                 NumberLiteral,
                 StringLiteralOrColorOrArrayOfColorOrAnyAsUnion,
@@ -2095,7 +2037,7 @@ impl<'de> serde::de::Visitor<'de> for ColorOrArrayOfColorVisitor {
             "interpolate-hcl" => {
                 let interpolation_type: Interpolation =
                     visit_seq_field(&mut seq, "interpolation_type")?;
-                let input: NumberLiteralOrNumberOrAnyAsUnion = visit_seq_field(&mut seq, "input")?;
+                let input: Number = visit_seq_field(&mut seq, "input")?;
                 let mut stops = Vec::new();
                 while let Some(stop_input_i) = seq.next_element::<NumberLiteral>()? {
                     let stop_output_i: StringLiteralOrColorOrArrayOfColorOrAnyAsUnion =
@@ -2115,7 +2057,7 @@ impl<'de> serde::de::Visitor<'de> for ColorOrArrayOfColorVisitor {
             "interpolate-lab" => {
                 let interpolation_type: Interpolation =
                     visit_seq_field(&mut seq, "interpolation_type")?;
-                let input: NumberLiteralOrNumberOrAnyAsUnion = visit_seq_field(&mut seq, "input")?;
+                let input: Number = visit_seq_field(&mut seq, "input")?;
                 let mut stops = Vec::new();
                 while let Some(stop_input_i) = seq.next_element::<NumberLiteral>()? {
                     let stop_output_i: StringLiteralOrColorOrArrayOfColorOrAnyAsUnion =
@@ -2380,7 +2322,7 @@ pub enum Image {
     /// Returns an `image` type for use in `icon-image`, `*-pattern` entries and as a section in the `format` expression. If set, the `image` argument will check that the requested image exists in the style and will return either the resolved image name or `null`, depending on whether or not the image is currently in the style. This validation process is synchronous and requires the image to have been added to the style before requesting it in the `image` argument.
     ///
     ///  - [Use a fallback image](https://maplibre.org/maplibre-gl-js/docs/examples/use-a-fallback-image/)
-    Op(String),
+    Op(Box<String>),
 }
 
 impl<'de> serde::Deserialize<'de> for Image {
@@ -2507,40 +2449,31 @@ impl<'de> serde::Deserialize<'de> for StringLiteralOrArrayOrStringOrAnyAsUnion {
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum Number {
     /// Returns the remainder after integer division of the first input by the second.
-    Percentage(
-        NumberLiteralOrNumberOrAnyAsUnion,
-        NumberLiteralOrNumberOrAnyAsUnion,
-    ),
+    Percentage(Box<Number>, Box<Number>),
     /// Returns the product of the inputs.
-    Star(Vec<NumberLiteralOrNumberOrAnyAsUnion>),
+    Star(Vec<Number>),
     /// Returns the sum of the inputs.
-    Plus(Vec<NumberLiteralOrNumberOrAnyAsUnion>),
+    Plus(Vec<Number>),
     /// For two inputs, returns the result of subtracting the second input from the first. For a single input, returns the result of subtracting it from 0.
     Minus(MinusOptions),
     /// Returns the result of floating point division of the first input by the second.
     ///
     ///  - [Visualize population density](https://maplibre.org/maplibre-gl-js/docs/examples/visualize-population-density/)
-    Slash(
-        NumberLiteralOrNumberOrAnyAsUnion,
-        NumberLiteralOrNumberOrAnyAsUnion,
-    ),
+    Slash(Box<Number>, Box<Number>),
     /// Returns the result of raising the first input to the power specified by the second.
-    Power(
-        NumberLiteralOrNumberOrAnyAsUnion,
-        NumberLiteralOrNumberOrAnyAsUnion,
-    ),
+    Power(Box<Number>, Box<Number>),
     /// Returns the absolute value of the input.
-    Absolute(NumberLiteralOrNumberOrAnyAsUnion),
+    Absolute(Box<Number>),
     /// Returns the arccosine of the input.
-    Arccosine(NumberLiteralOrNumberOrAnyAsUnion),
+    Arccosine(Box<Number>),
     /// Returns the arcsine of the input.
-    Asin(NumberLiteralOrNumberOrAnyAsUnion),
+    Asin(Box<Number>),
     /// Returns the arctangent of the input.
-    Atan(NumberLiteralOrNumberOrAnyAsUnion),
+    Atan(Box<Number>),
     /// Returns the smallest integer that is greater than or equal to the input.
-    Ceil(NumberLiteralOrNumberOrAnyAsUnion),
+    Ceil(Box<Number>),
     /// Returns the cosine of the input.
-    Cos(NumberLiteralOrNumberOrAnyAsUnion),
+    Cos(Box<Number>),
     /// Returns the shortest distance in meters between the evaluated feature and the input geometry. The input value can be a valid GeoJSON of type `Point`, `MultiPoint`, `LineString`, `MultiLineString`, `Polygon`, `MultiPolygon`, `Feature`, or `FeatureCollection`. Distance values returned may vary in precision due to loss in precision from encoding geometries, particularly below zoom level 13.
     Distance(GeoJSONObjectLiteral),
     /// Returns the mathematical constant e.
@@ -2548,7 +2481,7 @@ pub enum Number {
     /// Gets the elevation of a pixel (in meters above the vertical datum reference of the `raster-dem` tiles) from a `raster-dem` source. Can only be used in the `color-relief-color` property of a `color-relief` layer.
     Elevation,
     /// Returns the largest integer that is less than or equal to the input.
-    Floor(NumberLiteralOrNumberOrAnyAsUnion),
+    Floor(Box<Number>),
     /// Gets the kernel density estimation of a pixel in a heatmap layer, which is a relative measure of how many data points are crowded around a particular pixel. Can only be used in the `heatmap-color` property.
     HeatmapDensity,
     /// Returns the first position at which an item can be found in an array or a substring can be found in a string, or `-1` if the input cannot be found. Accepts an optional index from where to begin the search. In a string, a UTF-16 surrogate pair counts as a single position.
@@ -2558,33 +2491,37 @@ pub enum Number {
     /// Gets the progress along a gradient line. Can only be used in the `line-gradient` property.
     LineProgress,
     /// Returns the natural logarithm of the input.
-    Ln(NumberLiteralOrNumberOrAnyAsUnion),
+    Ln(Box<Number>),
     /// Returns the mathematical constant ln(2).
     Ln2,
     /// Returns the base-ten logarithm of the input.
-    Log10(NumberLiteralOrNumberOrAnyAsUnion),
+    Log10(Box<Number>),
     /// Returns the base-two logarithm of the input.
-    Log2(NumberLiteralOrNumberOrAnyAsUnion),
+    Log2(Box<Number>),
     /// Returns the maximum value of the inputs.
-    Max(Vec<NumberLiteralOrNumberOrAnyAsUnion>),
+    Max(Vec<Number>),
     /// Returns the minimum value of the inputs.
-    Min(Vec<NumberLiteralOrNumberOrAnyAsUnion>),
+    Min(Vec<Number>),
     /// Asserts that the input value is a number. If multiple values are provided, each one is evaluated in order until a number is obtained. If none of the inputs are numbers, the expression is an error.
     Op(Vec<ExprOrLiteral>),
     /// Returns the mathematical constant pi.
     Pi,
     /// Rounds the input to the nearest integer. Halfway values are rounded away from zero. For example, `["round", -1.5]` evaluates to -2.
-    Round(NumberLiteralOrNumberOrAnyAsUnion),
+    Round(Box<Number>),
     /// Returns the sine of the input.
-    Sin(NumberLiteralOrNumberOrAnyAsUnion),
+    Sin(Box<Number>),
     /// Returns the square root of the input.
-    Sqrt(NumberLiteralOrNumberOrAnyAsUnion),
+    Sqrt(Box<Number>),
     /// Returns the tangent of the input.
-    Tan(NumberLiteralOrNumberOrAnyAsUnion),
+    Tan(Box<Number>),
     /// Converts the input value to a number, if possible. If the input is `null` or `false`, the result is 0. If the input is `true`, the result is 1. If the input is a string, it is converted to a number as specified by the ["ToNumber Applied to the String Type" algorithm](https://tc39.github.io/ecma262/#sec-tonumber-applied-to-the-string-type) of the ECMAScript Language Specification. If multiple values are provided, each one is evaluated in order until the first successful conversion is obtained. If none of the inputs can be converted, the expression is an error.
     To(Vec<ExprOrLiteral>),
     /// Gets the current zoom level.  Note that in style layout and paint properties, ["zoom"] may only appear as the input to a top-level "step" or "interpolate" expression.
     Zoom,
+    /// A numeric literal value.
+    Literal(NumberLiteral),
+    /// A polymorphic expression (`case`, `match`, `get`, …) in a numeric position.
+    AnyExpr(Box<Any>),
 }
 
 /// Options for deserializing the syntax enum variant [`Number::Minus`]
@@ -2592,11 +2529,8 @@ pub enum Number {
 #[serde(untagged)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum MinusOptions {
-    TwoParams(
-        NumberLiteralOrNumberOrAnyAsUnion,
-        NumberLiteralOrNumberOrAnyAsUnion,
-    ),
-    OneParams(NumberLiteralOrNumberOrAnyAsUnion),
+    TwoParams(Box<Number>, Box<Number>),
+    OneParams(Box<Number>),
 }
 
 /// Options for deserializing the syntax enum variant [`Number::IndexOf`]
@@ -2612,8 +2546,8 @@ pub enum IndexOfOptions {
         Option<serde_json::Value>,
     ),
     Substring(
-        String,
-        String,
+        Box<String>,
+        Box<String>,
         #[serde(default)]
         #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_option_json_value))]
         Option<serde_json::Value>,
@@ -2625,7 +2559,7 @@ impl<'de> serde::Deserialize<'de> for Number {
     where
         D: serde::Deserializer<'de>,
     {
-        deserializer.deserialize_seq(NumberVisitor)
+        deserializer.deserialize_any(NumberVisitor)
     }
 }
 
@@ -2637,6 +2571,24 @@ impl<'de> serde::de::Visitor<'de> for NumberVisitor {
 
     fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
         formatter.write_str("an Number expression (example: [\"%\",10,3])")
+    }
+
+    fn visit_i64<E: serde::de::Error>(self, v: i64) -> Result<Self::Value, E> {
+        Ok(Number::Literal(NumberLiteral::from(
+            serde_json::Number::from(v),
+        )))
+    }
+
+    fn visit_u64<E: serde::de::Error>(self, v: u64) -> Result<Self::Value, E> {
+        Ok(Number::Literal(NumberLiteral::from(
+            serde_json::Number::from(v),
+        )))
+    }
+
+    fn visit_f64<E: serde::de::Error>(self, v: f64) -> Result<Self::Value, E> {
+        serde_json::Number::from_f64(v)
+            .map(|n| Number::Literal(NumberLiteral::from(n)))
+            .ok_or_else(|| serde::de::Error::custom("non-finite f64"))
     }
 
     fn visit_seq<A: serde::de::SeqAccess<'de>>(self, mut seq: A) -> Result<Self::Value, A::Error> {
@@ -2682,20 +2634,14 @@ impl<'de> serde::de::Visitor<'de> for NumberVisitor {
                 }
                 match rest.len() {
                     2 => Ok(Number::Minus(MinusOptions::TwoParams(
-                        serde_json::from_value::<NumberLiteralOrNumberOrAnyAsUnion>(
-                            rest[0].clone(),
-                        )
-                        .map_err(serde::de::Error::custom)?,
-                        serde_json::from_value::<NumberLiteralOrNumberOrAnyAsUnion>(
-                            rest[1].clone(),
-                        )
-                        .map_err(serde::de::Error::custom)?,
+                        serde_json::from_value::<Box<Number>>(rest[0].clone())
+                            .map_err(serde::de::Error::custom)?,
+                        serde_json::from_value::<Box<Number>>(rest[1].clone())
+                            .map_err(serde::de::Error::custom)?,
                     ))),
                     1 => Ok(Number::Minus(MinusOptions::OneParams(
-                        serde_json::from_value::<NumberLiteralOrNumberOrAnyAsUnion>(
-                            rest[0].clone(),
-                        )
-                        .map_err(serde::de::Error::custom)?,
+                        serde_json::from_value::<Box<Number>>(rest[0].clone())
+                            .map_err(serde::de::Error::custom)?,
                     ))),
                     len => Err(serde::de::Error::custom(format!(
                         "'-': expected 1 or 2 arguments, got {len}"
@@ -2818,45 +2764,16 @@ impl<'de> serde::de::Visitor<'de> for NumberVisitor {
                 Ok(Number::To(inputs))
             }
             "zoom" => Ok(Number::Zoom),
-            _ => Err(serde::de::Error::unknown_variant(
-                &op,
-                &[
-                    "%",
-                    "*",
-                    "+",
-                    "-",
-                    "/",
-                    "^",
-                    "abs",
-                    "acos",
-                    "asin",
-                    "atan",
-                    "ceil",
-                    "cos",
-                    "distance",
-                    "e",
-                    "elevation",
-                    "floor",
-                    "heatmap-density",
-                    "index-of",
-                    "length",
-                    "line-progress",
-                    "ln",
-                    "ln2",
-                    "log10",
-                    "log2",
-                    "max",
-                    "min",
-                    "number",
-                    "pi",
-                    "round",
-                    "sin",
-                    "sqrt",
-                    "tan",
-                    "to-number",
-                    "zoom",
-                ],
-            )),
+            _ => {
+                let mut elems = vec![serde_json::Value::String(op)];
+                while let Some(v) = seq.next_element::<serde_json::Value>()? {
+                    elems.push(v);
+                }
+                let arr = serde_json::Value::Array(elems);
+                let any_expr =
+                    serde_json::from_value::<Any>(arr).map_err(serde::de::Error::custom)?;
+                Ok(Number::AnyExpr(Box::new(any_expr)))
+            }
         }
     }
 }
@@ -3299,6 +3216,8 @@ impl serde::Serialize for Number {
                 }
                 seq.end()
             }
+            Number::Literal(n) => n.serialize(serializer),
+            Number::AnyExpr(a) => a.serialize(serializer),
         }
     }
 }
@@ -3395,7 +3314,7 @@ pub enum NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection {
     Interpolate(
         (
             Interpolation,
-            NumberLiteralOrNumberOrAnyAsUnion,
+            Number,
             Vec<(
                 NumberLiteral,
                 StringLiteralOrNumberOrArrayOfNumberOrColorOrArrayOfColorOrProjectionOrAnyAsUnion,
@@ -3445,7 +3364,7 @@ impl<'de> serde::de::Visitor<'de>
             "interpolate" => {
                 let interpolation_type: Interpolation =
                     visit_seq_field(&mut seq, "interpolation_type")?;
-                let input: NumberLiteralOrNumberOrAnyAsUnion = visit_seq_field(&mut seq, "input")?;
+                let input: Number = visit_seq_field(&mut seq, "input")?;
                 let mut stops = Vec::new();
                 while let Some(stop_input_i) = seq.next_element::<NumberLiteral>()? {
                     let stop_output_i: StringLiteralOrNumberOrArrayOfNumberOrColorOrArrayOfColorOrProjectionOrAnyAsUnion = seq.next_element()?.ok_or_else(|| serde::de::Error::custom("expected stop_output_i in NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection::Interpolate"))?;
@@ -3650,18 +3569,14 @@ pub enum String {
     ///
     ///  - [Display HTML clusters with custom properties](https://maplibre.org/maplibre-gl-js/docs/examples/display-html-clusters-with-custom-properties/)
     NumberFormat(
-        NumberLiteralOrNumberOrAnyAsUnion,
+        Box<Number>,
         #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_map))]
         serde_json::Map<std::string::String, serde_json::Value>,
     ),
     /// Returns the IETF language tag of the locale being used by the provided `collator`. This can be used to determine the default system locale, or to determine if a requested locale was successfully loaded.
     ResolvedLocale(Collator),
     /// Returns a subarray from an array or a substring from a string from a specified start index, or between a start index and an end index if set. The return value is inclusive of the start index but not of the end index. In a string, a UTF-16 surrogate pair counts as a single position.
-    Slice(
-        Box<String>,
-        NumberLiteralOrNumberOrAnyAsUnion,
-        Option<NumberLiteralOrNumberOrAnyAsUnion>,
-    ),
+    Slice(Box<String>, Box<Number>, Option<Box<Number>>),
     /// Asserts that the input value is a string. If multiple values are provided, each one is evaluated in order until a string is obtained. If none of the inputs are strings, the expression is an error.
     Op(Vec<ExprOrLiteral>),
     /// Converts the input value to a string. If the input is `null`, the result is `""`. If the input is a boolean, the result is `"true"` or `"false"`. If the input is a number, it is converted to a string as specified by the ["NumberToString" algorithm](https://tc39.github.io/ecma262/#sec-tostring-applied-to-the-number-type) of the ECMAScript Language Specification. If the input is a color, it is converted to a string of the form `"rgba(r,g,b,a)"`, where `r`, `g`, and `b` are numerals ranging from 0 to 255, and `a` ranges from 0 to 1. Otherwise, the input is converted to a string in the format specified by the [`JSON.stringify`](https://tc39.github.io/ecma262/#sec-json.stringify) function of the ECMAScript Language Specification.
