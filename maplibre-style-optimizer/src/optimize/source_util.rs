@@ -1,5 +1,6 @@
 //! Shared utilities for vector layer info.
 
+use maplibre_style_spec::spec::{AnyLayer, MaplibreStyleSpecification};
 use serde_json::Value;
 
 /// Information about a layer's vector source, pre-computed for use by visitors.
@@ -53,4 +54,46 @@ pub(super) fn precompute_vector_layer_info(style: &Value) -> Vec<Option<VectorLa
             })
         })
         .collect()
+}
+
+/// Pre-compute vector layer info from typed layers.
+pub(crate) fn precompute_vector_layer_info_typed(
+    style: &MaplibreStyleSpecification,
+) -> Vec<Option<VectorLayerInfo>> {
+    style
+        .layers
+        .iter()
+        .map(|layer| {
+            let AnyLayer::Typed(t) = layer else {
+                return None;
+            };
+            let common = t.common();
+            let source = common.source.as_ref()?.as_str();
+            let source_layer = common.source_layer.as_ref()?.as_str();
+
+            // Check if it's a vector source.
+            if !is_vector_source_typed(style, source) {
+                return None;
+            }
+
+            Some(VectorLayerInfo {
+                source: source.to_string(),
+                source_layer: source_layer.to_string(),
+            })
+        })
+        .collect()
+}
+
+fn is_vector_source_typed(style: &MaplibreStyleSpecification, source_name: &str) -> bool {
+    serde_json::to_value(&style.sources)
+        .ok()
+        .and_then(|v| {
+            v.as_object()?
+                .get(source_name)?
+                .as_object()?
+                .get("type")?
+                .as_str()
+                .map(|s| s == "vector")
+        })
+        .unwrap_or(false)
 }

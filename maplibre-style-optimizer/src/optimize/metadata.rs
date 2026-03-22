@@ -1,187 +1,116 @@
-//! Zoom-bound extraction from filter expressions.
-//!
-//! Shared helpers used by [`super::typed_passes::metadata_refinement_typed`].
+//! Metadata refinement pass operating on typed `MaplibreStyleSpecification`.
 
-use serde_json::Value;
+use maplibre_style_spec::spec::{AnyLayer, LayerFilter, MaplibreStyleSpecification, TypedLayer};
 
-use super::expr::extract_json_literal;
+use super::source_util::VectorLayerInfo;
+use crate::stats::TileStatistics;
 
-// ── Zoom-bound extraction ────────────────────────────────────────────────────
-
-fn is_zoom_expr(val: &Value) -> bool {
-    matches!(
-        val,
-        Value::Array(arr) if arr.len() == 1 && arr[0].as_str() == Some("zoom")
-    )
+/// Extract zoom bounds from filters and tighten minzoom/maxzoom.
+pub(crate) fn metadata_refinement(
+    style: &mut MaplibreStyleSpecification,
+    stats: Option<&TileStatistics>,
+    layer_info: Option<&[Option<VectorLayerInfo>]>,
+) {
+    for (i, layer) in style.layers.iter_mut().enumerate() {
+        let AnyLayer::Typed(typed) = layer else {
+            continue;
+        };
+        refine_typed_layer(typed, i, stats, layer_info);
+    }
 }
 
-pub(super) fn zoom_bounds_from_expression(expr: &Value) -> (Option<f64>, Option<f64>) {
-    match expr {
-        Value::Array(arr) if !arr.is_empty() => {
-            let head = arr[0].as_str();
-            match head {
-                Some("all") => {
-                    let mut acc_low = None;
-                    let mut acc_high = None;
-                    for child in arr.iter().skip(1) {
-                        let (child_low, child_high) = zoom_bounds_from_expression(child);
-                        acc_low = match (acc_low, child_low) {
-                            (None, next) => next,
-                            (Some(acc), Some(next)) => Some(acc.max(next)),
-                            (Some(acc), None) => Some(acc),
-                        };
-                        acc_high = match (acc_high, child_high) {
-                            (None, next) => next,
-                            (Some(acc), Some(next)) => Some(acc.min(next)),
-                            (Some(acc), None) => Some(acc),
-                        };
-                    }
-                    (acc_low, acc_high)
-                }
-                Some("any") => {
-                    let mut acc_low: Option<f64> = None;
-                    let mut acc_high: Option<f64> = None;
-                    let mut all_have_low = true;
-                    let mut all_have_high = true;
+fn refine_typed_layer(
+    layer: &mut TypedLayer,
+    layer_index: usize,
+    stats: Option<&TileStatistics>,
+    layer_info: Option<&[Option<VectorLayerInfo>]>,
+) {
+    let common = layer.common_mut();
 
-                    for child in arr.iter().skip(1) {
-                        let (cl, ch) = zoom_bounds_from_expression(child);
-                        if cl.is_none() {
-                            all_have_low = false;
-                        }
-                        if ch.is_none() {
-                            all_have_high = false;
-                        }
-                        acc_low = match (acc_low, cl) {
-                            (None, v) => v,
-                            (Some(a), Some(b)) => Some(a.min(b)),
-                            (Some(a), None) => Some(a),
-                        };
-                        acc_high = match (acc_high, ch) {
-                            (None, v) => v,
-                            (Some(a), Some(b)) => Some(a.max(b)),
-                            (Some(a), None) => Some(a),
-                        };
-                    }
+    // Filter-based zoom extraction.
+    if let Some(ref filter) = common.filter {
+        let filter_json = filter.to_json_value();
+        let (lb_raw, ub_raw) = super::zoom::zoom_bounds_from_expression(&filter_json);
+        let lb = lb_raw.map(f64::ceil);
+        let ub = ub_raw.map(f64::floor);
 
-                    (
-                        if all_have_low { acc_low } else { None },
-                        if all_have_high { acc_high } else { None },
-                    )
+        if let Some(bound) = lb {
+            let cur = common
+                .minzoom
+                .as_ref()
+                .and_then(maplibre_style_spec::spec::LayerMinzoom::as_f64);
+            match cur {
+                Some(c) if bound > c => {
+                    common.minzoom = maplibre_style_spec::spec::LayerMinzoom::from_f64(bound);
                 }
-                _ => zoom_bounds_from_compare(arr),
+                None => {
+                    common.minzoom = maplibre_style_spec::spec::LayerMinzoom::from_f64(bound);
+                }
+                _ => {}
             }
         }
-        _ => (None, None),
-    }
-}
 
-fn zoom_bounds_from_compare(arr: &[Value]) -> (Option<f64>, Option<f64>) {
-    if arr.len() != 3 {
-        return (None, None);
-    }
-    let Some(op) = arr[0].as_str() else {
-        return (None, None);
-    };
-    let (left, right) = (&arr[1], &arr[2]);
-    let (zoom_first, other) = if is_zoom_expr(left) {
-        (true, right)
-    } else if is_zoom_expr(right) {
-        (false, left)
-    } else {
-        return (None, None);
-    };
-    let Some(lit) = extract_json_literal(other) else {
-        return (None, None);
-    };
-    let Some(n) = lit.as_f64() else {
-        return (None, None);
-    };
+        if let Some(bound) = ub {
+            let cur = common
+                .maxzoom
+                .as_ref()
+                .and_then(maplibre_style_spec::spec::LayerMaxzoom::as_f64);
+            let new_max = match cur {
+                Some(c) => c.min(bound),
+                None => bound,
+            };
+            common.maxzoom = maplibre_style_spec::spec::LayerMaxzoom::from_f64(new_max);
+        }
 
-    match (op, zoom_first) {
-        (">=", true) | ("<=", false) => (Some(n), None),
-        (">=", false) | ("<=", true) => (None, Some(n)),
-        (">", true) | ("<", false) => (Some(next_zoom(n)), None),
-        (">", false) | ("<", true) => (None, Some(prev_zoom(n))),
-        _ => (None, None),
-    }
-}
-
-fn next_zoom(n: f64) -> f64 {
-    n.floor() + 1.0
-}
-
-fn prev_zoom(n: f64) -> f64 {
-    n.ceil() - 1.0
-}
-
-// ── Remove consumed zoom predicates ────────────────────────────────────────
-
-pub(super) fn remove_consumed_zoom_predicates(
-    filter: &mut Value,
-    adopted_min: Option<f64>,
-    adopted_max: Option<f64>,
-) {
-    let Value::Array(arr) = &*filter else {
-        return;
-    };
-    if arr.first().and_then(Value::as_str) != Some("all") {
-        return;
+        // Remove consumed zoom predicates from filter.
+        let adopted_min = common
+            .minzoom
+            .as_ref()
+            .and_then(maplibre_style_spec::spec::LayerMinzoom::as_f64);
+        let adopted_max = common
+            .maxzoom
+            .as_ref()
+            .and_then(maplibre_style_spec::spec::LayerMaxzoom::as_f64);
+        if (adopted_min.is_some() || adopted_max.is_some())
+            && let Some(ref mut filter) = common.filter
+        {
+            let mut filter_json = filter.to_json_value();
+            super::zoom::remove_consumed_zoom_predicates(
+                &mut filter_json,
+                adopted_min,
+                adopted_max,
+            );
+            if let Some(new_filter) = LayerFilter::from_value(filter_json) {
+                *filter = new_filter;
+            }
+        }
     }
 
-    let kept: Vec<Value> = std::iter::once(Value::String("all".to_string()))
-        .chain(
-            arr[1..]
-                .iter()
-                .filter(|child| !is_exact_zoom_predicate_consumed(child, adopted_min, adopted_max))
-                .cloned(),
-        )
-        .collect();
+    // Stats-driven zoom tightening.
+    if let Some(stats) = stats
+        && let Some(infos) = layer_info
+        && let Some(Some(info)) = infos.get(layer_index)
+        && let Some(layer_stats) = stats.layer_stats(&info.source, &info.source_layer)
+        && !layer_stats.features_by_zoom.is_empty()
+    {
+        let common = layer.common_mut();
+        let data_min = f64::from(*layer_stats.features_by_zoom.keys().next().unwrap());
+        let data_max = f64::from(*layer_stats.features_by_zoom.keys().next_back().unwrap());
 
-    if kept.len() == arr.len() {
-        return;
-    }
+        let cur_min = common
+            .minzoom
+            .as_ref()
+            .and_then(maplibre_style_spec::spec::LayerMinzoom::as_f64);
+        if cur_min.is_none_or(|c| data_min > c) {
+            common.minzoom = maplibre_style_spec::spec::LayerMinzoom::from_f64(data_min);
+        }
 
-    *filter = match kept.len() {
-        1 => serde_json::json!(["literal", true]),
-        2 => kept[1].clone(),
-        _ => Value::Array(kept),
-    };
-}
-
-fn is_exact_zoom_predicate_consumed(
-    pred: &Value,
-    adopted_min: Option<f64>,
-    adopted_max: Option<f64>,
-) -> bool {
-    let Value::Array(arr) = pred else {
-        return false;
-    };
-    if arr.len() != 3 {
-        return false;
-    }
-    let Some(op) = arr[0].as_str() else {
-        return false;
-    };
-
-    let (zoom_first, other) = if is_zoom_expr(&arr[1]) {
-        (true, &arr[2])
-    } else if is_zoom_expr(&arr[2]) {
-        (false, &arr[1])
-    } else {
-        return false;
-    };
-
-    let Some(n) = extract_json_literal(other).and_then(|v| v.as_f64()) else {
-        return false;
-    };
-    if n.fract() != 0.0 {
-        return false;
-    }
-
-    match (op, zoom_first) {
-        (">=", true) | ("<=", false) => adopted_min.is_some_and(|m| (m - n).abs() < f64::EPSILON),
-        ("<=", true) | (">=", false) => adopted_max.is_some_and(|m| (m - n).abs() < f64::EPSILON),
-        _ => false,
+        let cur_max = common
+            .maxzoom
+            .as_ref()
+            .and_then(maplibre_style_spec::spec::LayerMaxzoom::as_f64);
+        if cur_max.is_none_or(|c| data_max < c) {
+            common.maxzoom = maplibre_style_spec::spec::LayerMaxzoom::from_f64(data_max);
+        }
     }
 }

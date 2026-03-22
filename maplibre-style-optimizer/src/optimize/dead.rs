@@ -1,88 +1,64 @@
-//! Remove unreferenced sources and layers whose filter is always false.
+//! Dead elimination pass operating on typed `MaplibreStyleSpecification`.
 
-use serde_json::Value;
+use std::collections::{HashMap, HashSet};
 
-use super::expr::bool_literal;
-use super::source_util::{VectorLayerInfo, build_layer_index, collect_used_sources};
-use super::walk::StyleVisitor;
+use maplibre_style_spec::spec::{AnyLayer, MaplibreStyleSpecification, TypedLayer};
+
+use super::source_util::VectorLayerInfo;
 use crate::stats::TileStatistics;
 
-// ── Visitor ───────────────────────────────────────────────────────────────────
-
-pub(crate) struct DeadEliminationVisitor<'a> {
-    pub stats: Option<&'a TileStatistics>,
-    pub layer_info: Option<&'a [Option<VectorLayerInfo>]>,
-}
-
-impl StyleVisitor for DeadEliminationVisitor<'_> {
-    fn visit_root(&mut self, root: &mut Value) {
-        eliminate_dead_sources_and_layers(root, self.stats, self.layer_info);
-    }
-}
-
-// ── Implementation ────────────────────────────────────────────────────────────
-
-fn eliminate_dead_sources_and_layers(
-    v: &mut Value,
+/// Remove layers with always-false filters and geometry-type mismatches,
+/// then prune unused sources.
+pub(crate) fn dead_elimination(
+    style: &mut MaplibreStyleSpecification,
     stats: Option<&TileStatistics>,
     layer_info: Option<&[Option<VectorLayerInfo>]>,
 ) {
-    let Some(root) = v.as_object_mut() else {
-        return;
-    };
-
-    let Some(layers_val) = root.get_mut("layers") else {
-        return;
-    };
-    let Some(layers) = layers_val.as_array_mut() else {
-        return;
-    };
-
     let mut to_drop: Vec<usize> = Vec::new();
-    for (i, layer) in layers.iter().enumerate() {
-        let Some(obj) = layer.as_object() else {
-            continue;
-        };
-        // Original: filter is always false.
-        if let Some(filt) = obj.get("filter")
-            && filter_is_always_false(filt)
-        {
-            to_drop.push(i);
-            continue;
-        }
-        // Stats-driven: geometry type mismatch.
-        if let Some(stats) = stats
-            && is_dead_by_geometry(i, layer, stats, layer_info)
-        {
-            to_drop.push(i);
+    for (i, layer) in style.layers.iter().enumerate() {
+        if let AnyLayer::Typed(t) = layer {
+            // Filter is always false.
+            if let Some(ref filter) = t.common().filter
+                && filter.is_always_false()
+            {
+                to_drop.push(i);
+                continue;
+            }
+            // Stats-driven: geometry type mismatch.
+            if let Some(stats) = stats
+                && is_dead_by_geometry(i, t, stats, layer_info)
+            {
+                to_drop.push(i);
+            }
         }
     }
 
     if !to_drop.is_empty() {
         for i in to_drop.into_iter().rev() {
-            layers.remove(i);
+            style.layers.remove(i);
         }
     }
 
-    let used = collect_used_sources(layers, &build_layer_index(layers));
-    let Some(sources_val) = root.get_mut("sources") else {
-        return;
-    };
-    let Some(sources) = sources_val.as_object_mut() else {
-        return;
-    };
-    sources.retain(|id, _| used.contains(id.as_str()));
+    // Prune unused sources.
+    let used = collect_used_sources(&style.layers);
+    prune_sources(style, &used);
 }
 
-fn filter_is_always_false(f: &Value) -> bool {
-    bool_literal(f) == Some(false)
+/// Prune unused sources by roundtripping through JSON.
+pub(super) fn prune_sources(style: &mut MaplibreStyleSpecification, used: &HashSet<String>) {
+    if let Ok(mut sources_val) = serde_json::to_value(&style.sources) {
+        if let Some(obj) = sources_val.as_object_mut() {
+            obj.retain(|id, _| used.contains(id.as_str()));
+        }
+        if let Ok(new_sources) = serde_json::from_value(sources_val) {
+            style.sources = new_sources;
+        }
+    }
 }
 
-/// Check if a layer is dead because its geometry type requirement cannot be satisfied
-/// by the source-layer's actual geometry types.
 fn is_dead_by_geometry(
     layer_index: usize,
-    layer: &Value,
+    layer: &TypedLayer,
     stats: &TileStatistics,
     layer_info: Option<&[Option<VectorLayerInfo>]>,
 ) -> bool {
@@ -95,18 +71,65 @@ fn is_dead_by_geometry(
     let Some(layer_stats) = stats.layer_stats(&info.source, &info.source_layer) else {
         return false;
     };
-    let layer_type = layer
-        .as_object()
-        .and_then(|o| o.get("type"))
-        .and_then(Value::as_str)
-        .unwrap_or("");
 
     let gt = &layer_stats.geometry_types;
-    match layer_type {
+    match layer.layer_type() {
         "fill" | "fill-extrusion" => gt.polygon == 0,
         "circle" | "heatmap" => gt.point == 0,
         "line" => gt.linestring == 0 && gt.polygon == 0,
         "symbol" => gt.point == 0 && gt.linestring == 0,
         _ => false,
+    }
+}
+
+pub(super) fn collect_used_sources(layers: &[AnyLayer]) -> HashSet<String> {
+    let by_id: HashMap<&str, usize> = layers
+        .iter()
+        .enumerate()
+        .map(|(i, l)| (l.id().as_str(), i))
+        .collect();
+
+    let mut used = HashSet::new();
+    for layer in layers {
+        match layer {
+            AnyLayer::Typed(t) => {
+                if t.layer_type() == "background" {
+                    continue;
+                }
+                if let Some(src) = t.common().source.as_ref() {
+                    used.insert(src.as_str().to_string());
+                }
+            }
+            AnyLayer::Ref(r) => {
+                // Follow ref chain to find source.
+                if let Some(source) = resolve_ref_source(&r.r#ref, layers, &by_id) {
+                    used.insert(source);
+                }
+            }
+        }
+    }
+    used
+}
+
+fn resolve_ref_source(
+    ref_id: &str,
+    layers: &[AnyLayer],
+    by_id: &HashMap<&str, usize>,
+) -> Option<String> {
+    let mut visited = HashSet::new();
+    let mut current_ref = ref_id;
+    loop {
+        if !visited.insert(current_ref) {
+            return None; // cycle
+        }
+        let idx = by_id.get(current_ref)?;
+        match &layers[*idx] {
+            AnyLayer::Typed(t) => {
+                return t.common().source.as_ref().map(|s| s.as_str().to_string());
+            }
+            AnyLayer::Ref(r) => {
+                current_ref = &r.r#ref;
+            }
+        }
     }
 }

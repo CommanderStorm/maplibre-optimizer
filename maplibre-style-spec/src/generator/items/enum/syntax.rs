@@ -452,10 +452,16 @@ fn generate_expression_any_of(scope: &mut Scope, types: &[MirParameterType]) -> 
         })
         .collect();
 
-    // NOTE: `Any`-output operators (e.g. `get`, `match`, `accumulated`) were previously handled via
-    // an explicit `Any(Box<Any>)` arm here. They are now expanded into every concrete typed enum
-    // (e.g. `Number::Get`, `String::Match`) by the MIR preprocessing step, so the `Any` arm is
-    // redundant and would create ambiguous overlapping variants that break serde round-trips.
+    // `Any`-output operators (`get`, `let`, `case`, `match`, …) are polymorphic — their concrete
+    // return type is context-determined. They live only in the `Any` syntax enum. Typed parameter
+    // positions that must accept any expression (e.g. `["get", "prop"]` in a numeric slot) use
+    // this explicit `Any(Box<Any>)` fallback arm so serde falls through to it after typed
+    // variants fail.
+    if (number_literal_with_number_expr || string_literal_with_string_expr)
+        && !arms.iter().any(|(l, _)| l == "Any")
+    {
+        arms.push(("Any".to_string(), "Box<Any>".to_string()));
+    }
 
     // `interpolate-hcl` / `interpolate-lab` accept CSS color strings (e.g. `"#f00"`) as stop outputs.
     let mut arm_labels: Vec<&str> = arms.iter().map(|(l, _)| l.as_str()).collect();
@@ -593,7 +599,8 @@ fn generate_syntax_enum_body(
             // `match` has a fixed `input` prefix and a fixed `fallback` suffix that bracket
             // variadic `(label, output)` pairs. The generic template/suffix path misinterprets
             // this as repeating `(input, label, output)` triplets, producing wrong code.
-            if key == "match" {
+            // Only `Any::Match` exists (polymorphic output); this special case lives here.
+            if name == "Any" && key == "match" {
                 let variant_name = normalized_syntax_variant_ident(name, key);
                 let label_ty = generate_parameter_type(
                     scope,
@@ -1420,24 +1427,36 @@ fn generate_syntax_enum_deserializer(
     variadic_row_struct_names: &BTreeMap<String, String>,
 ) {
     let sep4_plans = precompute_variadic_sep4_plans(scope, name, values);
-    // Precompute `match` parameter types for any enum that has the operator — the generic
-    // template/suffix variadic path mishandles `match` because `input` is a fixed prefix, not
-    // part of the repeating (label, output) pair. We use a dedicated emitter instead.
-    let match_types = values.get("match").map(|def| {
-        let syntax = &def.syntax;
-        let variant_name = "Match";
-        let label_ty =
-            generate_parameter_type(scope, (name, variant_name, "label_i"), &syntax.parameters);
-        let output_ty =
-            generate_parameter_type(scope, (name, variant_name, "output_i"), &syntax.parameters);
-        let fallback_ty =
-            generate_parameter_type(scope, (name, variant_name, "fallback"), &syntax.parameters);
-        (
-            box_recursive_types(name, &label_ty),
-            box_recursive_types(name, &output_ty),
-            box_recursive_types(name, &fallback_ty),
-        )
-    });
+    // `Any::Match` needs dedicated deserialization: `input` is a fixed prefix, not part of
+    // the repeating `(label, output)` pair. Precompute types for the dedicated emitter.
+    let any_match_types = if name == "Any" {
+        values.get("match").map(|def| {
+            let syntax = &def.syntax;
+            let variant_name = "Match";
+            let label_ty = generate_parameter_type(
+                scope,
+                ("Any", variant_name, "label_i"),
+                &syntax.parameters,
+            );
+            let output_ty = generate_parameter_type(
+                scope,
+                ("Any", variant_name, "output_i"),
+                &syntax.parameters,
+            );
+            let fallback_ty = generate_parameter_type(
+                scope,
+                ("Any", variant_name, "fallback"),
+                &syntax.parameters,
+            );
+            (
+                box_recursive_types("Any", &label_ty),
+                box_recursive_types("Any", &output_ty),
+                box_recursive_types("Any", &fallback_ty),
+            )
+        })
+    } else {
+        None
+    };
     let number_minus_union_ty = if name == "Number" {
         Some(generate_expression_any_of(
             scope,
@@ -1474,8 +1493,9 @@ fn generate_syntax_enum_deserializer(
                 let row_struct = variadic_row_struct_names
                     .get(key.as_str())
                     .map(String::as_str);
-                if key == "match" {
-                    let (lt, ot, ft) = match_types.as_ref().expect("match precomputed types");
+                if name == "Any" && key == "match" {
+                    let (lt, ot, ft) =
+                        any_match_types.as_ref().expect("Any::Match precomputed types");
                     emit_match_deserializer_arm(
                         visit_seq,
                         name,

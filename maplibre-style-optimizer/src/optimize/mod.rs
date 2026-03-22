@@ -14,24 +14,27 @@
 //!   optimizer-produced forms survive).  Structural passes then run in one
 //!   batch: one deserialize → all structural passes → one `sync_typed_to_json`.
 
+mod cleanup;
+mod dead;
 mod defaults;
 pub(crate) mod expr;
-pub(crate) mod metadata;
+mod metadata;
 mod selectivity;
 pub(crate) mod source_util;
-pub(crate) mod typed_passes;
+mod strip;
 mod walk;
+mod zoom;
 
+use cleanup::cleanup;
+use dead::dead_elimination;
 use defaults::StripDefaultsVisitor;
 use expr::{NormalizeFoldVisitor, ReorderSelectivityVisitor};
 use maplibre_style_spec::mir::MirSpec;
 use maplibre_style_spec::spec::{AnyLayer, LayerFilter, MaplibreStyleSpecification};
+use metadata::metadata_refinement;
 use serde_json::Value;
-use source_util::precompute_vector_layer_info;
-use typed_passes::{
-    cleanup_typed, dead_elimination_typed, metadata_refinement_typed,
-    precompute_vector_layer_info_typed, strip_metadata_typed,
-};
+use source_util::{precompute_vector_layer_info, precompute_vector_layer_info_typed};
+use strip::strip_metadata;
 use walk::walk_style_mut;
 
 use crate::stats::TileStatistics;
@@ -150,7 +153,7 @@ fn run_pipeline(
     // 1. Strip metadata (typed, direct) — before expression passes so that the
     //    serialized JSON excludes metadata.
     if passes.strip_metadata {
-        strip_metadata_typed(style);
+        strip_metadata(style);
     }
 
     // 2. Expression passes: serialize → JSON walker → sync only filter changes back.
@@ -173,21 +176,21 @@ fn run_structural_passes(
     stats: Option<&TileStatistics>,
 ) {
     if passes.strip_metadata {
-        strip_metadata_typed(style);
+        strip_metadata(style);
     }
 
     if passes.dead_elimination {
         let layer_info = stats.map(|_| precompute_vector_layer_info_typed(style));
-        dead_elimination_typed(style, stats, layer_info.as_deref());
+        dead_elimination(style, stats, layer_info.as_deref());
     }
 
     if passes.metadata_refinement {
         let layer_info = stats.map(|_| precompute_vector_layer_info_typed(style));
-        metadata_refinement_typed(style, stats, layer_info.as_deref());
+        metadata_refinement(style, stats, layer_info.as_deref());
     }
 
     if passes.cleanup {
-        cleanup_typed(style);
+        cleanup(style);
     }
 }
 

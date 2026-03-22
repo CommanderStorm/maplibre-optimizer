@@ -1,12 +1,3 @@
-//! JSON serialize → deserialize round-trip for [`MaplibreStyleSpecification`].
-//!
-//! Run with a nightly toolchain (required by cargo-fuzz), e.g.:
-//! `cd maplibre-style-spec/fuzz && cargo +nightly fuzz run spec_roundtrip`
-//!
-//! If the default fuzz target fails to link on Linux (e.g. musl), see `fuzz/README.md`.
-//!
-//! Install: `cargo install cargo-fuzz`
-
 #![no_main]
 
 use arbitrary::{Arbitrary, Unstructured};

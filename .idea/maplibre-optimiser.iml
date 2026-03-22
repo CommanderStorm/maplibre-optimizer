@@ -8,6 +8,8 @@
       <sourceFolder url="file://$MODULE_DIR$/codegen/tests" isTestSource="true" />
       <sourceFolder url="file://$MODULE_DIR$/codegen2/src" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/codegen2/tests" isTestSource="true" />
+      <sourceFolder url="file://$MODULE_DIR$/maplibre-style-optimizer/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/maplibre-style-optimizer/tests" isTestSource="true" />
       <excludeFolder url="file://$MODULE_DIR$/target" />
     </content>
     <orderEntry type="inheritedJdk" />
