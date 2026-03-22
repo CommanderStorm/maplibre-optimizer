@@ -475,7 +475,7 @@ fn generate_expression_any_of(scope: &mut Scope, types: &[MirParameterType]) -> 
         );
         extra_untagged = true;
     }
-    // `Number`↔`NumberLiteral` and projection↔string stops share one serde shape; without `untagged`
+    // `Number` <-> `NumberLiteral` and projection<->string stops share one serde shape; without `untagged`
     // serde expects externally-tagged enums and rejects plain JSON scalars / arrays.
     if has_projection_stop {
         extra_untagged = true;

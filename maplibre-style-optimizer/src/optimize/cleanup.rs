@@ -2,8 +2,7 @@
 
 use std::collections::HashSet;
 
-use maplibre_style_spec::spec::{AnyLayer, MaplibreStyleSpecification, TypedLayer};
-use serde_json::Value;
+use maplibre_style_spec::spec::{AnyLayer, MaplibreStyleSpecification, TypedLayer, Visibility};
 
 use super::dead::{collect_used_sources, prune_sources};
 
@@ -39,11 +38,7 @@ pub(crate) fn cleanup(style: &mut MaplibreStyleSpecification) {
             if referenced_ids.contains(id) {
                 return None; // never remove a ref target
             }
-            if is_invisible(layer) {
-                Some(i)
-            } else {
-                None
-            }
+            if is_invisible(layer) { Some(i) } else { None }
         })
         .collect();
 
@@ -119,115 +114,87 @@ fn is_serialized_empty(v: &impl serde::Serialize) -> bool {
     val.as_object().is_some_and(serde_json::Map::is_empty)
 }
 
-#[expect(clippy::too_many_lines)]
+/// Extract the visibility from any layout variant.
+fn layout_visibility(layer: &TypedLayer) -> Option<Visibility> {
+    match layer {
+        TypedLayer::Background {
+            layout: Some(l), ..
+        } => l.visibility,
+        TypedLayer::Circle {
+            layout: Some(l), ..
+        } => l.visibility,
+        TypedLayer::ColorRelief {
+            layout: Some(l), ..
+        } => l.visibility,
+        TypedLayer::Fill {
+            layout: Some(l), ..
+        } => l.visibility,
+        TypedLayer::FillExtrusion {
+            layout: Some(l), ..
+        } => l.visibility,
+        TypedLayer::Heatmap {
+            layout: Some(l), ..
+        } => l.visibility,
+        TypedLayer::Hillshade {
+            layout: Some(l), ..
+        } => l.visibility,
+        TypedLayer::Line {
+            layout: Some(l), ..
+        } => l.visibility,
+        TypedLayer::Raster {
+            layout: Some(l), ..
+        } => l.visibility,
+        TypedLayer::Symbol {
+            layout: Some(l), ..
+        } => l.visibility,
+        _ => None,
+    }
+}
+
+/// Extract the primary opacity as a literal f64, if present.
+fn literal_opacity(layer: &TypedLayer) -> Option<f64> {
+    match layer {
+        TypedLayer::Fill { paint: Some(p), .. } => p.fill_opacity.as_ref()?.0.as_f64(),
+        TypedLayer::Line { paint: Some(p), .. } => p.line_opacity.as_ref()?.0.as_f64(),
+        TypedLayer::Circle { paint: Some(p), .. } => p.circle_opacity.as_ref()?.0.as_f64(),
+        TypedLayer::FillExtrusion { paint: Some(p), .. } => {
+            p.fill_extrusion_opacity.as_ref()?.0.as_f64()
+        }
+        TypedLayer::Raster { paint: Some(p), .. } => p.raster_opacity.as_ref()?.0.as_f64(),
+        TypedLayer::Heatmap { paint: Some(p), .. } => p.heatmap_opacity.as_ref()?.0.as_f64(),
+        _ => None,
+    }
+}
+
 fn is_invisible(layer: &AnyLayer) -> bool {
     let AnyLayer::Typed(t) = layer else {
         return false;
     };
 
-    // Check visibility via JSON serialization of layout (simpler than matching every layout type).
-    let visibility_none = match t {
-        TypedLayer::Fill {
-            layout: Some(l), ..
-        } => serde_json::to_value(l)
-            .ok()
-            .and_then(|v| v.get("visibility")?.as_str().map(|s| s == "none"))
-            .unwrap_or(false),
-        TypedLayer::Line {
-            layout: Some(l), ..
-        } => serde_json::to_value(l)
-            .ok()
-            .and_then(|v| v.get("visibility")?.as_str().map(|s| s == "none"))
-            .unwrap_or(false),
-        TypedLayer::Circle {
-            layout: Some(l), ..
-        } => serde_json::to_value(l)
-            .ok()
-            .and_then(|v| v.get("visibility")?.as_str().map(|s| s == "none"))
-            .unwrap_or(false),
-        TypedLayer::Symbol {
-            layout: Some(l), ..
-        } => serde_json::to_value(l)
-            .ok()
-            .and_then(|v| v.get("visibility")?.as_str().map(|s| s == "none"))
-            .unwrap_or(false),
-        TypedLayer::Raster {
-            layout: Some(l), ..
-        } => serde_json::to_value(l)
-            .ok()
-            .and_then(|v| v.get("visibility")?.as_str().map(|s| s == "none"))
-            .unwrap_or(false),
-        TypedLayer::Heatmap {
-            layout: Some(l), ..
-        } => serde_json::to_value(l)
-            .ok()
-            .and_then(|v| v.get("visibility")?.as_str().map(|s| s == "none"))
-            .unwrap_or(false),
-        TypedLayer::Hillshade {
-            layout: Some(l), ..
-        } => serde_json::to_value(l)
-            .ok()
-            .and_then(|v| v.get("visibility")?.as_str().map(|s| s == "none"))
-            .unwrap_or(false),
-        TypedLayer::FillExtrusion {
-            layout: Some(l), ..
-        } => serde_json::to_value(l)
-            .ok()
-            .and_then(|v| v.get("visibility")?.as_str().map(|s| s == "none"))
-            .unwrap_or(false),
-        TypedLayer::Background {
-            layout: Some(l), ..
-        } => serde_json::to_value(l)
-            .ok()
-            .and_then(|v| v.get("visibility")?.as_str().map(|s| s == "none"))
-            .unwrap_or(false),
-        _ => false,
-    };
-    if visibility_none {
+    // Check visibility.
+    if layout_visibility(t) == Some(Visibility::None) {
         return true;
     }
 
-    // Check zero opacity via JSON serialization of paint.
-    let layer_type = t.layer_type();
-    let opacity_prop = match layer_type {
-        "fill" => Some("fill-opacity"),
-        "line" => Some("line-opacity"),
-        "circle" => Some("circle-opacity"),
-        "fill-extrusion" => Some("fill-extrusion-opacity"),
-        "raster" => Some("raster-opacity"),
-        "heatmap" => Some("heatmap-opacity"),
-        _ => None,
-    };
-
-    if let Some(prop) = opacity_prop {
-        let paint_json = match t {
-            TypedLayer::Fill { paint: Some(p), .. } => serde_json::to_value(p).ok(),
-            TypedLayer::Line { paint: Some(p), .. } => serde_json::to_value(p).ok(),
-            TypedLayer::Circle { paint: Some(p), .. } => serde_json::to_value(p).ok(),
-            TypedLayer::FillExtrusion { paint: Some(p), .. } => serde_json::to_value(p).ok(),
-            TypedLayer::Raster { paint: Some(p), .. } => serde_json::to_value(p).ok(),
-            TypedLayer::Heatmap { paint: Some(p), .. } => serde_json::to_value(p).ok(),
-            _ => None,
-        };
-        if let Some(pj) = paint_json
-            && pj.get(prop).and_then(Value::as_f64) == Some(0.0)
-        {
-            // Circle special case.
-            if layer_type == "circle" {
-                let stroke_opacity = pj
-                    .get("circle-stroke-opacity")
-                    .and_then(Value::as_f64)
-                    .unwrap_or(1.0);
-                let stroke_width = pj
-                    .get("circle-stroke-width")
-                    .and_then(Value::as_f64)
-                    .unwrap_or(0.0);
-                if stroke_opacity != 0.0 && stroke_width != 0.0 {
-                    return false;
-                }
+    // Check zero opacity.
+    if literal_opacity(t) == Some(0.0) {
+        // Circle special case: visible stroke keeps the layer alive.
+        if let TypedLayer::Circle { paint: Some(p), .. } = t {
+            let stroke_opacity = p
+                .circle_stroke_opacity
+                .as_ref()
+                .and_then(|o| o.0.as_f64())
+                .unwrap_or(1.0);
+            let stroke_width = p
+                .circle_stroke_width
+                .as_ref()
+                .and_then(|w| w.0.as_f64())
+                .unwrap_or(0.0);
+            if stroke_opacity != 0.0 && stroke_width != 0.0 {
+                return false;
             }
-            return true;
         }
+        return true;
     }
 
     false

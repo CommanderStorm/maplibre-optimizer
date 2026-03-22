@@ -44,16 +44,9 @@ pub(crate) fn dead_elimination(
     prune_sources(style, &used);
 }
 
-/// Prune unused sources by roundtripping through JSON.
+/// Prune sources not referenced by any layer.
 pub(super) fn prune_sources(style: &mut MaplibreStyleSpecification, used: &HashSet<String>) {
-    if let Ok(mut sources_val) = serde_json::to_value(&style.sources) {
-        if let Some(obj) = sources_val.as_object_mut() {
-            obj.retain(|id, _| used.contains(id.as_str()));
-        }
-        if let Ok(new_sources) = serde_json::from_value(sources_val) {
-            style.sources = new_sources;
-        }
-    }
+    style.sources.0.retain(|id, _| used.contains(id.as_str()));
 }
 
 fn is_dead_by_geometry(

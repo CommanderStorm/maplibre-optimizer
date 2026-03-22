@@ -1,6 +1,6 @@
 //! Shared utilities for vector layer info.
 
-use maplibre_style_spec::spec::{AnyLayer, MaplibreStyleSpecification};
+use maplibre_style_spec::spec::{AnyLayer, MaplibreStyleSpecification, Source};
 use serde_json::Value;
 
 /// Information about a layer's vector source, pre-computed for use by visitors.
@@ -85,15 +85,9 @@ pub(crate) fn precompute_vector_layer_info_typed(
 }
 
 fn is_vector_source_typed(style: &MaplibreStyleSpecification, source_name: &str) -> bool {
-    serde_json::to_value(&style.sources)
-        .ok()
-        .and_then(|v| {
-            v.as_object()?
-                .get(source_name)?
-                .as_object()?
-                .get("type")?
-                .as_str()
-                .map(|s| s == "vector")
-        })
-        .unwrap_or(false)
+    style
+        .sources
+        .0
+        .get(source_name)
+        .is_some_and(|s| matches!(s, Source::Vector { .. }))
 }
