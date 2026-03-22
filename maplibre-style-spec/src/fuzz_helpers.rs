@@ -228,8 +228,9 @@ pub fn arbitrary_dynamic_color(u: &mut Unstructured<'_>) -> arbitrary::Result<Dy
 }
 
 pub fn arbitrary_geojson(u: &mut Unstructured<'_>) -> arbitrary::Result<GeoJson> {
-    let lon: f64 = f64::arbitrary(u)?;
-    let lat: f64 = f64::arbitrary(u)?;
+    // f64::arbitrary can produce NaN/infinity
+    let lon = i16::arbitrary(u)? as f64;
+    let lat = i16::arbitrary(u)? as f64;
     let geom = Geometry::from(GeoJsonValue::Point(vec![lon, lat]));
     Ok(GeoJson::Geometry(geom))
 }
