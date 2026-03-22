@@ -71,7 +71,7 @@ impl DecodedEnumValues {
     pub fn as_enum(&self) -> &BTreeMap<String, DecodedEnumDocs> {
         match self {
             DecodedEnumValues::SyntaxEnum(_) => panic!("Enum enum cannot be a DecodedSyntaxEnum"),
-            DecodedEnumValues::Version(_) => panic!("Enum enum cannot be a DecodedSyntaxEnum"),
+            DecodedEnumValues::Version(_) => panic!("Version enum cannot be an Enum"),
             DecodedEnumValues::Enum(btree_map) => btree_map,
         }
     }
