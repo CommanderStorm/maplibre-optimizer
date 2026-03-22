@@ -81,7 +81,17 @@ fn build_by_output_type(
                 .variants
                 .entry(expr_key.clone())
                 .and_modify(|def: &mut MirSyntaxVariantDef| {
-                    def.syntax.overloads.push(mir_overload.clone())
+                    // For `in`, the `substring/string` overload serialises identically to
+                    // `item/array`, making `#[serde(untagged)]` non-deterministic on
+                    // deserialisation. Drop it; `Item(ExprOrLiteral, ExprOrLiteral)` covers both.
+                    let skip = expr_key == "in"
+                        && mir_overload
+                            .parameters
+                            .first()
+                            .is_some_and(|p| p == "substring");
+                    if !skip {
+                        def.syntax.overloads.push(mir_overload.clone());
+                    }
                 })
                 .or_insert_with(|| {
                     let mut parameters: Vec<_> = syntax_enum
@@ -133,6 +143,38 @@ fn build_by_output_type(
                     o.output_type = output_type_param.clone();
                 }
                 group.variants.insert(k.clone(), specialised);
+            }
+        }
+    }
+
+    // Expand the `Any` group into every concrete output type.
+    // Operators with output type `any` (e.g. `get`, `match`, `step`, `coalesce`) are
+    // polymorphic and can appear wherever a specific type is expected.
+    if let Some(any_group) = by_output_type.get("Any").cloned() {
+        let concrete_types: Vec<(String, MirParameterType)> = possible_expressions
+            .iter()
+            .filter(|(k, _)| k.as_str() != "Any")
+            .map(|(k, v)| (k.clone(), v.clone()))
+            .collect();
+
+        for (output_type_name, output_type_param) in concrete_types {
+            let group =
+                by_output_type
+                    .entry(output_type_name)
+                    .or_insert_with(|| MirExpressionGroup {
+                        variants: BTreeMap::new(),
+                    });
+
+            for (k, v) in &any_group.variants {
+                // Only insert if the concrete group doesn't already have this operator
+                // (a concrete definition takes precedence over the `any` fallback).
+                if !group.variants.contains_key(k) {
+                    let mut specialised = v.clone();
+                    for o in specialised.syntax.overloads.iter_mut() {
+                        o.output_type = output_type_param.clone();
+                    }
+                    group.variants.insert(k.clone(), specialised);
+                }
             }
         }
     }

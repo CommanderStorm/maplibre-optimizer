@@ -115,12 +115,11 @@ fn filter_value_access() {
         "type": "fill",
         "filter": ["==", 1, 1]
     });
-    let mut layer: AnyLayer = serde_json::from_value(json).expect("deserialize");
-    if let AnyLayer::Typed(ref mut t) = layer {
-        let common = t.common_mut();
-        let filter = common.filter.as_mut().unwrap();
-        let val = filter.as_value_mut();
-        assert!(val.is_array());
+    let layer: AnyLayer = serde_json::from_value(json).expect("deserialize");
+    if let AnyLayer::Typed(ref t) = layer {
+        let filter = t.common().filter.as_ref().unwrap();
+        // ["==", 1, 1] is an expression, not a literal bool.
+        assert!(filter.as_boolean().is_some());
     }
 }
 
@@ -166,6 +165,6 @@ fn filter_literal_bool() {
     let layer: AnyLayer = serde_json::from_value(json).expect("deserialize");
     if let AnyLayer::Typed(ref t) = layer {
         let filter = t.common().filter.as_ref().unwrap();
-        assert_eq!(filter.as_literal_bool(), Some(true));
+        assert!(filter.is_always_true());
     }
 }

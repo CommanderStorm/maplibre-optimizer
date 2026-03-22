@@ -357,10 +357,17 @@ fn generate_source_types(scope: &mut Scope, sources: &MirSources) {
     // discriminant matches the `source_types` map key.
     let tag = Some("type".to_string());
 
+    // JSON discriminant uses kebab-case (e.g. `raster-dem`), but MIR keys are
+    // snake_case (stripped from `source_raster_dem`).  Restore the hyphens for serde.
     let renames: BTreeMap<String, String> = sources
         .source_types
         .keys()
-        .map(|k| (to_upper_camel_case(format!("{k}_source")), k.clone()))
+        .map(|k| {
+            (
+                to_upper_camel_case(format!("{k}_source")),
+                k.replace('_', "-"),
+            )
+        })
         .collect();
 
     generate_oneof(
@@ -416,21 +423,79 @@ fn generate_layer_types(scope: &mut Scope, layers: &MirLayers) {
 
 /// Generate the `LayerFilter` type.
 ///
-/// Ideally this would be `Boolean | bool`, but the generated expression enums
-/// don't yet have custom `Serialize` impls that produce the `["op", ...]` JSON
-/// array format (only custom `Deserialize`).  So we use `serde_json::Value` to
-/// preserve round-trip fidelity, with typed accessors for common patterns.
+/// A typed enum with custom serde: `Literal(bool)` for bare booleans and
+/// `["literal", bool]` (normalised on deserialize), `Expr(Box<Boolean>)` for
+/// expression arrays.  Both `Boolean::serialize` and `Boolean::deserialize`
+/// round-trip via the `["op", ...]` array format, so there is no information
+/// loss.
 fn generate_layer_filter(scope: &mut Scope) {
     scope.raw(
         r#"
-/// A filter expression — semantically a boolean expression or literal,
-/// stored as `serde_json::Value` for lossless JSON round-tripping.
-#[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+/// A filter expression: either a typed boolean expression or a literal bool.
+///
+/// On deserialize, bare `true`/`false` and `["literal", true/false]` are both
+/// normalised to `Literal(bool)`.  On serialize, `Literal(b)` emits the bare
+/// JSON boolean.
+#[derive(PartialEq, Debug, Clone)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub struct LayerFilter(
-    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
-    serde_json::Value,
-);
+pub enum LayerFilter {
+    Expr(Box<Boolean>),
+    Literal(bool),
+}
+
+impl<'de> serde::Deserialize<'de> for LayerFilter {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        deserializer.deserialize_any(LayerFilterVisitor)
+    }
+}
+
+struct LayerFilterVisitor;
+
+impl<'de> serde::de::Visitor<'de> for LayerFilterVisitor {
+    type Value = LayerFilter;
+
+    fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        f.write_str("a boolean literal or a Boolean expression array")
+    }
+
+    fn visit_bool<E: serde::de::Error>(self, b: bool) -> Result<Self::Value, E> {
+        Ok(LayerFilter::Literal(b))
+    }
+
+    fn visit_seq<A: serde::de::SeqAccess<'de>>(self, mut seq: A) -> Result<Self::Value, A::Error> {
+        // Collect all elements; we need to inspect the first to detect ["literal", bool].
+        let mut elements: Vec<serde_json::Value> = Vec::new();
+        while let Some(elem) = seq.next_element::<serde_json::Value>()? {
+            elements.push(elem);
+        }
+        // Normalise ["literal", true/false] → Literal(bool).
+        if elements.len() == 2
+            && elements[0].as_str() == Some("literal")
+            && elements[1].is_boolean()
+        {
+            return Ok(LayerFilter::Literal(elements[1].as_bool().unwrap()));
+        }
+        let arr = serde_json::Value::Array(elements);
+        let expr =
+            serde_json::from_value::<Boolean>(arr).map_err(serde::de::Error::custom)?;
+        Ok(LayerFilter::Expr(Box::new(expr)))
+    }
+}
+
+impl serde::Serialize for LayerFilter {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        match self {
+            LayerFilter::Expr(expr) => expr.serialize(serializer),
+            LayerFilter::Literal(b) => serializer.serialize_bool(*b),
+        }
+    }
+}
 "#,
     );
 }
@@ -672,27 +737,41 @@ impl LayerSourceLayer {{
 }}
 
 impl LayerFilter {{
-    pub fn as_value(&self) -> &serde_json::Value {{
-        &self.0
+    /// Returns `true` if this filter is the literal `false` (layer never renders).
+    pub fn is_always_false(&self) -> bool {{
+        matches!(self, LayerFilter::Literal(false))
     }}
 
-    pub fn as_value_mut(&mut self) -> &mut serde_json::Value {{
-        &mut self.0
+    /// Returns `true` if this filter is the literal `true` (layer always renders).
+    pub fn is_always_true(&self) -> bool {{
+        matches!(self, LayerFilter::Literal(true))
     }}
 
-    pub fn from_value(v: serde_json::Value) -> Self {{
-        Self(v)
-    }}
-
-    /// Returns `Some(true)` or `Some(false)` if this filter is a literal boolean
-    /// (`true`, `false`, `["literal", true]`, or `["literal", false]`).
-    pub fn as_literal_bool(&self) -> Option<bool> {{
-        match &self.0 {{
-            serde_json::Value::Bool(b) => Some(*b),
-            serde_json::Value::Array(a) if a.len() == 2
-                && a[0].as_str() == Some("literal") => a[1].as_bool(),
-            _ => None,
+    /// Returns the inner expression if this is an `Expr` variant.
+    pub fn as_boolean(&self) -> Option<&Boolean> {{
+        match self {{
+            LayerFilter::Expr(b) => Some(b),
+            LayerFilter::Literal(_) => None,
         }}
+    }}
+
+    /// Returns a mutable reference to the inner expression if this is an `Expr` variant.
+    pub fn as_boolean_mut(&mut self) -> Option<&mut Boolean> {{
+        match self {{
+            LayerFilter::Expr(b) => Some(b),
+            LayerFilter::Literal(_) => None,
+        }}
+    }}
+
+    /// Serialize to `serde_json::Value` for passes that still operate on JSON.
+    pub fn to_json_value(&self) -> serde_json::Value {{
+        serde_json::to_value(self).expect("LayerFilter serialization is infallible")
+    }}
+
+    /// Deserialize from `serde_json::Value`.  Returns `None` if the value is not
+    /// a valid filter (e.g. a string or object).
+    pub fn from_value(v: serde_json::Value) -> Option<Self> {{
+        serde_json::from_value(v).ok()
     }}
 }}
 

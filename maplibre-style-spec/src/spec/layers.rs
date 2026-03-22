@@ -2,14 +2,70 @@
 #[allow(unused_imports)]
 use super::*;
 
-/// A filter expression — semantically a boolean expression or literal,
-/// stored as `serde_json::Value` for lossless JSON round-tripping.
-#[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+/// A filter expression: either a typed boolean expression or a literal bool.
+///
+/// On deserialize, bare `true`/`false` and `["literal", true/false]` are both
+/// normalised to `Literal(bool)`.  On serialize, `Literal(b)` emits the bare
+/// JSON boolean.
+#[derive(PartialEq, Debug, Clone)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub struct LayerFilter(
-    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
-    serde_json::Value,
-);
+pub enum LayerFilter {
+    Expr(Box<Boolean>),
+    Literal(bool),
+}
+
+impl<'de> serde::Deserialize<'de> for LayerFilter {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        deserializer.deserialize_any(LayerFilterVisitor)
+    }
+}
+
+struct LayerFilterVisitor;
+
+impl<'de> serde::de::Visitor<'de> for LayerFilterVisitor {
+    type Value = LayerFilter;
+
+    fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        f.write_str("a boolean literal or a Boolean expression array")
+    }
+
+    fn visit_bool<E: serde::de::Error>(self, b: bool) -> Result<Self::Value, E> {
+        Ok(LayerFilter::Literal(b))
+    }
+
+    fn visit_seq<A: serde::de::SeqAccess<'de>>(self, mut seq: A) -> Result<Self::Value, A::Error> {
+        // Collect all elements; we need to inspect the first to detect ["literal", bool].
+        let mut elements: Vec<serde_json::Value> = Vec::new();
+        while let Some(elem) = seq.next_element::<serde_json::Value>()? {
+            elements.push(elem);
+        }
+        // Normalise ["literal", true/false] → Literal(bool).
+        if elements.len() == 2
+            && elements[0].as_str() == Some("literal")
+            && elements[1].is_boolean()
+        {
+            return Ok(LayerFilter::Literal(elements[1].as_bool().unwrap()));
+        }
+        let arr = serde_json::Value::Array(elements);
+        let expr = serde_json::from_value::<Boolean>(arr).map_err(serde::de::Error::custom)?;
+        Ok(LayerFilter::Expr(Box::new(expr)))
+    }
+}
+
+impl serde::Serialize for LayerFilter {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        match self {
+            LayerFilter::Expr(expr) => expr.serialize(serializer),
+            LayerFilter::Literal(b) => serializer.serialize_bool(*b),
+        }
+    }
+}
 
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
@@ -1478,14 +1534,81 @@ pub struct FillPaintLayer {
     pub fill_translate_anchor: Option<FillPaintLayerFillTranslateAnchor>,
 }
 
-/// Whether or not the fill should be antialiased.
-#[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone, Copy)]
+/// Nested expression: [`Boolean`] operators.
+#[derive(PartialEq, Debug, Clone)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub struct FillPaintLayerFillAntialias(bool);
+pub enum FillPaintLayerFillAntialiasExpression {
+    Boolean(Boolean),
+}
+
+impl serde::Serialize for FillPaintLayerFillAntialiasExpression {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        match self {
+            Self::Boolean(v) => v.serialize(serializer),
+        }
+    }
+}
+
+impl<'de> serde::Deserialize<'de> for FillPaintLayerFillAntialiasExpression {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
+        let mut errors: Vec<(&str, std::string::String)> = Vec::new();
+        match <Boolean as serde::Deserialize>::deserialize(&value) {
+            Ok(v) => return Ok(Self::Boolean(v)),
+            Err(e) => errors.push(("Boolean", e.to_string())),
+        }
+
+        let details: Vec<std::string::String> =
+            errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
+        Err(serde::de::Error::custom(format!(
+            "FillPaintLayerFillAntialiasExpression: no variant matched. Expected Boolean(Boolean). Errors: [{}]",
+            details.join("; ")
+        )))
+    }
+}
+
+/// Whether or not the fill should be antialiased.
+#[derive(PartialEq, Debug, Clone)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+pub enum FillPaintLayerFillAntialias {
+    Expr(Box<FillPaintLayerFillAntialiasExpression>),
+    Literal(bool),
+}
+
+impl serde::Serialize for FillPaintLayerFillAntialias {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        match self {
+            Self::Expr(v) => v.as_ref().serialize(serializer),
+            Self::Literal(v) => v.serialize(serializer),
+        }
+    }
+}
+
+impl<'de> serde::Deserialize<'de> for FillPaintLayerFillAntialias {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
+        let mut errors: Vec<(&str, std::string::String)> = Vec::new();
+        match <FillPaintLayerFillAntialiasExpression as serde::Deserialize>::deserialize(&value) {
+            Ok(v) => return Ok(Self::Expr(Box::new(v))),
+            Err(e) => errors.push(("Expr", e.to_string())),
+        }
+        match <bool as serde::Deserialize>::deserialize(&value) {
+            Ok(v) => return Ok(Self::Literal(v)),
+            Err(e) => errors.push(("Literal", e.to_string())),
+        }
+
+        let details: Vec<std::string::String> =
+            errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
+        Err(serde::de::Error::custom(format!(
+            "FillPaintLayerFillAntialias: no variant matched. Expected Expr(FillPaintLayerFillAntialiasExpression) | Literal(bool). Errors: [{}]",
+            details.join("; ")
+        )))
+    }
+}
 
 impl Default for FillPaintLayerFillAntialias {
     fn default() -> Self {
-        Self(true)
+        Self::Literal(true)
     }
 }
 
@@ -2233,14 +2356,83 @@ pub enum FillExtrusionPaintLayerFillExtrusionTranslateAnchor {
     Viewport,
 }
 
-/// Whether to apply a vertical gradient to the sides of a fill-extrusion layer. If true, sides will be shaded slightly darker farther down.
-#[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone, Copy)]
+/// Nested expression: [`Boolean`] operators.
+#[derive(PartialEq, Debug, Clone)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub struct FillExtrusionPaintLayerFillExtrusionVerticalGradient(bool);
+pub enum FillExtrusionPaintLayerFillExtrusionVerticalGradientExpression {
+    Boolean(Boolean),
+}
+
+impl serde::Serialize for FillExtrusionPaintLayerFillExtrusionVerticalGradientExpression {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        match self {
+            Self::Boolean(v) => v.serialize(serializer),
+        }
+    }
+}
+
+impl<'de> serde::Deserialize<'de>
+    for FillExtrusionPaintLayerFillExtrusionVerticalGradientExpression
+{
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
+        let mut errors: Vec<(&str, std::string::String)> = Vec::new();
+        match <Boolean as serde::Deserialize>::deserialize(&value) {
+            Ok(v) => return Ok(Self::Boolean(v)),
+            Err(e) => errors.push(("Boolean", e.to_string())),
+        }
+
+        let details: Vec<std::string::String> =
+            errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
+        Err(serde::de::Error::custom(format!(
+            "FillExtrusionPaintLayerFillExtrusionVerticalGradientExpression: no variant matched. Expected Boolean(Boolean). Errors: [{}]",
+            details.join("; ")
+        )))
+    }
+}
+
+/// Whether to apply a vertical gradient to the sides of a fill-extrusion layer. If true, sides will be shaded slightly darker farther down.
+#[derive(PartialEq, Debug, Clone)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+pub enum FillExtrusionPaintLayerFillExtrusionVerticalGradient {
+    Expr(Box<FillExtrusionPaintLayerFillExtrusionVerticalGradientExpression>),
+    Literal(bool),
+}
+
+impl serde::Serialize for FillExtrusionPaintLayerFillExtrusionVerticalGradient {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        match self {
+            Self::Expr(v) => v.as_ref().serialize(serializer),
+            Self::Literal(v) => v.serialize(serializer),
+        }
+    }
+}
+
+impl<'de> serde::Deserialize<'de> for FillExtrusionPaintLayerFillExtrusionVerticalGradient {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
+        let mut errors: Vec<(&str, std::string::String)> = Vec::new();
+        match <FillExtrusionPaintLayerFillExtrusionVerticalGradientExpression as serde::Deserialize>::deserialize(&value) {
+            Ok(v) => return Ok(Self::Expr(Box::new(v))),
+            Err(e) => errors.push(("Expr", e.to_string())),
+        }
+        match <bool as serde::Deserialize>::deserialize(&value) {
+            Ok(v) => return Ok(Self::Literal(v)),
+            Err(e) => errors.push(("Literal", e.to_string())),
+        }
+
+        let details: Vec<std::string::String> =
+            errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
+        Err(serde::de::Error::custom(format!(
+            "FillExtrusionPaintLayerFillExtrusionVerticalGradient: no variant matched. Expected Expr(FillExtrusionPaintLayerFillExtrusionVerticalGradientExpression) | Literal(bool). Errors: [{}]",
+            details.join("; ")
+        )))
+    }
+}
 
 impl Default for FillExtrusionPaintLayerFillExtrusionVerticalGradient {
     fn default() -> Self {
-        Self(true)
+        Self::Literal(true)
     }
 }
 
@@ -5178,10 +5370,85 @@ pub struct SymbolLayoutLayer {
     pub visibility: Option<SymbolLayoutLayerVisibility>,
 }
 
-/// If true, the icon will be visible even if it collides with other previously drawn symbols.
-#[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone, Copy, Default)]
+/// Nested expression: [`Boolean`] operators.
+#[derive(PartialEq, Debug, Clone)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub struct SymbolLayoutLayerIconAllowOverlap(bool);
+pub enum SymbolLayoutLayerIconAllowOverlapExpression {
+    Boolean(Boolean),
+}
+
+impl serde::Serialize for SymbolLayoutLayerIconAllowOverlapExpression {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        match self {
+            Self::Boolean(v) => v.serialize(serializer),
+        }
+    }
+}
+
+impl<'de> serde::Deserialize<'de> for SymbolLayoutLayerIconAllowOverlapExpression {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
+        let mut errors: Vec<(&str, std::string::String)> = Vec::new();
+        match <Boolean as serde::Deserialize>::deserialize(&value) {
+            Ok(v) => return Ok(Self::Boolean(v)),
+            Err(e) => errors.push(("Boolean", e.to_string())),
+        }
+
+        let details: Vec<std::string::String> =
+            errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
+        Err(serde::de::Error::custom(format!(
+            "SymbolLayoutLayerIconAllowOverlapExpression: no variant matched. Expected Boolean(Boolean). Errors: [{}]",
+            details.join("; ")
+        )))
+    }
+}
+
+/// If true, the icon will be visible even if it collides with other previously drawn symbols.
+#[derive(PartialEq, Debug, Clone)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+pub enum SymbolLayoutLayerIconAllowOverlap {
+    Expr(Box<SymbolLayoutLayerIconAllowOverlapExpression>),
+    Literal(bool),
+}
+
+impl serde::Serialize for SymbolLayoutLayerIconAllowOverlap {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        match self {
+            Self::Expr(v) => v.as_ref().serialize(serializer),
+            Self::Literal(v) => v.serialize(serializer),
+        }
+    }
+}
+
+impl<'de> serde::Deserialize<'de> for SymbolLayoutLayerIconAllowOverlap {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
+        let mut errors: Vec<(&str, std::string::String)> = Vec::new();
+        match <SymbolLayoutLayerIconAllowOverlapExpression as serde::Deserialize>::deserialize(
+            &value,
+        ) {
+            Ok(v) => return Ok(Self::Expr(Box::new(v))),
+            Err(e) => errors.push(("Expr", e.to_string())),
+        }
+        match <bool as serde::Deserialize>::deserialize(&value) {
+            Ok(v) => return Ok(Self::Literal(v)),
+            Err(e) => errors.push(("Literal", e.to_string())),
+        }
+
+        let details: Vec<std::string::String> =
+            errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
+        Err(serde::de::Error::custom(format!(
+            "SymbolLayoutLayerIconAllowOverlap: no variant matched. Expected Expr(SymbolLayoutLayerIconAllowOverlapExpression) | Literal(bool). Errors: [{}]",
+            details.join("; ")
+        )))
+    }
+}
+
+impl Default for SymbolLayoutLayerIconAllowOverlap {
+    fn default() -> Self {
+        Self::Literal(false)
+    }
+}
 
 /// Part of the icon placed closest to the anchor.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy, Default)]
@@ -5208,20 +5475,170 @@ pub enum SymbolLayoutLayerIconAnchor {
     TopRight,
 }
 
-/// If true, other symbols can be visible even if they collide with the icon.
-#[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone, Copy, Default)]
+/// Nested expression: [`Boolean`] operators.
+#[derive(PartialEq, Debug, Clone)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub struct SymbolLayoutLayerIconIgnorePlacement(bool);
+pub enum SymbolLayoutLayerIconIgnorePlacementExpression {
+    Boolean(Boolean),
+}
+
+impl serde::Serialize for SymbolLayoutLayerIconIgnorePlacementExpression {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        match self {
+            Self::Boolean(v) => v.serialize(serializer),
+        }
+    }
+}
+
+impl<'de> serde::Deserialize<'de> for SymbolLayoutLayerIconIgnorePlacementExpression {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
+        let mut errors: Vec<(&str, std::string::String)> = Vec::new();
+        match <Boolean as serde::Deserialize>::deserialize(&value) {
+            Ok(v) => return Ok(Self::Boolean(v)),
+            Err(e) => errors.push(("Boolean", e.to_string())),
+        }
+
+        let details: Vec<std::string::String> =
+            errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
+        Err(serde::de::Error::custom(format!(
+            "SymbolLayoutLayerIconIgnorePlacementExpression: no variant matched. Expected Boolean(Boolean). Errors: [{}]",
+            details.join("; ")
+        )))
+    }
+}
+
+/// If true, other symbols can be visible even if they collide with the icon.
+#[derive(PartialEq, Debug, Clone)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+pub enum SymbolLayoutLayerIconIgnorePlacement {
+    Expr(Box<SymbolLayoutLayerIconIgnorePlacementExpression>),
+    Literal(bool),
+}
+
+impl serde::Serialize for SymbolLayoutLayerIconIgnorePlacement {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        match self {
+            Self::Expr(v) => v.as_ref().serialize(serializer),
+            Self::Literal(v) => v.serialize(serializer),
+        }
+    }
+}
+
+impl<'de> serde::Deserialize<'de> for SymbolLayoutLayerIconIgnorePlacement {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
+        let mut errors: Vec<(&str, std::string::String)> = Vec::new();
+        match <SymbolLayoutLayerIconIgnorePlacementExpression as serde::Deserialize>::deserialize(
+            &value,
+        ) {
+            Ok(v) => return Ok(Self::Expr(Box::new(v))),
+            Err(e) => errors.push(("Expr", e.to_string())),
+        }
+        match <bool as serde::Deserialize>::deserialize(&value) {
+            Ok(v) => return Ok(Self::Literal(v)),
+            Err(e) => errors.push(("Literal", e.to_string())),
+        }
+
+        let details: Vec<std::string::String> =
+            errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
+        Err(serde::de::Error::custom(format!(
+            "SymbolLayoutLayerIconIgnorePlacement: no variant matched. Expected Expr(SymbolLayoutLayerIconIgnorePlacementExpression) | Literal(bool). Errors: [{}]",
+            details.join("; ")
+        )))
+    }
+}
+
+impl Default for SymbolLayoutLayerIconIgnorePlacement {
+    fn default() -> Self {
+        Self::Literal(false)
+    }
+}
 
 /// Name of image in sprite to use for drawing an image background.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct SymbolLayoutLayerIconImage(std::string::String);
 
-/// If true, the icon may be flipped to prevent it from being rendered upside-down.
-#[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone, Copy, Default)]
+/// Nested expression: [`Boolean`] operators.
+#[derive(PartialEq, Debug, Clone)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub struct SymbolLayoutLayerIconKeepUpright(bool);
+pub enum SymbolLayoutLayerIconKeepUprightExpression {
+    Boolean(Boolean),
+}
+
+impl serde::Serialize for SymbolLayoutLayerIconKeepUprightExpression {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        match self {
+            Self::Boolean(v) => v.serialize(serializer),
+        }
+    }
+}
+
+impl<'de> serde::Deserialize<'de> for SymbolLayoutLayerIconKeepUprightExpression {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
+        let mut errors: Vec<(&str, std::string::String)> = Vec::new();
+        match <Boolean as serde::Deserialize>::deserialize(&value) {
+            Ok(v) => return Ok(Self::Boolean(v)),
+            Err(e) => errors.push(("Boolean", e.to_string())),
+        }
+
+        let details: Vec<std::string::String> =
+            errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
+        Err(serde::de::Error::custom(format!(
+            "SymbolLayoutLayerIconKeepUprightExpression: no variant matched. Expected Boolean(Boolean). Errors: [{}]",
+            details.join("; ")
+        )))
+    }
+}
+
+/// If true, the icon may be flipped to prevent it from being rendered upside-down.
+#[derive(PartialEq, Debug, Clone)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+pub enum SymbolLayoutLayerIconKeepUpright {
+    Expr(Box<SymbolLayoutLayerIconKeepUprightExpression>),
+    Literal(bool),
+}
+
+impl serde::Serialize for SymbolLayoutLayerIconKeepUpright {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        match self {
+            Self::Expr(v) => v.as_ref().serialize(serializer),
+            Self::Literal(v) => v.serialize(serializer),
+        }
+    }
+}
+
+impl<'de> serde::Deserialize<'de> for SymbolLayoutLayerIconKeepUpright {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
+        let mut errors: Vec<(&str, std::string::String)> = Vec::new();
+        match <SymbolLayoutLayerIconKeepUprightExpression as serde::Deserialize>::deserialize(
+            &value,
+        ) {
+            Ok(v) => return Ok(Self::Expr(Box::new(v))),
+            Err(e) => errors.push(("Expr", e.to_string())),
+        }
+        match <bool as serde::Deserialize>::deserialize(&value) {
+            Ok(v) => return Ok(Self::Literal(v)),
+            Err(e) => errors.push(("Literal", e.to_string())),
+        }
+
+        let details: Vec<std::string::String> =
+            errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
+        Err(serde::de::Error::custom(format!(
+            "SymbolLayoutLayerIconKeepUpright: no variant matched. Expected Expr(SymbolLayoutLayerIconKeepUprightExpression) | Literal(bool). Errors: [{}]",
+            details.join("; ")
+        )))
+    }
+}
+
+impl Default for SymbolLayoutLayerIconKeepUpright {
+    fn default() -> Self {
+        Self::Literal(false)
+    }
+}
 
 /// Offset distance of icon from its anchor. Positive values indicate right and down, while negative values indicate left and up. Each component is multiplied by the value of `icon-size` to obtain the final offset in pixels. When combined with `icon-rotate` the offset will be as if the rotated direction was up.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
@@ -5242,10 +5659,83 @@ impl Default for SymbolLayoutLayerIconOffset {
     }
 }
 
-/// If true, text will display without their corresponding icons when the icon collides with other symbols and the text does not.
-#[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone, Copy, Default)]
+/// Nested expression: [`Boolean`] operators.
+#[derive(PartialEq, Debug, Clone)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub struct SymbolLayoutLayerIconOptional(bool);
+pub enum SymbolLayoutLayerIconOptionalExpression {
+    Boolean(Boolean),
+}
+
+impl serde::Serialize for SymbolLayoutLayerIconOptionalExpression {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        match self {
+            Self::Boolean(v) => v.serialize(serializer),
+        }
+    }
+}
+
+impl<'de> serde::Deserialize<'de> for SymbolLayoutLayerIconOptionalExpression {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
+        let mut errors: Vec<(&str, std::string::String)> = Vec::new();
+        match <Boolean as serde::Deserialize>::deserialize(&value) {
+            Ok(v) => return Ok(Self::Boolean(v)),
+            Err(e) => errors.push(("Boolean", e.to_string())),
+        }
+
+        let details: Vec<std::string::String> =
+            errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
+        Err(serde::de::Error::custom(format!(
+            "SymbolLayoutLayerIconOptionalExpression: no variant matched. Expected Boolean(Boolean). Errors: [{}]",
+            details.join("; ")
+        )))
+    }
+}
+
+/// If true, text will display without their corresponding icons when the icon collides with other symbols and the text does not.
+#[derive(PartialEq, Debug, Clone)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+pub enum SymbolLayoutLayerIconOptional {
+    Expr(Box<SymbolLayoutLayerIconOptionalExpression>),
+    Literal(bool),
+}
+
+impl serde::Serialize for SymbolLayoutLayerIconOptional {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        match self {
+            Self::Expr(v) => v.as_ref().serialize(serializer),
+            Self::Literal(v) => v.serialize(serializer),
+        }
+    }
+}
+
+impl<'de> serde::Deserialize<'de> for SymbolLayoutLayerIconOptional {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
+        let mut errors: Vec<(&str, std::string::String)> = Vec::new();
+        match <SymbolLayoutLayerIconOptionalExpression as serde::Deserialize>::deserialize(&value) {
+            Ok(v) => return Ok(Self::Expr(Box::new(v))),
+            Err(e) => errors.push(("Expr", e.to_string())),
+        }
+        match <bool as serde::Deserialize>::deserialize(&value) {
+            Ok(v) => return Ok(Self::Literal(v)),
+            Err(e) => errors.push(("Literal", e.to_string())),
+        }
+
+        let details: Vec<std::string::String> =
+            errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
+        Err(serde::de::Error::custom(format!(
+            "SymbolLayoutLayerIconOptional: no variant matched. Expected Expr(SymbolLayoutLayerIconOptionalExpression) | Literal(bool). Errors: [{}]",
+            details.join("; ")
+        )))
+    }
+}
+
+impl Default for SymbolLayoutLayerIconOptional {
+    fn default() -> Self {
+        Self::Literal(false)
+    }
+}
 
 /// Allows for control over whether to show an icon when it overlaps other symbols on the map. If `icon-overlap` is not set, `icon-allow-overlap` is used instead.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy)]
@@ -5576,10 +6066,85 @@ impl Default for SymbolLayoutLayerIconTextFitPadding {
     }
 }
 
-/// If true, the symbols will not cross tile edges to avoid mutual collisions. Recommended in layers that don't have enough padding in the vector tile to prevent collisions, or if it is a point symbol layer placed after a line symbol layer. When using a client that supports global collision detection, like MapLibre GL JS version 0.42.0 or greater, enabling this property is not needed to prevent clipped labels at tile boundaries.
-#[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone, Copy, Default)]
+/// Nested expression: [`Boolean`] operators.
+#[derive(PartialEq, Debug, Clone)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub struct SymbolLayoutLayerSymbolAvoidEdges(bool);
+pub enum SymbolLayoutLayerSymbolAvoidEdgesExpression {
+    Boolean(Boolean),
+}
+
+impl serde::Serialize for SymbolLayoutLayerSymbolAvoidEdgesExpression {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        match self {
+            Self::Boolean(v) => v.serialize(serializer),
+        }
+    }
+}
+
+impl<'de> serde::Deserialize<'de> for SymbolLayoutLayerSymbolAvoidEdgesExpression {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
+        let mut errors: Vec<(&str, std::string::String)> = Vec::new();
+        match <Boolean as serde::Deserialize>::deserialize(&value) {
+            Ok(v) => return Ok(Self::Boolean(v)),
+            Err(e) => errors.push(("Boolean", e.to_string())),
+        }
+
+        let details: Vec<std::string::String> =
+            errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
+        Err(serde::de::Error::custom(format!(
+            "SymbolLayoutLayerSymbolAvoidEdgesExpression: no variant matched. Expected Boolean(Boolean). Errors: [{}]",
+            details.join("; ")
+        )))
+    }
+}
+
+/// If true, the symbols will not cross tile edges to avoid mutual collisions. Recommended in layers that don't have enough padding in the vector tile to prevent collisions, or if it is a point symbol layer placed after a line symbol layer. When using a client that supports global collision detection, like MapLibre GL JS version 0.42.0 or greater, enabling this property is not needed to prevent clipped labels at tile boundaries.
+#[derive(PartialEq, Debug, Clone)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+pub enum SymbolLayoutLayerSymbolAvoidEdges {
+    Expr(Box<SymbolLayoutLayerSymbolAvoidEdgesExpression>),
+    Literal(bool),
+}
+
+impl serde::Serialize for SymbolLayoutLayerSymbolAvoidEdges {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        match self {
+            Self::Expr(v) => v.as_ref().serialize(serializer),
+            Self::Literal(v) => v.serialize(serializer),
+        }
+    }
+}
+
+impl<'de> serde::Deserialize<'de> for SymbolLayoutLayerSymbolAvoidEdges {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
+        let mut errors: Vec<(&str, std::string::String)> = Vec::new();
+        match <SymbolLayoutLayerSymbolAvoidEdgesExpression as serde::Deserialize>::deserialize(
+            &value,
+        ) {
+            Ok(v) => return Ok(Self::Expr(Box::new(v))),
+            Err(e) => errors.push(("Expr", e.to_string())),
+        }
+        match <bool as serde::Deserialize>::deserialize(&value) {
+            Ok(v) => return Ok(Self::Literal(v)),
+            Err(e) => errors.push(("Literal", e.to_string())),
+        }
+
+        let details: Vec<std::string::String> =
+            errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
+        Err(serde::de::Error::custom(format!(
+            "SymbolLayoutLayerSymbolAvoidEdges: no variant matched. Expected Expr(SymbolLayoutLayerSymbolAvoidEdgesExpression) | Literal(bool). Errors: [{}]",
+            details.join("; ")
+        )))
+    }
+}
+
+impl Default for SymbolLayoutLayerSymbolAvoidEdges {
+    fn default() -> Self {
+        Self::Literal(false)
+    }
+}
 
 /// Label placement relative to its geometry.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy, Default)]
@@ -5780,10 +6345,85 @@ pub enum SymbolLayoutLayerSymbolZOrder {
     ViewportY,
 }
 
-/// If true, the text will be visible even if it collides with other previously drawn symbols.
-#[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone, Copy, Default)]
+/// Nested expression: [`Boolean`] operators.
+#[derive(PartialEq, Debug, Clone)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub struct SymbolLayoutLayerTextAllowOverlap(bool);
+pub enum SymbolLayoutLayerTextAllowOverlapExpression {
+    Boolean(Boolean),
+}
+
+impl serde::Serialize for SymbolLayoutLayerTextAllowOverlapExpression {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        match self {
+            Self::Boolean(v) => v.serialize(serializer),
+        }
+    }
+}
+
+impl<'de> serde::Deserialize<'de> for SymbolLayoutLayerTextAllowOverlapExpression {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
+        let mut errors: Vec<(&str, std::string::String)> = Vec::new();
+        match <Boolean as serde::Deserialize>::deserialize(&value) {
+            Ok(v) => return Ok(Self::Boolean(v)),
+            Err(e) => errors.push(("Boolean", e.to_string())),
+        }
+
+        let details: Vec<std::string::String> =
+            errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
+        Err(serde::de::Error::custom(format!(
+            "SymbolLayoutLayerTextAllowOverlapExpression: no variant matched. Expected Boolean(Boolean). Errors: [{}]",
+            details.join("; ")
+        )))
+    }
+}
+
+/// If true, the text will be visible even if it collides with other previously drawn symbols.
+#[derive(PartialEq, Debug, Clone)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+pub enum SymbolLayoutLayerTextAllowOverlap {
+    Expr(Box<SymbolLayoutLayerTextAllowOverlapExpression>),
+    Literal(bool),
+}
+
+impl serde::Serialize for SymbolLayoutLayerTextAllowOverlap {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        match self {
+            Self::Expr(v) => v.as_ref().serialize(serializer),
+            Self::Literal(v) => v.serialize(serializer),
+        }
+    }
+}
+
+impl<'de> serde::Deserialize<'de> for SymbolLayoutLayerTextAllowOverlap {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
+        let mut errors: Vec<(&str, std::string::String)> = Vec::new();
+        match <SymbolLayoutLayerTextAllowOverlapExpression as serde::Deserialize>::deserialize(
+            &value,
+        ) {
+            Ok(v) => return Ok(Self::Expr(Box::new(v))),
+            Err(e) => errors.push(("Expr", e.to_string())),
+        }
+        match <bool as serde::Deserialize>::deserialize(&value) {
+            Ok(v) => return Ok(Self::Literal(v)),
+            Err(e) => errors.push(("Literal", e.to_string())),
+        }
+
+        let details: Vec<std::string::String> =
+            errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
+        Err(serde::de::Error::custom(format!(
+            "SymbolLayoutLayerTextAllowOverlap: no variant matched. Expected Expr(SymbolLayoutLayerTextAllowOverlapExpression) | Literal(bool). Errors: [{}]",
+            details.join("; ")
+        )))
+    }
+}
+
+impl Default for SymbolLayoutLayerTextAllowOverlap {
+    fn default() -> Self {
+        Self::Literal(false)
+    }
+}
 
 /// Part of the text placed closest to the anchor.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy, Default)]
@@ -5835,10 +6475,85 @@ impl Default for SymbolLayoutLayerTextFont {
     }
 }
 
-/// If true, other symbols can be visible even if they collide with the text.
-#[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone, Copy, Default)]
+/// Nested expression: [`Boolean`] operators.
+#[derive(PartialEq, Debug, Clone)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub struct SymbolLayoutLayerTextIgnorePlacement(bool);
+pub enum SymbolLayoutLayerTextIgnorePlacementExpression {
+    Boolean(Boolean),
+}
+
+impl serde::Serialize for SymbolLayoutLayerTextIgnorePlacementExpression {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        match self {
+            Self::Boolean(v) => v.serialize(serializer),
+        }
+    }
+}
+
+impl<'de> serde::Deserialize<'de> for SymbolLayoutLayerTextIgnorePlacementExpression {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
+        let mut errors: Vec<(&str, std::string::String)> = Vec::new();
+        match <Boolean as serde::Deserialize>::deserialize(&value) {
+            Ok(v) => return Ok(Self::Boolean(v)),
+            Err(e) => errors.push(("Boolean", e.to_string())),
+        }
+
+        let details: Vec<std::string::String> =
+            errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
+        Err(serde::de::Error::custom(format!(
+            "SymbolLayoutLayerTextIgnorePlacementExpression: no variant matched. Expected Boolean(Boolean). Errors: [{}]",
+            details.join("; ")
+        )))
+    }
+}
+
+/// If true, other symbols can be visible even if they collide with the text.
+#[derive(PartialEq, Debug, Clone)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+pub enum SymbolLayoutLayerTextIgnorePlacement {
+    Expr(Box<SymbolLayoutLayerTextIgnorePlacementExpression>),
+    Literal(bool),
+}
+
+impl serde::Serialize for SymbolLayoutLayerTextIgnorePlacement {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        match self {
+            Self::Expr(v) => v.as_ref().serialize(serializer),
+            Self::Literal(v) => v.serialize(serializer),
+        }
+    }
+}
+
+impl<'de> serde::Deserialize<'de> for SymbolLayoutLayerTextIgnorePlacement {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
+        let mut errors: Vec<(&str, std::string::String)> = Vec::new();
+        match <SymbolLayoutLayerTextIgnorePlacementExpression as serde::Deserialize>::deserialize(
+            &value,
+        ) {
+            Ok(v) => return Ok(Self::Expr(Box::new(v))),
+            Err(e) => errors.push(("Expr", e.to_string())),
+        }
+        match <bool as serde::Deserialize>::deserialize(&value) {
+            Ok(v) => return Ok(Self::Literal(v)),
+            Err(e) => errors.push(("Literal", e.to_string())),
+        }
+
+        let details: Vec<std::string::String> =
+            errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
+        Err(serde::de::Error::custom(format!(
+            "SymbolLayoutLayerTextIgnorePlacement: no variant matched. Expected Expr(SymbolLayoutLayerTextIgnorePlacementExpression) | Literal(bool). Errors: [{}]",
+            details.join("; ")
+        )))
+    }
+}
+
+impl Default for SymbolLayoutLayerTextIgnorePlacement {
+    fn default() -> Self {
+        Self::Literal(false)
+    }
+}
 
 /// Text justification options.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy, Default)]
@@ -5855,14 +6570,83 @@ pub enum SymbolLayoutLayerTextJustify {
     Right,
 }
 
-/// If true, the text may be flipped vertically to prevent it from being rendered upside-down.
-#[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone, Copy)]
+/// Nested expression: [`Boolean`] operators.
+#[derive(PartialEq, Debug, Clone)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub struct SymbolLayoutLayerTextKeepUpright(bool);
+pub enum SymbolLayoutLayerTextKeepUprightExpression {
+    Boolean(Boolean),
+}
+
+impl serde::Serialize for SymbolLayoutLayerTextKeepUprightExpression {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        match self {
+            Self::Boolean(v) => v.serialize(serializer),
+        }
+    }
+}
+
+impl<'de> serde::Deserialize<'de> for SymbolLayoutLayerTextKeepUprightExpression {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
+        let mut errors: Vec<(&str, std::string::String)> = Vec::new();
+        match <Boolean as serde::Deserialize>::deserialize(&value) {
+            Ok(v) => return Ok(Self::Boolean(v)),
+            Err(e) => errors.push(("Boolean", e.to_string())),
+        }
+
+        let details: Vec<std::string::String> =
+            errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
+        Err(serde::de::Error::custom(format!(
+            "SymbolLayoutLayerTextKeepUprightExpression: no variant matched. Expected Boolean(Boolean). Errors: [{}]",
+            details.join("; ")
+        )))
+    }
+}
+
+/// If true, the text may be flipped vertically to prevent it from being rendered upside-down.
+#[derive(PartialEq, Debug, Clone)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+pub enum SymbolLayoutLayerTextKeepUpright {
+    Expr(Box<SymbolLayoutLayerTextKeepUprightExpression>),
+    Literal(bool),
+}
+
+impl serde::Serialize for SymbolLayoutLayerTextKeepUpright {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        match self {
+            Self::Expr(v) => v.as_ref().serialize(serializer),
+            Self::Literal(v) => v.serialize(serializer),
+        }
+    }
+}
+
+impl<'de> serde::Deserialize<'de> for SymbolLayoutLayerTextKeepUpright {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
+        let mut errors: Vec<(&str, std::string::String)> = Vec::new();
+        match <SymbolLayoutLayerTextKeepUprightExpression as serde::Deserialize>::deserialize(
+            &value,
+        ) {
+            Ok(v) => return Ok(Self::Expr(Box::new(v))),
+            Err(e) => errors.push(("Expr", e.to_string())),
+        }
+        match <bool as serde::Deserialize>::deserialize(&value) {
+            Ok(v) => return Ok(Self::Literal(v)),
+            Err(e) => errors.push(("Literal", e.to_string())),
+        }
+
+        let details: Vec<std::string::String> =
+            errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
+        Err(serde::de::Error::custom(format!(
+            "SymbolLayoutLayerTextKeepUpright: no variant matched. Expected Expr(SymbolLayoutLayerTextKeepUprightExpression) | Literal(bool). Errors: [{}]",
+            details.join("; ")
+        )))
+    }
+}
 
 impl Default for SymbolLayoutLayerTextKeepUpright {
     fn default() -> Self {
-        Self(true)
+        Self::Literal(true)
     }
 }
 
@@ -6248,10 +7032,83 @@ impl Default for SymbolLayoutLayerTextOffset {
     }
 }
 
-/// If true, icons will display without their corresponding text when the text collides with other symbols and the icon does not.
-#[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone, Copy, Default)]
+/// Nested expression: [`Boolean`] operators.
+#[derive(PartialEq, Debug, Clone)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub struct SymbolLayoutLayerTextOptional(bool);
+pub enum SymbolLayoutLayerTextOptionalExpression {
+    Boolean(Boolean),
+}
+
+impl serde::Serialize for SymbolLayoutLayerTextOptionalExpression {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        match self {
+            Self::Boolean(v) => v.serialize(serializer),
+        }
+    }
+}
+
+impl<'de> serde::Deserialize<'de> for SymbolLayoutLayerTextOptionalExpression {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
+        let mut errors: Vec<(&str, std::string::String)> = Vec::new();
+        match <Boolean as serde::Deserialize>::deserialize(&value) {
+            Ok(v) => return Ok(Self::Boolean(v)),
+            Err(e) => errors.push(("Boolean", e.to_string())),
+        }
+
+        let details: Vec<std::string::String> =
+            errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
+        Err(serde::de::Error::custom(format!(
+            "SymbolLayoutLayerTextOptionalExpression: no variant matched. Expected Boolean(Boolean). Errors: [{}]",
+            details.join("; ")
+        )))
+    }
+}
+
+/// If true, icons will display without their corresponding text when the text collides with other symbols and the icon does not.
+#[derive(PartialEq, Debug, Clone)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+pub enum SymbolLayoutLayerTextOptional {
+    Expr(Box<SymbolLayoutLayerTextOptionalExpression>),
+    Literal(bool),
+}
+
+impl serde::Serialize for SymbolLayoutLayerTextOptional {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        match self {
+            Self::Expr(v) => v.as_ref().serialize(serializer),
+            Self::Literal(v) => v.serialize(serializer),
+        }
+    }
+}
+
+impl<'de> serde::Deserialize<'de> for SymbolLayoutLayerTextOptional {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
+        let mut errors: Vec<(&str, std::string::String)> = Vec::new();
+        match <SymbolLayoutLayerTextOptionalExpression as serde::Deserialize>::deserialize(&value) {
+            Ok(v) => return Ok(Self::Expr(Box::new(v))),
+            Err(e) => errors.push(("Expr", e.to_string())),
+        }
+        match <bool as serde::Deserialize>::deserialize(&value) {
+            Ok(v) => return Ok(Self::Literal(v)),
+            Err(e) => errors.push(("Literal", e.to_string())),
+        }
+
+        let details: Vec<std::string::String> =
+            errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
+        Err(serde::de::Error::custom(format!(
+            "SymbolLayoutLayerTextOptional: no variant matched. Expected Expr(SymbolLayoutLayerTextOptionalExpression) | Literal(bool). Errors: [{}]",
+            details.join("; ")
+        )))
+    }
+}
+
+impl Default for SymbolLayoutLayerTextOptional {
+    fn default() -> Self {
+        Self::Literal(false)
+    }
+}
 
 /// Allows for control over whether to show symbol text when it overlaps other symbols on the map. If `text-overlap` is not set, `text-allow-overlap` is used instead
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy)]
@@ -8022,28 +8879,41 @@ impl LayerSourceLayer {
 }
 
 impl LayerFilter {
-    pub fn as_value(&self) -> &serde_json::Value {
-        &self.0
+    /// Returns `true` if this filter is the literal `false` (layer never renders).
+    pub fn is_always_false(&self) -> bool {
+        matches!(self, LayerFilter::Literal(false))
     }
 
-    pub fn as_value_mut(&mut self) -> &mut serde_json::Value {
-        &mut self.0
+    /// Returns `true` if this filter is the literal `true` (layer always renders).
+    pub fn is_always_true(&self) -> bool {
+        matches!(self, LayerFilter::Literal(true))
     }
 
-    pub fn from_value(v: serde_json::Value) -> Self {
-        Self(v)
-    }
-
-    /// Returns `Some(true)` or `Some(false)` if this filter is a literal boolean
-    /// (`true`, `false`, `["literal", true]`, or `["literal", false]`).
-    pub fn as_literal_bool(&self) -> Option<bool> {
-        match &self.0 {
-            serde_json::Value::Bool(b) => Some(*b),
-            serde_json::Value::Array(a) if a.len() == 2 && a[0].as_str() == Some("literal") => {
-                a[1].as_bool()
-            }
-            _ => None,
+    /// Returns the inner expression if this is an `Expr` variant.
+    pub fn as_boolean(&self) -> Option<&Boolean> {
+        match self {
+            LayerFilter::Expr(b) => Some(b),
+            LayerFilter::Literal(_) => None,
         }
+    }
+
+    /// Returns a mutable reference to the inner expression if this is an `Expr` variant.
+    pub fn as_boolean_mut(&mut self) -> Option<&mut Boolean> {
+        match self {
+            LayerFilter::Expr(b) => Some(b),
+            LayerFilter::Literal(_) => None,
+        }
+    }
+
+    /// Serialize to `serde_json::Value` for passes that still operate on JSON.
+    pub fn to_json_value(&self) -> serde_json::Value {
+        serde_json::to_value(self).expect("LayerFilter serialization is infallible")
+    }
+
+    /// Deserialize from `serde_json::Value`.  Returns `None` if the value is not
+    /// a valid filter (e.g. a string or object).
+    pub fn from_value(v: serde_json::Value) -> Option<Self> {
+        serde_json::from_value(v).ok()
     }
 }
 

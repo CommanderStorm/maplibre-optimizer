@@ -796,7 +796,7 @@ pub enum Source {
     Image(ImageSource),
     #[serde(rename = "raster")]
     Raster(RasterSource),
-    #[serde(rename = "raster_dem")]
+    #[serde(rename = "raster-dem")]
     RasterDem(RasterDemSource),
     #[serde(rename = "vector")]
     Vector(VectorSource),

@@ -2,10 +2,77 @@
 #[allow(unused_imports)]
 use super::*;
 
-/// A filter selects specific features from a layer.
-#[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone, Copy)]
+/// Nested expression: [`Boolean`] operators.
+#[derive(PartialEq, Debug, Clone)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub struct Filter(bool);
+pub enum FilterExpression {
+    Boolean(Boolean),
+}
+
+impl serde::Serialize for FilterExpression {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        match self {
+            Self::Boolean(v) => v.serialize(serializer),
+        }
+    }
+}
+
+impl<'de> serde::Deserialize<'de> for FilterExpression {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
+        let mut errors: Vec<(&str, std::string::String)> = Vec::new();
+        match <Boolean as serde::Deserialize>::deserialize(&value) {
+            Ok(v) => return Ok(Self::Boolean(v)),
+            Err(e) => errors.push(("Boolean", e.to_string())),
+        }
+
+        let details: Vec<std::string::String> =
+            errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
+        Err(serde::de::Error::custom(format!(
+            "FilterExpression: no variant matched. Expected Boolean(Boolean). Errors: [{}]",
+            details.join("; ")
+        )))
+    }
+}
+
+/// A filter selects specific features from a layer.
+#[derive(PartialEq, Debug, Clone)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+pub enum Filter {
+    Expr(Box<FilterExpression>),
+    Literal(bool),
+}
+
+impl serde::Serialize for Filter {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        match self {
+            Self::Expr(v) => v.as_ref().serialize(serializer),
+            Self::Literal(v) => v.serialize(serializer),
+        }
+    }
+}
+
+impl<'de> serde::Deserialize<'de> for Filter {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
+        let mut errors: Vec<(&str, std::string::String)> = Vec::new();
+        match <FilterExpression as serde::Deserialize>::deserialize(&value) {
+            Ok(v) => return Ok(Self::Expr(Box::new(v))),
+            Err(e) => errors.push(("Expr", e.to_string())),
+        }
+        match <bool as serde::Deserialize>::deserialize(&value) {
+            Ok(v) => return Ok(Self::Literal(v)),
+            Err(e) => errors.push(("Literal", e.to_string())),
+        }
+
+        let details: Vec<std::string::String> =
+            errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
+        Err(serde::de::Error::custom(format!(
+            "Filter: no variant matched. Expected Expr(FilterExpression) | Literal(bool). Errors: [{}]",
+            details.join("; ")
+        )))
+    }
+}
 
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]

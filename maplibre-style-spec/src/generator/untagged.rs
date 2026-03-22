@@ -13,7 +13,6 @@ pub struct Variant {
     pub is_unit: bool,
     /// Optional condition to skip this variant during deserialization (e.g. `"value.is_array()"`).
     /// When set, the variant is only tried if the condition evaluates to false.
-    #[expect(clippy::struct_field_names)]
     pub skip_when: Option<String>,
 }
 

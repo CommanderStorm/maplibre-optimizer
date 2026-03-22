@@ -1693,9 +1693,15 @@ fn generate_syntax_enum_deserializer_regular_variadic_variant(
         visit_seq.line("while let Some(v) = seq.next_element()? { rest.push(v); }");
         // Zero template iterations is valid (e.g. `["let", body]` with no bindings),
         // so the minimum is just the suffix length.
-        visit_seq.line(format!(
-            "if rest.len() < {suffix_len} {{ return Err(serde::de::Error::custom(\"{name}::{variant_name}: too few arguments\")); }}"
-        ));
+        if suffix_len == 1 {
+            visit_seq.line("if rest.is_empty() {");
+        } else {
+            visit_seq.line(format!("if rest.len() < {suffix_len} {{"));
+        }
+        visit_seq.line(
+            "return Err(serde::de::Error::custom(\"{name}::{variant_name}: too few arguments\"));",
+        );
+        visit_seq.line("}");
         visit_seq.line(format!(
             "if !(rest.len() - {suffix_len}).is_multiple_of({template_len}) {{ return Err(serde::de::Error::custom(\"{name}::{variant_name}: malformed template/suffix layout\")); }}"
         ));

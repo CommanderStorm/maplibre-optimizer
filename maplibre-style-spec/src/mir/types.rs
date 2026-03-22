@@ -313,7 +313,20 @@ impl MirSyntax {
     pub fn from_decoder(operator: &str, syntax: crate::decoder::r#enum::Syntax) -> Self {
         let mut mir = MirSyntax::from(syntax);
         Self::patch_expression_parameters(operator, &mut mir.parameters);
+        Self::patch_overloads(operator, &mut mir.overloads);
         mir
+    }
+
+    /// Removes overloads that are JSON-indistinguishable from another overload in the same
+    /// operator, which would make `#[serde(untagged)]` deserialization non-deterministic.
+    fn patch_overloads(operator: &str, overloads: &mut Vec<MirOverload>) {
+        if operator == "in" {
+            // Both `["in", item, array]` and `["in", substring, string]` serialize to the same
+            // two-element JSON array. Keeping both produces an untagged enum where `Item` always
+            // wins on deserialization, breaking round-trips for the `Substring` variant. Drop the
+            // second overload and let `Item(ExprOrLiteral, ExprOrLiteral)` cover all uses.
+            overloads.retain(|o| o.parameters.first().is_none_or(|p| p != "substring"));
+        }
     }
 }
 

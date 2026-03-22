@@ -2,24 +2,81 @@ use codegen2::Scope;
 
 use crate::generator::autotest::generate_test_from_example_if_present;
 use crate::generator::fuzz;
+use crate::generator::untagged::{self, Variant};
 use crate::mir::types::MirStringField;
 
 pub fn generate(scope: &mut Scope, name: &str, field: &MirStringField) {
-    scope
-        .new_struct(name)
-        .vis("pub")
-        .doc(&field.meta.doc)
-        .derive("serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone")
-        .attr(fuzz::CFG_DERIVE_ARBITRARY)
-        .tuple_field("std::string::String");
+    if field.meta.expression.is_some() {
+        let expr_name = format!("{name}Expression");
+        let expr = scope
+            .new_enum(&expr_name)
+            .doc("Nested expression: [`String`] operators.")
+            .vis("pub")
+            .derive("PartialEq, Debug, Clone")
+            .attr(fuzz::CFG_DERIVE_ARBITRARY);
+        expr.new_variant("String").tuple("String");
+        untagged::emit_untagged_serde(
+            scope,
+            &expr_name,
+            &[Variant {
+                name: "String".into(),
+                inner_type: "String".into(),
+                is_boxed: false,
+                is_unit: false,
+                skip_when: None,
+            }],
+        );
+
+        let enu = scope
+            .new_enum(name)
+            .doc(&field.meta.doc)
+            .vis("pub")
+            .derive("PartialEq, Debug, Clone")
+            .attr(fuzz::CFG_DERIVE_ARBITRARY);
+        enu.new_variant("Expr").tuple(format!("Box<{expr_name}>"));
+        enu.new_variant("Literal").tuple("std::string::String");
+        untagged::emit_untagged_serde(
+            scope,
+            name,
+            &[
+                Variant {
+                    name: "Expr".into(),
+                    inner_type: expr_name.clone(),
+                    is_boxed: true,
+                    is_unit: false,
+                    skip_when: None,
+                },
+                Variant {
+                    name: "Literal".into(),
+                    inner_type: "std::string::String".into(),
+                    is_boxed: false,
+                    is_unit: false,
+                    skip_when: None,
+                },
+            ],
+        );
+    } else {
+        scope
+            .new_struct(name)
+            .vis("pub")
+            .doc(&field.meta.doc)
+            .derive("serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone")
+            .attr(fuzz::CFG_DERIVE_ARBITRARY)
+            .tuple_field("std::string::String");
+    }
 
     if let Some(default) = &field.default {
+        let default_body = if field.meta.expression.is_some() {
+            format!("Self::Literal(\"{default}\".to_string())")
+        } else {
+            format!("Self(\"{default}\".to_string())")
+        };
         scope
             .new_impl(name)
             .impl_trait("Default")
             .new_fn("default")
             .ret("Self")
-            .line(format!("Self(\"{default}\".to_string())"));
+            .line(default_body);
     }
     generate_test_from_example_if_present(scope, name, field.meta.example.as_ref());
 }
