@@ -4,7 +4,8 @@ use super::*;
 #[allow(unused_imports)]
 use crate::{boolean_prop, color_prop, numeric_prop, string_prop};
 
-/// A filter expression: either a typed boolean expression or a literal bool.
+/// A filter expression: a typed boolean expression, a polymorphic Any expression
+/// (`match`, `step`, `case`, …), or a literal bool.
 ///
 /// On deserialize, bare `true`/`false` and `["literal", true/false]` are both
 /// normalised to `Literal(bool)`.  On serialize, `Literal(b)` emits the bare
@@ -13,6 +14,7 @@ use crate::{boolean_prop, color_prop, numeric_prop, string_prop};
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum LayerFilter {
     Expr(Box<Boolean>),
+    AnyExpr(Box<Any>),
     Literal(bool),
 }
 
@@ -31,7 +33,9 @@ impl<'de> serde::de::Visitor<'de> for LayerFilterVisitor {
     type Value = LayerFilter;
 
     fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        f.write_str("a boolean literal or a Boolean expression array")
+        f.write_str(
+            "a boolean literal, a Boolean expression array, or a polymorphic expression array",
+        )
     }
 
     fn visit_bool<E: serde::de::Error>(self, b: bool) -> Result<Self::Value, E> {
@@ -52,8 +56,14 @@ impl<'de> serde::de::Visitor<'de> for LayerFilterVisitor {
             return Ok(LayerFilter::Literal(elements[1].as_bool().unwrap()));
         }
         let arr = serde_json::Value::Array(elements);
-        let expr = serde_json::from_value::<Boolean>(arr).map_err(serde::de::Error::custom)?;
-        Ok(LayerFilter::Expr(Box::new(expr)))
+        // Try Boolean first (fixed-output-type operators like `all`, `any`, `==`, …).
+        match serde_json::from_value::<Boolean>(arr.clone()) {
+            Ok(expr) => return Ok(LayerFilter::Expr(Box::new(expr))),
+            Err(_) => {}
+        }
+        // Fall back to Any (polymorphic operators like `match`, `step`, `case`, …).
+        let expr = serde_json::from_value::<Any>(arr).map_err(serde::de::Error::custom)?;
+        Ok(LayerFilter::AnyExpr(Box::new(expr)))
     }
 }
 
@@ -64,6 +74,7 @@ impl serde::Serialize for LayerFilter {
     {
         match self {
             LayerFilter::Expr(expr) => expr.serialize(serializer),
+            LayerFilter::AnyExpr(expr) => expr.serialize(serializer),
             LayerFilter::Literal(b) => serializer.serialize_bool(*b),
         }
     }
@@ -176,10 +187,10 @@ numeric_prop!(
         .expect("the number is serialised from a number and is thus always valid")
 );
 
-/// Name of image in sprite to use for drawing an image background. For seamless patterns, image width and height must be a factor of two (2, 4, 8, ..., 512). Note that zoom-dependent expressions will be evaluated only at integer zoom levels.
-#[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub struct BackgroundPaintLayerBackgroundPattern(std::string::String);
+string_prop!(
+    BackgroundPaintLayerBackgroundPattern,
+    doc = "Name of image in sprite to use for drawing an image background. For seamless patterns, image width and height must be a factor of two (2, 4, 8, ..., 512). Note that zoom-dependent expressions will be evaluated only at integer zoom levels."
+);
 
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
@@ -469,10 +480,10 @@ color_prop!(
     doc = "The outline color of the fill. Matches the value of `fill-color` if unspecified."
 );
 
-/// Name of image in sprite to use for drawing image fills. For seamless patterns, image width and height must be a factor of two (2, 4, 8, ..., 512). Note that zoom-dependent expressions will be evaluated only at integer zoom levels.
-#[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub struct FillPaintLayerFillPattern(std::string::String);
+string_prop!(
+    FillPaintLayerFillPattern,
+    doc = "Name of image in sprite to use for drawing image fills. For seamless patterns, image width and height must be a factor of two (2, 4, 8, ..., 512). Note that zoom-dependent expressions will be evaluated only at integer zoom levels."
+);
 
 /// The geometry's offset. Values are [x, y] where negatives indicate left and up, respectively.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
@@ -584,10 +595,10 @@ numeric_prop!(
         .expect("the number is serialised from a number and is thus always valid")
 );
 
-/// Name of image in sprite to use for drawing images on extruded fills. For seamless patterns, image width and height must be a factor of two (2, 4, 8, ..., 512). Note that zoom-dependent expressions will be evaluated only at integer zoom levels.
-#[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub struct FillExtrusionPaintLayerFillExtrusionPattern(std::string::String);
+string_prop!(
+    FillExtrusionPaintLayerFillExtrusionPattern,
+    doc = "Name of image in sprite to use for drawing images on extruded fills. For seamless patterns, image width and height must be a factor of two (2, 4, 8, ..., 512). Note that zoom-dependent expressions will be evaluated only at integer zoom levels."
+);
 
 /// The geometry's offset. Values are [x, y] where negatives indicate left and up (on the flat plane), respectively.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
@@ -1198,10 +1209,10 @@ numeric_prop!(
         .expect("the number is serialised from a number and is thus always valid")
 );
 
-/// Name of image in sprite to use for drawing image lines. For seamless patterns, image width must be a factor of two (2, 4, 8, ..., 512). Note that zoom-dependent expressions will be evaluated only at integer zoom levels.
-#[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub struct LinePaintLayerLinePattern(std::string::String);
+string_prop!(
+    LinePaintLayerLinePattern,
+    doc = "Name of image in sprite to use for drawing image lines. For seamless patterns, image width must be a factor of two (2, 4, 8, ..., 512). Note that zoom-dependent expressions will be evaluated only at integer zoom levels."
+);
 
 /// The geometry's offset. Values are [x, y] where negatives indicate left and up, respectively.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
@@ -1594,10 +1605,10 @@ boolean_prop!(
     default = false
 );
 
-/// Name of image in sprite to use for drawing an image background.
-#[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub struct SymbolLayoutLayerIconImage(std::string::String);
+string_prop!(
+    SymbolLayoutLayerIconImage,
+    doc = "Name of image in sprite to use for drawing an image background."
+);
 
 boolean_prop!(
     SymbolLayoutLayerIconKeepUpright,
@@ -1870,16 +1881,11 @@ pub enum SymbolLayoutLayerTextAnchor {
     TopRight,
 }
 
-/// Value to use for a text label. If a plain `string` is provided, it will be treated as a `formatted` with default/inherited formatting options.
-#[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub struct SymbolLayoutLayerTextField(std::string::String);
-
-impl Default for SymbolLayoutLayerTextField {
-    fn default() -> Self {
-        Self("".to_string())
-    }
-}
+string_prop!(
+    SymbolLayoutLayerTextField,
+    doc = "Value to use for a text label. If a plain `string` is provided, it will be treated as a `formatted` with default/inherited formatting options.",
+    default = "".to_string()
+);
 
 /// Fonts to use for displaying text. If the `glyphs` root property is specified, this array is joined together and interpreted as a font stack name. Otherwise, it is interpreted as a cascading fallback list of local font names.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
@@ -2598,7 +2604,7 @@ impl LayerFilter {
     pub fn as_boolean(&self) -> Option<&Boolean> {
         match self {
             LayerFilter::Expr(b) => Some(b),
-            LayerFilter::Literal(_) => None,
+            LayerFilter::AnyExpr(_) | LayerFilter::Literal(_) => None,
         }
     }
 
@@ -2606,7 +2612,7 @@ impl LayerFilter {
     pub fn as_boolean_mut(&mut self) -> Option<&mut Boolean> {
         match self {
             LayerFilter::Expr(b) => Some(b),
-            LayerFilter::Literal(_) => None,
+            LayerFilter::AnyExpr(_) | LayerFilter::Literal(_) => None,
         }
     }
 

@@ -431,7 +431,8 @@ fn generate_layer_types(scope: &mut Scope, layers: &MirLayers) {
 fn generate_layer_filter(scope: &mut Scope) {
     scope.raw(
         r#"
-/// A filter expression: either a typed boolean expression or a literal bool.
+/// A filter expression: a typed boolean expression, a polymorphic Any expression
+/// (`match`, `step`, `case`, …), or a literal bool.
 ///
 /// On deserialize, bare `true`/`false` and `["literal", true/false]` are both
 /// normalised to `Literal(bool)`.  On serialize, `Literal(b)` emits the bare
@@ -440,6 +441,7 @@ fn generate_layer_filter(scope: &mut Scope) {
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum LayerFilter {
     Expr(Box<Boolean>),
+    AnyExpr(Box<Any>),
     Literal(bool),
 }
 
@@ -458,7 +460,7 @@ impl<'de> serde::de::Visitor<'de> for LayerFilterVisitor {
     type Value = LayerFilter;
 
     fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        f.write_str("a boolean literal or a Boolean expression array")
+        f.write_str("a boolean literal, a Boolean expression array, or a polymorphic expression array")
     }
 
     fn visit_bool<E: serde::de::Error>(self, b: bool) -> Result<Self::Value, E> {
@@ -479,9 +481,14 @@ impl<'de> serde::de::Visitor<'de> for LayerFilterVisitor {
             return Ok(LayerFilter::Literal(elements[1].as_bool().unwrap()));
         }
         let arr = serde_json::Value::Array(elements);
-        let expr =
-            serde_json::from_value::<Boolean>(arr).map_err(serde::de::Error::custom)?;
-        Ok(LayerFilter::Expr(Box::new(expr)))
+        // Try Boolean first (fixed-output-type operators like `all`, `any`, `==`, …).
+        match serde_json::from_value::<Boolean>(arr.clone()) {
+            Ok(expr) => return Ok(LayerFilter::Expr(Box::new(expr))),
+            Err(_) => {}
+        }
+        // Fall back to Any (polymorphic operators like `match`, `step`, `case`, …).
+        let expr = serde_json::from_value::<Any>(arr).map_err(serde::de::Error::custom)?;
+        Ok(LayerFilter::AnyExpr(Box::new(expr)))
     }
 }
 
@@ -492,6 +499,7 @@ impl serde::Serialize for LayerFilter {
     {
         match self {
             LayerFilter::Expr(expr) => expr.serialize(serializer),
+            LayerFilter::AnyExpr(expr) => expr.serialize(serializer),
             LayerFilter::Literal(b) => serializer.serialize_bool(*b),
         }
     }
@@ -751,7 +759,7 @@ impl LayerFilter {{
     pub fn as_boolean(&self) -> Option<&Boolean> {{
         match self {{
             LayerFilter::Expr(b) => Some(b),
-            LayerFilter::Literal(_) => None,
+            LayerFilter::AnyExpr(_) | LayerFilter::Literal(_) => None,
         }}
     }}
 
@@ -759,7 +767,7 @@ impl LayerFilter {{
     pub fn as_boolean_mut(&mut self) -> Option<&mut Boolean> {{
         match self {{
             LayerFilter::Expr(b) => Some(b),
-            LayerFilter::Literal(_) => None,
+            LayerFilter::AnyExpr(_) | LayerFilter::Literal(_) => None,
         }}
     }}
 

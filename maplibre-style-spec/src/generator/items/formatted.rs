@@ -1,17 +1,26 @@
 use codegen2::Scope;
 
+use super::escape_doc_for_macro;
 use crate::generator::autotest::generate_test_from_example_if_present;
 use crate::generator::fuzz;
 use crate::mir::types::MirFormattedTextField;
 
 pub fn generate(scope: &mut Scope, name: &str, field: &MirFormattedTextField) {
-    scope
-        .new_struct(name)
-        .vis("pub")
-        .doc(&field.meta.doc)
-        .derive("serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone")
-        .attr(fuzz::CFG_DERIVE_ARBITRARY)
-        .tuple_field("std::string::String");
+    if field.meta.expression.is_some() {
+        let doc = escape_doc_for_macro(&field.meta.doc);
+        let default = &field.default;
+        let escaped = default.replace('\\', "\\\\").replace('"', "\\\"");
+        let mut args = format!("{name}, doc = \"{doc}\"");
+        args.push_str(&format!(", default = \"{escaped}\".to_string()"));
+        scope.raw(format!("string_prop!({args});"));
+    } else {
+        scope
+            .new_struct(name)
+            .vis("pub")
+            .doc(&field.meta.doc)
+            .derive("serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone")
+            .attr(fuzz::CFG_DERIVE_ARBITRARY)
+            .tuple_field("std::string::String");
 
     let default = &field.default;
     scope

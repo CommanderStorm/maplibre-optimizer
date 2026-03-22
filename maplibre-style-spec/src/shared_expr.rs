@@ -9,12 +9,13 @@
 
 // ── Shared Expression Enums ─────────────────────────────────────────────────
 
-/// Nested expression: ramp (`interpolate` / …) or regular [`Number`](crate::spec::Number) operators.
+/// Nested expression: ramp (`interpolate` / …), regular [`Number`](crate::spec::Number) operators, or polymorphic [`Any`](crate::spec::Any) operators (`match`, `step`, `case`, …).
 #[derive(PartialEq, Debug, Clone)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum NumericExpression {
     Number(crate::spec::Number),
     Ramp(crate::spec::NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection),
+    Any(Box<crate::spec::Any>),
 }
 
 impl serde::Serialize for NumericExpression {
@@ -22,6 +23,7 @@ impl serde::Serialize for NumericExpression {
         match self {
             Self::Number(v) => v.serialize(serializer),
             Self::Ramp(v) => v.serialize(serializer),
+            Self::Any(v) => v.as_ref().serialize(serializer),
         }
     }
 }
@@ -38,20 +40,25 @@ impl<'de> serde::Deserialize<'de> for NumericExpression {
             Ok(v) => return Ok(Self::Ramp(v)),
             Err(e) => errors.push(("Ramp", e.to_string())),
         }
+        match <crate::spec::Any as serde::Deserialize>::deserialize(&value) {
+            Ok(v) => return Ok(Self::Any(Box::new(v))),
+            Err(e) => errors.push(("Any", e.to_string())),
+        }
         let details: Vec<String> = errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
         Err(serde::de::Error::custom(format!(
-            "NumericExpression: no variant matched. Expected Number(Number) | Ramp(NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection). Errors: [{}]",
+            "NumericExpression: no variant matched. Expected Number(Number) | Ramp(NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection) | Any(Any). Errors: [{}]",
             details.join("; ")
         )))
     }
 }
 
-/// Nested expression: ramp (`interpolate-hcl`, …) or [`Color`](crate::spec::Color) operators.
+/// Nested expression: ramp (`interpolate-hcl`, …), [`Color`](crate::spec::Color) operators, or polymorphic [`Any`](crate::spec::Any) operators (`match`, `step`, `case`, …).
 #[derive(PartialEq, Debug, Clone)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum ColorExpression {
     Color(crate::spec::Color),
     Ramp(crate::spec::ColorOrArrayOfColor),
+    Any(Box<crate::spec::Any>),
 }
 
 impl serde::Serialize for ColorExpression {
@@ -59,6 +66,7 @@ impl serde::Serialize for ColorExpression {
         match self {
             Self::Color(v) => v.serialize(serializer),
             Self::Ramp(v) => v.serialize(serializer),
+            Self::Any(v) => v.as_ref().serialize(serializer),
         }
     }
 }
@@ -75,25 +83,31 @@ impl<'de> serde::Deserialize<'de> for ColorExpression {
             Ok(v) => return Ok(Self::Ramp(v)),
             Err(e) => errors.push(("Ramp", e.to_string())),
         }
+        match <crate::spec::Any as serde::Deserialize>::deserialize(&value) {
+            Ok(v) => return Ok(Self::Any(Box::new(v))),
+            Err(e) => errors.push(("Any", e.to_string())),
+        }
         let details: Vec<String> = errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
         Err(serde::de::Error::custom(format!(
-            "ColorExpression: no variant matched. Expected Color(Color) | Ramp(ColorOrArrayOfColor). Errors: [{}]",
+            "ColorExpression: no variant matched. Expected Color(Color) | Ramp(ColorOrArrayOfColor) | Any(Any). Errors: [{}]",
             details.join("; ")
         )))
     }
 }
 
-/// Nested expression: [`Boolean`](crate::spec::Boolean) operators.
+/// Nested expression: [`Boolean`](crate::spec::Boolean) operators, or polymorphic [`Any`](crate::spec::Any) operators (`match`, `step`, `case`, …).
 #[derive(PartialEq, Debug, Clone)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum BooleanExpression {
     Boolean(crate::spec::Boolean),
+    Any(Box<crate::spec::Any>),
 }
 
 impl serde::Serialize for BooleanExpression {
     fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         match self {
             Self::Boolean(v) => v.serialize(serializer),
+            Self::Any(v) => v.as_ref().serialize(serializer),
         }
     }
 }
@@ -106,25 +120,31 @@ impl<'de> serde::Deserialize<'de> for BooleanExpression {
             Ok(v) => return Ok(Self::Boolean(v)),
             Err(e) => errors.push(("Boolean", e.to_string())),
         }
+        match <crate::spec::Any as serde::Deserialize>::deserialize(&value) {
+            Ok(v) => return Ok(Self::Any(Box::new(v))),
+            Err(e) => errors.push(("Any", e.to_string())),
+        }
         let details: Vec<String> = errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
         Err(serde::de::Error::custom(format!(
-            "BooleanExpression: no variant matched. Expected Boolean(Boolean). Errors: [{}]",
+            "BooleanExpression: no variant matched. Expected Boolean(Boolean) | Any(Any). Errors: [{}]",
             details.join("; ")
         )))
     }
 }
 
-/// Nested expression: [`String`](crate::spec::String) operators.
+/// Nested expression: [`String`](crate::spec::String) operators, or polymorphic [`Any`](crate::spec::Any) operators (`match`, `step`, `case`, …).
 #[derive(PartialEq, Debug, Clone)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum StringExpression {
     String(crate::spec::String),
+    Any(Box<crate::spec::Any>),
 }
 
 impl serde::Serialize for StringExpression {
     fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         match self {
             Self::String(v) => v.serialize(serializer),
+            Self::Any(v) => v.as_ref().serialize(serializer),
         }
     }
 }
@@ -137,9 +157,13 @@ impl<'de> serde::Deserialize<'de> for StringExpression {
             Ok(v) => return Ok(Self::String(v)),
             Err(e) => errors.push(("String", e.to_string())),
         }
+        match <crate::spec::Any as serde::Deserialize>::deserialize(&value) {
+            Ok(v) => return Ok(Self::Any(Box::new(v))),
+            Err(e) => errors.push(("Any", e.to_string())),
+        }
         let details: Vec<String> = errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
         Err(serde::de::Error::custom(format!(
-            "StringExpression: no variant matched. Expected String(String). Errors: [{}]",
+            "StringExpression: no variant matched. Expected String(String) | Any(Any). Errors: [{}]",
             details.join("; ")
         )))
     }

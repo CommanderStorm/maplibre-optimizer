@@ -137,49 +137,98 @@ impl<'de> serde::Deserialize<'de> for ExprOrLiteral {
 /// Either of the below variants
 #[derive(PartialEq, Debug, Clone)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum StringOrNumberOrArrayOfStringOrArrayOfNumberAsUnion {
-    String(StringLiteral),
-    Number(NumberLiteral),
-    ArrayOfString(ArrayOfStringLiteral),
-    ArrayOfNumber(ArrayOfNumberLiteral),
+pub enum StringLiteralOrNumberLiteralOrArrayOfStringLiteralOrArrayOfNumberLiteralOrAnyAsUnion {
+    StringLiteral(StringLiteral),
+    NumberLiteral(NumberLiteral),
+    ArrayOfStringLiteral(ArrayOfStringLiteral),
+    ArrayOfNumberLiteral(ArrayOfNumberLiteral),
+    Any(Box<Any>),
 }
 
-impl serde::Serialize for StringOrNumberOrArrayOfStringOrArrayOfNumberAsUnion {
+impl serde::Serialize
+    for StringLiteralOrNumberLiteralOrArrayOfStringLiteralOrArrayOfNumberLiteralOrAnyAsUnion
+{
     fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         match self {
-            Self::String(v) => v.serialize(serializer),
-            Self::Number(v) => v.serialize(serializer),
-            Self::ArrayOfString(v) => v.serialize(serializer),
-            Self::ArrayOfNumber(v) => v.serialize(serializer),
+            Self::StringLiteral(v) => v.serialize(serializer),
+            Self::NumberLiteral(v) => v.serialize(serializer),
+            Self::ArrayOfStringLiteral(v) => v.serialize(serializer),
+            Self::ArrayOfNumberLiteral(v) => v.serialize(serializer),
+            Self::Any(v) => v.serialize(serializer),
         }
     }
 }
 
-impl<'de> serde::Deserialize<'de> for StringOrNumberOrArrayOfStringOrArrayOfNumberAsUnion {
+impl<'de> serde::Deserialize<'de>
+    for StringLiteralOrNumberLiteralOrArrayOfStringLiteralOrArrayOfNumberLiteralOrAnyAsUnion
+{
     fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
         let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
         let mut errors: Vec<(&str, std::string::String)> = Vec::new();
         match <StringLiteral as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::String(v)),
-            Err(e) => errors.push(("String", e.to_string())),
+            Ok(v) => return Ok(Self::StringLiteral(v)),
+            Err(e) => errors.push(("StringLiteral", e.to_string())),
         }
         match <NumberLiteral as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Number(v)),
-            Err(e) => errors.push(("Number", e.to_string())),
+            Ok(v) => return Ok(Self::NumberLiteral(v)),
+            Err(e) => errors.push(("NumberLiteral", e.to_string())),
         }
         match <ArrayOfStringLiteral as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::ArrayOfString(v)),
-            Err(e) => errors.push(("ArrayOfString", e.to_string())),
+            Ok(v) => return Ok(Self::ArrayOfStringLiteral(v)),
+            Err(e) => errors.push(("ArrayOfStringLiteral", e.to_string())),
         }
         match <ArrayOfNumberLiteral as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::ArrayOfNumber(v)),
-            Err(e) => errors.push(("ArrayOfNumber", e.to_string())),
+            Ok(v) => return Ok(Self::ArrayOfNumberLiteral(v)),
+            Err(e) => errors.push(("ArrayOfNumberLiteral", e.to_string())),
+        }
+        match <Box<Any> as serde::Deserialize>::deserialize(&value) {
+            Ok(v) => return Ok(Self::Any(v)),
+            Err(e) => errors.push(("Any", e.to_string())),
         }
 
         let details: Vec<std::string::String> =
             errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
         Err(serde::de::Error::custom(format!(
-            "StringOrNumberOrArrayOfStringOrArrayOfNumberAsUnion: no variant matched. Expected String(StringLiteral) | Number(NumberLiteral) | ArrayOfString(ArrayOfStringLiteral) | ArrayOfNumber(ArrayOfNumberLiteral). Errors: [{}]",
+            "StringLiteralOrNumberLiteralOrArrayOfStringLiteralOrArrayOfNumberLiteralOrAnyAsUnion: no variant matched. Expected StringLiteral(StringLiteral) | NumberLiteral(NumberLiteral) | ArrayOfStringLiteral(ArrayOfStringLiteral) | ArrayOfNumberLiteral(ArrayOfNumberLiteral) | Any(Box<Any>). Errors: [{}]",
+            details.join("; ")
+        )))
+    }
+}
+
+/// Either of the below variants
+#[derive(PartialEq, Debug, Clone)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+pub enum BooleanOrAnyAsUnion {
+    Boolean(Box<Boolean>),
+    Any(Box<Any>),
+}
+
+impl serde::Serialize for BooleanOrAnyAsUnion {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        match self {
+            Self::Boolean(v) => v.serialize(serializer),
+            Self::Any(v) => v.serialize(serializer),
+        }
+    }
+}
+
+impl<'de> serde::Deserialize<'de> for BooleanOrAnyAsUnion {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
+        let mut errors: Vec<(&str, std::string::String)> = Vec::new();
+        match <Box<Boolean> as serde::Deserialize>::deserialize(&value) {
+            Ok(v) => return Ok(Self::Boolean(v)),
+            Err(e) => errors.push(("Boolean", e.to_string())),
+        }
+        match <Box<Any> as serde::Deserialize>::deserialize(&value) {
+            Ok(v) => return Ok(Self::Any(v)),
+            Err(e) => errors.push(("Any", e.to_string())),
+        }
+
+        let details: Vec<std::string::String> =
+            errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
+        Err(serde::de::Error::custom(format!(
+            "BooleanOrAnyAsUnion: no variant matched. Expected Boolean(Box<Boolean>) | Any(Box<Any>). Errors: [{}]",
             details.join("; ")
         )))
     }
@@ -288,7 +337,7 @@ pub enum Any {
     ///  - [Create a hover effect](https://maplibre.org/maplibre-gl-js/docs/examples/create-a-hover-effect/)
     ///
     ///  - [Display HTML clusters with custom properties](https://maplibre.org/maplibre-gl-js/docs/examples/display-html-clusters-with-custom-properties/)
-    Case((Vec<(Boolean, ExprOrLiteral)>, ExprOrLiteral)),
+    Case((Vec<(BooleanOrAnyAsUnion,ExprOrLiteral)>,ExprOrLiteral)),
     /// Evaluates each expression in turn until the first non-null value is obtained, and returns that value.
     ///
     ///  - [Use a fallback image](https://maplibre.org/maplibre-gl-js/docs/examples/use-a-fallback-image/)
@@ -312,7 +361,7 @@ pub enum Any {
     /// Binds expressions to named variables, which can then be referenced in the result expression using `["var", "variable_name"]`.
     ///
     ///  - [Visualize population density](https://maplibre.org/maplibre-gl-js/docs/examples/visualize-population-density/)
-    Let((Vec<(StringLiteral, ExprOrLiteral)>, ExprOrLiteral)),
+    Let((Vec<(StringLiteral,ExprOrLiteral)>,ExprOrLiteral)),
     /// Selects the output whose label value matches the input value, or the fallback value if no match is found. The input can be any expression (e.g. `["get", "building_type"]`). Each label must be either:
     ///
     ///  - a single literal value; or
@@ -320,28 +369,13 @@ pub enum Any {
     ///  - an array of literal values, whose values must be all strings or all numbers (e.g. `[100, 101]` or `["c", "b"]`). The input matches if any of the values in the array matches, similar to the `"in"` operator.
     ///
     /// Each label must be unique. If the input type does not match the type of the labels, the result will be the fallback value.
-    Match(
-        (
-            ExprOrLiteral,
-            Vec<(
-                StringOrNumberOrArrayOfStringOrArrayOfNumberAsUnion,
-                ExprOrLiteral,
-            )>,
-            ExprOrLiteral,
-        ),
-    ),
+    Match((ExprOrLiteral, Vec<(StringLiteralOrNumberLiteralOrArrayOfStringLiteralOrArrayOfNumberLiteralOrAnyAsUnion,ExprOrLiteral)>, ExprOrLiteral)),
     /// Produces discrete, stepped results by evaluating a piecewise-constant function defined by pairs of input and output values ("stops"). The `input` may be any numeric expression (e.g., `["get", "population"]`). Stop inputs must be numeric literals in strictly ascending order.
     ///
     /// Returns the output value of the stop just less than the input, or the first output if the input is less than the first stop.
     ///
     ///  - [Create and style clusters](https://maplibre.org/maplibre-gl-js/docs/examples/create-and-style-clusters/)
-    Step(
-        (
-            NumberLiteralOrNumberOrAnyAsUnion,
-            ExprOrLiteral,
-            Vec<(NumberLiteral, ExprOrLiteral)>,
-        ),
-    ),
+    Step((NumberLiteralOrNumberOrAnyAsUnion,ExprOrLiteral,Vec<(NumberLiteral,ExprOrLiteral)>)),
     /// References variable bound using `let`.
     ///
     ///  - [Visualize population density](https://maplibre.org/maplibre-gl-js/docs/examples/visualize-population-density/)
@@ -487,9 +521,7 @@ impl<'de> serde::de::Visitor<'de> for AnyVisitor {
                     serde_json::from_value(rest.remove(0)).map_err(serde::de::Error::custom)?;
                 let mut pairs = Vec::new();
                 for chunk in rest.chunks_exact(2) {
-                    let label_i: StringOrNumberOrArrayOfStringOrArrayOfNumberAsUnion =
-                        serde_json::from_value(chunk[0].clone())
-                            .map_err(serde::de::Error::custom)?;
+                    let label_i: StringLiteralOrNumberLiteralOrArrayOfStringLiteralOrArrayOfNumberLiteralOrAnyAsUnion = serde_json::from_value(chunk[0].clone()).map_err(serde::de::Error::custom)?;
                     let output_i: ExprOrLiteral = serde_json::from_value(chunk[1].clone())
                         .map_err(serde::de::Error::custom)?;
                     pairs.push((label_i, output_i));
@@ -947,21 +979,23 @@ mod test {
 /// Either of the below variants
 #[derive(PartialEq, Debug, Clone)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum StringLiteralOrColorAsUnion {
+pub enum StringLiteralOrColorOrAnyAsUnion {
     StringLiteral(StringLiteral),
     Color(Color),
+    Any(Box<Any>),
 }
 
-impl serde::Serialize for StringLiteralOrColorAsUnion {
+impl serde::Serialize for StringLiteralOrColorOrAnyAsUnion {
     fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         match self {
             Self::StringLiteral(v) => v.serialize(serializer),
             Self::Color(v) => v.serialize(serializer),
+            Self::Any(v) => v.serialize(serializer),
         }
     }
 }
 
-impl<'de> serde::Deserialize<'de> for StringLiteralOrColorAsUnion {
+impl<'de> serde::Deserialize<'de> for StringLiteralOrColorOrAnyAsUnion {
     fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
         let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
         let mut errors: Vec<(&str, std::string::String)> = Vec::new();
@@ -973,11 +1007,15 @@ impl<'de> serde::Deserialize<'de> for StringLiteralOrColorAsUnion {
             Ok(v) => return Ok(Self::Color(v)),
             Err(e) => errors.push(("Color", e.to_string())),
         }
+        match <Box<Any> as serde::Deserialize>::deserialize(&value) {
+            Ok(v) => return Ok(Self::Any(v)),
+            Err(e) => errors.push(("Any", e.to_string())),
+        }
 
         let details: Vec<std::string::String> =
             errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
         Err(serde::de::Error::custom(format!(
-            "StringLiteralOrColorAsUnion: no variant matched. Expected StringLiteral(StringLiteral) | Color(Color). Errors: [{}]",
+            "StringLiteralOrColorOrAnyAsUnion: no variant matched. Expected StringLiteral(StringLiteral) | Color(Color) | Any(Box<Any>). Errors: [{}]",
             details.join("; ")
         )))
     }
@@ -1000,7 +1038,7 @@ pub enum Array {
         Option<NumberLiteralOrNumberOrAnyAsUnion>,
     ),
     /// Returns a four-element array containing the input color's red, green, blue, and alpha components, in that order.
-    ToRgba(StringLiteralOrColorAsUnion),
+    ToRgba(StringLiteralOrColorOrAnyAsUnion),
 }
 
 impl<'de> serde::Deserialize<'de> for Array {
@@ -1315,7 +1353,7 @@ pub enum Boolean {
     /// Logical negation. Returns `true` if the input is `false`, and `false` if the input is `true`.
     ///
     ///  - [Create and style clusters](https://maplibre.org/maplibre-gl-js/docs/examples/create-and-style-clusters/)
-    Not(Box<Boolean>),
+    Not(BooleanOrAnyAsUnion),
     /// Returns `true` if the input values are not equal, `false` otherwise. The comparison is strictly typed: values of different runtime types are always considered unequal. Cases where the types are known to be different at parse time are considered invalid and will produce a parse error. Accepts an optional `collator` argument to control locale-dependent string comparisons.
     ///
     ///  - [Display HTML clusters with custom properties](https://maplibre.org/maplibre-gl-js/docs/examples/display-html-clusters-with-custom-properties/)
@@ -1345,9 +1383,9 @@ pub enum Boolean {
     /// Returns `true` if all the inputs are `true`, `false` otherwise. The inputs are evaluated in order, and evaluation is short-circuiting: once an input expression evaluates to `false`, the result is `false` and no further input expressions are evaluated.
     ///
     ///  - [Display HTML clusters with custom properties](https://maplibre.org/maplibre-gl-js/docs/examples/display-html-clusters-with-custom-properties/)
-    All(Vec<Boolean>),
+    All(Vec<BooleanOrAnyAsUnion>),
     /// Returns `true` if any of the inputs are `true`, `false` otherwise. The inputs are evaluated in order, and evaluation is short-circuiting: once an input expression evaluates to `true`, the result is `true` and no further input expressions are evaluated.
-    Any(Vec<Boolean>),
+    Any(Vec<BooleanOrAnyAsUnion>),
     /// Asserts that the input value is a boolean. If multiple values are provided, each one is evaluated in order until a boolean is obtained. If none of the inputs are booleans, the expression is an error.
     ///
     ///  - [Create a hover effect](https://maplibre.org/maplibre-gl-js/docs/examples/create-a-hover-effect/)
@@ -2026,23 +2064,25 @@ impl serde::Serialize for Color {
 /// Either of the below variants
 #[derive(PartialEq, Debug, Clone)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum StringLiteralOrColorOrArrayOfColorAsUnion {
+pub enum StringLiteralOrColorOrArrayOfColorOrAnyAsUnion {
     StringLiteral(StringLiteral),
     Color(Color),
     ArrayOfColor(ColorOrArrayOfColor),
+    Any(Box<Any>),
 }
 
-impl serde::Serialize for StringLiteralOrColorOrArrayOfColorAsUnion {
+impl serde::Serialize for StringLiteralOrColorOrArrayOfColorOrAnyAsUnion {
     fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         match self {
             Self::StringLiteral(v) => v.serialize(serializer),
             Self::Color(v) => v.serialize(serializer),
             Self::ArrayOfColor(v) => v.serialize(serializer),
+            Self::Any(v) => v.serialize(serializer),
         }
     }
 }
 
-impl<'de> serde::Deserialize<'de> for StringLiteralOrColorOrArrayOfColorAsUnion {
+impl<'de> serde::Deserialize<'de> for StringLiteralOrColorOrArrayOfColorOrAnyAsUnion {
     fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
         let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
         let mut errors: Vec<(&str, std::string::String)> = Vec::new();
@@ -2058,11 +2098,15 @@ impl<'de> serde::Deserialize<'de> for StringLiteralOrColorOrArrayOfColorAsUnion 
             Ok(v) => return Ok(Self::ArrayOfColor(v)),
             Err(e) => errors.push(("ArrayOfColor", e.to_string())),
         }
+        match <Box<Any> as serde::Deserialize>::deserialize(&value) {
+            Ok(v) => return Ok(Self::Any(v)),
+            Err(e) => errors.push(("Any", e.to_string())),
+        }
 
         let details: Vec<std::string::String> =
             errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
         Err(serde::de::Error::custom(format!(
-            "StringLiteralOrColorOrArrayOfColorAsUnion: no variant matched. Expected StringLiteral(StringLiteral) | Color(Color) | ArrayOfColor(ColorOrArrayOfColor). Errors: [{}]",
+            "StringLiteralOrColorOrArrayOfColorOrAnyAsUnion: no variant matched. Expected StringLiteral(StringLiteral) | Color(Color) | ArrayOfColor(ColorOrArrayOfColor) | Any(Box<Any>). Errors: [{}]",
             details.join("; ")
         )))
     }
@@ -2077,7 +2121,10 @@ pub enum ColorOrArrayOfColor {
         (
             Interpolation,
             NumberLiteralOrNumberOrAnyAsUnion,
-            Vec<(NumberLiteral, StringLiteralOrColorOrArrayOfColorAsUnion)>,
+            Vec<(
+                NumberLiteral,
+                StringLiteralOrColorOrArrayOfColorOrAnyAsUnion,
+            )>,
         ),
     ),
     /// Produces continuous, smooth results by interpolating between pairs of input and output values ("stops"). Works like `interpolate`, but the output type must be `color` or `array<color>`, and the interpolation is performed in the CIELAB color space.
@@ -2085,7 +2132,10 @@ pub enum ColorOrArrayOfColor {
         (
             Interpolation,
             NumberLiteralOrNumberOrAnyAsUnion,
-            Vec<(NumberLiteral, StringLiteralOrColorOrArrayOfColorAsUnion)>,
+            Vec<(
+                NumberLiteral,
+                StringLiteralOrColorOrArrayOfColorOrAnyAsUnion,
+            )>,
         ),
     ),
 }
@@ -2132,7 +2182,7 @@ impl<'de> serde::de::Visitor<'de> for ColorOrArrayOfColorVisitor {
                 let input: NumberLiteralOrNumberOrAnyAsUnion = visit_seq_field(&mut seq, "input")?;
                 let mut stops = Vec::new();
                 while let Some(stop_input_i) = seq.next_element::<NumberLiteral>()? {
-                    let stop_output_i: StringLiteralOrColorOrArrayOfColorAsUnion =
+                    let stop_output_i: StringLiteralOrColorOrArrayOfColorOrAnyAsUnion =
                         seq.next_element()?.ok_or_else(|| {
                             serde::de::Error::custom(
                                 "expected stop_output_i in ColorOrArrayOfColor::InterpolateHcl",
@@ -2152,7 +2202,7 @@ impl<'de> serde::de::Visitor<'de> for ColorOrArrayOfColorVisitor {
                 let input: NumberLiteralOrNumberOrAnyAsUnion = visit_seq_field(&mut seq, "input")?;
                 let mut stops = Vec::new();
                 while let Some(stop_input_i) = seq.next_element::<NumberLiteral>()? {
-                    let stop_output_i: StringLiteralOrColorOrArrayOfColorAsUnion =
+                    let stop_output_i: StringLiteralOrColorOrArrayOfColorOrAnyAsUnion =
                         seq.next_element()?.ok_or_else(|| {
                             serde::de::Error::custom(
                                 "expected stop_output_i in ColorOrArrayOfColor::InterpolateLab",
@@ -3340,7 +3390,8 @@ impl serde::Serialize for Number {
 /// Either of the below variants
 #[derive(PartialEq, Debug, Clone)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjectionAsUnion {
+pub enum StringLiteralOrNumberOrArrayOfNumberOrColorOrArrayOfColorOrProjectionOrAnyAsUnion {
+    StringLiteral(StringLiteral),
     Number(NumberLiteral),
     ArrayOfNumber(
         #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
@@ -3349,26 +3400,35 @@ pub enum NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjectionAsUnion {
     Color(Color),
     ArrayOfColor(ColorOrArrayOfColor),
     Projection(Box<ProjectionType>),
+    Any(Box<Any>),
 }
 
-impl serde::Serialize for NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjectionAsUnion {
+impl serde::Serialize
+    for StringLiteralOrNumberOrArrayOfNumberOrColorOrArrayOfColorOrProjectionOrAnyAsUnion
+{
     fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         match self {
+            Self::StringLiteral(v) => v.serialize(serializer),
             Self::Number(v) => v.serialize(serializer),
             Self::ArrayOfNumber(v) => v.serialize(serializer),
             Self::Color(v) => v.serialize(serializer),
             Self::ArrayOfColor(v) => v.serialize(serializer),
             Self::Projection(v) => v.serialize(serializer),
+            Self::Any(v) => v.serialize(serializer),
         }
     }
 }
 
 impl<'de> serde::Deserialize<'de>
-    for NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjectionAsUnion
+    for StringLiteralOrNumberOrArrayOfNumberOrColorOrArrayOfColorOrProjectionOrAnyAsUnion
 {
     fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
         let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
         let mut errors: Vec<(&str, std::string::String)> = Vec::new();
+        match <StringLiteral as serde::Deserialize>::deserialize(&value) {
+            Ok(v) => return Ok(Self::StringLiteral(v)),
+            Err(e) => errors.push(("StringLiteral", e.to_string())),
+        }
         match <NumberLiteral as serde::Deserialize>::deserialize(&value) {
             Ok(v) => return Ok(Self::Number(v)),
             Err(e) => errors.push(("Number", e.to_string())),
@@ -3385,6 +3445,10 @@ impl<'de> serde::Deserialize<'de>
             Ok(v) => return Ok(Self::Projection(v)),
             Err(e) => errors.push(("Projection", e.to_string())),
         }
+        match <Box<Any> as serde::Deserialize>::deserialize(&value) {
+            Ok(v) => return Ok(Self::Any(v)),
+            Err(e) => errors.push(("Any", e.to_string())),
+        }
         match <serde_json::Value as serde::Deserialize>::deserialize(&value) {
             Ok(v) => return Ok(Self::ArrayOfNumber(v)),
             Err(e) => errors.push(("ArrayOfNumber", e.to_string())),
@@ -3393,7 +3457,7 @@ impl<'de> serde::Deserialize<'de>
         let details: Vec<std::string::String> =
             errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
         Err(serde::de::Error::custom(format!(
-            "NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjectionAsUnion: no variant matched. Expected Number(NumberLiteral) | ArrayOfNumber(serde_json::Value) | Color(Color) | ArrayOfColor(ColorOrArrayOfColor) | Projection(Box<ProjectionType>). Errors: [{}]",
+            "StringLiteralOrNumberOrArrayOfNumberOrColorOrArrayOfColorOrProjectionOrAnyAsUnion: no variant matched. Expected StringLiteral(StringLiteral) | Number(NumberLiteral) | ArrayOfNumber(serde_json::Value) | Color(Color) | ArrayOfColor(ColorOrArrayOfColor) | Projection(Box<ProjectionType>) | Any(Box<Any>). Errors: [{}]",
             details.join("; ")
         )))
     }
@@ -3418,7 +3482,7 @@ pub enum NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection {
             NumberLiteralOrNumberOrAnyAsUnion,
             Vec<(
                 NumberLiteral,
-                NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjectionAsUnion,
+                StringLiteralOrNumberOrArrayOfNumberOrColorOrArrayOfColorOrProjectionOrAnyAsUnion,
             )>,
         ),
     ),
@@ -3468,7 +3532,7 @@ impl<'de> serde::de::Visitor<'de>
                 let input: NumberLiteralOrNumberOrAnyAsUnion = visit_seq_field(&mut seq, "input")?;
                 let mut stops = Vec::new();
                 while let Some(stop_input_i) = seq.next_element::<NumberLiteral>()? {
-                    let stop_output_i: NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjectionAsUnion = seq.next_element()?.ok_or_else(|| serde::de::Error::custom("expected stop_output_i in NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection::Interpolate"))?;
+                    let stop_output_i: StringLiteralOrNumberOrArrayOfNumberOrColorOrArrayOfColorOrProjectionOrAnyAsUnion = seq.next_element()?.ok_or_else(|| serde::de::Error::custom("expected stop_output_i in NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection::Interpolate"))?;
                     stops.push((stop_input_i, stop_output_i));
                 }
                 Ok(

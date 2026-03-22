@@ -5,28 +5,26 @@ mod reorder;
 mod simplify;
 pub(crate) mod util;
 
-use maplibre_style_spec::mir::MirSpec;
-use serde_json::Value;
-
-use super::OptPasses;
-use super::source_util::VectorLayerInfo;
-use super::walk::{PropertyContext, StyleVisitor};
-use crate::stats::TileStatistics;
 use fold::{
     try_algebraic_simplify, try_dead_branch_case, try_dead_branch_match_literal,
     try_filter_contradiction, try_fold_boolean_algebra, try_fold_comparison,
     try_fold_has_from_stats, try_fold_not, try_fold_pure_operator, try_fold_redundant_coercion,
     try_negate_comparison, try_predicate_subsumption, try_range_tightening,
 };
+use maplibre_style_spec::mir::MirSpec;
 use reorder::{LayerContext, reorder_selectivity};
+use serde_json::Value;
 use simplify::{
     try_boolean_flattening, try_demorgan, try_inline_let_var, try_merge_in_expressions,
     try_rewrite_any_to_in, try_simplify_case, try_simplify_coalesce,
     try_simplify_interpolate_or_step, try_simplify_match, try_simplify_single_in,
 };
-
-// Re-export items used by other modules in `optimize/`.
 pub(crate) use util::extract_json_literal;
+
+use super::OptPasses;
+use super::source_util::VectorLayerInfo;
+use super::walk::{PropertyContext, StyleVisitor};
+use crate::stats::TileStatistics;
 
 // ── Visitors ──────────────────────────────────────────────────────────────────
 

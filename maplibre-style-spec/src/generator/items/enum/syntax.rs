@@ -445,6 +445,12 @@ fn generate_expression_any_of(scope: &mut Scope, types: &[MirParameterType]) -> 
             {
                 // Needs indirection: `String` contains this union recursively (`downcase`, `upcase`, `slice`).
                 "Box<String>".to_string()
+            } else if matches!(
+                p,
+                MirParameterType::Expression(e) if matches!(e.as_ref(), MirExpression::Boolean)
+            ) {
+                // Needs indirection: `Boolean` contains this union recursively (`all`, `any`, `!`).
+                "Box<Boolean>".to_string()
             } else {
                 normalize_expression_union_component_type(&label)
             };
@@ -454,13 +460,19 @@ fn generate_expression_any_of(scope: &mut Scope, types: &[MirParameterType]) -> 
 
     // `Any`-output operators (`get`, `let`, `case`, `match`, …) are polymorphic — their concrete
     // return type is context-determined. They live only in the `Any` syntax enum. Typed parameter
-    // positions that must accept any expression (e.g. `["get", "prop"]` in a numeric slot) use
-    // this explicit `Any(Box<Any>)` fallback arm so serde falls through to it after typed
-    // variants fail.
-    if (number_literal_with_number_expr || string_literal_with_string_expr)
-        && !arms.iter().any(|(l, _)| l == "Any")
-    {
+    // positions that must accept any expression (e.g. `["get", "prop"]` in a numeric slot, or
+    // `["match", ...]` in a boolean slot) use this explicit `Any(Box<Any>)` fallback arm so
+    // serde falls through to it after typed variants fail.
+    let has_typed_expression = types.iter().any(|p| {
+        matches!(
+            p,
+            MirParameterType::Expression(e) if !matches!(e.as_ref(), MirExpression::Any)
+        )
+    });
+    let mut added_any_fallback = false;
+    if has_typed_expression && !arms.iter().any(|(l, _)| l == "Any") {
         arms.push(("Any".to_string(), "Box<Any>".to_string()));
+        added_any_fallback = true;
     }
 
     // `interpolate-hcl` / `interpolate-lab` accept CSS color strings (e.g. `"#f00"`) as stop outputs.
@@ -468,7 +480,7 @@ fn generate_expression_any_of(scope: &mut Scope, types: &[MirParameterType]) -> 
     arm_labels.sort_unstable();
     arm_labels.dedup();
     let mut extra_untagged = false;
-    if arm_labels == ["ArrayOfColor", "Color"] {
+    if arm_labels.contains(&"ArrayOfColor") && arm_labels.contains(&"Color") {
         arms.insert(
             0,
             ("StringLiteral".to_string(), "StringLiteral".to_string()),
@@ -501,7 +513,8 @@ fn generate_expression_any_of(scope: &mut Scope, types: &[MirParameterType]) -> 
             .join("Or")
     );
     if scope.get_enum_mut(&any_of_type).is_none() {
-        let needs_untagged = expression_union_needs_untagged(types) || extra_untagged;
+        let needs_untagged =
+            expression_union_needs_untagged(types) || extra_untagged || added_any_fallback;
         let derive = if needs_untagged {
             "PartialEq, Debug, Clone"
         } else {
@@ -1185,6 +1198,15 @@ fn generate_parameter_variant(scope: &mut Scope, param: &MirParameterType) -> St
                     MirParameterType::Literal(MirLiteral::String),
                     MirParameterType::Expression(Box::new(MirExpression::Color)),
                 ],
+            ),
+            // `"boolean"` in parameter positions can receive polymorphic operators (`match`, `case`,
+            // `get`, …) that return Any, so route through `generate_expression_any_of` to get the
+            // `Any(Box<Any>)` fallback arm.
+            MirExpression::Boolean => generate_expression_any_of(
+                scope,
+                &[MirParameterType::Expression(Box::new(
+                    MirExpression::Boolean,
+                ))],
             ),
             // `array<T>` with a type variable means any expression that evaluates to an array is valid.
             MirExpression::Array { r#type, .. }
