@@ -34,6 +34,7 @@ impl serde::Serialize for ExprOrLiteral {
             Self::StringLiteral(v) => v.serialize(serializer),
             Self::GeoJSONObjectLiteral(v) => v.serialize(serializer),
             Self::JSONObjectLiteral(v) => v.serialize(serializer),
+            Self::JSONArrayLiteral(v) => v.serialize(serializer),
             Self::AnyExpr(v) => v.as_ref().serialize(serializer),
             Self::ArrayExpr(v) => v.as_ref().serialize(serializer),
             Self::BooleanExpr(v) => v.as_ref().serialize(serializer),
@@ -44,7 +45,6 @@ impl serde::Serialize for ExprOrLiteral {
             Self::NumberExpr(v) => v.as_ref().serialize(serializer),
             Self::ObjectExpr(v) => v.as_ref().serialize(serializer),
             Self::StringExpr(v) => v.as_ref().serialize(serializer),
-            Self::JSONArrayLiteral(v) => v.serialize(serializer),
         }
     }
 }
@@ -72,11 +72,13 @@ impl<'de> serde::Deserialize<'de> for ExprOrLiteral {
             Ok(v) => return Ok(Self::GeoJSONObjectLiteral(v)),
             Err(e) => errors.push(("GeoJSONObjectLiteral", e.to_string())),
         }
-        if !(value.is_array()) {
-            match <JSONObjectLiteral as serde::Deserialize>::deserialize(&value) {
-                Ok(v) => return Ok(Self::JSONObjectLiteral(v)),
-                Err(e) => errors.push(("JSONObjectLiteral", e.to_string())),
-            }
+        match <JSONObjectLiteral as serde::Deserialize>::deserialize(&value) {
+            Ok(v) => return Ok(Self::JSONObjectLiteral(v)),
+            Err(e) => errors.push(("JSONObjectLiteral", e.to_string())),
+        }
+        match <JSONArrayLiteral as serde::Deserialize>::deserialize(&value) {
+            Ok(v) => return Ok(Self::JSONArrayLiteral(v)),
+            Err(e) => errors.push(("JSONArrayLiteral", e.to_string())),
         }
         match <Any as serde::Deserialize>::deserialize(&value) {
             Ok(v) => return Ok(Self::AnyExpr(Box::new(v))),
@@ -118,15 +120,11 @@ impl<'de> serde::Deserialize<'de> for ExprOrLiteral {
             Ok(v) => return Ok(Self::StringExpr(Box::new(v))),
             Err(e) => errors.push(("StringExpr", e.to_string())),
         }
-        match <JSONArrayLiteral as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::JSONArrayLiteral(v)),
-            Err(e) => errors.push(("JSONArrayLiteral", e.to_string())),
-        }
 
         let details: Vec<std::string::String> =
             errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
         Err(serde::de::Error::custom(format!(
-            "ExprOrLiteral: no variant matched. Expected Null | Bool(bool) | NumberLiteral(NumberLiteral) | StringLiteral(StringLiteral) | GeoJSONObjectLiteral(GeoJSONObjectLiteral) | JSONObjectLiteral(JSONObjectLiteral) | AnyExpr(Any) | ArrayExpr(Array) | BooleanExpr(Boolean) | CollatorExpr(Collator) | ColorExpr(Color) | FormattedExpr(Formatted) | ImageExpr(Image) | NumberExpr(Number) | ObjectExpr(Object) | StringExpr(String) | JSONArrayLiteral(JSONArrayLiteral). Errors: [{}]",
+            "ExprOrLiteral: no variant matched. Expected Null | Bool(bool) | NumberLiteral(NumberLiteral) | StringLiteral(StringLiteral) | GeoJSONObjectLiteral(GeoJSONObjectLiteral) | JSONObjectLiteral(JSONObjectLiteral) | JSONArrayLiteral(JSONArrayLiteral) | AnyExpr(Any) | ArrayExpr(Array) | BooleanExpr(Boolean) | CollatorExpr(Collator) | ColorExpr(Color) | FormattedExpr(Formatted) | ImageExpr(Image) | NumberExpr(Number) | ObjectExpr(Object) | StringExpr(String). Errors: [{}]",
             details.join("; ")
         )))
     }
@@ -538,7 +536,7 @@ impl serde::Serialize for Any {
         match self {
             Any::Accumulated => {
                 let mut elems = vec![];
-                while elems.len() > 0 && elems.last().is_some_and(serde_json::Value::is_null) {
+                while elems.last().is_some_and(serde_json::Value::is_null) {
                     elems.pop();
                 }
                 let mut seq = serializer.serialize_seq(None)?;
@@ -553,7 +551,7 @@ impl serde::Serialize for Any {
                     serde_json::to_value(f0).map_err(serde::ser::Error::custom)?,
                     serde_json::to_value(f1).map_err(serde::ser::Error::custom)?,
                 ];
-                while elems.len() > 2 && elems.last().is_some_and(serde_json::Value::is_null) {
+                while elems.last().is_some_and(serde_json::Value::is_null) {
                     elems.pop();
                 }
                 let mut seq = serializer.serialize_seq(None)?;
@@ -611,7 +609,7 @@ impl serde::Serialize for Any {
             }
             Any::FeatureState(f0) => {
                 let mut elems = vec![serde_json::to_value(f0).map_err(serde::ser::Error::custom)?];
-                while elems.len() > 1 && elems.last().is_some_and(serde_json::Value::is_null) {
+                while elems.last().is_some_and(serde_json::Value::is_null) {
                     elems.pop();
                 }
                 let mut seq = serializer.serialize_seq(None)?;
@@ -626,7 +624,7 @@ impl serde::Serialize for Any {
                     serde_json::to_value(f0).map_err(serde::ser::Error::custom)?,
                     serde_json::to_value(f1).map_err(serde::ser::Error::custom)?,
                 ];
-                while elems.len() > 1 && elems.last().is_some_and(serde_json::Value::is_null) {
+                while elems.last().is_some_and(serde_json::Value::is_null) {
                     elems.pop();
                 }
                 let mut seq = serializer.serialize_seq(None)?;
@@ -638,7 +636,7 @@ impl serde::Serialize for Any {
             }
             Any::GlobalState(f0) => {
                 let mut elems = vec![serde_json::to_value(f0).map_err(serde::ser::Error::custom)?];
-                while elems.len() > 1 && elems.last().is_some_and(serde_json::Value::is_null) {
+                while elems.last().is_some_and(serde_json::Value::is_null) {
                     elems.pop();
                 }
                 let mut seq = serializer.serialize_seq(None)?;
@@ -650,7 +648,7 @@ impl serde::Serialize for Any {
             }
             Any::Id => {
                 let mut elems = vec![];
-                while elems.len() > 0 && elems.last().is_some_and(serde_json::Value::is_null) {
+                while elems.last().is_some_and(serde_json::Value::is_null) {
                     elems.pop();
                 }
                 let mut seq = serializer.serialize_seq(None)?;
@@ -761,7 +759,7 @@ impl serde::Serialize for Any {
             }
             Any::Var(f0) => {
                 let mut elems = vec![serde_json::to_value(f0).map_err(serde::ser::Error::custom)?];
-                while elems.len() > 1 && elems.last().is_some_and(serde_json::Value::is_null) {
+                while elems.last().is_some_and(serde_json::Value::is_null) {
                     elems.pop();
                 }
                 let mut seq = serializer.serialize_seq(None)?;
@@ -1068,7 +1066,7 @@ impl serde::Serialize for Array {
         match self {
             Array::Op(f0) => {
                 let mut elems = vec![serde_json::to_value(f0).map_err(serde::ser::Error::custom)?];
-                while elems.len() > 1 && elems.last().is_some_and(serde_json::Value::is_null) {
+                while elems.last().is_some_and(serde_json::Value::is_null) {
                     elems.pop();
                 }
                 let mut seq = serializer.serialize_seq(None)?;
@@ -1080,7 +1078,7 @@ impl serde::Serialize for Array {
             }
             Array::Literal(f0) => {
                 let mut elems = vec![serde_json::to_value(f0).map_err(serde::ser::Error::custom)?];
-                while elems.len() > 1 && elems.last().is_some_and(serde_json::Value::is_null) {
+                while elems.last().is_some_and(serde_json::Value::is_null) {
                     elems.pop();
                 }
                 let mut seq = serializer.serialize_seq(None)?;
@@ -1096,7 +1094,7 @@ impl serde::Serialize for Array {
                     serde_json::to_value(f1).map_err(serde::ser::Error::custom)?,
                     serde_json::to_value(f2).map_err(serde::ser::Error::custom)?,
                 ];
-                while elems.len() > 2 && elems.last().is_some_and(serde_json::Value::is_null) {
+                while elems.last().is_some_and(serde_json::Value::is_null) {
                     elems.pop();
                 }
                 let mut seq = serializer.serialize_seq(None)?;
@@ -1108,7 +1106,7 @@ impl serde::Serialize for Array {
             }
             Array::ToRgba(f0) => {
                 let mut elems = vec![serde_json::to_value(f0).map_err(serde::ser::Error::custom)?];
-                while elems.len() > 1 && elems.last().is_some_and(serde_json::Value::is_null) {
+                while elems.last().is_some_and(serde_json::Value::is_null) {
                     elems.pop();
                 }
                 let mut seq = serializer.serialize_seq(None)?;
@@ -1208,7 +1206,7 @@ impl serde::Serialize for ArrayLessTypeLengthGreater {
                     serde_json::to_value(f1).map_err(serde::ser::Error::custom)?,
                     serde_json::to_value(f2).map_err(serde::ser::Error::custom)?,
                 ];
-                while elems.len() > 3 && elems.last().is_some_and(serde_json::Value::is_null) {
+                while elems.last().is_some_and(serde_json::Value::is_null) {
                     elems.pop();
                 }
                 let mut seq = serializer.serialize_seq(None)?;
@@ -1288,7 +1286,7 @@ impl serde::Serialize for ArrayOfType {
                     serde_json::to_value(f0).map_err(serde::ser::Error::custom)?,
                     serde_json::to_value(f1).map_err(serde::ser::Error::custom)?,
                 ];
-                while elems.len() > 2 && elems.last().is_some_and(serde_json::Value::is_null) {
+                while elems.last().is_some_and(serde_json::Value::is_null) {
                     elems.pop();
                 }
                 let mut seq = serializer.serialize_seq(None)?;
@@ -1593,7 +1591,7 @@ impl serde::Serialize for Boolean {
         match self {
             Boolean::Not(f0) => {
                 let mut elems = vec![serde_json::to_value(f0).map_err(serde::ser::Error::custom)?];
-                while elems.len() > 1 && elems.last().is_some_and(serde_json::Value::is_null) {
+                while elems.last().is_some_and(serde_json::Value::is_null) {
                     elems.pop();
                 }
                 let mut seq = serializer.serialize_seq(None)?;
@@ -1609,7 +1607,7 @@ impl serde::Serialize for Boolean {
                     serde_json::to_value(f1).map_err(serde::ser::Error::custom)?,
                     serde_json::to_value(f2).map_err(serde::ser::Error::custom)?,
                 ];
-                while elems.len() > 2 && elems.last().is_some_and(serde_json::Value::is_null) {
+                while elems.last().is_some_and(serde_json::Value::is_null) {
                     elems.pop();
                 }
                 let mut seq = serializer.serialize_seq(None)?;
@@ -1630,8 +1628,6 @@ impl serde::Serialize for Boolean {
                     for elem in &arr {
                         seq.serialize_element(elem)?;
                     }
-                } else {
-                    seq.serialize_element(&opts_val)?;
                 }
                 seq.end()
             }
@@ -1646,8 +1642,6 @@ impl serde::Serialize for Boolean {
                     for elem in &arr {
                         seq.serialize_element(elem)?;
                     }
-                } else {
-                    seq.serialize_element(&opts_val)?;
                 }
                 seq.end()
             }
@@ -1657,7 +1651,7 @@ impl serde::Serialize for Boolean {
                     serde_json::to_value(f1).map_err(serde::ser::Error::custom)?,
                     serde_json::to_value(f2).map_err(serde::ser::Error::custom)?,
                 ];
-                while elems.len() > 2 && elems.last().is_some_and(serde_json::Value::is_null) {
+                while elems.last().is_some_and(serde_json::Value::is_null) {
                     elems.pop();
                 }
                 let mut seq = serializer.serialize_seq(None)?;
@@ -1678,8 +1672,6 @@ impl serde::Serialize for Boolean {
                     for elem in &arr {
                         seq.serialize_element(elem)?;
                     }
-                } else {
-                    seq.serialize_element(&opts_val)?;
                 }
                 seq.end()
             }
@@ -1694,8 +1686,6 @@ impl serde::Serialize for Boolean {
                     for elem in &arr {
                         seq.serialize_element(elem)?;
                     }
-                } else {
-                    seq.serialize_element(&opts_val)?;
                 }
                 seq.end()
             }
@@ -1743,7 +1733,7 @@ impl serde::Serialize for Boolean {
                     serde_json::to_value(f0).map_err(serde::ser::Error::custom)?,
                     serde_json::to_value(f1).map_err(serde::ser::Error::custom)?,
                 ];
-                while elems.len() > 1 && elems.last().is_some_and(serde_json::Value::is_null) {
+                while elems.last().is_some_and(serde_json::Value::is_null) {
                     elems.pop();
                 }
                 let mut seq = serializer.serialize_seq(None)?;
@@ -1764,14 +1754,12 @@ impl serde::Serialize for Boolean {
                     for elem in &arr {
                         seq.serialize_element(elem)?;
                     }
-                } else {
-                    seq.serialize_element(&opts_val)?;
                 }
                 seq.end()
             }
             Boolean::IsSupportedScript(f0) => {
                 let mut elems = vec![serde_json::to_value(f0).map_err(serde::ser::Error::custom)?];
-                while elems.len() > 1 && elems.last().is_some_and(serde_json::Value::is_null) {
+                while elems.last().is_some_and(serde_json::Value::is_null) {
                     elems.pop();
                 }
                 let mut seq = serializer.serialize_seq(None)?;
@@ -1783,7 +1771,7 @@ impl serde::Serialize for Boolean {
             }
             Boolean::To(f0) => {
                 let mut elems = vec![serde_json::to_value(f0).map_err(serde::ser::Error::custom)?];
-                while elems.len() > 1 && elems.last().is_some_and(serde_json::Value::is_null) {
+                while elems.last().is_some_and(serde_json::Value::is_null) {
                     elems.pop();
                 }
                 let mut seq = serializer.serialize_seq(None)?;
@@ -1795,7 +1783,7 @@ impl serde::Serialize for Boolean {
             }
             Boolean::Within(f0) => {
                 let mut elems = vec![serde_json::to_value(f0).map_err(serde::ser::Error::custom)?];
-                while elems.len() > 1 && elems.last().is_some_and(serde_json::Value::is_null) {
+                while elems.last().is_some_and(serde_json::Value::is_null) {
                     elems.pop();
                 }
                 let mut seq = serializer.serialize_seq(None)?;
@@ -1874,7 +1862,7 @@ impl serde::Serialize for Collator {
         match self {
             Collator::Op(f0) => {
                 let mut elems = vec![serde_json::to_value(f0).map_err(serde::ser::Error::custom)?];
-                while elems.len() > 1 && elems.last().is_some_and(serde_json::Value::is_null) {
+                while elems.last().is_some_and(serde_json::Value::is_null) {
                     elems.pop();
                 }
                 let mut seq = serializer.serialize_seq(None)?;
@@ -1988,7 +1976,7 @@ impl serde::Serialize for Color {
                     serde_json::to_value(f1).map_err(serde::ser::Error::custom)?,
                     serde_json::to_value(f2).map_err(serde::ser::Error::custom)?,
                 ];
-                while elems.len() > 3 && elems.last().is_some_and(serde_json::Value::is_null) {
+                while elems.last().is_some_and(serde_json::Value::is_null) {
                     elems.pop();
                 }
                 let mut seq = serializer.serialize_seq(None)?;
@@ -2005,7 +1993,7 @@ impl serde::Serialize for Color {
                     serde_json::to_value(f2).map_err(serde::ser::Error::custom)?,
                     serde_json::to_value(f3).map_err(serde::ser::Error::custom)?,
                 ];
-                while elems.len() > 4 && elems.last().is_some_and(serde_json::Value::is_null) {
+                while elems.last().is_some_and(serde_json::Value::is_null) {
                     elems.pop();
                 }
                 let mut seq = serializer.serialize_seq(None)?;
@@ -2395,9 +2383,23 @@ impl serde::Serialize for Formatted {
                 seq.serialize_element("format")?;
                 if let serde_json::Value::Array(top) = &inner_val {
                     for elem in top {
-                        if let serde_json::Value::Array(pair_elems) = elem {
-                            for pe in pair_elems {
-                                seq.serialize_element(pe)?;
+                        if let serde_json::Value::Array(sub) = elem {
+                            if sub.is_empty() {
+                                // Empty Vec — nothing to flatten.
+                            } else if sub[0].is_array() {
+                                // An array-of-arrays is the Vec<(A,B)> — flatten it.
+                                for pair in sub {
+                                    if let serde_json::Value::Array(pair_elems) = pair {
+                                        for pe in pair_elems {
+                                            seq.serialize_element(pe)?;
+                                        }
+                                    } else {
+                                        seq.serialize_element(pair)?;
+                                    }
+                                }
+                            } else {
+                                // Plain array value (e.g. a sub-expression like ["zoom"]).
+                                seq.serialize_element(elem)?;
                             }
                         } else {
                             seq.serialize_element(elem)?;
@@ -2476,7 +2478,7 @@ impl serde::Serialize for Image {
         match self {
             Image::Op(f0) => {
                 let mut elems = vec![serde_json::to_value(f0).map_err(serde::ser::Error::custom)?];
-                while elems.len() > 1 && elems.last().is_some_and(serde_json::Value::is_null) {
+                while elems.last().is_some_and(serde_json::Value::is_null) {
                     elems.pop();
                 }
                 let mut seq = serializer.serialize_seq(None)?;
@@ -2912,7 +2914,7 @@ impl serde::Serialize for Number {
                     serde_json::to_value(f0).map_err(serde::ser::Error::custom)?,
                     serde_json::to_value(f1).map_err(serde::ser::Error::custom)?,
                 ];
-                while elems.len() > 2 && elems.last().is_some_and(serde_json::Value::is_null) {
+                while elems.last().is_some_and(serde_json::Value::is_null) {
                     elems.pop();
                 }
                 let mut seq = serializer.serialize_seq(None)?;
@@ -2959,8 +2961,6 @@ impl serde::Serialize for Number {
                     for elem in &arr {
                         seq.serialize_element(elem)?;
                     }
-                } else {
-                    seq.serialize_element(&opts_val)?;
                 }
                 seq.end()
             }
@@ -2969,7 +2969,7 @@ impl serde::Serialize for Number {
                     serde_json::to_value(f0).map_err(serde::ser::Error::custom)?,
                     serde_json::to_value(f1).map_err(serde::ser::Error::custom)?,
                 ];
-                while elems.len() > 2 && elems.last().is_some_and(serde_json::Value::is_null) {
+                while elems.last().is_some_and(serde_json::Value::is_null) {
                     elems.pop();
                 }
                 let mut seq = serializer.serialize_seq(None)?;
@@ -2984,7 +2984,7 @@ impl serde::Serialize for Number {
                     serde_json::to_value(f0).map_err(serde::ser::Error::custom)?,
                     serde_json::to_value(f1).map_err(serde::ser::Error::custom)?,
                 ];
-                while elems.len() > 2 && elems.last().is_some_and(serde_json::Value::is_null) {
+                while elems.last().is_some_and(serde_json::Value::is_null) {
                     elems.pop();
                 }
                 let mut seq = serializer.serialize_seq(None)?;
@@ -2996,7 +2996,7 @@ impl serde::Serialize for Number {
             }
             Number::Absolute(f0) => {
                 let mut elems = vec![serde_json::to_value(f0).map_err(serde::ser::Error::custom)?];
-                while elems.len() > 1 && elems.last().is_some_and(serde_json::Value::is_null) {
+                while elems.last().is_some_and(serde_json::Value::is_null) {
                     elems.pop();
                 }
                 let mut seq = serializer.serialize_seq(None)?;
@@ -3008,7 +3008,7 @@ impl serde::Serialize for Number {
             }
             Number::Arccosine(f0) => {
                 let mut elems = vec![serde_json::to_value(f0).map_err(serde::ser::Error::custom)?];
-                while elems.len() > 1 && elems.last().is_some_and(serde_json::Value::is_null) {
+                while elems.last().is_some_and(serde_json::Value::is_null) {
                     elems.pop();
                 }
                 let mut seq = serializer.serialize_seq(None)?;
@@ -3020,7 +3020,7 @@ impl serde::Serialize for Number {
             }
             Number::Asin(f0) => {
                 let mut elems = vec![serde_json::to_value(f0).map_err(serde::ser::Error::custom)?];
-                while elems.len() > 1 && elems.last().is_some_and(serde_json::Value::is_null) {
+                while elems.last().is_some_and(serde_json::Value::is_null) {
                     elems.pop();
                 }
                 let mut seq = serializer.serialize_seq(None)?;
@@ -3032,7 +3032,7 @@ impl serde::Serialize for Number {
             }
             Number::Atan(f0) => {
                 let mut elems = vec![serde_json::to_value(f0).map_err(serde::ser::Error::custom)?];
-                while elems.len() > 1 && elems.last().is_some_and(serde_json::Value::is_null) {
+                while elems.last().is_some_and(serde_json::Value::is_null) {
                     elems.pop();
                 }
                 let mut seq = serializer.serialize_seq(None)?;
@@ -3044,7 +3044,7 @@ impl serde::Serialize for Number {
             }
             Number::Ceil(f0) => {
                 let mut elems = vec![serde_json::to_value(f0).map_err(serde::ser::Error::custom)?];
-                while elems.len() > 1 && elems.last().is_some_and(serde_json::Value::is_null) {
+                while elems.last().is_some_and(serde_json::Value::is_null) {
                     elems.pop();
                 }
                 let mut seq = serializer.serialize_seq(None)?;
@@ -3056,7 +3056,7 @@ impl serde::Serialize for Number {
             }
             Number::Cos(f0) => {
                 let mut elems = vec![serde_json::to_value(f0).map_err(serde::ser::Error::custom)?];
-                while elems.len() > 1 && elems.last().is_some_and(serde_json::Value::is_null) {
+                while elems.last().is_some_and(serde_json::Value::is_null) {
                     elems.pop();
                 }
                 let mut seq = serializer.serialize_seq(None)?;
@@ -3068,7 +3068,7 @@ impl serde::Serialize for Number {
             }
             Number::Distance(f0) => {
                 let mut elems = vec![serde_json::to_value(f0).map_err(serde::ser::Error::custom)?];
-                while elems.len() > 1 && elems.last().is_some_and(serde_json::Value::is_null) {
+                while elems.last().is_some_and(serde_json::Value::is_null) {
                     elems.pop();
                 }
                 let mut seq = serializer.serialize_seq(None)?;
@@ -3080,7 +3080,7 @@ impl serde::Serialize for Number {
             }
             Number::E => {
                 let mut elems = vec![];
-                while elems.len() > 0 && elems.last().is_some_and(serde_json::Value::is_null) {
+                while elems.last().is_some_and(serde_json::Value::is_null) {
                     elems.pop();
                 }
                 let mut seq = serializer.serialize_seq(None)?;
@@ -3092,7 +3092,7 @@ impl serde::Serialize for Number {
             }
             Number::Elevation => {
                 let mut elems = vec![];
-                while elems.len() > 0 && elems.last().is_some_and(serde_json::Value::is_null) {
+                while elems.last().is_some_and(serde_json::Value::is_null) {
                     elems.pop();
                 }
                 let mut seq = serializer.serialize_seq(None)?;
@@ -3104,7 +3104,7 @@ impl serde::Serialize for Number {
             }
             Number::Floor(f0) => {
                 let mut elems = vec![serde_json::to_value(f0).map_err(serde::ser::Error::custom)?];
-                while elems.len() > 1 && elems.last().is_some_and(serde_json::Value::is_null) {
+                while elems.last().is_some_and(serde_json::Value::is_null) {
                     elems.pop();
                 }
                 let mut seq = serializer.serialize_seq(None)?;
@@ -3116,7 +3116,7 @@ impl serde::Serialize for Number {
             }
             Number::HeatmapDensity => {
                 let mut elems = vec![];
-                while elems.len() > 0 && elems.last().is_some_and(serde_json::Value::is_null) {
+                while elems.last().is_some_and(serde_json::Value::is_null) {
                     elems.pop();
                 }
                 let mut seq = serializer.serialize_seq(None)?;
@@ -3137,14 +3137,12 @@ impl serde::Serialize for Number {
                     for elem in &arr {
                         seq.serialize_element(elem)?;
                     }
-                } else {
-                    seq.serialize_element(&opts_val)?;
                 }
                 seq.end()
             }
             Number::Length(f0) => {
                 let mut elems = vec![serde_json::to_value(f0).map_err(serde::ser::Error::custom)?];
-                while elems.len() > 1 && elems.last().is_some_and(serde_json::Value::is_null) {
+                while elems.last().is_some_and(serde_json::Value::is_null) {
                     elems.pop();
                 }
                 let mut seq = serializer.serialize_seq(None)?;
@@ -3156,7 +3154,7 @@ impl serde::Serialize for Number {
             }
             Number::LineProgress => {
                 let mut elems = vec![];
-                while elems.len() > 0 && elems.last().is_some_and(serde_json::Value::is_null) {
+                while elems.last().is_some_and(serde_json::Value::is_null) {
                     elems.pop();
                 }
                 let mut seq = serializer.serialize_seq(None)?;
@@ -3168,7 +3166,7 @@ impl serde::Serialize for Number {
             }
             Number::Ln(f0) => {
                 let mut elems = vec![serde_json::to_value(f0).map_err(serde::ser::Error::custom)?];
-                while elems.len() > 1 && elems.last().is_some_and(serde_json::Value::is_null) {
+                while elems.last().is_some_and(serde_json::Value::is_null) {
                     elems.pop();
                 }
                 let mut seq = serializer.serialize_seq(None)?;
@@ -3180,7 +3178,7 @@ impl serde::Serialize for Number {
             }
             Number::Ln2 => {
                 let mut elems = vec![];
-                while elems.len() > 0 && elems.last().is_some_and(serde_json::Value::is_null) {
+                while elems.last().is_some_and(serde_json::Value::is_null) {
                     elems.pop();
                 }
                 let mut seq = serializer.serialize_seq(None)?;
@@ -3192,7 +3190,7 @@ impl serde::Serialize for Number {
             }
             Number::Log10(f0) => {
                 let mut elems = vec![serde_json::to_value(f0).map_err(serde::ser::Error::custom)?];
-                while elems.len() > 1 && elems.last().is_some_and(serde_json::Value::is_null) {
+                while elems.last().is_some_and(serde_json::Value::is_null) {
                     elems.pop();
                 }
                 let mut seq = serializer.serialize_seq(None)?;
@@ -3204,7 +3202,7 @@ impl serde::Serialize for Number {
             }
             Number::Log2(f0) => {
                 let mut elems = vec![serde_json::to_value(f0).map_err(serde::ser::Error::custom)?];
-                while elems.len() > 1 && elems.last().is_some_and(serde_json::Value::is_null) {
+                while elems.last().is_some_and(serde_json::Value::is_null) {
                     elems.pop();
                 }
                 let mut seq = serializer.serialize_seq(None)?;
@@ -3255,7 +3253,7 @@ impl serde::Serialize for Number {
             }
             Number::Pi => {
                 let mut elems = vec![];
-                while elems.len() > 0 && elems.last().is_some_and(serde_json::Value::is_null) {
+                while elems.last().is_some_and(serde_json::Value::is_null) {
                     elems.pop();
                 }
                 let mut seq = serializer.serialize_seq(None)?;
@@ -3267,7 +3265,7 @@ impl serde::Serialize for Number {
             }
             Number::Round(f0) => {
                 let mut elems = vec![serde_json::to_value(f0).map_err(serde::ser::Error::custom)?];
-                while elems.len() > 1 && elems.last().is_some_and(serde_json::Value::is_null) {
+                while elems.last().is_some_and(serde_json::Value::is_null) {
                     elems.pop();
                 }
                 let mut seq = serializer.serialize_seq(None)?;
@@ -3279,7 +3277,7 @@ impl serde::Serialize for Number {
             }
             Number::Sin(f0) => {
                 let mut elems = vec![serde_json::to_value(f0).map_err(serde::ser::Error::custom)?];
-                while elems.len() > 1 && elems.last().is_some_and(serde_json::Value::is_null) {
+                while elems.last().is_some_and(serde_json::Value::is_null) {
                     elems.pop();
                 }
                 let mut seq = serializer.serialize_seq(None)?;
@@ -3291,7 +3289,7 @@ impl serde::Serialize for Number {
             }
             Number::Sqrt(f0) => {
                 let mut elems = vec![serde_json::to_value(f0).map_err(serde::ser::Error::custom)?];
-                while elems.len() > 1 && elems.last().is_some_and(serde_json::Value::is_null) {
+                while elems.last().is_some_and(serde_json::Value::is_null) {
                     elems.pop();
                 }
                 let mut seq = serializer.serialize_seq(None)?;
@@ -3303,7 +3301,7 @@ impl serde::Serialize for Number {
             }
             Number::Tan(f0) => {
                 let mut elems = vec![serde_json::to_value(f0).map_err(serde::ser::Error::custom)?];
-                while elems.len() > 1 && elems.last().is_some_and(serde_json::Value::is_null) {
+                while elems.last().is_some_and(serde_json::Value::is_null) {
                     elems.pop();
                 }
                 let mut seq = serializer.serialize_seq(None)?;
@@ -3328,7 +3326,7 @@ impl serde::Serialize for Number {
             }
             Number::Zoom => {
                 let mut elems = vec![];
-                while elems.len() > 0 && elems.last().is_some_and(serde_json::Value::is_null) {
+                while elems.last().is_some_and(serde_json::Value::is_null) {
                     elems.pop();
                 }
                 let mut seq = serializer.serialize_seq(None)?;
@@ -3612,7 +3610,7 @@ impl serde::Serialize for Object {
         match self {
             Object::Literal(f0) => {
                 let mut elems = vec![serde_json::to_value(f0).map_err(serde::ser::Error::custom)?];
-                while elems.len() > 1 && elems.last().is_some_and(serde_json::Value::is_null) {
+                while elems.last().is_some_and(serde_json::Value::is_null) {
                     elems.pop();
                 }
                 let mut seq = serializer.serialize_seq(None)?;
@@ -3637,7 +3635,7 @@ impl serde::Serialize for Object {
             }
             Object::Properties => {
                 let mut elems = vec![];
-                while elems.len() > 0 && elems.last().is_some_and(serde_json::Value::is_null) {
+                while elems.last().is_some_and(serde_json::Value::is_null) {
                     elems.pop();
                 }
                 let mut seq = serializer.serialize_seq(None)?;
@@ -3826,7 +3824,7 @@ impl serde::Serialize for String {
             }
             String::Downcase(f0) => {
                 let mut elems = vec![serde_json::to_value(f0).map_err(serde::ser::Error::custom)?];
-                while elems.len() > 1 && elems.last().is_some_and(serde_json::Value::is_null) {
+                while elems.last().is_some_and(serde_json::Value::is_null) {
                     elems.pop();
                 }
                 let mut seq = serializer.serialize_seq(None)?;
@@ -3838,7 +3836,7 @@ impl serde::Serialize for String {
             }
             String::GeometryType => {
                 let mut elems = vec![];
-                while elems.len() > 0 && elems.last().is_some_and(serde_json::Value::is_null) {
+                while elems.last().is_some_and(serde_json::Value::is_null) {
                     elems.pop();
                 }
                 let mut seq = serializer.serialize_seq(None)?;
@@ -3853,7 +3851,7 @@ impl serde::Serialize for String {
                     serde_json::to_value(f0).map_err(serde::ser::Error::custom)?,
                     serde_json::to_value(f1).map_err(serde::ser::Error::custom)?,
                 ];
-                while elems.len() > 2 && elems.last().is_some_and(serde_json::Value::is_null) {
+                while elems.last().is_some_and(serde_json::Value::is_null) {
                     elems.pop();
                 }
                 let mut seq = serializer.serialize_seq(None)?;
@@ -3865,7 +3863,7 @@ impl serde::Serialize for String {
             }
             String::ResolvedLocale(f0) => {
                 let mut elems = vec![serde_json::to_value(f0).map_err(serde::ser::Error::custom)?];
-                while elems.len() > 1 && elems.last().is_some_and(serde_json::Value::is_null) {
+                while elems.last().is_some_and(serde_json::Value::is_null) {
                     elems.pop();
                 }
                 let mut seq = serializer.serialize_seq(None)?;
@@ -3881,7 +3879,7 @@ impl serde::Serialize for String {
                     serde_json::to_value(f1).map_err(serde::ser::Error::custom)?,
                     serde_json::to_value(f2).map_err(serde::ser::Error::custom)?,
                 ];
-                while elems.len() > 2 && elems.last().is_some_and(serde_json::Value::is_null) {
+                while elems.last().is_some_and(serde_json::Value::is_null) {
                     elems.pop();
                 }
                 let mut seq = serializer.serialize_seq(None)?;
@@ -3906,7 +3904,7 @@ impl serde::Serialize for String {
             }
             String::To(f0) => {
                 let mut elems = vec![serde_json::to_value(f0).map_err(serde::ser::Error::custom)?];
-                while elems.len() > 1 && elems.last().is_some_and(serde_json::Value::is_null) {
+                while elems.last().is_some_and(serde_json::Value::is_null) {
                     elems.pop();
                 }
                 let mut seq = serializer.serialize_seq(None)?;
@@ -3918,7 +3916,7 @@ impl serde::Serialize for String {
             }
             String::Typeof(f0) => {
                 let mut elems = vec![serde_json::to_value(f0).map_err(serde::ser::Error::custom)?];
-                while elems.len() > 1 && elems.last().is_some_and(serde_json::Value::is_null) {
+                while elems.last().is_some_and(serde_json::Value::is_null) {
                     elems.pop();
                 }
                 let mut seq = serializer.serialize_seq(None)?;
@@ -3930,7 +3928,7 @@ impl serde::Serialize for String {
             }
             String::Upcase(f0) => {
                 let mut elems = vec![serde_json::to_value(f0).map_err(serde::ser::Error::custom)?];
-                while elems.len() > 1 && elems.last().is_some_and(serde_json::Value::is_null) {
+                while elems.last().is_some_and(serde_json::Value::is_null) {
                     elems.pop();
                 }
                 let mut seq = serializer.serialize_seq(None)?;

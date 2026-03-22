@@ -79,15 +79,6 @@ struct Cli {
     #[arg(long)]
     cleanup: bool,
 
-    /// Compute a data rewrite advisory (requires `--stats`). Rewrites style expressions
-    /// to match integer-encoded string properties.
-    #[arg(long)]
-    data_advisory: bool,
-
-    /// Write the data advisory JSON to this path (only with `--data-advisory`).
-    #[arg(long)]
-    advisory_output: Option<PathBuf>,
-
     /// Run JSON-tree validation after optimization (`maplibre_style_spec::validate`).
     #[arg(long)]
     validate: bool,
@@ -126,15 +117,8 @@ fn main() -> anyhow::Result<()> {
         })
         .transpose()?;
 
-    if cli.data_advisory && tile_stats.is_none() {
-        anyhow::bail!("--data-advisory requires --stats");
-    }
-
     let passes = if cli.all {
-        OptPasses {
-            data_advisory: cli.data_advisory,
-            ..OptPasses::all()
-        }
+        OptPasses::all()
     } else {
         OptPasses {
             simplify_unary: cli.simplify_unary,
@@ -147,22 +131,9 @@ fn main() -> anyhow::Result<()> {
             strip_defaults: cli.strip_defaults,
             simplify_expressions: cli.simplify_expressions,
             cleanup: cli.cleanup,
-            data_advisory: cli.data_advisory,
         }
     };
-    let advisory =
-        optimize_style_json_value_with_stats(&mut value, &mir, &passes, tile_stats.as_ref());
-
-    if let Some(adv) = &advisory {
-        if let Some(path) = &cli.advisory_output {
-            let adv_json = if cli.pretty {
-                serde_json::to_string_pretty(adv)?
-            } else {
-                serde_json::to_string(adv)?
-            };
-            fs::write(path, adv_json).with_context(|| path.display().to_string())?;
-        }
-    }
+    optimize_style_json_value_with_stats(&mut value, &mir, &passes, tile_stats.as_ref());
 
     if cli.validate {
         validate_style_value(&value).map_err(anyhow::Error::msg)?;

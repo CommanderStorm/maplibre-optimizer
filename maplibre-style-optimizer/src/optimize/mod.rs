@@ -10,11 +10,8 @@
 //!   operate on raw `serde_json::Value`.  They build a typed struct for
 //!   structural passes and fall back to JSON for expression passes.
 
-pub mod advisory_rewrite;
 mod defaults;
 pub(crate) mod expr;
-pub(crate) mod expr_util;
-pub mod field_analysis;
 pub(crate) mod metadata;
 mod selectivity;
 pub(crate) mod source_util;
@@ -33,7 +30,6 @@ use typed_passes::{
 };
 use walk::walk_style_mut;
 
-use crate::advisory::DataRewriteAdvisory;
 use crate::stats::TileStatistics;
 
 const NORMALIZE_FOLD_FIXPOINT_CAP: usize = 8;
@@ -52,8 +48,6 @@ pub struct OptPasses {
     pub strip_defaults: bool,
     pub simplify_expressions: bool,
     pub cleanup: bool,
-    /// When enabled, compute a data rewrite advisory and rewrite expressions to match.
-    pub data_advisory: bool,
 }
 
 impl OptPasses {
@@ -70,7 +64,6 @@ impl OptPasses {
             strip_defaults: true,
             simplify_expressions: true,
             cleanup: true,
-            data_advisory: false,
         }
     }
 }
@@ -91,15 +84,13 @@ pub fn optimize_style_json_value(v: &mut Value, mir: &IntermediateSpec, passes: 
 
 /// Primary JSON entry point.  Structural passes use typed structs internally;
 /// expression passes operate on the JSON directly.
-///
-/// Returns a [`DataRewriteAdvisory`] when `passes.data_advisory` is enabled and stats are provided.
 pub fn optimize_style_json_value_with_stats(
     v: &mut Value,
     mir: &IntermediateSpec,
     passes: &OptPasses,
     stats: Option<&TileStatistics>,
-) -> Option<DataRewriteAdvisory> {
-    run_pipeline(v, mir, passes, stats)
+) {
+    run_pipeline(v, mir, passes, stats);
 }
 
 /// Primary typed entry point.  Builds a parallel JSON value for expression
@@ -109,16 +100,15 @@ pub fn optimize_style(
     mir: &IntermediateSpec,
     passes: &OptPasses,
     stats: Option<&TileStatistics>,
-) -> Option<DataRewriteAdvisory> {
+) {
     let Ok(mut v) = serde_json::to_value(&*style) else {
-        return None;
+        return;
     };
-    let advisory = run_pipeline(&mut v, mir, passes, stats);
+    run_pipeline(&mut v, mir, passes, stats);
     // Sync final JSON state back to the typed struct (best-effort).
     if let Ok(updated) = serde_json::from_value::<MaplibreStyleSpecification>(v) {
         *style = updated;
     }
-    advisory
 }
 
 // ── Pipeline implementation ─────────────────────────────────────────────────
@@ -130,7 +120,7 @@ fn run_pipeline(
     mir: &IntermediateSpec,
     passes: &OptPasses,
     stats: Option<&TileStatistics>,
-) -> Option<DataRewriteAdvisory> {
+) {
     if !passes.strip_metadata
         && !wants_normalize_fold(passes)
         && !passes.dead_elimination
@@ -138,9 +128,8 @@ fn run_pipeline(
         && !passes.strip_defaults
         && !passes.selectivity_reorder
         && !passes.cleanup
-        && !passes.data_advisory
     {
-        return None;
+        return;
     }
 
     // 1. Strip metadata (typed).
@@ -153,19 +142,6 @@ fn run_pipeline(
 
     // 2. Expression passes (JSON walker).
     run_json_expression_passes(v, mir, passes, stats);
-
-    // 2b. Data advisory: field analysis → advisory → expression rewrite.
-    let advisory = if passes.data_advisory
-        && let Some(stats) = stats
-    {
-        let layer_info = precompute_vector_layer_info(v);
-        let field_analysis = field_analysis::analyze_fields(v, mir, &layer_info);
-        let adv = crate::advisory::compute_advisory(&field_analysis, stats);
-        advisory_rewrite::apply_advisory(v, mir, &layer_info, &adv);
-        Some(adv)
-    } else {
-        None
-    };
 
     // 3. Dead elimination (typed).
     if passes.dead_elimination
@@ -192,8 +168,6 @@ fn run_pipeline(
         cleanup_typed(&mut style);
         sync_typed_to_json(&style, v);
     }
-
-    advisory
 }
 
 /// Run expression-level passes on the JSON value.
