@@ -1691,8 +1691,10 @@ fn generate_syntax_enum_deserializer_regular_variadic_variant(
         let template_len = position_of_variadic_separator;
         visit_seq.line("let mut rest: Vec<serde_json::Value> = Vec::new();");
         visit_seq.line("while let Some(v) = seq.next_element()? { rest.push(v); }");
+        // Zero template iterations is valid (e.g. `["let", body]` with no bindings),
+        // so the minimum is just the suffix length.
         visit_seq.line(format!(
-            "if rest.len() < {template_len} + {suffix_len} {{ return Err(serde::de::Error::custom(\"{name}::{variant_name}: too few arguments\")); }}"
+            "if rest.len() < {suffix_len} {{ return Err(serde::de::Error::custom(\"{name}::{variant_name}: too few arguments\")); }}"
         ));
         visit_seq.line(format!(
             "if !(rest.len() - {suffix_len}).is_multiple_of({template_len}) {{ return Err(serde::de::Error::custom(\"{name}::{variant_name}: malformed template/suffix layout\")); }}"

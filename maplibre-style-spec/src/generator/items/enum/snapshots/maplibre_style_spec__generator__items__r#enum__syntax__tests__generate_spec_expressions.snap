@@ -234,7 +234,7 @@ impl<'de> serde::de::Visitor<'de> for AnyVisitor {
                 while let Some(v) = seq.next_element()? {
                     rest.push(v);
                 }
-                if rest.len() < 2 + 1 {
+                if rest.len() < 1 {
                     return Err(serde::de::Error::custom("Any::Let: too few arguments"));
                 }
                 if !(rest.len() - 1).is_multiple_of(2) {
