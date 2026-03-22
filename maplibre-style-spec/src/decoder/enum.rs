@@ -4,27 +4,27 @@ use serde::de::Error;
 use serde::{Deserialize, Deserializer, Serialize};
 use serde_json::{Number, Value};
 
-use crate::decoder::ParsedItem;
+use crate::decoder::DecodedParsedItem;
 use crate::generator::formatter::to_upper_camel_case;
 
 #[derive(Debug, PartialEq, Clone)]
-pub enum EnumValues {
+pub enum DecodedEnumValues {
     Version(Vec<Number>),
-    Enum(BTreeMap<String, EnumDocs>),
-    SyntaxEnum(BTreeMap<String, SyntaxEnum>),
+    Enum(BTreeMap<String, DecodedEnumDocs>),
+    SyntaxEnum(BTreeMap<String, DecodedSyntaxEnum>),
 }
 
-impl Serialize for EnumValues {
+impl Serialize for DecodedEnumValues {
     fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         match self {
-            EnumValues::Version(v) => v.serialize(serializer),
-            EnumValues::Enum(m) => m.serialize(serializer),
-            EnumValues::SyntaxEnum(m) => m.serialize(serializer),
+            DecodedEnumValues::Version(v) => v.serialize(serializer),
+            DecodedEnumValues::Enum(m) => m.serialize(serializer),
+            DecodedEnumValues::SyntaxEnum(m) => m.serialize(serializer),
         }
     }
 }
 
-impl<'de> Deserialize<'de> for EnumValues {
+impl<'de> Deserialize<'de> for DecodedEnumValues {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: serde::Deserializer<'de>,
@@ -32,34 +32,34 @@ impl<'de> Deserialize<'de> for EnumValues {
         let value = Value::deserialize(deserializer)?;
         if value.is_array() {
             return Vec::<Number>::deserialize(value)
-                .map(EnumValues::Version)
-                .map_err(|e| serde::de::Error::custom(format!("EnumValues::Version: {e}")));
+                .map(DecodedEnumValues::Version)
+                .map_err(|e| serde::de::Error::custom(format!("DecodedEnumValues::Version: {e}")));
         }
         if value.is_object() {
-            // try SyntaxEnum first (more specific, has "syntax" field in values), fall back to Enum
-            if let Ok(m) = BTreeMap::<String, SyntaxEnum>::deserialize(&value) {
-                return Ok(EnumValues::SyntaxEnum(m));
+            // try DecodedSyntaxEnum first (more specific, has "syntax" field in values), fall back to Enum
+            if let Ok(m) = BTreeMap::<String, DecodedSyntaxEnum>::deserialize(&value) {
+                return Ok(DecodedEnumValues::SyntaxEnum(m));
             }
-            return BTreeMap::<String, EnumDocs>::deserialize(value)
-                .map(EnumValues::Enum)
+            return BTreeMap::<String, DecodedEnumDocs>::deserialize(value)
+                .map(DecodedEnumValues::Enum)
                 .map_err(|e| {
                     serde::de::Error::custom(format!(
-                        "EnumValues: expected a map of EnumDocs or SyntaxEnum, got: {e}"
+                        "DecodedEnumValues: expected a map of DecodedEnumDocs or DecodedSyntaxEnum, got: {e}"
                     ))
                 });
         }
         Err(serde::de::Error::custom(
-            "expected an array of numbers (Version) or an object (Enum or SyntaxEnum)",
+            "expected an array of numbers (Version) or an object (Enum or DecodedSyntaxEnum)",
         ))
     }
 }
-impl EnumValues {
+impl DecodedEnumValues {
     /// number of variants this enum contains
     pub fn len(&self) -> usize {
         match self {
-            EnumValues::Version(numbers) => numbers.len(),
-            EnumValues::Enum(btree_map) => btree_map.len(),
-            EnumValues::SyntaxEnum(btree_map) => btree_map.len(),
+            DecodedEnumValues::Version(numbers) => numbers.len(),
+            DecodedEnumValues::Enum(btree_map) => btree_map.len(),
+            DecodedEnumValues::SyntaxEnum(btree_map) => btree_map.len(),
         }
     }
 
@@ -68,32 +68,32 @@ impl EnumValues {
         self.len() == 0
     }
 
-    pub fn as_enum(&self) -> &BTreeMap<String, EnumDocs> {
+    pub fn as_enum(&self) -> &BTreeMap<String, DecodedEnumDocs> {
         match self {
-            EnumValues::SyntaxEnum(_) => panic!("Enum enum cannot be a SyntaxEnum"),
-            EnumValues::Version(_) => panic!("Enum enum cannot be a SyntaxEnum"),
-            EnumValues::Enum(btree_map) => btree_map,
+            DecodedEnumValues::SyntaxEnum(_) => panic!("Enum enum cannot be a DecodedSyntaxEnum"),
+            DecodedEnumValues::Version(_) => panic!("Enum enum cannot be a DecodedSyntaxEnum"),
+            DecodedEnumValues::Enum(btree_map) => btree_map,
         }
     }
-    pub fn as_enum_mut(&mut self) -> &mut BTreeMap<String, EnumDocs> {
+    pub fn as_enum_mut(&mut self) -> &mut BTreeMap<String, DecodedEnumDocs> {
         match self {
-            EnumValues::SyntaxEnum(_) => panic!("Enum enum cannot be a SyntaxEnum"),
-            EnumValues::Version(_) => panic!("Version enum cannot be an Enum"),
-            EnumValues::Enum(btree_map) => btree_map,
+            DecodedEnumValues::SyntaxEnum(_) => panic!("Enum enum cannot be a DecodedSyntaxEnum"),
+            DecodedEnumValues::Version(_) => panic!("Version enum cannot be an Enum"),
+            DecodedEnumValues::Enum(btree_map) => btree_map,
         }
     }
-    pub fn as_syntax_enum(&self) -> &BTreeMap<String, SyntaxEnum> {
+    pub fn as_syntax_enum(&self) -> &BTreeMap<String, DecodedSyntaxEnum> {
         match self {
-            EnumValues::SyntaxEnum(btree_map) => btree_map,
-            EnumValues::Version(_) => panic!("Version enum cannot be a SyntaxEnum"),
-            EnumValues::Enum(_) => panic!("Enum enum cannot be a SyntaxEnum"),
+            DecodedEnumValues::SyntaxEnum(btree_map) => btree_map,
+            DecodedEnumValues::Version(_) => panic!("Version enum cannot be a DecodedSyntaxEnum"),
+            DecodedEnumValues::Enum(_) => panic!("Enum enum cannot be a DecodedSyntaxEnum"),
         }
     }
-    pub fn as_syntax_enum_mut(&mut self) -> &mut BTreeMap<String, SyntaxEnum> {
+    pub fn as_syntax_enum_mut(&mut self) -> &mut BTreeMap<String, DecodedSyntaxEnum> {
         match self {
-            EnumValues::SyntaxEnum(btree_map) => btree_map,
-            EnumValues::Version(_) => panic!("Version enum cannot be a SyntaxEnum"),
-            EnumValues::Enum(_) => panic!("Enum enum cannot be a SyntaxEnum"),
+            DecodedEnumValues::SyntaxEnum(btree_map) => btree_map,
+            DecodedEnumValues::Version(_) => panic!("Version enum cannot be a DecodedSyntaxEnum"),
+            DecodedEnumValues::Enum(_) => panic!("Enum enum cannot be a DecodedSyntaxEnum"),
         }
     }
 }
@@ -101,7 +101,7 @@ impl EnumValues {
 #[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 #[serde_with::skip_serializing_none]
-pub struct EnumDocs {
+pub struct DecodedEnumDocs {
     pub doc: String,
     #[serde(rename = "sdk-support")]
     pub sdk_support: Option<Value>,
@@ -109,7 +109,7 @@ pub struct EnumDocs {
 #[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 #[serde_with::skip_serializing_none]
-pub struct SyntaxEnum {
+pub struct DecodedSyntaxEnum {
     pub doc: String,
     #[serde(rename = "sdk-support")]
     pub sdk_support: Option<Value>,
@@ -123,7 +123,7 @@ pub struct SyntaxEnum {
 #[serde(deny_unknown_fields)]
 #[serde_with::skip_serializing_none]
 pub struct Syntax {
-    pub overloads: Vec<Overload>,
+    pub overloads: Vec<DecodedOverload>,
     #[serde(default)]
     pub parameters: Vec<Parameter>,
 }
@@ -139,13 +139,13 @@ impl Syntax {
 #[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 #[serde_with::skip_serializing_none]
-pub struct Overload {
+pub struct DecodedOverload {
     pub parameters: Vec<String>,
     #[serde(rename = "output-type")]
     pub output_type: ParameterType,
 }
 
-impl Overload {
+impl DecodedOverload {
     pub fn position_of_variadic_separator(&self) -> usize {
         self.parameters
             .iter()
@@ -195,7 +195,7 @@ pub enum ParameterType {
     LiteralAnyOf(Vec<Literal>),
     Expression(Box<Expression>),
     ExpressionAnyOf(Vec<ParameterType>),
-    Object(BTreeMap<String, ParsedItem>),
+    Object(BTreeMap<String, DecodedParsedItem>),
     Reference(String),
 }
 
@@ -242,7 +242,7 @@ impl<'de> Deserialize<'de> for ParameterType {
                         ))
                     })
             }
-            Value::Object(_) => BTreeMap::<String, ParsedItem>::deserialize(value)
+            Value::Object(_) => BTreeMap::<String, DecodedParsedItem>::deserialize(value)
                 .map(ParameterType::Object)
                 .map_err(|e| serde::de::Error::custom(format!("ParameterType::Object: {e}"))),
             other => Err(serde::de::Error::custom(format!(
@@ -560,8 +560,8 @@ mod tests {
                     .unwrap_or_else(|e| panic!("Failed to decode ParameterType from the output_type of {k}.syntax.overloads[{i}] because {e:?}\nSerialised form was {output_type}"));
             }
 
-            let _: SyntaxEnum = serde_json::from_value(v.clone())
-                .unwrap_or_else(|e| panic!("Failed to decode SyntaxEnum from \"{k}\" because {e:?}\nSerialised form was {v}"));
+            let _: DecodedSyntaxEnum = serde_json::from_value(v.clone())
+                .unwrap_or_else(|e| panic!("Failed to decode DecodedSyntaxEnum from \"{k}\" because {e:?}\nSerialised form was {v}"));
         }
     }
     #[test]
@@ -581,7 +581,7 @@ mod tests {
                 "sdk-support": {},
             }
         });
-        let _: BTreeMap<String, SyntaxEnum> = serde_json::from_value(reference).unwrap();
+        let _: BTreeMap<String, DecodedSyntaxEnum> = serde_json::from_value(reference).unwrap();
     }
 
     #[rstest]
@@ -615,7 +615,7 @@ mod tests {
 
     #[test]
     fn test_variadic_separator_is_found() {
-        let overload = Overload {
+        let overload = DecodedOverload {
             parameters: vec![
                 "param1".to_string(),
                 "param2".to_string(),
@@ -635,7 +635,7 @@ mod tests {
     #[test]
     #[should_panic(expected = "... parameter must be in a variadic list")]
     fn test_variadic_separator_is_missing_panics() {
-        let overload = Overload {
+        let overload = DecodedOverload {
             parameters: vec![],
             output_type: ParameterType::Literal(Literal::Number),
         };

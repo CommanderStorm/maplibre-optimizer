@@ -1,24 +1,22 @@
 use std::collections::BTreeMap;
 
-use crate::decoder::TopLevelItem;
-use crate::mir::expressions::{ExpressionGroup, IntermediateExpressions};
-use crate::mir::types::{MirParameterType, MirSyntax, SyntaxVariantDef};
+use crate::decoder::DecodedTopLevelItem;
+use crate::mir::expressions::{MirExpressionGroup, MirExpressions};
+use crate::mir::types::{MirParameterType, MirSyntax, MirSyntaxVariantDef};
 
 /// Remove and process `expression_name` and `expression` from the top-level fields,
-/// returning the fully constructed [`IntermediateExpressions`].
+/// returning the fully constructed [`MirExpressions`].
 ///
 /// Two complementary representations are built from the same source data:
 ///
 /// - `by_output_type` — the code-generator view (T expanded into each concrete type).
 /// - `operators` — the optimizer view (flat map, T-polymorphism preserved).
-pub fn preprocess_expression(
-    fields: &mut BTreeMap<String, TopLevelItem>,
-) -> IntermediateExpressions {
+pub fn preprocess_expression(fields: &mut BTreeMap<String, DecodedTopLevelItem>) -> MirExpressions {
     // not used in the generator or MIR
     let _ = fields.remove("filter_operator");
     let Some(_) = fields.remove("expression") else {
         // Not present in test fixtures — return empty.
-        return IntermediateExpressions {
+        return MirExpressions {
             by_output_type: BTreeMap::new(),
             operators: BTreeMap::new(),
         };
@@ -31,7 +29,7 @@ pub fn preprocess_expression(
     // ── Build operators (optimizer view) ─────────────────────────────────────
     //
     // All operators are included with their T-polymorphic output preserved.
-    let operators = IntermediateExpressions::build_operators(&expression_name);
+    let operators = MirExpressions::build_operators(&expression_name);
 
     // ── Build by_output_type (generator view) ────────────────────────────────
     //
@@ -39,7 +37,7 @@ pub fn preprocess_expression(
     // by output-type name and T is expanded into every concrete output type.
     let by_output_type = build_by_output_type(&expression_name);
 
-    IntermediateExpressions {
+    MirExpressions {
         by_output_type,
         operators,
     }
@@ -51,7 +49,9 @@ pub fn preprocess_expression(
 ///
 /// This exactly mirrors the generator's `reorder_expressions` but operates on
 /// the already-decoded types rather than raw JSON.
-fn build_by_output_type(expression_name: &TopLevelItem) -> BTreeMap<String, ExpressionGroup> {
+fn build_by_output_type(
+    expression_name: &DecodedTopLevelItem,
+) -> BTreeMap<String, MirExpressionGroup> {
     let syntax_enum_values = {
         let (values, _common, default) = expression_name.as_item().as_primitive().as_enum();
         assert_eq!(
@@ -61,7 +61,7 @@ fn build_by_output_type(expression_name: &TopLevelItem) -> BTreeMap<String, Expr
         values.as_syntax_enum().clone()
     };
 
-    let mut by_output_type: BTreeMap<String, ExpressionGroup> = BTreeMap::new();
+    let mut by_output_type: BTreeMap<String, MirExpressionGroup> = BTreeMap::new();
     // Tracks output type name → its ParameterType (needed to specialise T below).
     let mut possible_expressions: BTreeMap<String, MirParameterType> = BTreeMap::new();
 
@@ -73,14 +73,14 @@ fn build_by_output_type(expression_name: &TopLevelItem) -> BTreeMap<String, Expr
 
             let group = by_output_type
                 .entry(output_type_name.clone())
-                .or_insert_with(|| ExpressionGroup {
+                .or_insert_with(|| MirExpressionGroup {
                     variants: BTreeMap::new(),
                 });
 
             group
                 .variants
                 .entry(expr_key.clone())
-                .and_modify(|def: &mut SyntaxVariantDef| {
+                .and_modify(|def: &mut MirSyntaxVariantDef| {
                     def.syntax.overloads.push(mir_overload.clone())
                 })
                 .or_insert_with(|| {
@@ -92,7 +92,7 @@ fn build_by_output_type(expression_name: &TopLevelItem) -> BTreeMap<String, Expr
                         .map(Into::into)
                         .collect();
                     MirSyntax::patch_expression_parameters(expr_key, &mut parameters);
-                    SyntaxVariantDef {
+                    MirSyntaxVariantDef {
                         doc: syntax_enum.doc.clone(),
                         syntax: MirSyntax {
                             overloads: vec![mir_overload],
@@ -137,8 +137,8 @@ fn build_by_output_type(expression_name: &TopLevelItem) -> BTreeMap<String, Expr
         }
     }
 
-    // Handle the case where the expression_name uses `EnumValues::Version` — not
-    // present in production but guards test fixtures that lack SyntaxEnum values.
+    // Handle the case where the expression_name uses `DecodedEnumValues::Version` — not
+    // present in production but guards test fixtures that lack DecodedSyntaxEnum values.
     by_output_type
 }
 
@@ -169,7 +169,7 @@ mod tests {
         // not expanded into concrete types.
         use serde_json::json;
 
-        use crate::mir::expressions::ExprType;
+        use crate::mir::expressions::MirExprType;
 
         let fixture = json!({
             "$version": 8,
@@ -211,7 +211,7 @@ mod tests {
         );
         assert_eq!(
             literal.overloads[0].output,
-            ExprType::TypeVar("T".to_string()),
+            MirExprType::TypeVar("T".to_string()),
             "literal's output must be TypeVar(T), not expanded"
         );
     }

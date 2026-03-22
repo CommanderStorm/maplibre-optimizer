@@ -3,7 +3,7 @@ use std::path::PathBuf;
 
 use maplibre_style_spec::decoder::StyleReference;
 use maplibre_style_spec::generator::generate_spec_modules;
-use maplibre_style_spec::mir::IntermediateSpec;
+use maplibre_style_spec::mir::MirSpec;
 
 fn main() {
     let json_content = include_str!("../../../upstream/src/reference/v8.json");
@@ -11,7 +11,7 @@ fn main() {
     let reference: StyleReference =
         serde_json::from_str(json_content).expect("Failed to parse v8.json into StyleReference");
 
-    let spec = IntermediateSpec::from(reference);
+    let spec = MirSpec::from(reference);
     let generated_scope = generate_spec_modules(&spec);
 
     let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));

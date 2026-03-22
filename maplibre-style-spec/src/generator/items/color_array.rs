@@ -3,9 +3,9 @@ use codegen2::Scope;
 use crate::generator::autotest::generate_test_from_example_if_present;
 use crate::generator::fuzz;
 use crate::generator::untagged::{self, Variant};
-use crate::mir::types::ColorArrayField;
+use crate::mir::types::MirColorArrayField;
 
-pub fn generate(scope: &mut Scope, name: &str, field: &ColorArrayField) {
+pub fn generate(scope: &mut Scope, name: &str, field: &MirColorArrayField) {
     let enu = scope
         .new_enum(name)
         .vis("pub")
@@ -53,7 +53,7 @@ pub fn generate(scope: &mut Scope, name: &str, field: &ColorArrayField) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::mir::types::FieldMeta;
+    use crate::mir::types::MirFieldMeta;
 
     #[test]
     fn generate_empty() {
@@ -61,8 +61,8 @@ mod tests {
         generate(
             &mut scope,
             "Foo",
-            &ColorArrayField {
-                meta: FieldMeta::default(),
+            &MirColorArrayField {
+                meta: MirFieldMeta::default(),
                 default: None,
             },
         );

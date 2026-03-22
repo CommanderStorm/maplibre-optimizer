@@ -2,9 +2,9 @@ use codegen2::Scope;
 
 use crate::generator::autotest::generate_test_from_example_if_present;
 use crate::generator::fuzz;
-use crate::mir::types::StateField;
+use crate::mir::types::MirStateField;
 
-pub fn generate(scope: &mut Scope, name: &str, field: &StateField) {
+pub fn generate(scope: &mut Scope, name: &str, field: &MirStateField) {
     scope
         .new_struct(name)
         .vis("pub")
@@ -26,7 +26,7 @@ pub fn generate(scope: &mut Scope, name: &str, field: &StateField) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::mir::types::FieldMeta;
+    use crate::mir::types::MirFieldMeta;
 
     #[test]
     fn generate_empty() {
@@ -34,8 +34,8 @@ mod tests {
         generate(
             &mut scope,
             "Foo",
-            &StateField {
-                meta: FieldMeta::default(),
+            &MirStateField {
+                meta: MirFieldMeta::default(),
                 default: serde_json::json!(null),
             },
         );

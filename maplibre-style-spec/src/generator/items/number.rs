@@ -3,9 +3,9 @@ use codegen2::Scope;
 use crate::generator::autotest::generate_test_from_example_if_present;
 use crate::generator::fuzz;
 use crate::generator::untagged::{self, Variant};
-use crate::mir::types::NumberField;
+use crate::mir::types::MirNumberField;
 
-pub fn generate(scope: &mut Scope, name: &str, field: &NumberField) {
+pub fn generate(scope: &mut Scope, name: &str, field: &MirNumberField) {
     if field.meta.expression.is_some() {
         // `interpolate` / `step` for numeric properties use the combined ramp enum, not [`Number`].
         let expr_name = format!("{name}Expression");
@@ -112,7 +112,7 @@ pub fn generate_number_default(n: &serde_json::Number) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::mir::types::FieldMeta;
+    use crate::mir::types::MirFieldMeta;
 
     #[test]
     fn generate_number_empty() {
@@ -120,8 +120,8 @@ mod tests {
         generate(
             &mut scope,
             "Foo",
-            &NumberField {
-                meta: FieldMeta::default(),
+            &MirNumberField {
+                meta: MirFieldMeta::default(),
                 default: None,
                 min: None,
                 max: None,
@@ -146,10 +146,10 @@ mod tests {
         generate(
             &mut scope,
             "Foo",
-            &NumberField {
-                meta: FieldMeta {
+            &MirNumberField {
+                meta: MirFieldMeta {
                     doc,
-                    ..FieldMeta::default()
+                    ..MirFieldMeta::default()
                 },
                 default: None,
                 min: Some(360.0),
@@ -174,8 +174,8 @@ mod tests {
         generate(
             &mut scope,
             "Foo",
-            &NumberField {
-                meta: FieldMeta::default(),
+            &MirNumberField {
+                meta: MirFieldMeta::default(),
                 default: Some(42.into()),
                 min: None,
                 max: None,

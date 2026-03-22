@@ -3,9 +3,9 @@ use codegen2::Scope;
 use crate::generator::autotest::generate_test_from_example_if_present;
 use crate::generator::fuzz;
 use crate::generator::untagged::{self, Variant};
-use crate::mir::types::PaddingField;
+use crate::mir::types::MirPaddingField;
 
-pub fn generate(scope: &mut Scope, name: &str, field: &PaddingField) {
+pub fn generate(scope: &mut Scope, name: &str, field: &MirPaddingField) {
     let enu = scope
         .new_enum(name)
         .vis("pub")
@@ -104,7 +104,7 @@ pub fn generate(scope: &mut Scope, name: &str, field: &PaddingField) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::mir::types::FieldMeta;
+    use crate::mir::types::MirFieldMeta;
 
     #[test]
     fn generate_empty() {
@@ -112,8 +112,8 @@ mod tests {
         generate(
             &mut scope,
             "Foo",
-            &PaddingField {
-                meta: FieldMeta::default(),
+            &MirPaddingField {
+                meta: MirFieldMeta::default(),
                 default: vec![2.into()],
             },
         );

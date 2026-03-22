@@ -3,9 +3,9 @@ use codegen2::Scope;
 use crate::generator::autotest::generate_test_from_example_if_present;
 use crate::generator::formatter::to_upper_camel_case;
 use crate::generator::fuzz;
-use crate::mir::types::ReferenceField;
+use crate::mir::types::MirReferenceField;
 
-pub fn generate(scope: &mut Scope, name: &str, field: &ReferenceField) {
+pub fn generate(scope: &mut Scope, name: &str, field: &MirReferenceField) {
     let rust_inner = match field.target.as_str() {
         // `$root.sources` uses `type: "sources"` but sources are modeled as `Source` plus a map.
         "sources" => "std::collections::BTreeMap<std::string::String, Source>".to_string(),
@@ -27,7 +27,7 @@ pub fn generate(scope: &mut Scope, name: &str, field: &ReferenceField) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::mir::types::FieldMeta;
+    use crate::mir::types::MirFieldMeta;
 
     #[test]
     fn generate_empty() {
@@ -35,8 +35,8 @@ mod tests {
         generate(
             &mut scope,
             "Foo",
-            &ReferenceField {
-                meta: FieldMeta::default(),
+            &MirReferenceField {
+                meta: MirFieldMeta::default(),
                 target: "sky".to_string(),
             },
         );

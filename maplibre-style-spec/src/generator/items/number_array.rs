@@ -4,9 +4,9 @@ use crate::generator::autotest::generate_test_from_example_if_present;
 use crate::generator::fuzz;
 use crate::generator::items::number::generate_number_default;
 use crate::generator::untagged::{self, Variant};
-use crate::mir::types::NumberArrayField;
+use crate::mir::types::MirNumberArrayField;
 
-pub fn generate(scope: &mut Scope, name: &str, field: &NumberArrayField) {
+pub fn generate(scope: &mut Scope, name: &str, field: &MirNumberArrayField) {
     let enu = scope
         .new_enum(name)
         .vis("pub")
@@ -53,7 +53,7 @@ pub fn generate(scope: &mut Scope, name: &str, field: &NumberArrayField) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::mir::types::FieldMeta;
+    use crate::mir::types::MirFieldMeta;
 
     #[test]
     fn generate_empty() {
@@ -61,8 +61,8 @@ mod tests {
         generate(
             &mut scope,
             "Foo",
-            &NumberArrayField {
-                meta: FieldMeta::default(),
+            &MirNumberArrayField {
+                meta: MirFieldMeta::default(),
                 default: None,
                 min: None,
                 max: None,

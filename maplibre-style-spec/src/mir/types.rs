@@ -3,14 +3,14 @@ use std::collections::BTreeMap;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-use crate::decoder::ParsedItem;
+use crate::decoder::DecodedParsedItem;
 use crate::generator::formatter::to_upper_camel_case;
 
 // ── Shared field metadata ─────────────────────────────────────────────────────
 
 /// Metadata shared by every field variant — only what is truly common to all.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
-pub struct FieldMeta {
+pub struct MirFieldMeta {
     /// Original spec name (e.g. `"fill-color"`) — used for `#[serde(rename="...")]`.
     pub spec_name: String,
     /// Pre-computed snake_case Rust identifier (e.g. `"fill_color"`).
@@ -19,7 +19,7 @@ pub struct FieldMeta {
     /// Whether this field supports CSS transitions.
     pub transition: bool,
     /// Expression capability if data-driven; `None` means not data-driven.
-    pub expression: Option<ExpressionCapabilities>,
+    pub expression: Option<MirExpressionCapabilities>,
     /// Documentation string — may include range annotations for numeric types.
     pub doc: String,
     pub example: Option<Value>,
@@ -31,31 +31,31 @@ pub struct FieldMeta {
 /// Every variant wraps a dedicated struct that carries only data valid for its kind.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum MirField {
-    Number(NumberField),
-    Boolean(BooleanField),
-    String(StringField),
-    Color(ColorField),
-    Enum(EnumField),
-    Array(ArrayField),
-    NumberArray(NumberArrayField),
-    ColorArray(ColorArrayField),
-    FormattedText(FormattedTextField),
-    ResolvedImage(ResolvedImageField),
-    Padding(PaddingField),
-    State(StateField),
-    ProjectionDefinition(ProjectionDefinitionField),
+    Number(MirNumberField),
+    Boolean(MirBooleanField),
+    String(MirStringField),
+    Color(MirColorField),
+    Enum(MirEnumField),
+    Array(MirArrayField),
+    NumberArray(MirNumberArrayField),
+    ColorArray(MirColorArrayField),
+    FormattedText(MirFormattedTextField),
+    ResolvedImage(MirResolvedImageField),
+    Padding(MirPaddingField),
+    State(MirStateField),
+    ProjectionDefinition(MirProjectionDefinitionField),
     /// "bad spec" types — no type-specific data beyond the shared metadata.
-    Sprite(FieldMeta),
-    PromoteId(FieldMeta),
-    VariableAnchorOffsetCollection(FieldMeta),
+    Sprite(MirFieldMeta),
+    PromoteId(MirFieldMeta),
+    VariableAnchorOffsetCollection(MirFieldMeta),
     /// Catch-all wildcard type (`*`) from the spec.
-    Star(FieldMeta),
-    /// Reference to a named type in `IntermediateSpec::named_types`.
-    Reference(ReferenceField),
+    Star(MirFieldMeta),
+    /// Reference to a named type in `MirSpec::named_types`.
+    Reference(MirReferenceField),
 }
 
 impl MirField {
-    pub fn meta(&self) -> &FieldMeta {
+    pub fn meta(&self) -> &MirFieldMeta {
         match self {
             MirField::Number(f) => &f.meta,
             MirField::Boolean(f) => &f.meta,
@@ -82,8 +82,8 @@ impl MirField {
 // ── Per-type field structs ────────────────────────────────────────────────────
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct NumberField {
-    pub meta: FieldMeta,
+pub struct MirNumberField {
+    pub meta: MirFieldMeta,
     /// Default value — `serde_json::Number` preserves int/float distinction.
     pub default: Option<serde_json::Number>,
     /// Minimum bound (for doc annotation only).
@@ -95,89 +95,89 @@ pub struct NumberField {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct BooleanField {
-    pub meta: FieldMeta,
+pub struct MirBooleanField {
+    pub meta: MirFieldMeta,
     pub default: Option<bool>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct StringField {
-    pub meta: FieldMeta,
+pub struct MirStringField {
+    pub meta: MirFieldMeta,
     pub default: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct ColorField {
-    pub meta: FieldMeta,
+pub struct MirColorField {
+    pub meta: MirFieldMeta,
     /// May be a CSS string like `"#fff"` or a JSON object.
     pub default: Option<Value>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct ColorArrayField {
-    pub meta: FieldMeta,
+pub struct MirColorArrayField {
+    pub meta: MirFieldMeta,
     pub default: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct ResolvedImageField {
-    pub meta: FieldMeta,
+pub struct MirResolvedImageField {
+    pub meta: MirFieldMeta,
     pub tokens: Option<bool>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct FormattedTextField {
-    pub meta: FieldMeta,
+pub struct MirFormattedTextField {
+    pub meta: MirFieldMeta,
     pub tokens: bool,
     pub default: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct PaddingField {
-    pub meta: FieldMeta,
+pub struct MirPaddingField {
+    pub meta: MirFieldMeta,
     pub default: Vec<serde_json::Number>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct StateField {
-    pub meta: FieldMeta,
+pub struct MirStateField {
+    pub meta: MirFieldMeta,
     pub default: Value,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct ProjectionDefinitionField {
-    pub meta: FieldMeta,
+pub struct MirProjectionDefinitionField {
+    pub meta: MirFieldMeta,
     pub default: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct ReferenceField {
-    pub meta: FieldMeta,
-    /// Name of the referenced named type in `IntermediateSpec::named_types`.
+pub struct MirReferenceField {
+    pub meta: MirFieldMeta,
+    /// Name of the referenced named type in `MirSpec::named_types`.
     pub target: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct NumberArrayField {
-    pub meta: FieldMeta,
+pub struct MirNumberArrayField {
+    pub meta: MirFieldMeta,
     pub default: Option<serde_json::Number>,
     pub min: Option<f64>,
     pub max: Option<f64>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct EnumField {
-    pub meta: FieldMeta,
+pub struct MirEnumField {
+    pub meta: MirFieldMeta,
     /// Default value (typically a string variant name, kept as `Value` for flexibility).
     pub default: Option<Value>,
     pub variants: MirEnum,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct ArrayField {
-    pub meta: FieldMeta,
+pub struct MirArrayField {
+    pub meta: MirFieldMeta,
     pub default: Option<Vec<Value>>,
-    pub element: ArrayElement,
+    pub element: MirArrayElement,
     pub length: Option<usize>,
 }
 
@@ -186,34 +186,34 @@ pub struct ArrayField {
 /// Algebraic enum — never a struct with a `kind` discriminant field.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum MirEnum {
-    Regular(RegularEnum),
-    Version(VersionEnum),
-    Syntax(SyntaxEnumMap),
+    Regular(MirRegularEnum),
+    Version(MirVersionEnum),
+    Syntax(MirSyntaxEnumMap),
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct RegularEnum {
-    pub variants: BTreeMap<String, RegularVariant>,
+pub struct MirRegularEnum {
+    pub variants: BTreeMap<String, MirRegularVariant>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct RegularVariant {
+pub struct MirRegularVariant {
     pub doc: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct VersionEnum {
+pub struct MirVersionEnum {
     pub versions: Vec<u32>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct SyntaxEnumMap {
-    pub variants: BTreeMap<String, SyntaxVariantDef>,
+pub struct MirSyntaxEnumMap {
+    pub variants: BTreeMap<String, MirSyntaxVariantDef>,
 }
 
-/// One entry in a syntax enum — mirrors `decoder::enum::SyntaxEnum` without `sdk_support`.
+/// One entry in a syntax enum — mirrors `decoder::enum::DecodedSyntaxEnum` without `sdk_support`.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct SyntaxVariantDef {
+pub struct MirSyntaxVariantDef {
     pub doc: String,
     pub syntax: MirSyntax,
     pub example: Option<Value>,
@@ -372,7 +372,7 @@ pub enum MirParameterType {
     LiteralAnyOf(Vec<MirLiteral>),
     Expression(Box<MirExpression>),
     ExpressionAnyOf(Vec<MirParameterType>),
-    Object(BTreeMap<String, ParsedItem>),
+    Object(BTreeMap<String, DecodedParsedItem>),
     Reference(String),
     /// A closed set of valid plain string values (e.g. `"string"`, `"number"`, `"boolean"`).
     /// Generates a unit-variant enum with `#[serde(rename = "...")]` on each arm.
@@ -547,8 +547,8 @@ impl From<crate::decoder::r#enum::Parameter> for MirParameter {
     }
 }
 
-impl From<crate::decoder::r#enum::Overload> for MirOverload {
-    fn from(value: crate::decoder::r#enum::Overload) -> Self {
+impl From<crate::decoder::r#enum::DecodedOverload> for MirOverload {
+    fn from(value: crate::decoder::r#enum::DecodedOverload) -> Self {
         MirOverload {
             parameters: value.parameters,
             output_type: value.output_type.into(),
@@ -572,19 +572,19 @@ impl From<crate::decoder::r#enum::Syntax> for MirSyntax {
 // ── Array element types ───────────────────────────────────────────────────────
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub enum ArrayElement {
+pub enum MirArrayElement {
     String,
     Number { min: Option<f64>, max: Option<f64> },
     Boolean,
     Color,
-    Enum(RegularEnum),
+    Enum(MirRegularEnum),
     Star,
     Layer,
     FunctionStop,
     FontFaces,
     ExpressionName,
     InterpolationName,
-    Either(Vec<ArrayElement>),
+    Either(Vec<MirArrayElement>),
     Complex(Box<MirField>),
 }
 
@@ -592,19 +592,19 @@ pub enum ArrayElement {
 
 /// Tracks expression-capability of a field. MIR-only — not emitted to `spec.rs`.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct ExpressionCapabilities {
+pub struct MirExpressionCapabilities {
     pub interpolated: bool,
     pub zoom: bool,
     pub feature: bool,
     pub global_state: bool,
 }
 
-// ── IntermediateType / ArrayElementType ───────────────────────────────────────
+// ── MirType / MirArrayElementType ───────────────────────────────────────
 // These simpler enums are used by the layer and root preprocessing passes.
 
-/// Clean representation of a field's type, abstracting over the decoder's `PrimitiveType`.
+/// Clean representation of a field's type, abstracting over the decoder's `DecodedPrimitiveType`.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub enum IntermediateType {
+pub enum MirType {
     Number {
         min: Option<f64>,
         max: Option<f64>,
@@ -616,7 +616,7 @@ pub enum IntermediateType {
         values: Vec<String>,
     },
     Array {
-        element: ArrayElementType,
+        element: MirArrayElementType,
         length: Option<usize>,
     },
     Padding,
@@ -641,7 +641,7 @@ pub enum IntermediateType {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub enum ArrayElementType {
+pub enum MirArrayElementType {
     String,
     Number,
     Color,

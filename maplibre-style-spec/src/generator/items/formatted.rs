@@ -2,9 +2,9 @@ use codegen2::Scope;
 
 use crate::generator::autotest::generate_test_from_example_if_present;
 use crate::generator::fuzz;
-use crate::mir::types::FormattedTextField;
+use crate::mir::types::MirFormattedTextField;
 
-pub fn generate(scope: &mut Scope, name: &str, field: &FormattedTextField) {
+pub fn generate(scope: &mut Scope, name: &str, field: &MirFormattedTextField) {
     scope
         .new_struct(name)
         .vis("pub")
@@ -26,7 +26,7 @@ pub fn generate(scope: &mut Scope, name: &str, field: &FormattedTextField) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::mir::types::FieldMeta;
+    use crate::mir::types::MirFieldMeta;
 
     #[test]
     fn generate_empty() {
@@ -34,8 +34,8 @@ mod tests {
         generate(
             &mut scope,
             "Foo",
-            &FormattedTextField {
-                meta: FieldMeta::default(),
+            &MirFormattedTextField {
+                meta: MirFieldMeta::default(),
                 tokens: false,
                 default: String::new(),
             },

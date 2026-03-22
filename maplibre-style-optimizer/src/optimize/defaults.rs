@@ -3,7 +3,7 @@
 //! Removes paint/layout properties that equal their spec-defined default values.
 //! Only strips plain scalars (numbers, strings, booleans) — never expressions.
 
-use maplibre_style_spec::mir::{IntermediateSpec, PropertySection};
+use maplibre_style_spec::mir::{MirPropertySection, MirSpec};
 use serde_json::Value;
 
 use super::walk::StyleVisitor;
@@ -11,7 +11,7 @@ use super::walk::StyleVisitor;
 // ── Visitor ───────────────────────────────────────────────────────────────────
 
 pub(crate) struct StripDefaultsVisitor<'a> {
-    pub mir: &'a IntermediateSpec,
+    pub mir: &'a MirSpec,
 }
 
 impl StyleVisitor for StripDefaultsVisitor<'_> {
@@ -33,9 +33,9 @@ fn is_plain_value(v: &Value) -> bool {
 fn strip_section(
     layer_obj: &mut serde_json::Map<String, Value>,
     section_key: &str,
-    section: PropertySection,
+    section: MirPropertySection,
     layer_type: &str,
-    mir: &IntermediateSpec,
+    mir: &MirSpec,
 ) {
     let Some(section_val) = layer_obj.get_mut(section_key) else {
         return;
@@ -64,13 +64,13 @@ fn strip_section(
     }
 }
 
-fn strip_layer_defaults(layer: &mut Value, layer_type: &str, mir: &IntermediateSpec) {
+fn strip_layer_defaults(layer: &mut Value, layer_type: &str, mir: &MirSpec) {
     let Some(obj) = layer.as_object_mut() else {
         return;
     };
 
-    strip_section(obj, "paint", PropertySection::Paint, layer_type, mir);
-    strip_section(obj, "layout", PropertySection::Layout, layer_type, mir);
+    strip_section(obj, "paint", MirPropertySection::Paint, layer_type, mir);
+    strip_section(obj, "layout", MirPropertySection::Layout, layer_type, mir);
 
     // Remove empty sections produced by stripping.
     for section_key in ["paint", "layout"] {
@@ -94,7 +94,7 @@ mod tests {
     use crate::load_intermediate_spec_from_v8_path;
     use crate::optimize::walk::walk_style_mut;
 
-    fn sample_mir() -> IntermediateSpec {
+    fn sample_mir() -> MirSpec {
         let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
             .join("../upstream/src/reference/v8.json");
         load_intermediate_spec_from_v8_path(&path).expect("v8.json")

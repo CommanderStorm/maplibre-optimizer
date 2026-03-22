@@ -20,7 +20,7 @@ mod walk;
 
 use defaults::StripDefaultsVisitor;
 use expr::{NormalizeFoldVisitor, ReorderSelectivityVisitor};
-use maplibre_style_spec::mir::IntermediateSpec;
+use maplibre_style_spec::mir::MirSpec;
 use maplibre_style_spec::spec::MaplibreStyleSpecification;
 use serde_json::Value;
 use source_util::precompute_vector_layer_info;
@@ -78,7 +78,7 @@ fn wants_normalize_fold(passes: &OptPasses) -> bool {
 // ── Public entry points ─────────────────────────────────────────────────────
 
 /// Convenience wrapper (no stats).
-pub fn optimize_style_json_value(v: &mut Value, mir: &IntermediateSpec, passes: &OptPasses) {
+pub fn optimize_style_json_value(v: &mut Value, mir: &MirSpec, passes: &OptPasses) {
     optimize_style_json_value_with_stats(v, mir, passes, None);
 }
 
@@ -86,7 +86,7 @@ pub fn optimize_style_json_value(v: &mut Value, mir: &IntermediateSpec, passes: 
 /// expression passes operate on the JSON directly.
 pub fn optimize_style_json_value_with_stats(
     v: &mut Value,
-    mir: &IntermediateSpec,
+    mir: &MirSpec,
     passes: &OptPasses,
     stats: Option<&TileStatistics>,
 ) {
@@ -97,7 +97,7 @@ pub fn optimize_style_json_value_with_stats(
 /// passes and syncs results between the two representations.
 pub fn optimize_style(
     style: &mut MaplibreStyleSpecification,
-    mir: &IntermediateSpec,
+    mir: &MirSpec,
     passes: &OptPasses,
     stats: Option<&TileStatistics>,
 ) {
@@ -115,12 +115,7 @@ pub fn optimize_style(
 
 /// Single pipeline that takes a mutable JSON `Value` and uses typed structs
 /// internally for the structural passes.
-fn run_pipeline(
-    v: &mut Value,
-    mir: &IntermediateSpec,
-    passes: &OptPasses,
-    stats: Option<&TileStatistics>,
-) {
+fn run_pipeline(v: &mut Value, mir: &MirSpec, passes: &OptPasses, stats: Option<&TileStatistics>) {
     if !passes.strip_metadata
         && !wants_normalize_fold(passes)
         && !passes.dead_elimination
@@ -173,7 +168,7 @@ fn run_pipeline(
 /// Run expression-level passes on the JSON value.
 fn run_json_expression_passes(
     v: &mut Value,
-    mir: &IntermediateSpec,
+    mir: &MirSpec,
     passes: &OptPasses,
     stats: Option<&TileStatistics>,
 ) {
@@ -291,7 +286,7 @@ mod tests {
     use super::*;
     use crate::load_intermediate_spec_from_v8_path;
 
-    fn sample_mir() -> IntermediateSpec {
+    fn sample_mir() -> MirSpec {
         let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("../upstream/src/reference/v8.json");
         load_intermediate_spec_from_v8_path(&path).expect("v8.json")
     }

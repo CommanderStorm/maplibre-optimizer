@@ -2,9 +2,9 @@ use codegen2::Scope;
 
 use crate::generator::autotest::generate_test_from_example_if_present;
 use crate::generator::fuzz;
-use crate::mir::types::BooleanField;
+use crate::mir::types::MirBooleanField;
 
-pub fn generate(scope: &mut Scope, name: &str, field: &BooleanField) {
+pub fn generate(scope: &mut Scope, name: &str, field: &MirBooleanField) {
     // `clippy::derivable_impls`: for `Default` implementations that are always `false`, prefer
     // `#[derive(Default)]` and avoid hand-written `impl Default`.
     let derives = if field.default == Some(false) {
@@ -35,7 +35,7 @@ pub fn generate(scope: &mut Scope, name: &str, field: &BooleanField) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::mir::types::FieldMeta;
+    use crate::mir::types::MirFieldMeta;
 
     #[test]
     fn generate_empty() {
@@ -43,8 +43,8 @@ mod tests {
         generate(
             &mut scope,
             "Foo",
-            &BooleanField {
-                meta: FieldMeta::default(),
+            &MirBooleanField {
+                meta: MirFieldMeta::default(),
                 default: None,
             },
         );

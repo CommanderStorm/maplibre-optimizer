@@ -4,9 +4,9 @@ use serde_json::Value;
 use crate::generator::autotest::generate_test_from_example_if_present;
 use crate::generator::fuzz;
 use crate::generator::untagged::{self, Variant};
-use crate::mir::types::ColorField;
+use crate::mir::types::MirColorField;
 
-pub fn generate(scope: &mut Scope, name: &str, field: &ColorField) {
+pub fn generate(scope: &mut Scope, name: &str, field: &MirColorField) {
     if field.meta.expression.is_some() {
         let expr_name = format!("{name}Expression");
         let expr = scope
@@ -101,7 +101,7 @@ pub fn generate(scope: &mut Scope, name: &str, field: &ColorField) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::mir::types::FieldMeta;
+    use crate::mir::types::MirFieldMeta;
 
     #[test]
     fn generate_empty() {
@@ -109,8 +109,8 @@ mod tests {
         generate(
             &mut scope,
             "Foo",
-            &ColorField {
-                meta: FieldMeta::default(),
+            &MirColorField {
+                meta: MirFieldMeta::default(),
                 default: None,
             },
         );

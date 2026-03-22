@@ -10,47 +10,42 @@ pub mod types;
 use std::collections::BTreeMap;
 
 pub use expressions::{
-    ExprParamType, ExprType, ExpressionGroup, ExpressionOperator, ExpressionOverload,
-    ExpressionParam, IntermediateExpressions as Expressions, LiteralKind, OverloadParams,
-    ResolvedParam,
+    MirExprParamType, MirExprType, MirExpressionGroup, MirExpressionOperator,
+    MirExpressionOverload, MirExpressionParam, MirExpressions, MirLiteralKind, MirOverloadParams,
+    MirResolvedParam,
 };
-pub use layers::{
-    IntermediateLayerField, IntermediateLayerType, IntermediateLayers, PropertySection,
-};
-pub use root::IntermediateRootPrimitives;
-/// Alias kept for existing imports (`generator`, tests).
-pub type Layers = IntermediateLayers;
-pub use sources::{IntermediateSources as Sources, SourceTypeDef};
+pub use layers::{MirLayerField, MirLayerType, MirLayers, MirPropertySection};
+pub use root::MirRootPrimitives;
+pub use sources::{MirSourceTypeDef, MirSources};
 pub use types::{
-    ArrayElement, ArrayField, BooleanField, ColorArrayField, ColorField, EnumField,
-    ExpressionCapabilities, FieldMeta, FormattedTextField, MirEnum, NumberArrayField, NumberField,
-    PaddingField, ProjectionDefinitionField, ReferenceField, RegularEnum, RegularVariant,
-    ResolvedImageField, StateField, StringField, SyntaxEnumMap, SyntaxVariantDef, VersionEnum,
+    MirArrayElement, MirArrayField, MirBooleanField, MirColorArrayField, MirColorField, MirEnum,
+    MirEnumField, MirExpressionCapabilities, MirFieldMeta, MirFormattedTextField,
+    MirNumberArrayField, MirNumberField, MirPaddingField, MirProjectionDefinitionField,
+    MirReferenceField, MirRegularEnum, MirRegularVariant, MirResolvedImageField, MirStateField,
+    MirStringField, MirSyntaxEnumMap, MirSyntaxVariantDef, MirVersionEnum,
 };
 
 use crate::decoder;
-use crate::decoder::{ParsedItem, PrimitiveType, TopLevelItem};
-use crate::mir::expressions::IntermediateExpressions;
+use crate::decoder::{DecodedParsedItem, DecodedPrimitiveType, DecodedTopLevelItem};
 use crate::mir::lower::lower_parsed_item;
-use crate::mir::resources::{IntermediateFontResources, IntermediateSpriteResources};
-use crate::mir::sources::IntermediateSources;
+use crate::mir::resources::{MirFontResources, MirSpriteResources};
 use crate::mir::types::MirField;
 
-// ── IntermediateNamedType ─────────────────────────────────────────────────────
+// ── MirNamedType ─────────────────────────────────────────────────────
 
 /// A named top-level type referenced from the spec.
-pub enum IntermediateNamedType {
+pub enum MirNamedType {
     /// A group of fields (e.g. `light`, `terrain`, `fog`, `sky`).
     Struct(Vec<MirField>),
     /// A single type definition: enum, alias, or special type.
     TypeDef(MirField),
     /// A sum type (Rust enum wrapping multiple struct variants).
-    OneOf(IntermediateOneOf),
+    OneOf(MirOneOf),
 }
 
 /// A OneOf type — a Rust enum where each variant wraps a named struct.
-pub struct IntermediateOneOf {
-    /// Variant names (keys into `IntermediateSpec::named_types` of type `Struct`).
+pub struct MirOneOf {
+    /// Variant names (keys into `MirSpec::named_types` of type `Struct`).
     pub variants: Vec<String>,
     /// Serde tag field, if discriminant detection found one (→ `#[serde(tag="...")]`).
     pub tag: Option<String>,
@@ -58,29 +53,29 @@ pub struct IntermediateOneOf {
     pub renames: BTreeMap<String, String>,
 }
 
-// ── IntermediateSpec ──────────────────────────────────────────────────────────
+// ── MirSpec ──────────────────────────────────────────────────────────
 
 /// The fully-semantic intermediate representation of the style spec.
 /// All preprocessing has been applied; every consumer works only with MIR types.
-pub struct IntermediateSpec {
+pub struct MirSpec {
     pub version: u8,
     /// Simple root-level fields (e.g. `center`, `zoom`, `pitch`, `bearing`).
-    pub root: IntermediateRootPrimitives,
+    pub root: MirRootPrimitives,
     /// Rendering layers.
-    pub layers: IntermediateLayers,
+    pub layers: MirLayers,
     /// Expression operators grouped by output type.
-    pub expressions: IntermediateExpressions,
+    pub expressions: MirExpressions,
     /// Data source type definitions.
-    pub sources: IntermediateSources,
+    pub sources: MirSources,
     /// Remaining named types (groups, type aliases, sum types).
-    pub named_types: BTreeMap<String, IntermediateNamedType>,
+    pub named_types: BTreeMap<String, MirNamedType>,
     /// Glyph/font resource metadata (from spec's `glyphs` root field).
-    pub fonts: IntermediateFontResources,
+    pub fonts: MirFontResources,
     /// Sprite resource metadata (from spec's `sprite` root field).
-    pub sprite: IntermediateSpriteResources,
+    pub sprite: MirSpriteResources,
 }
 
-impl From<decoder::StyleReference> for IntermediateSpec {
+impl From<decoder::StyleReference> for MirSpec {
     fn from(mut value: decoder::StyleReference) -> Self {
         let expressions = preprocessing::preprocess_expression(&mut value.fields);
         let layers = preprocessing::preprocess_layers(&mut value);
@@ -92,7 +87,11 @@ impl From<decoder::StyleReference> for IntermediateSpec {
         // Extract font/sprite resource metadata from $root before it is consumed.
         let fonts = {
             let url_template = value.root.remove("glyphs").and_then(|item| {
-                if let ParsedItem::Primitive(PrimitiveType::String { common, default }) = item {
+                if let DecodedParsedItem::Primitive(DecodedPrimitiveType::String {
+                    common,
+                    default,
+                }) = item
+                {
                     default.or_else(|| {
                         common
                             .example
@@ -102,25 +101,25 @@ impl From<decoder::StyleReference> for IntermediateSpec {
                     None
                 }
             });
-            IntermediateFontResources { url_template }
+            MirFontResources { url_template }
         };
 
         let sprite = {
             let url = value.root.remove("sprite").and_then(|item| {
-                if let ParsedItem::Primitive(PrimitiveType::Sprite(common)) = item {
+                if let DecodedParsedItem::Primitive(DecodedPrimitiveType::Sprite(common)) = item {
                     common.example
                 } else {
                     None
                 }
             });
-            IntermediateSpriteResources { url }
+            MirSpriteResources { url }
         };
 
         let named_types = lower_remaining_fields(value.fields);
 
-        IntermediateSpec {
+        MirSpec {
             version: value.version,
-            root: IntermediateRootPrimitives::from(value.root),
+            root: MirRootPrimitives::from(value.root),
             expressions,
             layers,
             sources,
@@ -133,25 +132,25 @@ impl From<decoder::StyleReference> for IntermediateSpec {
 
 // ── Remaining-fields lowering ─────────────────────────────────────────────────
 
-/// Lower whatever remains in `fields` into `IntermediateNamedType` entries.
+/// Lower whatever remains in `fields` into `MirNamedType` entries.
 /// Applies discriminant detection and removal before lowering groups.
 fn lower_remaining_fields(
-    fields: BTreeMap<String, TopLevelItem>,
-) -> BTreeMap<String, IntermediateNamedType> {
+    fields: BTreeMap<String, DecodedTopLevelItem>,
+) -> BTreeMap<String, MirNamedType> {
     // Separate fields into bins so we can process discriminants before lowering
-    let mut groups: BTreeMap<String, BTreeMap<String, ParsedItem>> = BTreeMap::new();
+    let mut groups: BTreeMap<String, BTreeMap<String, DecodedParsedItem>> = BTreeMap::new();
     let mut one_ofs: BTreeMap<String, Vec<String>> = BTreeMap::new();
-    let mut items: BTreeMap<String, ParsedItem> = BTreeMap::new();
+    let mut items: BTreeMap<String, DecodedParsedItem> = BTreeMap::new();
 
     for (key, item) in fields {
         match item {
-            TopLevelItem::Group(g) => {
+            DecodedTopLevelItem::Group(g) => {
                 groups.insert(key, g);
             }
-            TopLevelItem::OneOf(v) => {
+            DecodedTopLevelItem::OneOf(v) => {
                 one_ofs.insert(key, v);
             }
-            TopLevelItem::Item(i) => {
+            DecodedTopLevelItem::Item(i) => {
                 items.insert(key, *i);
             }
         }
@@ -160,23 +159,28 @@ fn lower_remaining_fields(
     // Detect and remove discriminants from groups referenced by OneOfs
     let discriminants = extract_discriminants(&one_ofs, &mut groups);
 
-    let mut result: BTreeMap<String, IntermediateNamedType> = BTreeMap::new();
+    let mut result: BTreeMap<String, MirNamedType> = BTreeMap::new();
 
-    // Lower groups (filter out PropertyType meta-fields)
+    // Lower groups (filter out DecodedPropertyType meta-fields)
     for (key, group) in groups {
         let mir_fields = group
             .into_iter()
             .filter(|(k, _)| k != "property-type")
-            .filter(|(_, v)| !matches!(v, ParsedItem::Primitive(PrimitiveType::PropertyType(_))))
+            .filter(|(_, v)| {
+                !matches!(
+                    v,
+                    DecodedParsedItem::Primitive(DecodedPrimitiveType::PropertyType(_))
+                )
+            })
             .map(|(k, v)| lower_parsed_item(&k, v))
             .collect();
-        result.insert(key, IntermediateNamedType::Struct(mir_fields));
+        result.insert(key, MirNamedType::Struct(mir_fields));
     }
 
     // Lower single items
     for (key, item) in items {
         let field = lower_parsed_item(&key, item);
-        result.insert(key, IntermediateNamedType::TypeDef(field));
+        result.insert(key, MirNamedType::TypeDef(field));
     }
 
     // Lower OneOfs (using the extracted discriminant info)
@@ -189,7 +193,7 @@ fn lower_remaining_fields(
 
         result.insert(
             key,
-            IntermediateNamedType::OneOf(IntermediateOneOf {
+            MirNamedType::OneOf(MirOneOf {
                 variants,
                 tag,
                 renames,
@@ -206,9 +210,9 @@ fn lower_remaining_fields(
 /// Returns a map from OneOf key → (tag_field_name, map{variant_key → discriminant_value}).
 fn extract_discriminants(
     one_ofs: &BTreeMap<String, Vec<String>>,
-    groups: &mut BTreeMap<String, BTreeMap<String, ParsedItem>>,
+    groups: &mut BTreeMap<String, BTreeMap<String, DecodedParsedItem>>,
 ) -> BTreeMap<String, (String, BTreeMap<String, String>)> {
-    use crate::decoder::r#enum::EnumValues;
+    use crate::decoder::r#enum::DecodedEnumValues;
     use crate::generator::formatter::to_upper_camel_case;
 
     let mut result: BTreeMap<String, (String, BTreeMap<String, String>)> = BTreeMap::new();
@@ -223,9 +227,10 @@ fn extract_discriminants(
             };
 
             for (field_name, item) in group {
-                if let ParsedItem::Primitive(PrimitiveType::Enum { values, .. }) = item
+                if let DecodedParsedItem::Primitive(DecodedPrimitiveType::Enum { values, .. }) =
+                    item
                     && values.len() == 1
-                    && let EnumValues::Enum(enum_map) = values
+                    && let DecodedEnumValues::Enum(enum_map) = values
                 {
                     let value = enum_map.keys().next().expect("len is 1").clone();
                     // The tag field name must be consistent across all variants

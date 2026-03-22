@@ -7,10 +7,10 @@ use serde_json::Value;
 
 use crate::generator::autotest::generate_test_from_example_if_present;
 use crate::generator::formatter::to_upper_camel_case;
-use crate::mir::types::{EnumField, MirEnum, RegularEnum};
+use crate::mir::types::{MirEnum, MirEnumField, MirRegularEnum};
 
-/// Dispatch an `EnumField` from the MIR to the appropriate enum generator.
-pub fn generate_mir(scope: &mut Scope, name: &str, field: &EnumField) {
+/// Dispatch an `MirEnumField` from the MIR to the appropriate enum generator.
+pub fn generate_mir(scope: &mut Scope, name: &str, field: &MirEnumField) {
     match &field.variants {
         MirEnum::Version(v) => version::generate_version(scope, name, &field.meta.doc, v),
         MirEnum::Regular(r) => {
@@ -46,7 +46,7 @@ pub fn generate_regular(
     scope: &mut Scope,
     name: &str,
     doc: &str,
-    variants: &RegularEnum,
+    variants: &MirRegularEnum,
     default: Option<&Value>,
 ) {
     regular::generate_regular_enum(scope, name, doc, variants, default);

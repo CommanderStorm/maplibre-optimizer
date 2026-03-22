@@ -5,14 +5,13 @@ use codegen2::Scope;
 use crate::generator::formatter::{to_snake_case, to_upper_camel_case};
 use crate::generator::literals::generate_literals;
 use crate::mir::types::{
-    ArrayElement, ArrayElementType, BooleanField, ColorArrayField, ColorField, EnumField,
-    FieldMeta, FormattedTextField, IntermediateType, MirEnum, MirField, NumberArrayField,
-    NumberField, PaddingField, ProjectionDefinitionField, RegularEnum, RegularVariant,
-    ResolvedImageField, StateField, StringField,
+    MirArrayElement, MirArrayElementType, MirBooleanField, MirColorArrayField, MirColorField,
+    MirEnum, MirEnumField, MirField, MirFieldMeta, MirFormattedTextField, MirNumberArrayField,
+    MirNumberField, MirPaddingField, MirProjectionDefinitionField, MirRegularEnum,
+    MirRegularVariant, MirResolvedImageField, MirStateField, MirStringField, MirType,
 };
 use crate::mir::{
-    Expressions, IntermediateLayerField, IntermediateNamedType, IntermediateOneOf,
-    IntermediateSpec, Layers, Sources,
+    MirExpressions, MirLayerField, MirLayers, MirNamedType, MirOneOf, MirSources, MirSpec,
 };
 
 mod autotest;
@@ -24,7 +23,7 @@ pub(crate) mod untagged;
 
 /// Generate Rust source from the semantic MIR.
 /// This is the sole entry point; it never touches decoder types.
-pub fn generate_spec_scope(spec: &IntermediateSpec) -> String {
+pub fn generate_spec_scope(spec: &MirSpec) -> String {
     let mut scope = Scope::new();
 
     // Expression syntax tuples reference literal newtypes (`StringLiteral`, …).
@@ -60,7 +59,7 @@ pub fn generate_spec_scope(spec: &IntermediateSpec) -> String {
 /// (`literals`, `root`, `named_types`, `expressions`, `sources`, `layers`).
 /// Each domain module contains its own `#[cfg(test)] mod test { ... }` for the
 /// generated `test_example_*_decodes` checks.
-pub fn generate_spec_modules(spec: &IntermediateSpec) -> Scope {
+pub fn generate_spec_modules(spec: &MirSpec) -> Scope {
     let mut outer = Scope::new();
 
     let domains = [
@@ -145,7 +144,7 @@ pub fn generate_spec_modules(spec: &IntermediateSpec) -> Scope {
 
 // ── Root struct ───────────────────────────────────────────────────────────────
 
-fn generate_root_struct(scope: &mut Scope, spec: &IntermediateSpec) {
+fn generate_root_struct(scope: &mut Scope, spec: &MirSpec) {
     let s = scope
         .new_struct("MaplibreStyleSpecification")
         .doc("This is a Maplibre Style Specification")
@@ -189,11 +188,11 @@ fn generate_root_struct(scope: &mut Scope, spec: &IntermediateSpec) {
 
 // ── Named types ───────────────────────────────────────────────────────────────
 
-fn generate_named_type(scope: &mut Scope, name: &str, named_type: &IntermediateNamedType) {
+fn generate_named_type(scope: &mut Scope, name: &str, named_type: &MirNamedType) {
     match named_type {
-        IntermediateNamedType::Struct(fields) => generate_struct_from_fields(scope, name, fields),
-        IntermediateNamedType::TypeDef(field) => generate_mir_type(scope, name, field),
-        IntermediateNamedType::OneOf(one_of) => generate_oneof(scope, name, one_of),
+        MirNamedType::Struct(fields) => generate_struct_from_fields(scope, name, fields),
+        MirNamedType::TypeDef(field) => generate_mir_type(scope, name, field),
+        MirNamedType::OneOf(one_of) => generate_oneof(scope, name, one_of),
     }
 }
 
@@ -257,7 +256,7 @@ fn generate_struct_from_fields(scope: &mut Scope, name: &str, fields: &[MirField
 }
 
 /// Generate a `#[serde(tag)]` or untagged (custom visitor) sum-type enum.
-fn generate_oneof(scope: &mut Scope, name: &str, one_of: &IntermediateOneOf) {
+fn generate_oneof(scope: &mut Scope, name: &str, one_of: &MirOneOf) {
     let is_tagged = one_of.tag.is_some();
 
     let derive = if is_tagged {
@@ -320,7 +319,7 @@ fn generate_oneof(scope: &mut Scope, name: &str, one_of: &IntermediateOneOf) {
 
 // ── Expression types ──────────────────────────────────────────────────────────
 
-fn generate_expression_types(scope: &mut Scope, expressions: &Expressions) {
+fn generate_expression_types(scope: &mut Scope, expressions: &MirExpressions) {
     // ExprOrLiteral must be defined exactly once per codegen scope, before any
     // expression enum is emitted (both in the monolith and in the split-module case).
     items::r#enum::syntax::ensure_expr_or_literal_type(scope);
@@ -336,7 +335,7 @@ fn generate_expression_types(scope: &mut Scope, expressions: &Expressions) {
 
 // ── Source types ──────────────────────────────────────────────────────────────
 
-fn generate_source_types(scope: &mut Scope, sources: &Sources) {
+fn generate_source_types(scope: &mut Scope, sources: &MirSources) {
     if sources.source_types.is_empty() {
         return;
     }
@@ -367,7 +366,7 @@ fn generate_source_types(scope: &mut Scope, sources: &Sources) {
     generate_oneof(
         scope,
         "Source",
-        &IntermediateOneOf {
+        &MirOneOf {
             variants: variant_keys,
             tag,
             renames,
@@ -377,7 +376,7 @@ fn generate_source_types(scope: &mut Scope, sources: &Sources) {
 
 // ── Layer types ───────────────────────────────────────────────────────────────
 
-fn generate_layer_types(scope: &mut Scope, layers: &Layers) {
+fn generate_layer_types(scope: &mut Scope, layers: &MirLayers) {
     if layers.common_fields.is_empty() && layers.layer_types.is_empty() {
         return;
     }
@@ -483,7 +482,7 @@ fn generate_layer_struct(scope: &mut Scope, common_mir: &[MirField]) {
 ///
 /// Each variant contains `#[serde(flatten)] common: Layer` plus optional paint/layout
 /// structs for that layer type.
-fn generate_typed_layer_enum(scope: &mut Scope, layers: &Layers) {
+fn generate_typed_layer_enum(scope: &mut Scope, layers: &MirLayers) {
     let enu = scope
         .new_enum("TypedLayer")
         .doc("A style layer with its type-specific paint and layout properties.")
@@ -569,7 +568,7 @@ fn generate_any_layer(scope: &mut Scope) {
 }
 
 /// Emit hand-written helper impls on `TypedLayer`, `AnyLayer`, and newtype wrappers.
-fn generate_layer_helper_impls(scope: &mut Scope, layers: &Layers) {
+fn generate_layer_helper_impls(scope: &mut Scope, layers: &MirLayers) {
     // Build match arms for common() / common_mut() / layer_type()
     let mut common_arms = String::new();
     let mut type_arms = String::new();
@@ -721,7 +720,7 @@ impl LayerMaxzoom {{
 }
 
 fn layer_fields_to_mir(
-    fields: &std::collections::BTreeMap<String, IntermediateLayerField>,
+    fields: &std::collections::BTreeMap<String, MirLayerField>,
 ) -> Vec<MirField> {
     fields
         .iter()
@@ -729,8 +728,8 @@ fn layer_fields_to_mir(
         .collect()
 }
 
-fn layer_field_to_mir(spec_name: &str, f: &IntermediateLayerField) -> MirField {
-    let meta = FieldMeta {
+fn layer_field_to_mir(spec_name: &str, f: &MirLayerField) -> MirField {
+    let meta = MirFieldMeta {
         spec_name: spec_name.to_string(),
         rust_name: to_snake_case(spec_name),
         optional: !f.required,
@@ -742,7 +741,7 @@ fn layer_field_to_mir(spec_name: &str, f: &IntermediateLayerField) -> MirField {
     };
 
     match &f.r#type {
-        IntermediateType::Number { min, max } => MirField::Number(NumberField {
+        MirType::Number { min, max } => MirField::Number(MirNumberField {
             meta,
             default: f
                 .default
@@ -752,34 +751,34 @@ fn layer_field_to_mir(spec_name: &str, f: &IntermediateLayerField) -> MirField {
             max: *max,
             period: None,
         }),
-        IntermediateType::String => MirField::String(StringField {
+        MirType::String => MirField::String(MirStringField {
             meta,
             default: f
                 .default
                 .as_ref()
                 .and_then(|v| v.as_str().map(|s| s.to_string())),
         }),
-        IntermediateType::Boolean => MirField::Boolean(BooleanField {
+        MirType::Boolean => MirField::Boolean(MirBooleanField {
             meta,
             default: f.default.as_ref().and_then(|v| v.as_bool()),
         }),
-        IntermediateType::Color => MirField::Color(ColorField {
+        MirType::Color => MirField::Color(MirColorField {
             meta,
             default: f.default.clone(),
         }),
-        IntermediateType::Enum { values } => MirField::Enum(EnumField {
+        MirType::Enum { values } => MirField::Enum(MirEnumField {
             meta,
             default: f.default.clone(),
-            variants: MirEnum::Regular(RegularEnum {
+            variants: MirEnum::Regular(MirRegularEnum {
                 variants: values
                     .iter()
-                    .map(|v| (v.clone(), RegularVariant { doc: String::new() }))
+                    .map(|v| (v.clone(), MirRegularVariant { doc: String::new() }))
                     .collect(),
             }),
         }),
-        IntermediateType::Array { element, length } => {
+        MirType::Array { element, length } => {
             let mir_element = array_element_type_to_mir(element);
-            MirField::Array(crate::mir::types::ArrayField {
+            MirField::Array(crate::mir::types::MirArrayField {
                 meta,
                 default: f
                     .default
@@ -789,7 +788,7 @@ fn layer_field_to_mir(spec_name: &str, f: &IntermediateLayerField) -> MirField {
                 length: *length,
             })
         }
-        IntermediateType::Padding => MirField::Padding(PaddingField {
+        MirType::Padding => MirField::Padding(MirPaddingField {
             meta,
             default: match &f.default {
                 Some(serde_json::Value::Array(arr)) => arr
@@ -799,7 +798,7 @@ fn layer_field_to_mir(spec_name: &str, f: &IntermediateLayerField) -> MirField {
                 _ => vec![],
             },
         }),
-        IntermediateType::Formatted { tokens } => MirField::FormattedText(FormattedTextField {
+        MirType::Formatted { tokens } => MirField::FormattedText(MirFormattedTextField {
             meta,
             tokens: *tokens,
             default: f
@@ -808,11 +807,11 @@ fn layer_field_to_mir(spec_name: &str, f: &IntermediateLayerField) -> MirField {
                 .and_then(|v| v.as_str().map(|s| s.to_string()))
                 .unwrap_or_default(),
         }),
-        IntermediateType::ResolvedImage { tokens } => MirField::ResolvedImage(ResolvedImageField {
+        MirType::ResolvedImage { tokens } => MirField::ResolvedImage(MirResolvedImageField {
             meta,
             tokens: Some(*tokens),
         }),
-        IntermediateType::NumberArray { min, max } => MirField::NumberArray(NumberArrayField {
+        MirType::NumberArray { min, max } => MirField::NumberArray(MirNumberArrayField {
             meta,
             default: f
                 .default
@@ -821,22 +820,22 @@ fn layer_field_to_mir(spec_name: &str, f: &IntermediateLayerField) -> MirField {
             min: *min,
             max: *max,
         }),
-        IntermediateType::ColorArray => MirField::ColorArray(ColorArrayField {
+        MirType::ColorArray => MirField::ColorArray(MirColorArrayField {
             meta,
             default: f
                 .default
                 .as_ref()
                 .and_then(|v| v.as_str().map(|s| s.to_string())),
         }),
-        IntermediateType::State => MirField::State(StateField {
+        MirType::State => MirField::State(MirStateField {
             meta,
             default: f.default.clone().unwrap_or(serde_json::Value::Null),
         }),
-        IntermediateType::AnyObject => MirField::Star(meta),
-        IntermediateType::Sprite => MirField::Sprite(meta),
-        IntermediateType::PromoteId => MirField::PromoteId(meta),
-        IntermediateType::ProjectionDefinition => {
-            MirField::ProjectionDefinition(ProjectionDefinitionField {
+        MirType::AnyObject => MirField::Star(meta),
+        MirType::Sprite => MirField::Sprite(meta),
+        MirType::PromoteId => MirField::PromoteId(meta),
+        MirType::ProjectionDefinition => {
+            MirField::ProjectionDefinition(MirProjectionDefinitionField {
                 meta,
                 default: f
                     .default
@@ -845,27 +844,25 @@ fn layer_field_to_mir(spec_name: &str, f: &IntermediateLayerField) -> MirField {
                     .unwrap_or_default(),
             })
         }
-        IntermediateType::VariableAnchorOffsetCollection => {
-            MirField::VariableAnchorOffsetCollection(meta)
-        }
+        MirType::VariableAnchorOffsetCollection => MirField::VariableAnchorOffsetCollection(meta),
     }
 }
 
-fn array_element_type_to_mir(element: &ArrayElementType) -> ArrayElement {
+fn array_element_type_to_mir(element: &MirArrayElementType) -> MirArrayElement {
     match element {
-        ArrayElementType::String => ArrayElement::String,
-        ArrayElementType::Number => ArrayElement::Number {
+        MirArrayElementType::String => MirArrayElement::String,
+        MirArrayElementType::Number => MirArrayElement::Number {
             min: None,
             max: None,
         },
-        ArrayElementType::Color => ArrayElement::Color,
-        ArrayElementType::Enum(values) => ArrayElement::Enum(RegularEnum {
+        MirArrayElementType::Color => MirArrayElement::Color,
+        MirArrayElementType::Enum(values) => MirArrayElement::Enum(MirRegularEnum {
             variants: values
                 .iter()
-                .map(|v| (v.clone(), RegularVariant { doc: String::new() }))
+                .map(|v| (v.clone(), MirRegularVariant { doc: String::new() }))
                 .collect(),
         }),
-        ArrayElementType::Layer => ArrayElement::Layer,
+        MirArrayElementType::Layer => MirArrayElement::Layer,
     }
 }
 
@@ -904,7 +901,7 @@ mod tests {
 
     use super::*;
     use crate::decoder::StyleReference;
-    use crate::mir::IntermediateSpec;
+    use crate::mir::MirSpec;
 
     #[test]
     fn test_generate_spec_items() {
@@ -918,7 +915,7 @@ mod tests {
             }
         });
         let reference: StyleReference = serde_json::from_value(reference).unwrap();
-        let spec = IntermediateSpec::from(reference);
+        let spec = MirSpec::from(reference);
         insta::assert_snapshot!(generate_spec_scope(&spec));
     }
 
@@ -936,7 +933,7 @@ mod tests {
             }
         });
         let reference: StyleReference = serde_json::from_value(reference).unwrap();
-        let spec = IntermediateSpec::from(reference);
+        let spec = MirSpec::from(reference);
         insta::assert_snapshot!(generate_spec_scope(&spec));
     }
 
@@ -959,7 +956,7 @@ mod tests {
             "numbers": ["number_one", "number_two"]
         });
         let reference: StyleReference = serde_json::from_value(reference).unwrap();
-        let spec = IntermediateSpec::from(reference);
+        let spec = MirSpec::from(reference);
         insta::assert_snapshot!(generate_spec_scope(&spec));
     }
 }

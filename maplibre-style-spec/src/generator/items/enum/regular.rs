@@ -2,13 +2,13 @@ use codegen2::Scope;
 
 use crate::generator::formatter::to_upper_camel_case;
 use crate::generator::fuzz;
-use crate::mir::types::RegularEnum;
+use crate::mir::types::MirRegularEnum;
 
 pub fn generate_regular_enum(
     scope: &mut Scope,
     name: &str,
     doc: &str,
-    variants: &RegularEnum,
+    variants: &MirRegularEnum,
     default: Option<&serde_json::Value>,
 ) {
     let default_key = default.map(|d| d.to_string());
@@ -39,7 +39,7 @@ mod tests {
     use serde_json::json;
 
     use crate::decoder::StyleReference;
-    use crate::mir::IntermediateSpec;
+    use crate::mir::MirSpec;
 
     #[test]
     fn test_generate_spec() {
@@ -64,7 +64,7 @@ mod tests {
         },
         });
         let reference: StyleReference = serde_json::from_value(reference).unwrap();
-        let spec = IntermediateSpec::from(reference);
+        let spec = MirSpec::from(reference);
         insta::assert_snapshot!(crate::generator::generate_spec_scope(&spec));
     }
 
@@ -93,7 +93,7 @@ mod tests {
         },
         });
         let reference: StyleReference = serde_json::from_value(reference).unwrap();
-        let spec = IntermediateSpec::from(reference);
+        let spec = MirSpec::from(reference);
         insta::assert_snapshot!(crate::generator::generate_spec_scope(&spec));
     }
 }

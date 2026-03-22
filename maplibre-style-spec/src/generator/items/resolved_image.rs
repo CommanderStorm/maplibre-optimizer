@@ -2,9 +2,9 @@ use codegen2::Scope;
 
 use crate::generator::autotest::generate_test_from_example_if_present;
 use crate::generator::fuzz;
-use crate::mir::types::ResolvedImageField;
+use crate::mir::types::MirResolvedImageField;
 
-pub fn generate(scope: &mut Scope, name: &str, field: &ResolvedImageField) {
+pub fn generate(scope: &mut Scope, name: &str, field: &MirResolvedImageField) {
     scope
         .new_struct(name)
         .vis("pub")
@@ -18,7 +18,7 @@ pub fn generate(scope: &mut Scope, name: &str, field: &ResolvedImageField) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::mir::types::FieldMeta;
+    use crate::mir::types::MirFieldMeta;
 
     #[test]
     fn generate_empty() {
@@ -26,8 +26,8 @@ mod tests {
         generate(
             &mut scope,
             "Foo",
-            &ResolvedImageField {
-                meta: FieldMeta::default(),
+            &MirResolvedImageField {
+                meta: MirFieldMeta::default(),
                 tokens: None,
             },
         );

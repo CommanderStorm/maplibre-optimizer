@@ -6,9 +6,9 @@ use crate::generator::formatter::to_upper_camel_case;
 use crate::generator::fuzz;
 use crate::generator::items::number::generate_number_default;
 use crate::generator::untagged::{self, Variant};
-use crate::mir::types::{ArrayElement, ArrayField, RegularEnum};
+use crate::mir::types::{MirArrayElement, MirArrayField, MirRegularEnum};
 
-pub fn generate(scope: &mut Scope, name: &str, field: &ArrayField) {
+pub fn generate(scope: &mut Scope, name: &str, field: &MirArrayField) {
     let element_type_name = to_upper_camel_case(format!("{name} Value"));
     let rust_element_type = generate_array_element(scope, &element_type_name, &field.element);
 
@@ -28,28 +28,28 @@ pub fn generate(scope: &mut Scope, name: &str, field: &ArrayField) {
         .attr(fuzz::CFG_DERIVE_ARBITRARY);
 
     match (&field.element, field.length) {
-        (ArrayElement::Star, _) => {
+        (MirArrayElement::Star, _) => {
             st.tuple_field_with_attrs([fuzz::ARB_VEC_JSON_VALUE], field_type);
         }
-        (ArrayElement::Number { .. }, None) => {
+        (MirArrayElement::Number { .. }, None) => {
             st.tuple_field_with_attrs([fuzz::ARB_VEC_JSON_NUMBER], field_type);
         }
-        (ArrayElement::Number { .. }, Some(1)) => {
+        (MirArrayElement::Number { .. }, Some(1)) => {
             st.tuple_field_with_attrs([fuzz::ARB_BOX_1_JSON_NUMBER], field_type);
         }
-        (ArrayElement::Number { .. }, Some(2)) => {
+        (MirArrayElement::Number { .. }, Some(2)) => {
             st.tuple_field_with_attrs([fuzz::ARB_BOX_2_JSON_NUMBER], field_type);
         }
-        (ArrayElement::Number { .. }, Some(3)) => {
+        (MirArrayElement::Number { .. }, Some(3)) => {
             st.tuple_field_with_attrs([fuzz::ARB_BOX_3_JSON_NUMBER], field_type);
         }
-        (ArrayElement::Number { .. }, Some(4)) => {
+        (MirArrayElement::Number { .. }, Some(4)) => {
             st.tuple_field_with_attrs([fuzz::ARB_BOX_4_JSON_NUMBER], field_type);
         }
-        (ArrayElement::Number { .. }, Some(_)) => {
+        (MirArrayElement::Number { .. }, Some(_)) => {
             st.tuple_field(field_type);
         }
-        (ArrayElement::Color, None) => {
+        (MirArrayElement::Color, None) => {
             st.tuple_field_with_attrs([fuzz::ARB_VEC_DYNAMIC_COLOR], field_type);
         }
         _ => {
@@ -72,38 +72,40 @@ pub fn generate(scope: &mut Scope, name: &str, field: &ArrayField) {
 
 /// Whether this element type should be used directly as the field type
 /// rather than being wrapped in `Vec<...>`.
-fn is_direct_element(element: &ArrayElement) -> bool {
+fn is_direct_element(element: &MirArrayElement) -> bool {
     matches!(
         element,
-        ArrayElement::FontFaces | ArrayElement::ExpressionName | ArrayElement::InterpolationName
+        MirArrayElement::FontFaces
+            | MirArrayElement::ExpressionName
+            | MirArrayElement::InterpolationName
     )
 }
 
 /// Returns the Rust type name for the array element, generating any necessary
 /// helper types into `scope`.
-fn generate_array_element(scope: &mut Scope, name: &str, element: &ArrayElement) -> String {
+fn generate_array_element(scope: &mut Scope, name: &str, element: &MirArrayElement) -> String {
     match element {
-        ArrayElement::String => "std::string::String".to_string(),
-        ArrayElement::Number { .. } => "serde_json::Number".to_string(),
-        ArrayElement::Boolean => "bool".to_string(),
-        ArrayElement::Color => "color::DynamicColor".to_string(),
-        ArrayElement::Star => "serde_json::Value".to_string(),
-        ArrayElement::Layer => "Layer".to_string(),
-        ArrayElement::FunctionStop => "FunctionStop".to_string(),
-        ArrayElement::ExpressionName => "ExpressionName".to_string(),
-        ArrayElement::InterpolationName => "InterpolationName".to_string(),
+        MirArrayElement::String => "std::string::String".to_string(),
+        MirArrayElement::Number { .. } => "serde_json::Number".to_string(),
+        MirArrayElement::Boolean => "bool".to_string(),
+        MirArrayElement::Color => "color::DynamicColor".to_string(),
+        MirArrayElement::Star => "serde_json::Value".to_string(),
+        MirArrayElement::Layer => "Layer".to_string(),
+        MirArrayElement::FunctionStop => "FunctionStop".to_string(),
+        MirArrayElement::ExpressionName => "ExpressionName".to_string(),
+        MirArrayElement::InterpolationName => "InterpolationName".to_string(),
 
-        ArrayElement::Enum(r) => {
+        MirArrayElement::Enum(r) => {
             generate_inline_enum(scope, name, r);
             name.to_string()
         }
 
-        ArrayElement::FontFaces => {
+        MirArrayElement::FontFaces => {
             generate_font_faces(scope);
             "std::collections::BTreeMap<std::string::String,FontFace>".to_string()
         }
 
-        ArrayElement::Either(options) => {
+        MirArrayElement::Either(options) => {
             let mut variant_types = Vec::with_capacity(options.len());
             for (i, option) in options.iter().enumerate() {
                 let enum_variant_name = to_upper_camel_case(i.to_string());
@@ -148,7 +150,7 @@ fn generate_array_element(scope: &mut Scope, name: &str, element: &ArrayElement)
             name.to_string()
         }
 
-        ArrayElement::Complex(inner_field) => {
+        MirArrayElement::Complex(inner_field) => {
             // Delegate to the central MIR dispatch in the parent generator module.
             crate::generator::generate_mir_type(scope, name, inner_field);
             name.to_string()
@@ -156,7 +158,7 @@ fn generate_array_element(scope: &mut Scope, name: &str, element: &ArrayElement)
     }
 }
 
-fn generate_inline_enum(scope: &mut Scope, name: &str, r: &RegularEnum) {
+fn generate_inline_enum(scope: &mut Scope, name: &str, r: &MirRegularEnum) {
     crate::generator::items::r#enum::generate_regular(scope, name, "", r, None);
 }
 
@@ -254,7 +256,7 @@ fn generate_value_default(buffer: &mut String, item: &Value) {
 mod tests {
     use super::*;
     use crate::decoder::StyleReference;
-    use crate::mir::types::FieldMeta;
+    use crate::mir::types::MirFieldMeta;
 
     #[test]
     fn generate_empty() {
@@ -262,10 +264,10 @@ mod tests {
         generate(
             &mut scope,
             "Foo",
-            &ArrayField {
-                meta: FieldMeta::default(),
+            &MirArrayField {
+                meta: MirFieldMeta::default(),
                 default: None,
-                element: ArrayElement::Star,
+                element: MirArrayElement::Star,
                 length: None,
             },
         );
@@ -310,7 +312,7 @@ mod tests {
         },
         });
         let reference: StyleReference = serde_json::from_value(reference).unwrap();
-        let spec = crate::mir::IntermediateSpec::from(reference);
+        let spec = crate::mir::MirSpec::from(reference);
         insta::assert_snapshot!(crate::generator::generate_spec_scope(&spec), @r#"
         /// JSON number in an expression position
         #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
@@ -550,7 +552,7 @@ mod tests {
             }
         });
         let reference: StyleReference = serde_json::from_value(reference).unwrap();
-        let spec = crate::mir::IntermediateSpec::from(reference);
+        let spec = crate::mir::MirSpec::from(reference);
         insta::assert_snapshot!(crate::generator::generate_spec_scope(&spec), @r##"
         /// JSON number in an expression position
         #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
@@ -763,7 +765,7 @@ mod tests {
             },
         });
         let reference: StyleReference = serde_json::from_value(reference).unwrap();
-        let spec = crate::mir::IntermediateSpec::from(reference);
+        let spec = crate::mir::MirSpec::from(reference);
         insta::assert_snapshot!(crate::generator::generate_spec_scope(&spec), @r#"
         /// JSON number in an expression position
         #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]

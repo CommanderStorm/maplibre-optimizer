@@ -2,9 +2,9 @@ use codegen2::Scope;
 
 use crate::generator::autotest::generate_test_from_example_if_present;
 use crate::generator::fuzz;
-use crate::mir::types::FieldMeta;
+use crate::mir::types::MirFieldMeta;
 
-pub fn generate(scope: &mut Scope, name: &str, meta: &FieldMeta) {
+pub fn generate(scope: &mut Scope, name: &str, meta: &MirFieldMeta) {
     scope
         .new_struct(name)
         .vis("pub")
@@ -22,7 +22,7 @@ mod tests {
     #[test]
     fn generate_empty() {
         let mut scope = Scope::new();
-        generate(&mut scope, "Foo", &FieldMeta::default());
+        generate(&mut scope, "Foo", &MirFieldMeta::default());
         insta::assert_snapshot!(scope.to_string(), @r#"
         #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
         #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]

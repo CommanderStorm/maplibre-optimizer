@@ -4,18 +4,20 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 use crate::decoder;
-use crate::decoder::TopLevelItem;
-use crate::decoder::r#enum::{Literal, Overload, Parameter, ParameterType, SyntaxEnum};
-use crate::mir::types::SyntaxVariantDef;
+use crate::decoder::DecodedTopLevelItem;
+use crate::decoder::r#enum::{
+    DecodedOverload, DecodedSyntaxEnum, Literal, Parameter, ParameterType,
+};
+use crate::mir::types::MirSyntaxVariantDef;
 
 // ── Generator-facing view (unchanged) ─────────────────────────────────────────
 
 /// All expression operators that produce a specific output type.
 /// Used by the code generator to emit per-output-type enums.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct ExpressionGroup {
+pub struct MirExpressionGroup {
     /// Keyed by the expression operator name (e.g. `"literal"`, `"interpolate"`).
-    pub variants: BTreeMap<String, SyntaxVariantDef>,
+    pub variants: BTreeMap<String, MirSyntaxVariantDef>,
 }
 
 // ── Top-level container ────────────────────────────────────────────────────────
@@ -27,14 +29,14 @@ pub struct ExpressionGroup {
 /// - `by_output_type` — the code-generator view: operators grouped by their output type
 ///   with T expanded into every concrete type (same structure the generator emits enums from).
 /// - `operators` — the optimizer/analysis view: all operators flat, with fully resolved
-///   parameter types and polymorphism preserved via [`ExprType::TypeVar`] rather than
+///   parameter types and polymorphism preserved via [`MirExprType::TypeVar`] rather than
 ///   being expanded.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct IntermediateExpressions {
+pub struct MirExpressions {
     /// Code-generator view: operators grouped by output-type name (T expanded).
-    pub by_output_type: BTreeMap<String, ExpressionGroup>,
+    pub by_output_type: BTreeMap<String, MirExpressionGroup>,
     /// Optimizer view: all operators keyed by spec name, T-polymorphism preserved.
-    pub operators: BTreeMap<String, ExpressionOperator>,
+    pub operators: BTreeMap<String, MirExpressionOperator>,
 }
 
 // ── Per-operator ──────────────────────────────────────────────────────────────
@@ -42,29 +44,29 @@ pub struct IntermediateExpressions {
 /// One expression operator (e.g. `"case"`, `"interpolate"`, `"literal"`).
 ///
 /// Contains fully resolved, MIR-typed calling conventions. Polymorphic operators
-/// (those whose output type depends on their input) use [`ExprType::TypeVar`] rather
+/// (those whose output type depends on their input) use [`MirExprType::TypeVar`] rather
 /// than being expanded into one copy per concrete type.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct ExpressionOperator {
+pub struct MirExpressionOperator {
     pub doc: String,
     /// Grouping hint from the spec (e.g. `"Lookup"`, `"Math"`, `"Decision"`).
     pub group: Option<String>,
     pub example: Option<Value>,
     /// All calling conventions, in spec order.
-    pub overloads: Vec<ExpressionOverload>,
+    pub overloads: Vec<MirExpressionOverload>,
     /// Named parameter definitions shared across overloads.
-    pub parameters: Vec<ExpressionParam>,
+    pub parameters: Vec<MirExpressionParam>,
 }
 
-// ── Overload (one calling convention) ────────────────────────────────────────
+// ── DecodedOverload (one calling convention) ────────────────────────────────────────
 
 /// One fully-typed calling convention for an operator.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct ExpressionOverload {
+pub struct MirExpressionOverload {
     /// Resolved, typed parameter sequence for this calling convention.
-    pub params: OverloadParams,
+    pub params: MirOverloadParams,
     /// The type this calling convention produces.
-    pub output: ExprType,
+    pub output: MirExprType,
 }
 
 /// The structure of an overload's parameter sequence.
@@ -78,22 +80,22 @@ pub struct ExpressionOverload {
 ///    suffix. Covers both explicit `"..."` separators and template-expansion variadics
 ///    (e.g. `val_1`, `val_2`, … where `val_i` is the template definition).
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub enum OverloadParams {
+pub enum MirOverloadParams {
     /// All parameters positional and required; arity is fixed.
-    Fixed(Vec<ResolvedParam>),
+    Fixed(Vec<MirResolvedParam>),
     /// A required prefix followed by optional trailing parameters.
     WithOptional {
-        required: Vec<ResolvedParam>,
-        optional: Vec<ResolvedParam>,
+        required: Vec<MirResolvedParam>,
+        optional: Vec<MirResolvedParam>,
     },
     /// A fixed prefix, a unit that repeats arbitrarily, and a fixed suffix.
     Variadic {
         /// Parameters before the repeating section.
-        prefix: Vec<ResolvedParam>,
+        prefix: Vec<MirResolvedParam>,
         /// Smallest repeating unit (one or two elements depending on the operator).
-        repeating: Vec<ResolvedParam>,
+        repeating: Vec<MirResolvedParam>,
         /// Parameters after the repeating section (e.g. the fallback in `case`).
-        suffix: Vec<ResolvedParam>,
+        suffix: Vec<MirResolvedParam>,
     },
 }
 
@@ -101,19 +103,19 @@ pub enum OverloadParams {
 
 /// A resolved overload parameter: canonical name, resolved type, and optional docs.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct ResolvedParam {
+pub struct MirResolvedParam {
     /// The parameter reference name as it appears in the overload (e.g. `"cond_1"`,
     /// `"val_i"`, `"input?"`). Preserves the original spec form for use in code gen.
     pub name: String,
-    pub r#type: ExprParamType,
+    pub r#type: MirExprParamType,
     pub doc: Option<String>,
 }
 
 /// A named parameter definition (the spec's `Parameter` lifted to MIR types).
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct ExpressionParam {
+pub struct MirExpressionParam {
     pub name: String,
-    pub r#type: ExprParamType,
+    pub r#type: MirExprParamType,
     pub doc: Option<String>,
 }
 
@@ -124,24 +126,24 @@ pub struct ExpressionParam {
 /// This is recursive: parameters can themselves be sub-expressions, typed arrays,
 /// or inline object schemas.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub enum ExprParamType {
+pub enum MirExprParamType {
     /// A literal JSON value (not a sub-expression — a bare constant in the array).
-    Literal(LiteralKind),
+    Literal(MirLiteralKind),
     /// One of several allowed literal kinds.
-    LiteralAnyOf(Vec<LiteralKind>),
+    LiteralAnyOf(Vec<MirLiteralKind>),
     /// A sub-expression whose output must be of the given type.
-    Expression(ExprType),
+    Expression(MirExprType),
     /// A sub-expression whose output may be any of the given types.
-    ExpressionAnyOf(Vec<ExprParamType>),
+    ExpressionAnyOf(Vec<MirExprParamType>),
     /// An inline object with a fixed field schema (used by `format` / `image` args).
-    InlineObject(BTreeMap<String, ExprParamType>),
+    InlineObject(BTreeMap<String, MirExprParamType>),
     /// A polymorphic type variable — `"T"` means "same type as the evaluation context".
     TypeVar(String),
 }
 
 /// The output type of an expression, or the type constraint on an expression parameter.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub enum ExprType {
+pub enum MirExprType {
     Any,
     Boolean,
     Number,
@@ -153,7 +155,7 @@ pub enum ExprType {
     Color,
     /// A typed or untyped array, with an optional element type and fixed length.
     Array {
-        element: Option<Box<ExprParamType>>,
+        element: Option<Box<MirExprParamType>>,
         length: Option<usize>,
     },
     /// The interpolation method type returned by `linear`, `exponential`, `cubic-bezier`.
@@ -164,7 +166,7 @@ pub enum ExprType {
 
 /// A literal JSON value kind (a bare constant — not a sub-expression).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub enum LiteralKind {
+pub enum MirLiteralKind {
     Number,
     String,
     GeoJSONObject,
@@ -172,89 +174,93 @@ pub enum LiteralKind {
     JSONArray,
 }
 
-// ── From: Literal → LiteralKind ──────────────────────────────────────────────
+// ── From: Literal → MirLiteralKind ──────────────────────────────────────────────
 
-impl From<&Literal> for LiteralKind {
+impl From<&Literal> for MirLiteralKind {
     fn from(l: &Literal) -> Self {
         match l {
-            Literal::Number => LiteralKind::Number,
-            Literal::String => LiteralKind::String,
-            Literal::GeoJSONObject => LiteralKind::GeoJSONObject,
-            Literal::JSONObject => LiteralKind::JSONObject,
-            Literal::JSONArray => LiteralKind::JSONArray,
+            Literal::Number => MirLiteralKind::Number,
+            Literal::String => MirLiteralKind::String,
+            Literal::GeoJSONObject => MirLiteralKind::GeoJSONObject,
+            Literal::JSONObject => MirLiteralKind::JSONObject,
+            Literal::JSONArray => MirLiteralKind::JSONArray,
         }
     }
 }
 
-// ── From: decoder::Expression → ExprType ─────────────────────────────────────
+// ── From: decoder::Expression → MirExprType ─────────────────────────────────────
 
-impl From<&decoder::r#enum::Expression> for ExprType {
+impl From<&decoder::r#enum::Expression> for MirExprType {
     fn from(e: &decoder::r#enum::Expression) -> Self {
         use decoder::r#enum::Expression as DE;
         match e {
-            DE::Any => ExprType::Any,
-            DE::Boolean => ExprType::Boolean,
-            DE::Number => ExprType::Number,
-            DE::String => ExprType::String,
-            DE::Collator => ExprType::Collator,
-            DE::Formatted => ExprType::Formatted,
-            DE::Image => ExprType::Image,
-            DE::Object => ExprType::Object,
-            DE::Color => ExprType::Color,
-            DE::Array { r#type, length } => ExprType::Array {
-                element: r#type.as_ref().map(|pt| Box::new(ExprParamType::from(pt))),
+            DE::Any => MirExprType::Any,
+            DE::Boolean => MirExprType::Boolean,
+            DE::Number => MirExprType::Number,
+            DE::String => MirExprType::String,
+            DE::Collator => MirExprType::Collator,
+            DE::Formatted => MirExprType::Formatted,
+            DE::Image => MirExprType::Image,
+            DE::Object => MirExprType::Object,
+            DE::Color => MirExprType::Color,
+            DE::Array { r#type, length } => MirExprType::Array {
+                element: r#type
+                    .as_ref()
+                    .map(|pt| Box::new(MirExprParamType::from(pt))),
                 length: *length,
             },
         }
     }
 }
 
-// ── From: ParameterType → ExprType (for overload output_type) ─────────────────
+// ── From: ParameterType → MirExprType (for overload output_type) ─────────────────
 
-impl From<&ParameterType> for ExprType {
+impl From<&ParameterType> for MirExprType {
     fn from(pt: &ParameterType) -> Self {
         match pt {
-            ParameterType::Expression(e) => ExprType::from(e.as_ref()),
+            ParameterType::Expression(e) => MirExprType::from(e.as_ref()),
             ParameterType::Reference(r) => expr_type_from_name(r.as_str()),
             // ExpressionAnyOf as an output type collapses to Any — unusual in the spec.
-            ParameterType::ExpressionAnyOf(_) => ExprType::Any,
+            ParameterType::ExpressionAnyOf(_) => MirExprType::Any,
             // Literals and objects as output types are edge cases; treat as Any.
-            ParameterType::Literal(_) | ParameterType::LiteralAnyOf(_) => ExprType::Any,
-            ParameterType::Object(_) => ExprType::Object,
+            ParameterType::Literal(_) | ParameterType::LiteralAnyOf(_) => MirExprType::Any,
+            ParameterType::Object(_) => MirExprType::Object,
         }
     }
 }
 
-// ── From: ParameterType → ExprParamType ──────────────────────────────────────
+// ── From: ParameterType → MirExprParamType ──────────────────────────────────────
 
-impl From<&ParameterType> for ExprParamType {
+impl From<&ParameterType> for MirExprParamType {
     fn from(pt: &ParameterType) -> Self {
         match pt {
-            ParameterType::Literal(l) => ExprParamType::Literal(LiteralKind::from(l)),
+            ParameterType::Literal(l) => MirExprParamType::Literal(MirLiteralKind::from(l)),
             ParameterType::LiteralAnyOf(ls) => {
-                ExprParamType::LiteralAnyOf(ls.iter().map(LiteralKind::from).collect())
+                MirExprParamType::LiteralAnyOf(ls.iter().map(MirLiteralKind::from).collect())
             }
-            ParameterType::Expression(e) => ExprParamType::Expression(ExprType::from(e.as_ref())),
+            ParameterType::Expression(e) => {
+                MirExprParamType::Expression(MirExprType::from(e.as_ref()))
+            }
             ParameterType::ExpressionAnyOf(pts) => {
-                ExprParamType::ExpressionAnyOf(pts.iter().map(ExprParamType::from).collect())
+                MirExprParamType::ExpressionAnyOf(pts.iter().map(MirExprParamType::from).collect())
             }
-            ParameterType::Object(obj) => ExprParamType::InlineObject(
+            ParameterType::Object(obj) => MirExprParamType::InlineObject(
                 obj.iter()
                     .map(|(k, v)| (k.clone(), parsed_item_to_param_type(v)))
                     .collect(),
             ),
-            ParameterType::Reference(r) => ExprParamType::TypeVar(r.clone()),
+            ParameterType::Reference(r) => MirExprParamType::TypeVar(r.clone()),
         }
     }
 }
 
-// ── From: Parameter → ExpressionParam ────────────────────────────────────────
+// ── From: Parameter → MirExpressionParam ────────────────────────────────────────
 
-impl From<&Parameter> for ExpressionParam {
+impl From<&Parameter> for MirExpressionParam {
     fn from(p: &Parameter) -> Self {
-        ExpressionParam {
+        MirExpressionParam {
             name: p.name.clone(),
-            r#type: ExprParamType::from(&p.r#type),
+            r#type: MirExprParamType::from(&p.r#type),
             doc: p.doc.clone(),
         }
     }
@@ -262,7 +268,7 @@ impl From<&Parameter> for ExpressionParam {
 
 // ── Constructor ───────────────────────────────────────────────────────────────
 
-impl IntermediateExpressions {
+impl MirExpressions {
     /// Returns the logical negation of a comparison operator if the negated operator exists in MIR.
     ///
     /// e.g. `"=="` → `Some("!=")`, `"<"` → `Some(">=")`
@@ -285,24 +291,26 @@ impl IntermediateExpressions {
 
     /// Construct from the raw `expression_name` top-level item.
     ///
-    /// All operators are taken from the `expression_name` SyntaxEnum.
+    /// All operators are taken from the `expression_name` DecodedSyntaxEnum.
     /// Operators whose overloads have `output-type: "T"` will be stored with
-    /// [`ExprType::TypeVar`]`("T")` — polymorphism is **not** expanded here.
-    pub fn build_operators(expression_name: &TopLevelItem) -> BTreeMap<String, ExpressionOperator> {
+    /// [`MirExprType::TypeVar`]`("T")` — polymorphism is **not** expanded here.
+    pub fn build_operators(
+        expression_name: &DecodedTopLevelItem,
+    ) -> BTreeMap<String, MirExpressionOperator> {
         let syntax_map = extract_syntax_enum(expression_name);
         syntax_map
             .iter()
             .map(|(name, syntax_enum)| {
                 (
                     name.clone(),
-                    ExpressionOperator::from_syntax_enum(syntax_enum),
+                    MirExpressionOperator::from_syntax_enum(syntax_enum),
                 )
             })
             .collect()
     }
 }
 
-impl ExpressionOperator {
+impl MirExpressionOperator {
     /// Whether this operator's output depends only on its arguments (no camera, feature, or
     /// state dependency), making it safe to constant-fold when all inputs are literals.
     pub fn is_pure(&self) -> bool {
@@ -312,13 +320,13 @@ impl ExpressionOperator {
         )
     }
 
-    /// Convert a single `SyntaxEnum` entry from the decoder into a fully resolved MIR operator.
-    pub fn from_syntax_enum(s: &SyntaxEnum) -> Self {
-        let parameters: Vec<ExpressionParam> = s
+    /// Convert a single `DecodedSyntaxEnum` entry from the decoder into a fully resolved MIR operator.
+    pub fn from_syntax_enum(s: &DecodedSyntaxEnum) -> Self {
+        let parameters: Vec<MirExpressionParam> = s
             .syntax
             .parameters
             .iter()
-            .map(ExpressionParam::from)
+            .map(MirExpressionParam::from)
             .collect();
         let overloads = s
             .syntax
@@ -326,7 +334,7 @@ impl ExpressionOperator {
             .iter()
             .map(|o| resolve_overload(o, &s.syntax.parameters))
             .collect();
-        ExpressionOperator {
+        MirExpressionOperator {
             doc: s.doc.clone(),
             group: s.group.clone(),
             example: s.example.clone(),
@@ -336,22 +344,22 @@ impl ExpressionOperator {
     }
 }
 
-// ── Overload resolution ───────────────────────────────────────────────────────
+// ── DecodedOverload resolution ───────────────────────────────────────────────────────
 
-/// Fully resolve one overload into a typed [`ExpressionOverload`].
+/// Fully resolve one overload into a typed [`MirExpressionOverload`].
 ///
 /// Determines the calling convention shape (Fixed / WithOptional / Variadic) and
 /// resolves every parameter-name reference to the matching [`Parameter`] definition.
-fn resolve_overload(overload: &Overload, params: &[Parameter]) -> ExpressionOverload {
-    let output = ExprType::from(&overload.output_type);
+fn resolve_overload(overload: &DecodedOverload, params: &[Parameter]) -> MirExpressionOverload {
+    let output = MirExprType::from(&overload.output_type);
     let call_params = resolve_overload_params(overload, params);
-    ExpressionOverload {
+    MirExpressionOverload {
         params: call_params,
         output,
     }
 }
 
-fn resolve_overload_params(overload: &Overload, params: &[Parameter]) -> OverloadParams {
+fn resolve_overload_params(overload: &DecodedOverload, params: &[Parameter]) -> MirOverloadParams {
     let has_explicit_variadic = overload.parameters.iter().any(|p| p == "...");
     let is_variadic = overload.is_variadic(params);
     let has_optional = !has_explicit_variadic
@@ -373,9 +381,9 @@ fn resolve_overload_params(overload: &Overload, params: &[Parameter]) -> Overloa
                 required.push(resolved);
             }
         }
-        OverloadParams::WithOptional { required, optional }
+        MirOverloadParams::WithOptional { required, optional }
     } else {
-        OverloadParams::Fixed(
+        MirOverloadParams::Fixed(
             overload
                 .parameters
                 .iter()
@@ -392,7 +400,10 @@ fn resolve_overload_params(overload: &Overload, params: &[Parameter]) -> Overloa
 /// - **repeating** — the template unit (parameters matched via `_i` naming).
 ///
 /// Parameters after `"..."` form the **suffix** (e.g. the fallback in `case`).
-fn resolve_explicit_variadic(overload: &Overload, params: &[Parameter]) -> OverloadParams {
+fn resolve_explicit_variadic(
+    overload: &DecodedOverload,
+    params: &[Parameter],
+) -> MirOverloadParams {
     let dot_pos = overload.position_of_variadic_separator();
     let before_dot = &overload.parameters[..dot_pos];
     let after_dot = &overload.parameters[dot_pos + 1..];
@@ -409,7 +420,7 @@ fn resolve_explicit_variadic(overload: &Overload, params: &[Parameter]) -> Overl
         .map(|p| resolve_param_ref(p, params))
         .collect();
 
-    OverloadParams::Variadic {
+    MirOverloadParams::Variadic {
         prefix,
         repeating,
         suffix,
@@ -420,14 +431,17 @@ fn resolve_explicit_variadic(overload: &Overload, params: &[Parameter]) -> Overl
 ///
 /// This happens when the overload references names like `val_3`, `val_4` that
 /// can only match a `val_i` template parameter (since only `_1`/`_2` are defined).
-fn resolve_template_variadic(overload: &Overload, params: &[Parameter]) -> OverloadParams {
+fn resolve_template_variadic(
+    overload: &DecodedOverload,
+    params: &[Parameter],
+) -> MirOverloadParams {
     let (prefix_refs, template_refs) = partition_prefix_and_template(&overload.parameters, params);
     let prefix = prefix_refs
         .iter()
         .map(|p| resolve_param_ref(p, params))
         .collect();
     let repeating = deduplicate_template_params(&template_refs, params);
-    OverloadParams::Variadic {
+    MirOverloadParams::Variadic {
         prefix,
         repeating,
         suffix: Vec::new(),
@@ -466,7 +480,10 @@ fn partition_prefix_and_template<'a>(
 
 /// Deduplicate a list of template-instance parameter references into the canonical
 /// `_i` definitions, preserving order and without repeating the same template param.
-fn deduplicate_template_params(template_refs: &[&str], params: &[Parameter]) -> Vec<ResolvedParam> {
+fn deduplicate_template_params(
+    template_refs: &[&str],
+    params: &[Parameter],
+) -> Vec<MirResolvedParam> {
     let mut seen: std::collections::BTreeSet<String> = std::collections::BTreeSet::new();
     let mut result = Vec::new();
 
@@ -477,9 +494,9 @@ fn deduplicate_template_params(template_refs: &[&str], params: &[Parameter]) -> 
             .find(|p| p.matches_overload_parameter_name(base))
             && seen.insert(param.name.clone())
         {
-            result.push(ResolvedParam {
+            result.push(MirResolvedParam {
                 name: param.name.clone(),
-                r#type: ExprParamType::from(&param.r#type),
+                r#type: MirExprParamType::from(&param.r#type),
                 doc: param.doc.clone(),
             });
         }
@@ -499,7 +516,7 @@ fn deduplicate_template_params(template_refs: &[&str], params: &[Parameter]) -> 
 ///    the suffix position after `"..."`).
 ///
 /// Panics if no matching parameter is found — indicates a malformed spec entry.
-fn resolve_param_ref(param_ref: &str, params: &[Parameter]) -> ResolvedParam {
+fn resolve_param_ref(param_ref: &str, params: &[Parameter]) -> MirResolvedParam {
     let base = param_ref.strip_suffix('?').unwrap_or(param_ref);
 
     // Primary lookup.
@@ -507,18 +524,18 @@ fn resolve_param_ref(param_ref: &str, params: &[Parameter]) -> ResolvedParam {
         .iter()
         .find(|p| p.matches_overload_parameter_name(base))
     {
-        return ResolvedParam {
+        return MirResolvedParam {
             name: param_ref.to_string(),
-            r#type: ExprParamType::from(&param.r#type),
+            r#type: MirExprParamType::from(&param.r#type),
             doc: param.doc.clone(),
         };
     }
 
     // Fallback: treat names like `var_name_n` as instances of the `var_name_i` template.
     if let Some(param) = find_template_param_by_suffix(base, params) {
-        return ResolvedParam {
+        return MirResolvedParam {
             name: param_ref.to_string(),
-            r#type: ExprParamType::from(&param.r#type),
+            r#type: MirExprParamType::from(&param.r#type),
             doc: param.doc.clone(),
         };
     }
@@ -537,51 +554,63 @@ fn find_template_param_by_suffix<'a>(name: &str, params: &'a [Parameter]) -> Opt
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-/// Map a string type name (as found in `ParameterType::Reference`) to [`ExprType`].
-fn expr_type_from_name(name: &str) -> ExprType {
+/// Map a string type name (as found in `ParameterType::Reference`) to [`MirExprType`].
+fn expr_type_from_name(name: &str) -> MirExprType {
     match name {
-        "any" => ExprType::Any,
-        "boolean" => ExprType::Boolean,
-        "number" => ExprType::Number,
-        "string" => ExprType::String,
-        "collator" => ExprType::Collator,
-        "formatted" => ExprType::Formatted,
-        "image" => ExprType::Image,
-        "object" => ExprType::Object,
-        "color" => ExprType::Color,
-        "interpolation" => ExprType::Interpolation,
-        other => ExprType::TypeVar(other.to_string()),
+        "any" => MirExprType::Any,
+        "boolean" => MirExprType::Boolean,
+        "number" => MirExprType::Number,
+        "string" => MirExprType::String,
+        "collator" => MirExprType::Collator,
+        "formatted" => MirExprType::Formatted,
+        "image" => MirExprType::Image,
+        "object" => MirExprType::Object,
+        "color" => MirExprType::Color,
+        "interpolation" => MirExprType::Interpolation,
+        other => MirExprType::TypeVar(other.to_string()),
     }
 }
 
-/// Convert a [`decoder::ParsedItem`] to an [`ExprParamType`].
+/// Convert a [`decoder::DecodedParsedItem`] to an [`MirExprParamType`].
 ///
 /// Used for inline-object parameter schemas (e.g. `format` style-override arguments).
 /// Reference items are converted via their type name string; primitive items are
 /// mapped to their closest expression-type equivalent.
-fn parsed_item_to_param_type(item: &decoder::ParsedItem) -> ExprParamType {
-    use decoder::PrimitiveType;
+fn parsed_item_to_param_type(item: &decoder::DecodedParsedItem) -> MirExprParamType {
+    use decoder::DecodedPrimitiveType;
     match item {
-        decoder::ParsedItem::Reference { references, .. } => {
-            ExprParamType::Expression(expr_type_from_name(references.as_str()))
+        decoder::DecodedParsedItem::Reference { references, .. } => {
+            MirExprParamType::Expression(expr_type_from_name(references.as_str()))
         }
-        decoder::ParsedItem::Primitive(p) => match p {
-            PrimitiveType::Boolean { .. } => ExprParamType::Expression(ExprType::Boolean),
-            PrimitiveType::Number { .. } => ExprParamType::Expression(ExprType::Number),
-            PrimitiveType::String { .. } => ExprParamType::Expression(ExprType::String),
-            PrimitiveType::Color { .. } => ExprParamType::Expression(ExprType::Color),
-            PrimitiveType::Formatted { .. } => ExprParamType::Expression(ExprType::Formatted),
-            PrimitiveType::ResolvedImage { .. } => ExprParamType::Expression(ExprType::Image),
-            PrimitiveType::Array { .. } => ExprParamType::Expression(ExprType::Array {
-                element: None,
-                length: None,
-            }),
-            _ => ExprParamType::TypeVar(String::from("_")),
+        decoder::DecodedParsedItem::Primitive(p) => match p {
+            DecodedPrimitiveType::Boolean { .. } => {
+                MirExprParamType::Expression(MirExprType::Boolean)
+            }
+            DecodedPrimitiveType::Number { .. } => {
+                MirExprParamType::Expression(MirExprType::Number)
+            }
+            DecodedPrimitiveType::String { .. } => {
+                MirExprParamType::Expression(MirExprType::String)
+            }
+            DecodedPrimitiveType::Color { .. } => MirExprParamType::Expression(MirExprType::Color),
+            DecodedPrimitiveType::Formatted { .. } => {
+                MirExprParamType::Expression(MirExprType::Formatted)
+            }
+            DecodedPrimitiveType::ResolvedImage { .. } => {
+                MirExprParamType::Expression(MirExprType::Image)
+            }
+            DecodedPrimitiveType::Array { .. } => {
+                MirExprParamType::Expression(MirExprType::Array {
+                    element: None,
+                    length: None,
+                })
+            }
+            _ => MirExprParamType::TypeVar(String::from("_")),
         },
     }
 }
 
-/// Extract the `SyntaxEnum` map from an `expression_name` [`TopLevelItem`].
-fn extract_syntax_enum(item: &TopLevelItem) -> &BTreeMap<String, SyntaxEnum> {
+/// Extract the `DecodedSyntaxEnum` map from an `expression_name` [`DecodedTopLevelItem`].
+fn extract_syntax_enum(item: &DecodedTopLevelItem) -> &BTreeMap<String, DecodedSyntaxEnum> {
     item.as_item().as_primitive().as_enum().0.as_syntax_enum()
 }

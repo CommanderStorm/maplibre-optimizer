@@ -3,9 +3,9 @@ use codegen2::Scope;
 use crate::generator::autotest::generate_test_from_example_if_present;
 use crate::generator::fuzz;
 use crate::generator::untagged::{self, Variant};
-use crate::mir::types::ProjectionDefinitionField;
+use crate::mir::types::MirProjectionDefinitionField;
 
-pub fn generate(scope: &mut Scope, name: &str, field: &ProjectionDefinitionField) {
+pub fn generate(scope: &mut Scope, name: &str, field: &MirProjectionDefinitionField) {
     if field.meta.expression.is_some() {
         let enu = scope
             .new_enum(name)
@@ -64,7 +64,7 @@ pub fn generate(scope: &mut Scope, name: &str, field: &ProjectionDefinitionField
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::mir::types::FieldMeta;
+    use crate::mir::types::MirFieldMeta;
 
     #[test]
     fn generate_empty() {
@@ -72,8 +72,8 @@ mod tests {
         generate(
             &mut scope,
             "Foo",
-            &ProjectionDefinitionField {
-                meta: FieldMeta::default(),
+            &MirProjectionDefinitionField {
+                meta: MirFieldMeta::default(),
                 default: "mercator".to_string(),
             },
         );

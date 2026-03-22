@@ -1,17 +1,8 @@
-//! Upstream expression integration parity (compile success vs failure only).
+//! Upstream expression integration parity (compile success vs failure only, no exact error messages).
 //!
 //! Corpus: `upstream/test/integration/expression/tests/**/test.json` (same layout
 //! as `upstream/test/integration/expression/expression.test.ts`).
-//!
-//! **Compared:** `expected.compiled.result` is `"success"` or `"error"`.
-//!
-//! **Actual:** `validate_expression_with_spec` (in `maplibre_style_spec::expression_validate`) —
-//! recursive walk, operator whitelist from `IntermediateSpec`, and typed serde checks against
-//! generated syntax enums per operator output group. Full evaluation/output parity is out of scope.
-//!
-//! **Policy:** we only fail the run when upstream marks an expression as **`success`** but the
-//! validator rejects it. Cases where upstream expects **`error`** but we still accept the expression
-//! are tracked as `permissive_count` (the checker is intentionally looser than GL JS type rules).
+#![cfg(feature = "full")]
 
 use std::collections::HashSet;
 use std::fs;
@@ -21,7 +12,7 @@ use maplibre_style_spec::decoder::StyleReference;
 use maplibre_style_spec::expression_validate::{
     operator_groups_map, validate_expression_with_spec,
 };
-use maplibre_style_spec::mir::{ExprParamType, ExprType, IntermediateSpec};
+use maplibre_style_spec::mir::{MirExprParamType, MirExprType, MirSpec};
 use maplibre_style_spec::spec::ExprOrLiteral;
 use serde::Deserialize;
 
@@ -88,7 +79,7 @@ fn upstream_expression_reject_parity() {
     let v8 = include_str!("../../upstream/src/reference/v8.json");
     let reference: StyleReference =
         serde_json::from_str(v8).expect("v8.json should parse as StyleReference");
-    let spec = IntermediateSpec::from(reference);
+    let spec = MirSpec::from(reference);
     let mut known_ops: HashSet<String> = spec.expressions.operators.keys().cloned().collect();
     // Used for short-circuit tests (`["error", "..."]`); not always present as a named spec entry.
     known_ops.insert("error".to_string());
@@ -132,7 +123,7 @@ fn upstream_expression_reject_parity() {
             .property_spec
             .as_ref()
             .map(expr_type_from_property_spec)
-            .unwrap_or(ExprType::Any);
+            .unwrap_or(MirExprType::Any);
         let actual_ok = validate_expression_with_spec(
             &fixture.expression,
             &expected_ty,
@@ -225,28 +216,28 @@ fn upstream_expression_reject_parity() {
     );
 }
 
-fn expr_type_from_property_spec(ps: &PropertySpec) -> ExprType {
+fn expr_type_from_property_spec(ps: &PropertySpec) -> MirExprType {
     match ps.property_type.as_str() {
-        "string" => ExprType::String,
-        "number" => ExprType::Number,
-        "boolean" => ExprType::Boolean,
-        "color" => ExprType::Color,
-        "formatted" => ExprType::Formatted,
-        "image" => ExprType::Image,
-        "object" => ExprType::Object,
+        "string" => MirExprType::String,
+        "number" => MirExprType::Number,
+        "boolean" => MirExprType::Boolean,
+        "color" => MirExprType::Color,
+        "formatted" => MirExprType::Formatted,
+        "image" => MirExprType::Image,
+        "object" => MirExprType::Object,
         // Generic array: we don't know element type from the property alone.
-        "array" => ExprType::Array {
+        "array" => MirExprType::Array {
             element: ps
                 .value
                 .as_deref()
                 .and_then(|v| match v {
-                    "string" => Some(ExprType::String),
-                    "number" => Some(ExprType::Number),
-                    "boolean" => Some(ExprType::Boolean),
-                    "color" => Some(ExprType::Color),
+                    "string" => Some(MirExprType::String),
+                    "number" => Some(MirExprType::Number),
+                    "boolean" => Some(MirExprType::Boolean),
+                    "color" => Some(MirExprType::Color),
                     _ => None,
                 })
-                .map(|inner_ty| Box::new(ExprParamType::Expression(inner_ty))),
+                .map(|inner_ty| Box::new(MirExprParamType::Expression(inner_ty))),
             length: None,
         },
         other => {
@@ -254,25 +245,25 @@ fn expr_type_from_property_spec(ps: &PropertySpec) -> ExprType {
             if let Some(inner) = ty.strip_prefix("array<").and_then(|s| s.strip_suffix('>')) {
                 let inner = inner.trim();
                 let inner_ty = match inner {
-                    "string" => ExprType::String,
-                    "number" => ExprType::Number,
-                    "boolean" => ExprType::Boolean,
-                    "color" => ExprType::Color,
+                    "string" => MirExprType::String,
+                    "number" => MirExprType::Number,
+                    "boolean" => MirExprType::Boolean,
+                    "color" => MirExprType::Color,
                     _ => {
-                        return ExprType::Array {
+                        return MirExprType::Array {
                             element: None,
                             length: None,
                         };
                     }
                 };
-                return ExprType::Array {
-                    element: Some(Box::new(ExprParamType::Expression(inner_ty))),
+                return MirExprType::Array {
+                    element: Some(Box::new(MirExprParamType::Expression(inner_ty))),
                     length: None,
                 };
             }
 
             // Fallback: treat unknown property types as unconstrained.
-            ExprType::Any
+            MirExprType::Any
         }
     }
 }

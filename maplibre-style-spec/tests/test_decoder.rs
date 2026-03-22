@@ -1,6 +1,6 @@
 use std::collections::{BTreeMap, HashMap};
 
-use maplibre_style_spec::decoder::{ParsedItem, StyleReference, TopLevelItem};
+use maplibre_style_spec::decoder::{DecodedParsedItem, DecodedTopLevelItem, StyleReference};
 use serde_json::Value;
 
 // objects produced by errors here are too large to review;
@@ -40,19 +40,19 @@ fn test_decode_top_level() {
         let root_items = serde_json::from_value::<BTreeMap<String, Value>>(root.clone())
             .expect("$root is a valid map of top level items.");
         for (key, root_item) in root_items {
-            serde_json::from_value::<ParsedItem>(root_item.clone()).unwrap_or_else(|e| {
-                panic!("$root.{key} is not a valid ParsedItem\n{root_item:#?}: {e:?}")
+            serde_json::from_value::<DecodedParsedItem>(root_item.clone()).unwrap_or_else(|e| {
+                panic!("$root.{key} is not a valid DecodedParsedItem\n{root_item:#?}: {e:?}")
             });
         }
     }
 
     for (key, value) in style {
-        if let Err(e) = serde_json::from_value::<TopLevelItem>(value.clone()) {
+        if let Err(e) = serde_json::from_value::<DecodedTopLevelItem>(value.clone()) {
             if !value.is_object() {
                 panic!("Failed to parse {key} {e:?}.\n\nWas {value:#?}.");
             }
             let minimized = minimise_object(
-                |val| serde_json::from_value::<TopLevelItem>(val).is_err(),
+                |val| serde_json::from_value::<DecodedTopLevelItem>(val).is_err(),
                 value.clone(),
             );
 
@@ -82,23 +82,23 @@ fn collect_referencs(style: &StyleReference) -> HashMap<String, String> {
     let mut ht = HashMap::new();
     for (k, field) in &style.fields {
         match field {
-            TopLevelItem::Item(p) => {
-                if let ParsedItem::Reference { references, .. } = p.as_ref()
+            DecodedTopLevelItem::Item(p) => {
+                if let DecodedParsedItem::Reference { references, .. } = p.as_ref()
                     && !ht.contains_key(references)
                 {
                     ht.insert(references.clone(), k.clone());
                 }
             }
-            TopLevelItem::Group(g) => {
+            DecodedTopLevelItem::Group(g) => {
                 for (key2, p) in g {
-                    if let ParsedItem::Reference { references, .. } = p
+                    if let DecodedParsedItem::Reference { references, .. } = p
                         && !ht.contains_key(references)
                     {
                         ht.insert(references.clone(), format!("{k}.{key2}"));
                     }
                 }
             }
-            TopLevelItem::OneOf(rs) => {
+            DecodedTopLevelItem::OneOf(rs) => {
                 for reference in rs {
                     if !ht.contains_key(reference) {
                         ht.insert(reference.clone(), k.clone());

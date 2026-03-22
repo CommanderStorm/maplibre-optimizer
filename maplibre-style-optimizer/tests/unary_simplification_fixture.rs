@@ -10,7 +10,7 @@ fn fixture_dir() -> std::path::PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures")
 }
 
-fn sample_mir() -> maplibre_style_spec::mir::IntermediateSpec {
+fn sample_mir() -> maplibre_style_spec::mir::MirSpec {
     let v8 = Path::new(env!("CARGO_MANIFEST_DIR")).join("../upstream/src/reference/v8.json");
     load_intermediate_spec_from_v8_path(&v8).expect("load v8.json")
 }

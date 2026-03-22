@@ -1,4 +1,5 @@
-//! Roundtrip tests for the TypedLayer / AnyLayer / MaplibreStyleSpecification types.
+//! Roundtrip tests for the MaplibreStyleSpecification types.
+#![cfg(feature = "full")]
 
 use maplibre_style_spec::spec::*;
 

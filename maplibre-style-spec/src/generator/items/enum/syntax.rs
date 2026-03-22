@@ -7,8 +7,8 @@ use crate::generator::autotest::generate_test_from_examples_if_present;
 use crate::generator::formatter::{to_snake_case, to_upper_camel_case};
 use crate::generator::fuzz;
 use crate::mir::types::{
-    MirExpression, MirLiteral as Literal, MirOverload as Overload, MirParameter as Parameter,
-    MirParameterType as ParameterType, MirSyntax as Syntax, SyntaxVariantDef,
+    MirExpression, MirLiteral, MirOverload, MirParameter, MirParameterType, MirSyntax,
+    MirSyntaxVariantDef,
 };
 
 fn emit_tuple_slot(v: &mut Variant, rust_ty: &str) {
@@ -199,7 +199,7 @@ pub fn generate_syntax_enum(
     scope: &mut Scope,
     name: &str,
     doc: &str,
-    values: &BTreeMap<String, SyntaxVariantDef>,
+    values: &BTreeMap<String, MirSyntaxVariantDef>,
 ) {
     pregenerate_all_operator_parameter_types(scope, values);
     // pass 1: populate enum variants
@@ -253,7 +253,7 @@ fn example_json_operator_matches_variant_key(
 /// (e.g. the global `array` example is 4 elements but the `array` *output* group only includes the
 /// 1-arg `["array", value]` overload).
 fn example_matches_fixed_arity_overload(
-    def: &SyntaxVariantDef,
+    def: &MirSyntaxVariantDef,
     example: &serde_json::Value,
 ) -> bool {
     let serde_json::Value::Array(elems) = example else {
@@ -277,7 +277,7 @@ fn example_matches_fixed_arity_overload(
 
 fn pregenerate_all_operator_parameter_types(
     scope: &mut Scope,
-    values: &BTreeMap<String, SyntaxVariantDef>,
+    values: &BTreeMap<String, MirSyntaxVariantDef>,
 ) {
     for def in values.values() {
         for overload in &def.syntax.overloads {
@@ -299,21 +299,21 @@ fn pregenerate_all_operator_parameter_types(
     }
 }
 
-fn pregenerate_parameter_type(scope: &mut Scope, param: &ParameterType) {
+fn pregenerate_parameter_type(scope: &mut Scope, param: &MirParameterType) {
     match param {
-        ParameterType::LiteralAnyOf(ls) => {
+        MirParameterType::LiteralAnyOf(ls) => {
             generate_any_of(scope, ls);
         }
-        ParameterType::ExpressionAnyOf(es) => {
+        MirParameterType::ExpressionAnyOf(es) => {
             generate_expression_any_of(scope, es);
             for e in es {
                 pregenerate_parameter_type(scope, e);
             }
         }
-        ParameterType::Expression(inner) => {
+        MirParameterType::Expression(inner) => {
             pregenerate_mir_expression(scope, inner.as_ref());
         }
-        ParameterType::StringEnum(values) => {
+        MirParameterType::StringEnum(values) => {
             generate_string_enum(scope, values);
         }
         _ => {}
@@ -373,24 +373,24 @@ fn normalized_syntax_variant_ident(syntax_enum_name: &str, operator_key: &str) -
 
 /// `#[serde(untagged)]` is required only when JSON shapes differ by variant (e.g. bare string vs
 /// `["op", …]`). Using it for homogeneous expression unions breaks deserialization (ambiguous arms).
-fn expression_union_needs_untagged(types: &[ParameterType]) -> bool {
+fn expression_union_needs_untagged(types: &[MirParameterType]) -> bool {
     let mut has_literal = false;
     let mut has_non_literal = false;
     for p in types {
         match p {
-            ParameterType::Literal(_) | ParameterType::LiteralAnyOf(_) => has_literal = true,
+            MirParameterType::Literal(_) | MirParameterType::LiteralAnyOf(_) => has_literal = true,
             // A string enum is always a plain string — treat it as a literal for untagged purposes.
-            ParameterType::StringEnum(_) => has_literal = true,
-            ParameterType::Object(_) => has_non_literal = true,
-            ParameterType::Expression(_)
-            | ParameterType::ExpressionAnyOf(_)
-            | ParameterType::Reference(_) => has_non_literal = true,
+            MirParameterType::StringEnum(_) => has_literal = true,
+            MirParameterType::Object(_) => has_non_literal = true,
+            MirParameterType::Expression(_)
+            | MirParameterType::ExpressionAnyOf(_)
+            | MirParameterType::Reference(_) => has_non_literal = true,
         }
     }
     has_literal && has_non_literal
 }
 
-fn generate_expression_any_of(scope: &mut Scope, types: &[ParameterType]) -> String {
+fn generate_expression_any_of(scope: &mut Scope, types: &[MirParameterType]) -> String {
     // `interpolate` / `step` stop outputs mix JSON literals (bare numbers) with expression arrays.
     // The spec encodes the numeric stop output as `expression(number)` which we normally lower to
     // the [`Number`] syntax enum — that rejects bare JSON numbers, so map that arm to
@@ -398,25 +398,25 @@ fn generate_expression_any_of(scope: &mut Scope, types: &[ParameterType]) -> Str
     let has_projection_stop = types.iter().any(|p| {
         matches!(
             p,
-            ParameterType::Reference(r) if r == "projection"
+            MirParameterType::Reference(r) if r == "projection"
         )
     });
     let number_literal_with_number_expr = types
         .iter()
-        .any(|p| matches!(p, ParameterType::Literal(Literal::Number)))
+        .any(|p| matches!(p, MirParameterType::Literal(MirLiteral::Number)))
         && types.iter().any(|p| {
             matches!(
                 p,
-                ParameterType::Expression(e) if matches!(e.as_ref(), MirExpression::Number)
+                MirParameterType::Expression(e) if matches!(e.as_ref(), MirExpression::Number)
             )
         });
     let string_literal_with_string_expr = types
         .iter()
-        .any(|p| matches!(p, ParameterType::Literal(Literal::String)))
+        .any(|p| matches!(p, MirParameterType::Literal(MirLiteral::String)))
         && types.iter().any(|p| {
             matches!(
                 p,
-                ParameterType::Expression(e) if matches!(e.as_ref(), MirExpression::String)
+                MirParameterType::Expression(e) if matches!(e.as_ref(), MirExpression::String)
             )
         });
     let mut arms: Vec<(String, String)> = types
@@ -426,13 +426,13 @@ fn generate_expression_any_of(scope: &mut Scope, types: &[ParameterType]) -> Str
             let rust_ty = if has_projection_stop
                 && matches!(
                     p,
-                    ParameterType::Expression(e) if matches!(e.as_ref(), MirExpression::Number)
+                    MirParameterType::Expression(e) if matches!(e.as_ref(), MirExpression::Number)
                 ) {
                 "NumberLiteral".to_string()
             } else if number_literal_with_number_expr
                 && matches!(
                     p,
-                    ParameterType::Expression(e) if matches!(e.as_ref(), MirExpression::Number)
+                    MirParameterType::Expression(e) if matches!(e.as_ref(), MirExpression::Number)
                 )
             {
                 // Needs indirection: `Number` contains this union recursively (`+`, `*`, …).
@@ -440,7 +440,7 @@ fn generate_expression_any_of(scope: &mut Scope, types: &[ParameterType]) -> Str
             } else if string_literal_with_string_expr
                 && matches!(
                     p,
-                    ParameterType::Expression(e) if matches!(e.as_ref(), MirExpression::String)
+                    MirParameterType::Expression(e) if matches!(e.as_ref(), MirExpression::String)
                 )
             {
                 // Needs indirection: `String` contains this union recursively (`downcase`, `upcase`, `slice`).
@@ -538,7 +538,7 @@ fn generate_expression_any_of(scope: &mut Scope, types: &[ParameterType]) -> Str
 fn generate_referenced_multi_overload_options_enums(
     scope: &mut Scope,
     name: &str,
-    values: &BTreeMap<String, SyntaxVariantDef>,
+    values: &BTreeMap<String, MirSyntaxVariantDef>,
 ) {
     for (key, value) in values {
         let var_name = normalized_syntax_variant_ident(name, key);
@@ -574,7 +574,7 @@ fn generate_syntax_enum_body(
     scope: &mut Scope,
     name: &str,
     doc: &str,
-    values: &BTreeMap<String, SyntaxVariantDef>,
+    values: &BTreeMap<String, MirSyntaxVariantDef>,
 ) -> BTreeMap<String, String> {
     // Variadic variants need `generate_parameter_variant`, which mutates `scope`. `new_enum` also
     // holds a `scope` borrow via its handle, so precompute tuple types before creating the enum.
@@ -865,7 +865,7 @@ fn box_recursive_types(parent_syntax_enum: &str, rust_type: &str) -> String {
 
 /// `<` / `<=` / … use `(string,string)` and `(number,number)` overloads. `untagged` +
 /// `SeqAccessDeserializer` breaks when serde probes variants; merge to one `(Value, Value, …)`.
-fn comparison_operands_merge_applies(syntax: &Syntax) -> bool {
+fn comparison_operands_merge_applies(syntax: &MirSyntax) -> bool {
     if syntax.overloads.len() != 2 {
         return false;
     }
@@ -886,7 +886,7 @@ fn comparison_operands_merge_applies(syntax: &Syntax) -> bool {
 fn generate_multi_overload(
     scope: &mut Scope,
     (name, var_name, options_name): (&str, &str, &str),
-    syntax: &Syntax,
+    syntax: &MirSyntax,
 ) {
     if comparison_operands_merge_applies(syntax) {
         let enu = scope
@@ -978,8 +978,8 @@ fn generate_multi_overload(
 fn generate_variadic_overload_tuples(
     scope: &mut Scope,
     (name, var_name): (&str, &str),
-    syntax: &Syntax,
-    overload: &Overload,
+    syntax: &MirSyntax,
+    overload: &MirOverload,
 ) -> Vec<String> {
     let separator_idx = overload.position_of_variadic_separator();
     let prefix = &overload.parameters[..separator_idx];
@@ -1043,7 +1043,7 @@ fn map_template_n_to_1(param: &str) -> Option<String> {
 
 /// Parameters after the `...` separator that are **not** part of the repeating template (e.g.
 /// `fallback` / `expression` on `case` / `let`).
-fn variadic_non_template_suffix_parameters(overload: &Overload) -> Vec<String> {
+fn variadic_non_template_suffix_parameters(overload: &MirOverload) -> Vec<String> {
     let sep = overload.position_of_variadic_separator();
     overload.parameters[sep + 1..]
         .iter()
@@ -1059,7 +1059,7 @@ enum OverloadVariantNamingStrategy {
 }
 
 impl OverloadVariantNamingStrategy {
-    fn detect(overloads: &Vec<Overload>) -> Self {
+    fn detect(overloads: &Vec<MirOverload>) -> Self {
         assert!(
             overloads.len() > 1,
             "renaming detection does only make sense for more than one overload"
@@ -1122,7 +1122,7 @@ impl OverloadVariantNamingStrategy {
 
         panic!("could not determine a good naming strategy for {overloads:?}");
     }
-    fn var_name(&self, overload: &Overload, i: usize) -> String {
+    fn var_name(&self, overload: &MirOverload, i: usize) -> String {
         match self {
             OverloadVariantNamingStrategy::OutputType => overload.output_type.to_upper_camel_case(),
             OverloadVariantNamingStrategy::NumberOptions(ns) => {
@@ -1136,7 +1136,7 @@ impl OverloadVariantNamingStrategy {
 fn generate_parameter_type(
     scope: &mut Scope,
     (name, var_name, param): (&str, &str, &str),
-    parameters: &[Parameter],
+    parameters: &[MirParameter],
 ) -> String {
     if let Some(param) = param.strip_suffix('?') {
         let param = parameters.iter()
@@ -1152,18 +1152,18 @@ fn generate_parameter_type(
     }
 }
 
-fn generate_parameter_variant(scope: &mut Scope, param: &ParameterType) -> String {
+fn generate_parameter_variant(scope: &mut Scope, param: &MirParameterType) -> String {
     match &param {
-        ParameterType::Literal(l) => l.to_upper_camel_case().to_string(),
-        ParameterType::LiteralAnyOf(ls) => generate_any_of(scope, ls),
-        ParameterType::Expression(e) => match e.as_ref() {
+        MirParameterType::Literal(l) => l.to_upper_camel_case().to_string(),
+        MirParameterType::LiteralAnyOf(ls) => generate_any_of(scope, ls),
+        MirParameterType::Expression(e) => match e.as_ref() {
             // `any` in the style spec means "expression or JSON literal", not the [`Any`] syntax enum.
             MirExpression::Any => "ExprOrLiteral".to_string(),
             MirExpression::Number => generate_expression_any_of(
                 scope,
                 &[
-                    ParameterType::Literal(Literal::Number),
-                    ParameterType::Expression(Box::new(MirExpression::Number)),
+                    MirParameterType::Literal(MirLiteral::Number),
+                    MirParameterType::Expression(Box::new(MirExpression::Number)),
                 ],
             ),
             // `"string"` in the style spec means "a string value or expression", so plain
@@ -1171,34 +1171,34 @@ fn generate_parameter_variant(scope: &mut Scope, param: &ParameterType) -> Strin
             MirExpression::String => generate_expression_any_of(
                 scope,
                 &[
-                    ParameterType::Literal(Literal::String),
-                    ParameterType::Expression(Box::new(MirExpression::String)),
+                    MirParameterType::Literal(MirLiteral::String),
+                    MirParameterType::Expression(Box::new(MirExpression::String)),
                 ],
             ),
             // `"color"` can be a CSS color string literal (e.g. `"#ff0000"`) or a Color expression.
             MirExpression::Color => generate_expression_any_of(
                 scope,
                 &[
-                    ParameterType::Literal(Literal::String),
-                    ParameterType::Expression(Box::new(MirExpression::Color)),
+                    MirParameterType::Literal(MirLiteral::String),
+                    MirParameterType::Expression(Box::new(MirExpression::Color)),
                 ],
             ),
             // `array<T>` with a type variable means any expression that evaluates to an array is valid.
             MirExpression::Array { r#type, .. }
                 if r#type
                     .as_ref()
-                    .is_some_and(|t| matches!(t, ParameterType::Reference(r) if r == "T")) =>
+                    .is_some_and(|t| matches!(t, MirParameterType::Reference(r) if r == "T")) =>
             {
                 "ExprOrLiteral".to_string()
             }
             _ => e.to_upper_camel_case().to_string(),
         },
-        ParameterType::ExpressionAnyOf(es) => generate_expression_any_of(scope, es),
-        ParameterType::StringEnum(values) => generate_string_enum(scope, values),
-        ParameterType::Object(_) => {
+        MirParameterType::ExpressionAnyOf(es) => generate_expression_any_of(scope, es),
+        MirParameterType::StringEnum(values) => generate_string_enum(scope, values),
+        MirParameterType::Object(_) => {
             "serde_json::Map<std::string::String, serde_json::Value>".to_string()
         }
-        ParameterType::Reference(r) => {
+        MirParameterType::Reference(r) => {
             if r == "T" {
                 // Type variable `T` permits literals or arbitrary nested expressions (e.g. `coalesce`
                 // with `image`, `in` with feature properties, …).
@@ -1212,7 +1212,7 @@ fn generate_parameter_variant(scope: &mut Scope, param: &ParameterType) -> Strin
         }
     }
 }
-fn generate_any_of(scope: &mut Scope, any_of: &[Literal]) -> String {
+fn generate_any_of(scope: &mut Scope, any_of: &[MirLiteral]) -> String {
     let ts = any_of
         .iter()
         .map(|l| l.to_upper_camel_case())
@@ -1256,7 +1256,7 @@ fn generate_string_enum(scope: &mut Scope, values: &[String]) -> String {
     type_name
 }
 
-fn overload_uses_interpolate_style_variadic(overload: &Overload) -> bool {
+fn overload_uses_interpolate_style_variadic(overload: &MirOverload) -> bool {
     let sep = overload.position_of_variadic_separator();
     if sep < 4 {
         return false;
@@ -1285,7 +1285,7 @@ struct VariadicSep4Plan {
 fn precompute_variadic_sep4_plans(
     scope: &mut Scope,
     syntax_enum_name: &str,
-    values: &BTreeMap<String, SyntaxVariantDef>,
+    values: &BTreeMap<String, MirSyntaxVariantDef>,
 ) -> BTreeMap<String, VariadicSep4Plan> {
     let mut out = BTreeMap::new();
     for (key, syntax_docs) in values {
@@ -1411,7 +1411,7 @@ fn emit_number_minus_deserializer_arm(visit_seq: &mut Function, union_ty: &str) 
 fn generate_syntax_enum_deserializer(
     scope: &mut Scope,
     name: &str,
-    values: &BTreeMap<String, SyntaxVariantDef>,
+    values: &BTreeMap<String, MirSyntaxVariantDef>,
     example: &serde_json::Value,
     variadic_row_struct_names: &BTreeMap<String, String>,
 ) {
@@ -1448,8 +1448,8 @@ fn generate_syntax_enum_deserializer(
         Some(generate_expression_any_of(
             scope,
             &[
-                ParameterType::Literal(Literal::Number),
-                ParameterType::Expression(Box::new(MirExpression::Number)),
+                MirParameterType::Literal(MirLiteral::Number),
+                MirParameterType::Expression(Box::new(MirExpression::Number)),
             ],
         ))
     } else {
@@ -1600,7 +1600,7 @@ fn generate_syntax_enum_deserializer_multi_overload_variant(
 fn generate_syntax_enum_deserializer_regular_variadic_variant(
     visit_seq: &mut Function,
     (name, variant_name): (&str, &str),
-    overload: &Overload,
+    overload: &MirOverload,
     row_struct_name: Option<&str>,
     sep4_plan: Option<&VariadicSep4Plan>,
 ) {
@@ -1788,7 +1788,7 @@ fn generate_syntax_enum_deserializer_regular_variadic_variant(
 fn generate_syntax_enum_deserializer_regular_variant(
     visit_seq: &mut Function,
     (name, variant_name): (&str, &str),
-    overload: &Overload,
+    overload: &MirOverload,
 ) {
     for param in &overload.parameters {
         if let Some(param) = param.strip_suffix('?') {
@@ -1831,7 +1831,7 @@ fn generate_syntax_enum_deserializer_regular_variant(
 fn generate_syntax_enum_serializer(
     scope: &mut Scope,
     name: &str,
-    values: &BTreeMap<String, SyntaxVariantDef>,
+    values: &BTreeMap<String, MirSyntaxVariantDef>,
 ) {
     let mut arms = String::new();
 
@@ -1998,7 +1998,7 @@ mod tests {
     use serde_json::json;
 
     use crate::decoder::StyleReference;
-    use crate::mir::IntermediateSpec;
+    use crate::mir::MirSpec;
 
     #[test]
     fn test_generate_spec_expressions() {
@@ -2038,7 +2038,7 @@ mod tests {
         }
         });
         let reference: StyleReference = serde_json::from_value(reference).unwrap();
-        let spec = IntermediateSpec::from(reference);
+        let spec = MirSpec::from(reference);
         insta::assert_snapshot!(crate::generator::generate_spec_scope(&spec));
     }
 
@@ -2064,7 +2064,7 @@ mod tests {
         }
         });
         let reference: StyleReference = serde_json::from_value(reference).unwrap();
-        let spec = IntermediateSpec::from(reference);
+        let spec = MirSpec::from(reference);
         insta::assert_snapshot!(crate::generator::generate_spec_scope(&spec));
     }
 
@@ -2098,7 +2098,7 @@ mod tests {
           }
         });
         let reference: StyleReference = serde_json::from_value(reference).unwrap();
-        let spec = IntermediateSpec::from(reference);
+        let spec = MirSpec::from(reference);
         insta::assert_snapshot!(crate::generator::generate_spec_scope(&spec));
     }
 }

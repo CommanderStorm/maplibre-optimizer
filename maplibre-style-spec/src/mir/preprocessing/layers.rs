@@ -3,24 +3,24 @@ use std::collections::{BTreeMap, BTreeSet};
 use serde_json::Value;
 
 use crate::decoder;
-use crate::decoder::array::{ArrayValue, SimpleArrayValue};
-use crate::decoder::r#enum::EnumValues;
-use crate::decoder::{ParsedItem, PrimitiveType};
-use crate::mir::layers::{IntermediateLayerField, IntermediateLayerType, IntermediateLayers};
+use crate::decoder::array::{DecodedArrayValue, DecodedSimpleArrayValue};
+use crate::decoder::r#enum::DecodedEnumValues;
+use crate::decoder::{DecodedParsedItem, DecodedPrimitiveType};
+use crate::mir::layers::{MirLayerField, MirLayerType, MirLayers};
 use crate::mir::preprocessing::pop_one_of_as_group;
-use crate::mir::types::{ArrayElementType, ExpressionCapabilities, IntermediateType};
+use crate::mir::types::{MirArrayElementType, MirExpressionCapabilities, MirType};
 
 fn parsed_items_to_layer_fields(
-    map: BTreeMap<String, ParsedItem>,
-) -> BTreeMap<String, IntermediateLayerField> {
+    map: BTreeMap<String, DecodedParsedItem>,
+) -> BTreeMap<String, MirLayerField> {
     map.into_iter()
         .filter(|(k, _)| k != "*")
         .map(|(k, v)| (k, parsed_item_to_layer_field(v)))
         .collect()
 }
 
-fn lower_expression_caps(e: &crate::decoder::Expression) -> ExpressionCapabilities {
-    ExpressionCapabilities {
+fn lower_expression_caps(e: &crate::decoder::Expression) -> MirExpressionCapabilities {
+    MirExpressionCapabilities {
         interpolated: e.interpolated,
         zoom: e.parameters.iter().any(|p| p == "zoom"),
         feature: e.parameters.iter().any(|p| p == "feature"),
@@ -28,29 +28,29 @@ fn lower_expression_caps(e: &crate::decoder::Expression) -> ExpressionCapabiliti
     }
 }
 
-fn parsed_item_to_layer_field(item: ParsedItem) -> IntermediateLayerField {
+fn parsed_item_to_layer_field(item: DecodedParsedItem) -> MirLayerField {
     match item {
-        ParsedItem::Reference { references, common } => IntermediateLayerField {
+        DecodedParsedItem::Reference { references, common } => MirLayerField {
             r#type: reference_to_intermediate_type(&references),
             default: None,
             doc: common.doc,
             required: common.required.unwrap_or(false),
             expression: common.expression.as_ref().map(lower_expression_caps),
         },
-        ParsedItem::Primitive(p) => primitive_to_layer_field(p),
+        DecodedParsedItem::Primitive(p) => primitive_to_layer_field(p),
     }
 }
 
-fn primitive_to_layer_field(p: PrimitiveType) -> IntermediateLayerField {
+fn primitive_to_layer_field(p: DecodedPrimitiveType) -> MirLayerField {
     match p {
-        PrimitiveType::Number {
+        DecodedPrimitiveType::Number {
             common,
             default,
             maximum,
             minimum,
             period: _,
-        } => IntermediateLayerField {
-            r#type: IntermediateType::Number {
+        } => MirLayerField {
+            r#type: MirType::Number {
                 min: minimum.as_ref().and_then(|n| n.as_f64()),
                 max: maximum.as_ref().and_then(|n| n.as_f64()),
             },
@@ -59,33 +59,33 @@ fn primitive_to_layer_field(p: PrimitiveType) -> IntermediateLayerField {
             required: common.required.unwrap_or(false),
             expression: common.expression.as_ref().map(lower_expression_caps),
         },
-        PrimitiveType::Boolean { common, default } => IntermediateLayerField {
-            r#type: IntermediateType::Boolean,
+        DecodedPrimitiveType::Boolean { common, default } => MirLayerField {
+            r#type: MirType::Boolean,
             default: default.map(Value::Bool),
             doc: common.doc,
             required: common.required.unwrap_or(false),
             expression: common.expression.as_ref().map(lower_expression_caps),
         },
-        PrimitiveType::String { common, default } => IntermediateLayerField {
-            r#type: IntermediateType::String,
+        DecodedPrimitiveType::String { common, default } => MirLayerField {
+            r#type: MirType::String,
             default: default.map(Value::String),
             doc: common.doc,
             required: common.required.unwrap_or(false),
             expression: common.expression.as_ref().map(lower_expression_caps),
         },
-        PrimitiveType::Color { common, default } => IntermediateLayerField {
-            r#type: IntermediateType::Color,
+        DecodedPrimitiveType::Color { common, default } => MirLayerField {
+            r#type: MirType::Color,
             default,
             doc: common.doc,
             required: common.required.unwrap_or(false),
             expression: common.expression.as_ref().map(lower_expression_caps),
         },
-        PrimitiveType::Enum {
+        DecodedPrimitiveType::Enum {
             common,
             default,
             values,
-        } => IntermediateLayerField {
-            r#type: IntermediateType::Enum {
+        } => MirLayerField {
+            r#type: MirType::Enum {
                 values: enum_values_to_strings(&values),
             },
             default,
@@ -93,7 +93,7 @@ fn primitive_to_layer_field(p: PrimitiveType) -> IntermediateLayerField {
             required: common.required.unwrap_or(false),
             expression: common.expression.as_ref().map(lower_expression_caps),
         },
-        PrimitiveType::Array {
+        DecodedPrimitiveType::Array {
             common,
             default,
             value,
@@ -103,21 +103,21 @@ fn primitive_to_layer_field(p: PrimitiveType) -> IntermediateLayerField {
             length,
         } => {
             let element = array_value_to_element_type(value, values);
-            IntermediateLayerField {
-                r#type: IntermediateType::Array { element, length },
+            MirLayerField {
+                r#type: MirType::Array { element, length },
                 default: default.map(Value::Array),
                 doc: common.doc,
                 required: common.required.unwrap_or(false),
                 expression: common.expression.as_ref().map(lower_expression_caps),
             }
         }
-        PrimitiveType::NumberArray {
+        DecodedPrimitiveType::NumberArray {
             common,
             default,
             minimum,
             maximum,
-        } => IntermediateLayerField {
-            r#type: IntermediateType::NumberArray {
+        } => MirLayerField {
+            r#type: MirType::NumberArray {
                 min: minimum.as_ref().and_then(|n| n.as_f64()),
                 max: maximum.as_ref().and_then(|n| n.as_f64()),
             },
@@ -126,15 +126,15 @@ fn primitive_to_layer_field(p: PrimitiveType) -> IntermediateLayerField {
             required: common.required.unwrap_or(false),
             expression: common.expression.as_ref().map(lower_expression_caps),
         },
-        PrimitiveType::ColorArray { common, default } => IntermediateLayerField {
-            r#type: IntermediateType::ColorArray,
+        DecodedPrimitiveType::ColorArray { common, default } => MirLayerField {
+            r#type: MirType::ColorArray,
             default: default.map(Value::String),
             doc: common.doc,
             required: common.required.unwrap_or(false),
             expression: common.expression.as_ref().map(lower_expression_caps),
         },
-        PrimitiveType::Padding { common, default } => IntermediateLayerField {
-            r#type: IntermediateType::Padding,
+        DecodedPrimitiveType::Padding { common, default } => MirLayerField {
+            r#type: MirType::Padding,
             default: Some(Value::Array(
                 default.into_iter().map(Value::Number).collect(),
             )),
@@ -142,19 +142,19 @@ fn primitive_to_layer_field(p: PrimitiveType) -> IntermediateLayerField {
             required: common.required.unwrap_or(false),
             expression: common.expression.as_ref().map(lower_expression_caps),
         },
-        PrimitiveType::Formatted {
+        DecodedPrimitiveType::Formatted {
             common,
             tokens,
             default,
-        } => IntermediateLayerField {
-            r#type: IntermediateType::Formatted { tokens },
+        } => MirLayerField {
+            r#type: MirType::Formatted { tokens },
             default: Some(Value::String(default)),
             doc: common.doc,
             required: common.required.unwrap_or(false),
             expression: common.expression.as_ref().map(lower_expression_caps),
         },
-        PrimitiveType::ResolvedImage { common, tokens } => IntermediateLayerField {
-            r#type: IntermediateType::ResolvedImage {
+        DecodedPrimitiveType::ResolvedImage { common, tokens } => MirLayerField {
+            r#type: MirType::ResolvedImage {
                 tokens: tokens.unwrap_or(false),
             },
             default: None,
@@ -162,8 +162,8 @@ fn primitive_to_layer_field(p: PrimitiveType) -> IntermediateLayerField {
             required: common.required.unwrap_or(false),
             expression: common.expression.as_ref().map(lower_expression_caps),
         },
-        PrimitiveType::State { common, default } => IntermediateLayerField {
-            r#type: IntermediateType::State,
+        DecodedPrimitiveType::State { common, default } => MirLayerField {
+            r#type: MirType::State,
             default: if default == Value::Null {
                 None
             } else {
@@ -173,114 +173,114 @@ fn primitive_to_layer_field(p: PrimitiveType) -> IntermediateLayerField {
             required: common.required.unwrap_or(false),
             expression: common.expression.as_ref().map(lower_expression_caps),
         },
-        PrimitiveType::ProjectionDefinition { common, default } => IntermediateLayerField {
-            r#type: IntermediateType::ProjectionDefinition,
+        DecodedPrimitiveType::ProjectionDefinition { common, default } => MirLayerField {
+            r#type: MirType::ProjectionDefinition,
             default: Some(Value::String(default)),
             doc: common.doc,
             required: common.required.unwrap_or(false),
             expression: common.expression.as_ref().map(lower_expression_caps),
         },
-        PrimitiveType::Star(common) => IntermediateLayerField {
-            r#type: IntermediateType::AnyObject,
+        DecodedPrimitiveType::Star(common) => MirLayerField {
+            r#type: MirType::AnyObject,
             default: None,
             doc: common.doc,
             required: common.required.unwrap_or(false),
             expression: common.expression.as_ref().map(lower_expression_caps),
         },
-        PrimitiveType::Sprite(common) => IntermediateLayerField {
-            r#type: IntermediateType::Sprite,
+        DecodedPrimitiveType::Sprite(common) => MirLayerField {
+            r#type: MirType::Sprite,
             default: None,
             doc: common.doc,
             required: common.required.unwrap_or(false),
             expression: common.expression.as_ref().map(lower_expression_caps),
         },
-        PrimitiveType::PromoteId(common) => IntermediateLayerField {
-            r#type: IntermediateType::PromoteId,
+        DecodedPrimitiveType::PromoteId(common) => MirLayerField {
+            r#type: MirType::PromoteId,
             default: None,
             doc: common.doc,
             required: common.required.unwrap_or(false),
             expression: common.expression.as_ref().map(lower_expression_caps),
         },
-        PrimitiveType::VariableAnchorOffsetCollection(common) => IntermediateLayerField {
-            r#type: IntermediateType::VariableAnchorOffsetCollection,
+        DecodedPrimitiveType::VariableAnchorOffsetCollection(common) => MirLayerField {
+            r#type: MirType::VariableAnchorOffsetCollection,
             default: None,
             doc: common.doc,
             required: common.required.unwrap_or(false),
             expression: common.expression.as_ref().map(lower_expression_caps),
         },
-        PrimitiveType::PropertyType(_) => {
-            panic!("PropertyType is a meta-type and should be filtered before lowering")
+        DecodedPrimitiveType::PropertyType(_) => {
+            panic!("DecodedPropertyType is a meta-type and should be filtered before lowering")
         }
     }
 }
 
-fn enum_values_to_strings(values: &EnumValues) -> Vec<String> {
+fn enum_values_to_strings(values: &DecodedEnumValues) -> Vec<String> {
     match values {
-        EnumValues::Enum(map) => map.keys().cloned().collect(),
-        EnumValues::Version(numbers) => numbers.iter().map(|n| n.to_string()).collect(),
-        EnumValues::SyntaxEnum(map) => map.keys().cloned().collect(),
+        DecodedEnumValues::Enum(map) => map.keys().cloned().collect(),
+        DecodedEnumValues::Version(numbers) => numbers.iter().map(|n| n.to_string()).collect(),
+        DecodedEnumValues::SyntaxEnum(map) => map.keys().cloned().collect(),
     }
 }
 
 fn array_value_to_element_type(
-    value: ArrayValue,
-    enum_values: Option<EnumValues>,
-) -> ArrayElementType {
+    value: DecodedArrayValue,
+    enum_values: Option<DecodedEnumValues>,
+) -> MirArrayElementType {
     match value {
-        ArrayValue::Simple(s) => match s {
-            SimpleArrayValue::String => ArrayElementType::String,
-            SimpleArrayValue::Number => ArrayElementType::Number,
-            SimpleArrayValue::Color => ArrayElementType::Color,
-            SimpleArrayValue::Layer => ArrayElementType::Layer,
-            SimpleArrayValue::Enum => {
+        DecodedArrayValue::Simple(s) => match s {
+            DecodedSimpleArrayValue::String => MirArrayElementType::String,
+            DecodedSimpleArrayValue::Number => MirArrayElementType::Number,
+            DecodedSimpleArrayValue::Color => MirArrayElementType::Color,
+            DecodedSimpleArrayValue::Layer => MirArrayElementType::Layer,
+            DecodedSimpleArrayValue::Enum => {
                 let variants = match enum_values {
-                    Some(EnumValues::Enum(map)) => map.keys().cloned().collect(),
+                    Some(DecodedEnumValues::Enum(map)) => map.keys().cloned().collect(),
                     _ => vec![],
                 };
-                ArrayElementType::Enum(variants)
+                MirArrayElementType::Enum(variants)
             }
             // Fall back to String for uncommon/meta types
-            SimpleArrayValue::Star
-            | SimpleArrayValue::FunctionStop
-            | SimpleArrayValue::FontFaces
-            | SimpleArrayValue::ExpressionName
-            | SimpleArrayValue::InterpolationName => ArrayElementType::String,
+            DecodedSimpleArrayValue::Star
+            | DecodedSimpleArrayValue::FunctionStop
+            | DecodedSimpleArrayValue::FontFaces
+            | DecodedSimpleArrayValue::ExpressionName
+            | DecodedSimpleArrayValue::InterpolationName => MirArrayElementType::String,
         },
-        ArrayValue::Either(_) | ArrayValue::Complex(_) => ArrayElementType::String,
+        DecodedArrayValue::Either(_) | DecodedArrayValue::Complex(_) => MirArrayElementType::String,
     }
 }
 
-fn reference_to_intermediate_type(references: &str) -> IntermediateType {
+fn reference_to_intermediate_type(references: &str) -> MirType {
     match references {
-        "color" => IntermediateType::Color,
-        "string" => IntermediateType::String,
-        "number" => IntermediateType::Number {
+        "color" => MirType::Color,
+        "string" => MirType::String,
+        "number" => MirType::Number {
             min: None,
             max: None,
         },
-        "boolean" => IntermediateType::Boolean,
-        "enum" => IntermediateType::Enum { values: vec![] },
-        "array" => IntermediateType::Array {
-            element: ArrayElementType::String,
+        "boolean" => MirType::Boolean,
+        "enum" => MirType::Enum { values: vec![] },
+        "array" => MirType::Array {
+            element: MirArrayElementType::String,
             length: None,
         },
-        "formatted" => IntermediateType::Formatted { tokens: false },
-        "resolvedImage" => IntermediateType::ResolvedImage { tokens: false },
-        "padding" => IntermediateType::Padding,
-        "variableAnchorOffsetCollection" => IntermediateType::VariableAnchorOffsetCollection,
-        "projectionDefinition" => IntermediateType::ProjectionDefinition,
-        _ => IntermediateType::String,
+        "formatted" => MirType::Formatted { tokens: false },
+        "resolvedImage" => MirType::ResolvedImage { tokens: false },
+        "padding" => MirType::Padding,
+        "variableAnchorOffsetCollection" => MirType::VariableAnchorOffsetCollection,
+        "projectionDefinition" => MirType::ProjectionDefinition,
+        _ => MirType::String,
     }
 }
 
-pub fn preprocess_layers(reference: &mut decoder::StyleReference) -> IntermediateLayers {
+pub fn preprocess_layers(reference: &mut decoder::StyleReference) -> MirLayers {
     let Some(layers_item) = reference.root.remove("layers") else {
-        return IntermediateLayers {
+        return MirLayers {
             common_fields: BTreeMap::new(),
             layer_types: BTreeMap::new(),
         };
     };
-    let decoder::PrimitiveType::Array { .. } = layers_item.as_primitive() else {
+    let decoder::DecodedPrimitiveType::Array { .. } = layers_item.as_primitive() else {
         panic!("layers must be an array");
     };
 
@@ -313,10 +313,10 @@ pub fn preprocess_layers(reference: &mut decoder::StyleReference) -> Intermediat
     for key in layer_type_keys {
         let layout = parsed_items_to_layer_fields(layout.remove(&key).unwrap_or_default());
         let paint = parsed_items_to_layer_fields(paint.remove(&key).unwrap_or_default());
-        layer_types.insert(key, IntermediateLayerType { layout, paint });
+        layer_types.insert(key, MirLayerType { layout, paint });
     }
 
-    IntermediateLayers {
+    MirLayers {
         common_fields,
         layer_types,
     }

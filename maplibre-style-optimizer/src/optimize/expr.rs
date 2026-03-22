@@ -1,6 +1,6 @@
 //! Expression-tree passes: normalisation, constant folding, selectivity reordering.
 
-use maplibre_style_spec::mir::{ExpressionOperator, IntermediateSpec};
+use maplibre_style_spec::mir::{MirExpressionOperator, MirSpec};
 use serde_json::Value;
 
 use super::OptPasses;
@@ -12,7 +12,7 @@ use crate::stats::TileStatistics;
 // ── Visitors ──────────────────────────────────────────────────────────────────
 
 pub(crate) struct NormalizeFoldVisitor<'a> {
-    pub mir: &'a IntermediateSpec,
+    pub mir: &'a MirSpec,
     pub passes: &'a OptPasses,
     pub stats: Option<&'a TileStatistics>,
     pub layer_info: Option<&'a [Option<VectorLayerInfo>]>,
@@ -70,7 +70,7 @@ fn fold_id_to_null(v: &mut Value) -> bool {
 }
 
 pub(crate) struct ReorderSelectivityVisitor<'a> {
-    pub mir: &'a IntermediateSpec,
+    pub mir: &'a MirSpec,
     pub stats: Option<&'a TileStatistics>,
     pub layer_info: Option<&'a [Option<VectorLayerInfo>]>,
 }
@@ -107,12 +107,7 @@ impl StyleVisitor for ReorderSelectivityVisitor<'_> {
 
 // ── Recursive walkers ─────────────────────────────────────────────────────────
 
-fn normalize_and_fold(
-    v: &mut Value,
-    mir: &IntermediateSpec,
-    passes: &OptPasses,
-    changed: &mut bool,
-) {
+fn normalize_and_fold(v: &mut Value, mir: &MirSpec, passes: &OptPasses, changed: &mut bool) {
     match v {
         Value::Array(arr) => {
             for x in arr.iter_mut() {
@@ -159,7 +154,7 @@ fn normalize_and_fold(
 
 fn reorder_selectivity(
     v: &mut Value,
-    mir: &IntermediateSpec,
+    mir: &MirSpec,
     stats: Option<&TileStatistics>,
     ctx: Option<&LayerContext<'_>>,
 ) {
@@ -183,7 +178,7 @@ fn reorder_selectivity(
 
 fn rewrite_expression_array(
     arr: &mut Vec<Value>,
-    mir: &IntermediateSpec,
+    mir: &MirSpec,
     passes: &OptPasses,
     changed: &mut bool,
 ) {
@@ -192,11 +187,7 @@ fn rewrite_expression_array(
     }
 }
 
-fn apply_one_rewrite_pass(
-    arr: &mut Vec<Value>,
-    mir: &IntermediateSpec,
-    passes: &OptPasses,
-) -> bool {
+fn apply_one_rewrite_pass(arr: &mut Vec<Value>, mir: &MirSpec, passes: &OptPasses) -> bool {
     if passes.expression_kind && try_negate_comparison(arr, mir) {
         return true;
     }
@@ -248,8 +239,8 @@ fn apply_one_rewrite_pass(
 
 /// `["!", [op, a, b]]` → `[negation_of(op), a, b]` when the negated operator exists in MIR.
 ///
-/// Handles `==`↔`!=`, `<`↔`>=`, `>`↔`<=` generically via `IntermediateExpressions::negation_of`.
-fn try_negate_comparison(arr: &mut Vec<Value>, mir: &IntermediateSpec) -> bool {
+/// Handles `==`↔`!=`, `<`↔`>=`, `>`↔`<=` generically via `MirExpressions::negation_of`.
+fn try_negate_comparison(arr: &mut Vec<Value>, mir: &MirSpec) -> bool {
     if arr.len() != 2 || arr[0].as_str() != Some("!") {
         return false;
     }
@@ -422,7 +413,7 @@ fn try_fold_boolean_algebra(arr: &mut Vec<Value>) -> bool {
 // ── Pass 3: Arithmetic / String / Type / Color constant folding ────────────────
 
 /// Try to evaluate a pure operator whose all arguments are literal values.
-fn try_fold_pure_operator(arr: &mut Vec<Value>, mir: &IntermediateSpec) -> bool {
+fn try_fold_pure_operator(arr: &mut Vec<Value>, mir: &MirSpec) -> bool {
     if arr.is_empty() {
         return false;
     }
@@ -435,7 +426,7 @@ fn try_fold_pure_operator(arr: &mut Vec<Value>, mir: &IntermediateSpec) -> bool 
         .expressions
         .operators
         .get(op)
-        .is_some_and(ExpressionOperator::is_pure);
+        .is_some_and(MirExpressionOperator::is_pure);
     if !pure_in_mir && !matches!(op, "length" | "at") {
         return false;
     }
@@ -1169,7 +1160,7 @@ fn try_simplify_coalesce(arr: &mut Vec<Value>) -> bool {
 
 fn maybe_reorder_any_all(
     arr: &mut Vec<Value>,
-    mir: &IntermediateSpec,
+    mir: &MirSpec,
     stats: Option<&TileStatistics>,
     ctx: Option<&LayerContext<'_>>,
 ) {

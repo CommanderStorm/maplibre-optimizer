@@ -170,7 +170,7 @@ mod tests {
     use super::*;
     use crate::optimize::walk::walk_style_mut;
 
-    fn dummy_mir() -> maplibre_style_spec::mir::IntermediateSpec {
+    fn dummy_mir() -> maplibre_style_spec::mir::MirSpec {
         let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
             .join("../upstream/src/reference/v8.json");
         crate::load_intermediate_spec_from_v8_path(&path).expect("v8.json")

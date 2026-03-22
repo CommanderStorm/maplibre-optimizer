@@ -14,23 +14,23 @@ use std::path::Path;
 
 use anyhow::Context;
 use maplibre_style_spec::decoder::StyleReference;
-use maplibre_style_spec::mir::IntermediateSpec;
+use maplibre_style_spec::mir::MirSpec;
 pub use optimize::{
     OptPasses, optimize_style, optimize_style_json_value, optimize_style_json_value_with_stats,
 };
 pub use stats::TileStatistics;
 
 /// Load MIR from a `MapLibre` style reference `v8.json` on disk.
-pub fn load_intermediate_spec_from_v8_path(path: &Path) -> anyhow::Result<IntermediateSpec> {
+pub fn load_intermediate_spec_from_v8_path(path: &Path) -> anyhow::Result<MirSpec> {
     let text =
         fs::read_to_string(path).with_context(|| format!("read reference {}", path.display()))?;
     let reference: StyleReference = serde_json::from_str(&text)
         .with_context(|| format!("parse reference {}", path.display()))?;
-    Ok(IntermediateSpec::from(reference))
+    Ok(MirSpec::from(reference))
 }
 
 /// Ensure the reference defines an expression operator (sanity check against wrong `v8.json`).
-pub fn ensure_expression_operator(mir: &IntermediateSpec, name: &str) -> anyhow::Result<()> {
+pub fn ensure_expression_operator(mir: &MirSpec, name: &str) -> anyhow::Result<()> {
     if mir.expressions.operators.contains_key(name) {
         Ok(())
     } else {

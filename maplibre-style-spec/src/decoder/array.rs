@@ -1,45 +1,45 @@
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-use crate::decoder::ParsedItem;
+use crate::decoder::DecodedParsedItem;
 
 #[derive(Debug, PartialEq, Clone)]
-pub enum ArrayValue {
-    Simple(SimpleArrayValue),
-    Either(Vec<ArrayValue>),
-    Complex(Box<ParsedItem>),
+pub enum DecodedArrayValue {
+    Simple(DecodedSimpleArrayValue),
+    Either(Vec<DecodedArrayValue>),
+    Complex(Box<DecodedParsedItem>),
 }
 
-impl Serialize for ArrayValue {
+impl Serialize for DecodedArrayValue {
     fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         match self {
-            ArrayValue::Simple(s) => s.serialize(serializer),
-            ArrayValue::Either(v) => v.serialize(serializer),
-            ArrayValue::Complex(p) => p.serialize(serializer),
+            DecodedArrayValue::Simple(s) => s.serialize(serializer),
+            DecodedArrayValue::Either(v) => v.serialize(serializer),
+            DecodedArrayValue::Complex(p) => p.serialize(serializer),
         }
     }
 }
 
-impl<'de> Deserialize<'de> for ArrayValue {
+impl<'de> Deserialize<'de> for DecodedArrayValue {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: serde::Deserializer<'de>,
     {
         let value = Value::deserialize(deserializer)?;
         if let Some(s) = value.as_str() {
-            return SimpleArrayValue::deserialize(Value::String(s.to_owned()))
-                .map(ArrayValue::Simple)
-                .map_err(|e| serde::de::Error::custom(format!("ArrayValue::Simple: {e}")));
+            return DecodedSimpleArrayValue::deserialize(Value::String(s.to_owned()))
+                .map(DecodedArrayValue::Simple)
+                .map_err(|e| serde::de::Error::custom(format!("DecodedArrayValue::Simple: {e}")));
         }
         if value.is_array() {
-            return Vec::<ArrayValue>::deserialize(value)
-                .map(ArrayValue::Either)
-                .map_err(|e| serde::de::Error::custom(format!("ArrayValue::Either: {e}")));
+            return Vec::<DecodedArrayValue>::deserialize(value)
+                .map(DecodedArrayValue::Either)
+                .map_err(|e| serde::de::Error::custom(format!("DecodedArrayValue::Either: {e}")));
         }
         if value.is_object() {
-            return ParsedItem::deserialize(value)
-                .map(|p| ArrayValue::Complex(Box::new(p)))
-                .map_err(|e| serde::de::Error::custom(format!("ArrayValue::Complex: {e}")));
+            return DecodedParsedItem::deserialize(value)
+                .map(|p| DecodedArrayValue::Complex(Box::new(p)))
+                .map_err(|e| serde::de::Error::custom(format!("DecodedArrayValue::Complex: {e}")));
         }
         Err(serde::de::Error::custom(
             "expected a string (Simple), array (Either), or object (Complex)",
@@ -49,7 +49,7 @@ impl<'de> Deserialize<'de> for ArrayValue {
 
 #[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub enum SimpleArrayValue {
+pub enum DecodedSimpleArrayValue {
     String,
     Number,
     #[serde(rename = "*")]

@@ -7,9 +7,9 @@ use std::collections::BTreeMap;
 use serde::{Deserialize, Serialize};
 use serde_json::{Number, Value};
 
-use crate::decoder::array::ArrayValue;
-use crate::decoder::r#enum::EnumValues;
-use crate::decoder::property_type::PropertyType;
+use crate::decoder::array::DecodedArrayValue;
+use crate::decoder::r#enum::DecodedEnumValues;
+use crate::decoder::property_type::DecodedPropertyType;
 
 #[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
 pub struct StyleReference {
@@ -21,31 +21,31 @@ pub struct StyleReference {
 
     /// defines the layout of the style spec
     #[serde(rename = "$root")]
-    pub root: BTreeMap<String, ParsedItem>,
+    pub root: BTreeMap<String, DecodedParsedItem>,
 
     /// definitions of the items referenced in the root
     #[serde(flatten)]
-    pub fields: BTreeMap<String, TopLevelItem>,
+    pub fields: BTreeMap<String, DecodedTopLevelItem>,
 }
 
 #[derive(Debug, PartialEq, Clone)]
-pub enum TopLevelItem {
-    Item(Box<ParsedItem>),
-    Group(BTreeMap<String, ParsedItem>),
+pub enum DecodedTopLevelItem {
+    Item(Box<DecodedParsedItem>),
+    Group(BTreeMap<String, DecodedParsedItem>),
     OneOf(Vec<String>),
 }
 
-impl Serialize for TopLevelItem {
+impl Serialize for DecodedTopLevelItem {
     fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         match self {
-            TopLevelItem::Item(item) => item.serialize(serializer),
-            TopLevelItem::Group(group) => group.serialize(serializer),
-            TopLevelItem::OneOf(one_of) => one_of.serialize(serializer),
+            DecodedTopLevelItem::Item(item) => item.serialize(serializer),
+            DecodedTopLevelItem::Group(group) => group.serialize(serializer),
+            DecodedTopLevelItem::OneOf(one_of) => one_of.serialize(serializer),
         }
     }
 }
 
-impl<'de> Deserialize<'de> for TopLevelItem {
+impl<'de> Deserialize<'de> for DecodedTopLevelItem {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: serde::Deserializer<'de>,
@@ -53,17 +53,17 @@ impl<'de> Deserialize<'de> for TopLevelItem {
         let value = Value::deserialize(deserializer)?;
         if value.is_array() {
             return Vec::<String>::deserialize(value)
-                .map(TopLevelItem::OneOf)
-                .map_err(|e| serde::de::Error::custom(format!("TopLevelItem::OneOf: {e}")));
+                .map(DecodedTopLevelItem::OneOf)
+                .map_err(|e| serde::de::Error::custom(format!("DecodedTopLevelItem::OneOf: {e}")));
         }
         if value.is_object() {
             // try Item first (has a "type" field), fall back to Group
-            if let Ok(item) = ParsedItem::deserialize(&value) {
-                return Ok(TopLevelItem::Item(Box::new(item)));
+            if let Ok(item) = DecodedParsedItem::deserialize(&value) {
+                return Ok(DecodedTopLevelItem::Item(Box::new(item)));
             }
-            return BTreeMap::<String, ParsedItem>::deserialize(value)
-                .map(TopLevelItem::Group)
-                .map_err(|e| serde::de::Error::custom(format!("TopLevelItem::Group: {e}")));
+            return BTreeMap::<String, DecodedParsedItem>::deserialize(value)
+                .map(DecodedTopLevelItem::Group)
+                .map_err(|e| serde::de::Error::custom(format!("DecodedTopLevelItem::Group: {e}")));
         }
         Err(serde::de::Error::custom(
             "expected an object (Item or Group) or an array of strings (OneOf)",
@@ -71,47 +71,47 @@ impl<'de> Deserialize<'de> for TopLevelItem {
     }
 }
 
-impl TopLevelItem {
-    pub fn as_item(&self) -> &ParsedItem {
+impl DecodedTopLevelItem {
+    pub fn as_item(&self) -> &DecodedParsedItem {
         match self {
-            TopLevelItem::Item(item) => item,
-            TopLevelItem::Group(_) => panic!("cannot get item from group"),
-            TopLevelItem::OneOf(_) => panic!("cannot get item from oneof"),
+            DecodedTopLevelItem::Item(item) => item,
+            DecodedTopLevelItem::Group(_) => panic!("cannot get item from group"),
+            DecodedTopLevelItem::OneOf(_) => panic!("cannot get item from oneof"),
         }
     }
-    pub fn as_item_mut(&mut self) -> &mut ParsedItem {
+    pub fn as_item_mut(&mut self) -> &mut DecodedParsedItem {
         match self {
-            TopLevelItem::Item(item) => item,
-            TopLevelItem::Group(_) => panic!("cannot get item from group"),
-            TopLevelItem::OneOf(_) => panic!("cannot get item from oneof"),
+            DecodedTopLevelItem::Item(item) => item,
+            DecodedTopLevelItem::Group(_) => panic!("cannot get item from group"),
+            DecodedTopLevelItem::OneOf(_) => panic!("cannot get item from oneof"),
         }
     }
-    pub fn as_group(&self) -> &BTreeMap<String, ParsedItem> {
+    pub fn as_group(&self) -> &BTreeMap<String, DecodedParsedItem> {
         match self {
-            TopLevelItem::Item(_) => panic!("cannot get group from item"),
-            TopLevelItem::Group(group) => group,
-            TopLevelItem::OneOf(_) => panic!("cannot get group from oneof"),
+            DecodedTopLevelItem::Item(_) => panic!("cannot get group from item"),
+            DecodedTopLevelItem::Group(group) => group,
+            DecodedTopLevelItem::OneOf(_) => panic!("cannot get group from oneof"),
         }
     }
-    pub fn as_group_mut(&mut self) -> &mut BTreeMap<String, ParsedItem> {
+    pub fn as_group_mut(&mut self) -> &mut BTreeMap<String, DecodedParsedItem> {
         match self {
-            TopLevelItem::Item(_) => panic!("cannot get group from item"),
-            TopLevelItem::Group(group) => group,
-            TopLevelItem::OneOf(_) => panic!("cannot get group from oneof"),
+            DecodedTopLevelItem::Item(_) => panic!("cannot get group from item"),
+            DecodedTopLevelItem::Group(group) => group,
+            DecodedTopLevelItem::OneOf(_) => panic!("cannot get group from oneof"),
         }
     }
     pub fn as_one_of(&self) -> &[String] {
         match self {
-            TopLevelItem::Item(_) => panic!("cannot get oneof from item"),
-            TopLevelItem::Group(_) => panic!("cannot get oneof from group"),
-            TopLevelItem::OneOf(one_of) => one_of,
+            DecodedTopLevelItem::Item(_) => panic!("cannot get oneof from item"),
+            DecodedTopLevelItem::Group(_) => panic!("cannot get oneof from group"),
+            DecodedTopLevelItem::OneOf(one_of) => one_of,
         }
     }
     pub fn as_one_of_mut(&mut self) -> &mut [String] {
         match self {
-            TopLevelItem::Item(_) => panic!("cannot get oneof from item"),
-            TopLevelItem::Group(_) => panic!("cannot get oneof from group"),
-            TopLevelItem::OneOf(one_of) => one_of,
+            DecodedTopLevelItem::Item(_) => panic!("cannot get oneof from item"),
+            DecodedTopLevelItem::Group(_) => panic!("cannot get oneof from group"),
+            DecodedTopLevelItem::OneOf(one_of) => one_of,
         }
     }
 }
@@ -120,10 +120,10 @@ impl TopLevelItem {
 #[serde(tag = "type", rename_all = "camelCase")]
 #[serde(deny_unknown_fields)]
 #[serde_with::skip_serializing_none]
-pub enum PrimitiveType {
+pub enum DecodedPrimitiveType {
     Number {
         #[serde(flatten)]
-        common: Fields,
+        common: DecodedFields,
         default: Option<Number>,
         maximum: Option<Number>,
         minimum: Option<Number>,
@@ -131,18 +131,18 @@ pub enum PrimitiveType {
     },
     Enum {
         #[serde(flatten)]
-        common: Fields,
+        common: DecodedFields,
 
         default: Option<Value>,
-        values: EnumValues,
+        values: DecodedEnumValues,
     },
     Array {
         #[serde(flatten)]
-        common: Fields,
+        common: DecodedFields,
         default: Option<Vec<Value>>,
-        value: ArrayValue,
+        value: DecodedArrayValue,
         // if value is an enum
-        values: Option<EnumValues>,
+        values: Option<DecodedEnumValues>,
         // if value is a number
         minimum: Option<Number>,
         maximum: Option<Number>,
@@ -151,29 +151,29 @@ pub enum PrimitiveType {
     },
     Color {
         #[serde(flatten)]
-        common: Fields,
+        common: DecodedFields,
         default: Option<Value>,
     },
     String {
         #[serde(flatten)]
-        common: Fields,
+        common: DecodedFields,
         default: Option<String>,
     },
     Boolean {
         #[serde(flatten)]
-        common: Fields,
+        common: DecodedFields,
         default: Option<bool>,
     },
     ResolvedImage {
         #[serde(flatten)]
-        common: Fields,
+        common: DecodedFields,
 
         /// can autocomplete fields from layers
         tokens: Option<bool>,
     },
     NumberArray {
         #[serde(flatten)]
-        common: Fields,
+        common: DecodedFields,
 
         default: Option<Number>,
         minimum: Option<Number>,
@@ -181,23 +181,23 @@ pub enum PrimitiveType {
     },
     ColorArray {
         #[serde(flatten)]
-        common: Fields,
+        common: DecodedFields,
 
         default: Option<String>,
     },
     State {
         #[serde(flatten)]
-        common: Fields,
+        common: DecodedFields,
         default: Value,
     },
     Padding {
         #[serde(flatten)]
-        common: Fields,
+        common: DecodedFields,
         default: Vec<Number>,
     },
     Formatted {
         #[serde(flatten)]
-        common: Fields,
+        common: DecodedFields,
         /// can autocomplete fields from layers
         tokens: bool,
         default: String,
@@ -205,23 +205,23 @@ pub enum PrimitiveType {
 
     // meta types
     #[serde(rename = "*")]
-    Star(Fields),
+    Star(DecodedFields),
     #[serde(rename = "property-type")]
     PropertyType(Value),
 
     // below are types which are only primitives due to bad spec work upstream
     ProjectionDefinition {
         #[serde(flatten)]
-        common: Fields,
+        common: DecodedFields,
         default: String,
     },
-    VariableAnchorOffsetCollection(Fields),
-    Sprite(Fields),
-    PromoteId(Fields),
+    VariableAnchorOffsetCollection(DecodedFields),
+    Sprite(DecodedFields),
+    PromoteId(DecodedFields),
 }
 
-impl PrimitiveType {
-    fn common(&self) -> &Fields {
+impl DecodedPrimitiveType {
+    fn common(&self) -> &DecodedFields {
         match self {
             Self::Number { common, .. } => common,
             Self::Enum { common, .. } => common,
@@ -245,7 +245,7 @@ impl PrimitiveType {
             Self::PromoteId(common) => common,
         }
     }
-    pub fn as_enum(&self) -> (&EnumValues, &Fields, Option<&Value>) {
+    pub fn as_enum(&self) -> (&DecodedEnumValues, &DecodedFields, Option<&Value>) {
         match self {
             Self::Enum {
                 values,
@@ -255,20 +255,20 @@ impl PrimitiveType {
             _ => panic!("cannot downcast as enum"),
         }
     }
-    pub fn enum_values_mut(&mut self) -> &mut EnumValues {
+    pub fn enum_values_mut(&mut self) -> &mut DecodedEnumValues {
         match self {
             Self::Enum { values, .. } => values,
             _ => panic!("cannot downcast as enum"),
         }
     }
-    pub fn as_array(&self) -> (&ArrayValue, Option<&EnumValues>) {
+    pub fn as_array(&self) -> (&DecodedArrayValue, Option<&DecodedEnumValues>) {
         match self {
             Self::Array { value, values, .. } => (value, values.as_ref()),
             _ => panic!("cannot downcast as array"),
         }
     }
 
-    pub fn as_number(&self) -> (&Fields, Option<f64>, Option<f64>) {
+    pub fn as_number(&self) -> (&DecodedFields, Option<f64>, Option<f64>) {
         match self {
             Self::Number {
                 common,
@@ -284,35 +284,35 @@ impl PrimitiveType {
         }
     }
 
-    pub fn as_color(&self) -> (&Fields, Option<&Value>) {
+    pub fn as_color(&self) -> (&DecodedFields, Option<&Value>) {
         match self {
             Self::Color { common, default } => (common, default.as_ref()),
             _ => panic!("cannot downcast as color"),
         }
     }
 
-    pub fn as_string(&self) -> (&Fields, Option<&str>) {
+    pub fn as_string(&self) -> (&DecodedFields, Option<&str>) {
         match self {
             Self::String { common, default } => (common, default.as_deref()),
             _ => panic!("cannot downcast as string"),
         }
     }
 
-    pub fn as_boolean(&self) -> (&Fields, Option<bool>) {
+    pub fn as_boolean(&self) -> (&DecodedFields, Option<bool>) {
         match self {
             Self::Boolean { common, default } => (common, *default),
             _ => panic!("cannot downcast as boolean"),
         }
     }
 
-    pub fn as_resolved_image(&self) -> (&Fields, Option<bool>) {
+    pub fn as_resolved_image(&self) -> (&DecodedFields, Option<bool>) {
         match self {
             Self::ResolvedImage { common, tokens } => (common, *tokens),
             _ => panic!("cannot downcast as resolved_image"),
         }
     }
 
-    pub fn as_number_array(&self) -> (&Fields, Option<f64>, Option<f64>) {
+    pub fn as_number_array(&self) -> (&DecodedFields, Option<f64>, Option<f64>) {
         match self {
             Self::NumberArray {
                 common,
@@ -328,63 +328,63 @@ impl PrimitiveType {
         }
     }
 
-    pub fn as_color_array(&self) -> (&Fields, Option<&str>) {
+    pub fn as_color_array(&self) -> (&DecodedFields, Option<&str>) {
         match self {
             Self::ColorArray { common, default } => (common, default.as_deref()),
             _ => panic!("cannot downcast as color_array"),
         }
     }
 
-    pub fn as_padding(&self) -> (&Fields, &[Number]) {
+    pub fn as_padding(&self) -> (&DecodedFields, &[Number]) {
         match self {
             Self::Padding { common, default } => (common, default.as_slice()),
             _ => panic!("cannot downcast as padding"),
         }
     }
 
-    pub fn as_formatted(&self) -> (&Fields, bool) {
+    pub fn as_formatted(&self) -> (&DecodedFields, bool) {
         match self {
             Self::Formatted { common, tokens, .. } => (common, *tokens),
             _ => panic!("cannot downcast as formatted"),
         }
     }
 
-    pub fn as_state(&self) -> (&Fields, &Value) {
+    pub fn as_state(&self) -> (&DecodedFields, &Value) {
         match self {
             Self::State { common, default } => (common, default),
             _ => panic!("cannot downcast as state"),
         }
     }
 
-    pub fn as_projection_definition(&self) -> (&Fields, &str) {
+    pub fn as_projection_definition(&self) -> (&DecodedFields, &str) {
         match self {
             Self::ProjectionDefinition { common, default } => (common, default.as_str()),
             _ => panic!("cannot downcast as projection_definition"),
         }
     }
 
-    pub fn as_variable_anchor_offset_collection(&self) -> &Fields {
+    pub fn as_variable_anchor_offset_collection(&self) -> &DecodedFields {
         match self {
             Self::VariableAnchorOffsetCollection(common) => common,
             _ => panic!("cannot downcast as variable_anchor_offset_collection"),
         }
     }
 
-    pub fn as_sprite(&self) -> &Fields {
+    pub fn as_sprite(&self) -> &DecodedFields {
         match self {
             Self::Sprite(common) => common,
             _ => panic!("cannot downcast as sprite"),
         }
     }
 
-    pub fn as_promote_id(&self) -> &Fields {
+    pub fn as_promote_id(&self) -> &DecodedFields {
         match self {
             Self::PromoteId(common) => common,
             _ => panic!("cannot downcast as promote_id"),
         }
     }
 
-    pub fn as_star(&self) -> &Fields {
+    pub fn as_star(&self) -> &DecodedFields {
         match self {
             Self::Star(common) => common,
             _ => panic!("cannot downcast as star"),
@@ -412,16 +412,19 @@ impl PrimitiveType {
 }
 
 #[derive(Debug, PartialEq, Clone)]
-pub enum ParsedItem {
-    Primitive(PrimitiveType),
-    Reference { references: String, common: Fields },
+pub enum DecodedParsedItem {
+    Primitive(DecodedPrimitiveType),
+    Reference {
+        references: String,
+        common: DecodedFields,
+    },
 }
 
-impl Serialize for ParsedItem {
+impl Serialize for DecodedParsedItem {
     fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         match self {
-            ParsedItem::Primitive(p) => p.serialize(serializer),
-            ParsedItem::Reference { references, common } => {
+            DecodedParsedItem::Primitive(p) => p.serialize(serializer),
+            DecodedParsedItem::Reference { references, common } => {
                 use serde::ser::SerializeMap;
                 // flatten common fields and add "type"
                 let value = serde_json::to_value(common).map_err(serde::ser::Error::custom)?;
@@ -438,78 +441,79 @@ impl Serialize for ParsedItem {
     }
 }
 
-impl<'de> Deserialize<'de> for ParsedItem {
+impl<'de> Deserialize<'de> for DecodedParsedItem {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: serde::Deserializer<'de>,
     {
         let value = Value::deserialize(deserializer)?;
         // try Primitive first (internally tagged by "type" with known variant names)
-        if let Ok(p) = PrimitiveType::deserialize(&value) {
-            return Ok(ParsedItem::Primitive(p));
+        if let Ok(p) = DecodedPrimitiveType::deserialize(&value) {
+            return Ok(DecodedParsedItem::Primitive(p));
         }
         // fall back to Reference: object with a "type" string that's a reference name
         let obj = value
             .as_object()
-            .ok_or_else(|| serde::de::Error::custom("ParsedItem: expected an object"))?;
+            .ok_or_else(|| serde::de::Error::custom("DecodedParsedItem: expected an object"))?;
         let references = obj
             .get("type")
             .and_then(Value::as_str)
             .ok_or_else(|| {
                 serde::de::Error::custom(
-                    "ParsedItem: expected a known primitive type or a \"type\" field with a reference string",
+                    "DecodedParsedItem: expected a known primitive type or a \"type\" field with a reference string",
                 )
             })?
             .to_owned();
-        // deserialize remaining fields as Fields (ignoring "type")
-        let common = Fields::deserialize(&value)
-            .map_err(|e| serde::de::Error::custom(format!("ParsedItem::Reference fields: {e}")))?;
-        Ok(ParsedItem::Reference { references, common })
+        // deserialize remaining fields as DecodedFields (ignoring "type")
+        let common = DecodedFields::deserialize(&value).map_err(|e| {
+            serde::de::Error::custom(format!("DecodedParsedItem::Reference fields: {e}"))
+        })?;
+        Ok(DecodedParsedItem::Reference { references, common })
     }
 }
 
-impl ParsedItem {
+impl DecodedParsedItem {
     pub fn doc(&self) -> &str {
         self.common().doc.as_str()
     }
     pub fn optional(&self) -> bool {
         !self.common().required.unwrap_or(false)
     }
-    fn common(&self) -> &Fields {
+    fn common(&self) -> &DecodedFields {
         match self {
-            ParsedItem::Primitive(p) => p.common(),
-            ParsedItem::Reference { common, .. } => common,
+            DecodedParsedItem::Primitive(p) => p.common(),
+            DecodedParsedItem::Reference { common, .. } => common,
         }
     }
 
-    pub fn as_primitive(&self) -> &PrimitiveType {
+    pub fn as_primitive(&self) -> &DecodedPrimitiveType {
         match self {
-            ParsedItem::Primitive(p) => p,
-            ParsedItem::Reference { .. } => panic!("cannot get primitive from reference"),
+            DecodedParsedItem::Primitive(p) => p,
+            DecodedParsedItem::Reference { .. } => panic!("cannot get primitive from reference"),
         }
     }
-    pub fn as_primitive_mut(&mut self) -> &mut PrimitiveType {
+    pub fn as_primitive_mut(&mut self) -> &mut DecodedPrimitiveType {
         match self {
-            ParsedItem::Primitive(p) => p,
-            ParsedItem::Reference { .. } => panic!("cannot get primitive from reference"),
+            DecodedParsedItem::Primitive(p) => p,
+            DecodedParsedItem::Reference { .. } => panic!("cannot get primitive from reference"),
         }
     }
     pub fn as_reference(&self) -> &str {
         match self {
-            ParsedItem::Primitive(_) => panic!("cannot get reference from primitive"),
-            ParsedItem::Reference { references, .. } => references,
+            DecodedParsedItem::Primitive(_) => panic!("cannot get reference from primitive"),
+            DecodedParsedItem::Reference { references, .. } => references,
         }
     }
     pub fn as_reference_mut(&mut self) -> &mut String {
         match self {
-            ParsedItem::Primitive(_) => panic!("cannot get reference from primitive"),
-            ParsedItem::Reference { references, .. } => references,
+            DecodedParsedItem::Primitive(_) => panic!("cannot get reference from primitive"),
+            DecodedParsedItem::Reference { references, .. } => references,
         }
     }
 }
 
 #[derive(Default, Debug, PartialEq, Clone, Serialize, Deserialize)]
-pub struct Fields {
+pub struct DecodedFields {
     // metadata fields
     pub doc: String,
     pub example: Option<Value>,
@@ -518,7 +522,7 @@ pub struct Fields {
     // data fields
     pub expression: Option<Expression>,
     #[serde(rename = "property-type")]
-    pub property_type: Option<PropertyType>,
+    pub property_type: Option<DecodedPropertyType>,
     #[serde(rename = "sdk-support")]
     pub sdk_support: Option<Value>,
 
@@ -527,10 +531,10 @@ pub struct Fields {
     pub required: Option<bool>,
     pub overridable: Option<bool>,
 
-    pub requires: Option<Vec<Requirement>>,
+    pub requires: Option<Vec<DecodedRequirement>>,
 }
 
-impl Fields {
+impl DecodedFields {
     pub fn doc_with_range(
         &self,
         max: Option<&Number>,
@@ -573,43 +577,43 @@ pub struct Expression {
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
-pub enum Requirement {
+pub enum DecodedRequirement {
     Exists(String),
     Equals(BTreeMap<String, Value>),
 }
 
-impl Serialize for Requirement {
+impl Serialize for DecodedRequirement {
     fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         match self {
-            Requirement::Exists(s) => s.serialize(serializer),
-            Requirement::Equals(m) => m.serialize(serializer),
+            DecodedRequirement::Exists(s) => s.serialize(serializer),
+            DecodedRequirement::Equals(m) => m.serialize(serializer),
         }
     }
 }
 
-impl<'de> Deserialize<'de> for Requirement {
+impl<'de> Deserialize<'de> for DecodedRequirement {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: serde::Deserializer<'de>,
     {
         struct RequirementVisitor;
         impl<'de> serde::de::Visitor<'de> for RequirementVisitor {
-            type Value = Requirement;
+            type Value = DecodedRequirement;
             fn expecting(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
                 f.write_str("a string (Exists) or a map (Equals)")
             }
             fn visit_str<E: serde::de::Error>(self, v: &str) -> Result<Self::Value, E> {
-                Ok(Requirement::Exists(v.to_owned()))
+                Ok(DecodedRequirement::Exists(v.to_owned()))
             }
             fn visit_string<E: serde::de::Error>(self, v: String) -> Result<Self::Value, E> {
-                Ok(Requirement::Exists(v))
+                Ok(DecodedRequirement::Exists(v))
             }
             fn visit_map<A: serde::de::MapAccess<'de>>(
                 self,
                 map: A,
             ) -> Result<Self::Value, A::Error> {
                 let m = BTreeMap::deserialize(serde::de::value::MapAccessDeserializer::new(map))?;
-                Ok(Requirement::Equals(m))
+                Ok(DecodedRequirement::Equals(m))
             }
         }
         deserializer.deserialize_any(RequirementVisitor)

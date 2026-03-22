@@ -6,11 +6,8 @@ use std::sync::OnceLock;
 use serde_json::{Map, Value};
 
 use crate::decoder::StyleReference;
-use crate::mir::types::{IntermediateType, MirField};
-use crate::mir::{
-    IntermediateLayerField, IntermediateLayers, IntermediateNamedType, IntermediateRootPrimitives,
-    IntermediateSpec,
-};
+use crate::mir::types::{MirField, MirType};
+use crate::mir::{MirLayerField, MirLayers, MirNamedType, MirRootPrimitives, MirSpec};
 use crate::spec::MaplibreStyleSpecification;
 
 #[derive(Debug)]
@@ -28,7 +25,7 @@ fn mir_tables() -> &'static MirValidationTables {
         let reference: StyleReference =
             serde_json::from_str(include_str!("../../upstream/src/reference/v8.json"))
                 .expect("parse v8.json for validation tables");
-        let spec = IntermediateSpec::from(reference);
+        let spec = MirSpec::from(reference);
         MirValidationTables {
             layer_number_bounds: layer_number_bounds(&spec.layers),
             root_center_len: root_center_expected_len(&spec.root),
@@ -67,18 +64,16 @@ fn merge_num_bounds(
 
 fn merge_fields_bounds(
     map: &mut BTreeMap<String, (Option<f64>, Option<f64>)>,
-    fields: &BTreeMap<String, IntermediateLayerField>,
+    fields: &BTreeMap<String, MirLayerField>,
 ) {
     for (spec_name, f) in fields {
-        if let IntermediateType::Number { min, max } = &f.r#type {
+        if let MirType::Number { min, max } = &f.r#type {
             merge_num_bounds(map, spec_name, *min, *max);
         }
     }
 }
 
-fn layer_number_bounds(
-    layers: &IntermediateLayers,
-) -> BTreeMap<String, (Option<f64>, Option<f64>)> {
+fn layer_number_bounds(layers: &MirLayers) -> BTreeMap<String, (Option<f64>, Option<f64>)> {
     let mut out = BTreeMap::new();
     for lt in layers.layer_types.values() {
         merge_fields_bounds(&mut out, &lt.paint);
@@ -87,7 +82,7 @@ fn layer_number_bounds(
     out
 }
 
-fn root_center_expected_len(root: &IntermediateRootPrimitives) -> Option<usize> {
+fn root_center_expected_len(root: &MirRootPrimitives) -> Option<usize> {
     let field = root.0.get("center")?;
     match field {
         MirField::Array(a) => a.length,
@@ -95,9 +90,9 @@ fn root_center_expected_len(root: &IntermediateRootPrimitives) -> Option<usize> 
     }
 }
 
-fn light_allowed_keys(named: &BTreeMap<String, IntermediateNamedType>) -> HashSet<String> {
+fn light_allowed_keys(named: &BTreeMap<String, MirNamedType>) -> HashSet<String> {
     let mut out = match named.get("light") {
-        Some(IntermediateNamedType::Struct(fields)) => {
+        Some(MirNamedType::Struct(fields)) => {
             fields.iter().map(|f| f.meta().spec_name.clone()).collect()
         }
         _ => HashSet::new(),

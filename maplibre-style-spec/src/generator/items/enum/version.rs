@@ -2,9 +2,9 @@ use codegen2::Scope;
 
 use crate::generator::formatter::to_upper_camel_case;
 use crate::generator::fuzz;
-use crate::mir::types::VersionEnum;
+use crate::mir::types::MirVersionEnum;
 
-pub fn generate_version(scope: &mut Scope, name: &str, doc: &str, versions: &VersionEnum) {
+pub fn generate_version(scope: &mut Scope, name: &str, doc: &str, versions: &MirVersionEnum) {
     assert!(versions.versions.len() <= u8::MAX as usize);
 
     let enu = scope
@@ -27,7 +27,7 @@ mod tests {
     use serde_json::json;
 
     use crate::decoder::StyleReference;
-    use crate::mir::IntermediateSpec;
+    use crate::mir::MirSpec;
 
     #[test]
     fn test_generate_spec_version() {
@@ -46,7 +46,7 @@ mod tests {
         },
         });
         let reference: StyleReference = serde_json::from_value(reference).unwrap();
-        let spec = IntermediateSpec::from(reference);
+        let spec = MirSpec::from(reference);
         insta::assert_snapshot!(crate::generator::generate_spec_scope(&spec));
     }
 }

@@ -2,7 +2,7 @@
 
 use std::collections::{HashMap, HashSet};
 
-use maplibre_style_spec::mir::{IntermediateLayerField, IntermediateSpec, PropertySection};
+use maplibre_style_spec::mir::{MirLayerField, MirPropertySection, MirSpec};
 use serde_json::Value;
 
 // ── Public types ──────────────────────────────────────────────────────────────
@@ -12,9 +12,9 @@ use serde_json::Value;
 pub(crate) struct PropertyContext<'a> {
     pub layer_index: usize,
     pub layer_type: &'a str,
-    pub section: PropertySection,
+    pub section: MirPropertySection,
     pub property_name: &'a str,
-    pub field: &'a IntermediateLayerField,
+    pub field: &'a MirLayerField,
 }
 
 /// Visitor trait for schema-guided style tree walks.
@@ -48,11 +48,7 @@ pub(crate) trait StyleVisitor {
 // ── Driver ────────────────────────────────────────────────────────────────────
 
 /// Walk a style JSON tree, calling visitor methods with schema context from MIR.
-pub(crate) fn walk_style_mut(
-    style: &mut Value,
-    mir: &IntermediateSpec,
-    visitor: &mut impl StyleVisitor,
-) {
+pub(crate) fn walk_style_mut(style: &mut Value, mir: &MirSpec, visitor: &mut impl StyleVisitor) {
     // Immutable pass: resolve every layer's effective type (following `ref` chains).
     let layer_types = collect_layer_types(style);
 
@@ -90,7 +86,7 @@ pub(crate) fn walk_style_mut(
                                     &PropertyContext {
                                         layer_index: i,
                                         layer_type,
-                                        section: PropertySection::Paint,
+                                        section: MirPropertySection::Paint,
                                         property_name: prop_name,
                                         field,
                                     },
@@ -109,7 +105,7 @@ pub(crate) fn walk_style_mut(
                                     &PropertyContext {
                                         layer_index: i,
                                         layer_type,
-                                        section: PropertySection::Layout,
+                                        section: MirPropertySection::Layout,
                                         property_name: prop_name,
                                         field,
                                     },

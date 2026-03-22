@@ -1,10 +1,10 @@
 use std::collections::BTreeMap;
 
-use crate::decoder::r#enum::EnumValues;
-use crate::decoder::{ParsedItem, PrimitiveType, TopLevelItem};
+use crate::decoder::r#enum::DecodedEnumValues;
+use crate::decoder::{DecodedParsedItem, DecodedPrimitiveType, DecodedTopLevelItem};
 use crate::mir::lower::lower_parsed_item;
 use crate::mir::preprocessing::pop_one_of_as_group;
-use crate::mir::sources::{IntermediateSources, SourceTypeDef};
+use crate::mir::sources::{MirSourceTypeDef, MirSources};
 
 /// Consume the `"source"` OneOf key and all referenced `source_*` groups from `fields`,
 /// returning structured source definitions keyed by source-type name.
@@ -12,13 +12,13 @@ use crate::mir::sources::{IntermediateSources, SourceTypeDef};
 /// The `"type"` discriminant field is stripped from each group (the map key is the JSON
 /// `"type"` value for serde); the `"sources"` wildcard group (used only in spec validation)
 /// is also removed.
-pub fn preprocess_sources(fields: &mut BTreeMap<String, TopLevelItem>) -> IntermediateSources {
+pub fn preprocess_sources(fields: &mut BTreeMap<String, DecodedTopLevelItem>) -> MirSources {
     // Remove the `sources` wildcard group — not needed for codegen
     fields.remove("sources");
 
     // If there is no "source" OneOf entry (e.g. in unit tests), return empty.
     if !fields.contains_key("source") {
-        return IntermediateSources {
+        return MirSources {
             source_types: BTreeMap::new(),
         };
     }
@@ -36,33 +36,33 @@ pub fn preprocess_sources(fields: &mut BTreeMap<String, TopLevelItem>) -> Interm
                 .filter(|(_, v)| {
                     !matches!(
                         v,
-                        crate::decoder::ParsedItem::Primitive(
-                            crate::decoder::PrimitiveType::PropertyType(_)
+                        crate::decoder::DecodedParsedItem::Primitive(
+                            crate::decoder::DecodedPrimitiveType::PropertyType(_)
                         )
                     )
                 })
                 .map(|(k, v)| lower_parsed_item(&k, v))
                 .collect();
 
-            (type_name, SourceTypeDef { fields: mir_fields })
+            (type_name, MirSourceTypeDef { fields: mir_fields })
         })
         .collect();
 
-    IntermediateSources { source_types }
+    MirSources { source_types }
 }
 
 /// Remove the source `"type"` field when it is the usual single-variant enum, so it is not
 /// emitted twice (serde tag + field). The JSON discriminant string is always the map key
-/// (`source_types` in [`IntermediateSources`]).
+/// (`source_types` in [`MirSources`]).
 fn strip_source_type_discriminant_field(
-    group: &mut BTreeMap<String, ParsedItem>,
+    group: &mut BTreeMap<String, DecodedParsedItem>,
     field_name: &str,
 ) {
     let Some(item) = group.remove(field_name) else {
         return;
     };
-    if let ParsedItem::Primitive(PrimitiveType::Enum {
-        values: EnumValues::Enum(ref vals),
+    if let DecodedParsedItem::Primitive(DecodedPrimitiveType::Enum {
+        values: DecodedEnumValues::Enum(ref vals),
         ..
     }) = item
         && vals.len() == 1

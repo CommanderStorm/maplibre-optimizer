@@ -2,7 +2,7 @@ use codegen2::Scope;
 
 use crate::generator::autotest::generate_test_from_example_if_present;
 use crate::generator::fuzz;
-use crate::mir::types::FieldMeta;
+use crate::mir::types::MirFieldMeta;
 
 const SPRITE_URL_AND_ID_DOCS: &str = r#"Defining Id and Url for a sprite allows you to load multiple sprites at once.
 
@@ -34,7 +34,7 @@ The sprite with id `default` is special in that you do not need to prefix the im
 For example, to reference the image with id `airport` in the default sprite above, you can simply use `airport`.
 "#;
 
-pub fn generate(scope: &mut Scope, name: &str, meta: &FieldMeta) {
+pub fn generate(scope: &mut Scope, name: &str, meta: &MirFieldMeta) {
     let sprite_url_and_id = scope
         .new_struct("SpriteUrlAndId")
         .vis("pub")
@@ -85,7 +85,7 @@ mod tests {
     #[test]
     fn generate_empty() {
         let mut scope = Scope::new();
-        generate(&mut scope, "Foo", &FieldMeta::default());
+        generate(&mut scope, "Foo", &MirFieldMeta::default());
         insta::assert_snapshot!(scope.to_string(), @r#"
         /// Identifier of a sprite
         #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]

@@ -8,31 +8,35 @@ use std::sync::LazyLock;
 use serde_json::Value;
 
 use crate::decoder::StyleReference;
-use crate::mir::{ExprParamType, ExprType, Expressions, IntermediateSpec, LiteralKind};
+use crate::mir::{MirExprParamType, MirExprType, MirExpressions, MirLiteralKind, MirSpec};
 use crate::spec::ExprOrLiteral;
 
-static MIR_SPEC: LazyLock<IntermediateSpec> = LazyLock::new(|| {
+static MIR_SPEC: LazyLock<MirSpec> = LazyLock::new(|| {
     let v8 = include_str!("../../upstream/src/reference/v8.json");
     let reference: StyleReference =
         serde_json::from_str(v8).expect("v8.json should parse as StyleReference");
-    IntermediateSpec::from(reference)
+    MirSpec::from(reference)
 });
 
 #[derive(Debug, Clone, Default)]
 struct TypeEnv {
-    bindings: HashMap<String, ExprType>,
+    bindings: HashMap<String, MirExprType>,
 }
 
-fn resolve_type(t: &ExprType, env: &TypeEnv) -> ExprType {
+fn resolve_type(t: &MirExprType, env: &TypeEnv) -> MirExprType {
     match t {
-        ExprType::TypeVar(name) => env.bindings.get(name).cloned().unwrap_or_else(|| t.clone()),
+        MirExprType::TypeVar(name) => env.bindings.get(name).cloned().unwrap_or_else(|| t.clone()),
         other => other.clone(),
     }
 }
 
-fn unify_types(actual: &ExprType, expected: &ExprType, env: &mut TypeEnv) -> Result<(), String> {
+fn unify_types(
+    actual: &MirExprType,
+    expected: &MirExprType,
+    env: &mut TypeEnv,
+) -> Result<(), String> {
     // Treat `any` as a permissive supertype: upstream often succeeds by inserting coercions/assertions.
-    if matches!(actual, ExprType::Any) || matches!(expected, ExprType::Any) {
+    if matches!(actual, MirExprType::Any) || matches!(expected, MirExprType::Any) {
         return Ok(());
     }
 
@@ -45,31 +49,31 @@ fn unify_types(actual: &ExprType, expected: &ExprType, env: &mut TypeEnv) -> Res
     // - a `color`/`formatted` expected type can be produced from a `string` value.
     // For parity we treat these as compatible at compile-time.
     match (&actual, &expected) {
-        (ExprType::String, ExprType::Color) => return Ok(()),
-        (ExprType::String, ExprType::Formatted) => return Ok(()),
+        (MirExprType::String, MirExprType::Color) => return Ok(()),
+        (MirExprType::String, MirExprType::Formatted) => return Ok(()),
         _ => {}
     }
 
     match (&actual, &expected) {
-        (ExprType::TypeVar(tv), other) | (other, ExprType::TypeVar(tv)) => {
+        (MirExprType::TypeVar(tv), other) | (other, MirExprType::TypeVar(tv)) => {
             env.bindings.insert(tv.clone(), other.clone());
             Ok(())
         }
-        (ExprType::Boolean, ExprType::Boolean)
-        | (ExprType::Number, ExprType::Number)
-        | (ExprType::String, ExprType::String)
-        | (ExprType::Collator, ExprType::Collator)
-        | (ExprType::Formatted, ExprType::Formatted)
-        | (ExprType::Image, ExprType::Image)
-        | (ExprType::Object, ExprType::Object)
-        | (ExprType::Color, ExprType::Color)
-        | (ExprType::Interpolation, ExprType::Interpolation) => Ok(()),
+        (MirExprType::Boolean, MirExprType::Boolean)
+        | (MirExprType::Number, MirExprType::Number)
+        | (MirExprType::String, MirExprType::String)
+        | (MirExprType::Collator, MirExprType::Collator)
+        | (MirExprType::Formatted, MirExprType::Formatted)
+        | (MirExprType::Image, MirExprType::Image)
+        | (MirExprType::Object, MirExprType::Object)
+        | (MirExprType::Color, MirExprType::Color)
+        | (MirExprType::Interpolation, MirExprType::Interpolation) => Ok(()),
         (
-            ExprType::Array {
+            MirExprType::Array {
                 element: a_el,
                 length: a_len,
             },
-            ExprType::Array {
+            MirExprType::Array {
                 element: e_el,
                 length: e_len,
             },
@@ -85,8 +89,8 @@ fn unify_types(actual: &ExprType, expected: &ExprType, env: &mut TypeEnv) -> Res
             match (e_el.as_deref(), a_el.as_deref()) {
                 (None, _) => Ok(()),
                 (Some(e), None) => {
-                    if let ExprParamType::TypeVar(tv) = e {
-                        env.bindings.insert(tv.clone(), ExprType::Any);
+                    if let MirExprParamType::TypeVar(tv) = e {
+                        env.bindings.insert(tv.clone(), MirExprType::Any);
                         Ok(())
                     } else {
                         Err("array element constraint missing".into())
@@ -96,23 +100,23 @@ fn unify_types(actual: &ExprType, expected: &ExprType, env: &mut TypeEnv) -> Res
                     if a == e {
                         Ok(())
                     } else if let (
-                        ExprParamType::Expression(e_ty),
-                        ExprParamType::Expression(a_ty),
+                        MirExprParamType::Expression(e_ty),
+                        MirExprParamType::Expression(a_ty),
                     ) = (e, a)
                     {
                         // String → Color/Formatted coercion for array elements (e.g. color arrays
                         // passed as `["literal", ["white", "black"]]`).
                         match (a_ty, e_ty) {
-                            (ExprType::String, ExprType::Color) => Ok(()),
-                            (ExprType::String, ExprType::Formatted) => Ok(()),
+                            (MirExprType::String, MirExprType::Color) => Ok(()),
+                            (MirExprType::String, MirExprType::Formatted) => Ok(()),
                             _ => Err(format!(
                                 "array element constraint mismatch: expected {e:?}, actual {a:?}"
                             )),
                         }
-                    } else if let ExprParamType::TypeVar(tv) = e {
+                    } else if let MirExprParamType::TypeVar(tv) = e {
                         env.bindings.insert(tv.clone(), param_type_to_expr_type(a));
                         Ok(())
-                    } else if let ExprParamType::TypeVar(tv) = a {
+                    } else if let MirExprParamType::TypeVar(tv) = a {
                         env.bindings.insert(tv.clone(), param_type_to_expr_type(e));
                         Ok(())
                     } else {
@@ -129,40 +133,40 @@ fn unify_types(actual: &ExprType, expected: &ExprType, env: &mut TypeEnv) -> Res
     }
 }
 
-fn param_type_to_expr_type(pt: &ExprParamType) -> ExprType {
+fn param_type_to_expr_type(pt: &MirExprParamType) -> MirExprType {
     match pt {
-        ExprParamType::Literal(kind) => match kind {
-            LiteralKind::Number => ExprType::Number,
-            LiteralKind::String => ExprType::String,
-            LiteralKind::GeoJSONObject | LiteralKind::JSONObject => ExprType::Object,
-            LiteralKind::JSONArray => ExprType::Array {
+        MirExprParamType::Literal(kind) => match kind {
+            MirLiteralKind::Number => MirExprType::Number,
+            MirLiteralKind::String => MirExprType::String,
+            MirLiteralKind::GeoJSONObject | MirLiteralKind::JSONObject => MirExprType::Object,
+            MirLiteralKind::JSONArray => MirExprType::Array {
                 element: None,
                 length: None,
             },
         },
-        ExprParamType::LiteralAnyOf(_) => ExprType::Any,
-        ExprParamType::Expression(t) => t.clone(),
-        ExprParamType::ExpressionAnyOf(_) => ExprType::Any,
-        ExprParamType::InlineObject(_) => ExprType::Object,
-        ExprParamType::TypeVar(tv) => ExprType::TypeVar(tv.clone()),
+        MirExprParamType::LiteralAnyOf(_) => MirExprType::Any,
+        MirExprParamType::Expression(t) => t.clone(),
+        MirExprParamType::ExpressionAnyOf(_) => MirExprType::Any,
+        MirExprParamType::InlineObject(_) => MirExprType::Object,
+        MirExprParamType::TypeVar(tv) => MirExprType::TypeVar(tv.clone()),
     }
 }
 
-fn validate_literal_kind_value(kind: &LiteralKind, v: &Value) -> Result<(), String> {
+fn validate_literal_kind_value(kind: &MirLiteralKind, v: &Value) -> Result<(), String> {
     match kind {
-        LiteralKind::Number => v
+        MirLiteralKind::Number => v
             .is_number()
             .then_some(())
             .ok_or_else(|| "expected number literal".to_string()),
-        LiteralKind::String => v
+        MirLiteralKind::String => v
             .is_string()
             .then_some(())
             .ok_or_else(|| "expected string literal".to_string()),
-        LiteralKind::GeoJSONObject | LiteralKind::JSONObject => v
+        MirLiteralKind::GeoJSONObject | MirLiteralKind::JSONObject => v
             .is_object()
             .then_some(())
             .ok_or_else(|| "expected JSON object literal".to_string()),
-        LiteralKind::JSONArray => v
+        MirLiteralKind::JSONArray => v
             .is_array()
             .then_some(())
             .ok_or_else(|| "expected JSON array literal".to_string()),
@@ -170,14 +174,14 @@ fn validate_literal_kind_value(kind: &LiteralKind, v: &Value) -> Result<(), Stri
 }
 
 fn validate_param_type_value(
-    pt: &ExprParamType,
+    pt: &MirExprParamType,
     v: &Value,
-    spec: &IntermediateSpec,
+    spec: &MirSpec,
     env: &mut TypeEnv,
 ) -> Result<(), String> {
     match pt {
-        ExprParamType::Literal(kind) => validate_literal_kind_value(kind, v),
-        ExprParamType::LiteralAnyOf(kinds) => {
+        MirExprParamType::Literal(kind) => validate_literal_kind_value(kind, v),
+        MirExprParamType::LiteralAnyOf(kinds) => {
             if kinds
                 .iter()
                 .any(|k| validate_literal_kind_value(k, v).is_ok())
@@ -187,11 +191,11 @@ fn validate_param_type_value(
                 Err("literal kind mismatch".into())
             }
         }
-        ExprParamType::Expression(expected_ty) => {
+        MirExprParamType::Expression(expected_ty) => {
             let _ = validate_expression_with_mir(v, expected_ty, spec, env)?;
             Ok(())
         }
-        ExprParamType::ExpressionAnyOf(options) => {
+        MirExprParamType::ExpressionAnyOf(options) => {
             for opt in options {
                 if validate_param_type_value(opt, v, spec, env).is_ok() {
                     return Ok(());
@@ -199,7 +203,7 @@ fn validate_param_type_value(
             }
             Err("expression any-of mismatch".into())
         }
-        ExprParamType::InlineObject(schema) => {
+        MirExprParamType::InlineObject(schema) => {
             let Value::Object(map) = v else {
                 return Err("inline object must be a JSON object".into());
             };
@@ -209,7 +213,7 @@ fn validate_param_type_value(
                     // v8.json models text-font as `string`, but upstream accepts array-of-strings
                     // font stacks at compile time.
                     if k == "text-font"
-                        && matches!(field_pt, ExprParamType::Expression(ExprType::String))
+                        && matches!(field_pt, MirExprParamType::Expression(MirExprType::String))
                         && matches!(field_val, Value::Array(_))
                     {
                         // Validate elements inside `["literal", [...]]` font stacks.
@@ -223,7 +227,7 @@ fn validate_param_type_value(
                                 return Err("text-font must be an array of strings".into());
                             }
                         }
-                        validate_expression_with_mir(field_val, &ExprType::Any, spec, env)?;
+                        validate_expression_with_mir(field_val, &MirExprType::Any, spec, env)?;
                         continue;
                     }
                     validate_param_type_value(field_pt, field_val, spec, env)?;
@@ -231,8 +235,8 @@ fn validate_param_type_value(
             }
             Ok(())
         }
-        ExprParamType::TypeVar(tv) => {
-            let expected = ExprType::TypeVar(tv.clone());
+        MirExprParamType::TypeVar(tv) => {
+            let expected = MirExprType::TypeVar(tv.clone());
             let _ = validate_expression_with_mir(v, &expected, spec, env)?;
             Ok(())
         }
@@ -241,11 +245,11 @@ fn validate_param_type_value(
 
 fn validate_array_literal_of_typed_values(
     arr: &[Value],
-    expected: &ExprType,
-    spec: &IntermediateSpec,
+    expected: &MirExprType,
+    spec: &MirSpec,
     env: &mut TypeEnv,
-) -> Result<ExprType, String> {
-    let ExprType::Array { element, length } = expected else {
+) -> Result<MirExprType, String> {
+    let MirExprType::Array { element, length } = expected else {
         return Err(
             "internal error: validate_array_literal_of_typed_values called with non-array expected"
                 .into(),
@@ -257,7 +261,7 @@ fn validate_array_literal_of_typed_values(
 
     // Restrict to `array<... literal>` contexts to avoid treating expression arrays as literal values.
     match element.as_ref() {
-        ExprParamType::Literal(_) | ExprParamType::LiteralAnyOf(_) => {}
+        MirExprParamType::Literal(_) | MirExprParamType::LiteralAnyOf(_) => {}
         _ => return Err("array literal allowed only for array<... literal> contexts".into()),
     }
 
@@ -274,7 +278,7 @@ fn validate_array_literal_of_typed_values(
         validate_param_type_value(element.as_ref(), v, spec, env)?;
     }
 
-    let actual = ExprType::Array {
+    let actual = MirExprType::Array {
         element: Some(element.clone()),
         length: *length,
     };
@@ -284,10 +288,10 @@ fn validate_array_literal_of_typed_values(
 
 fn validate_interpolation_type(
     arr: &[Value],
-    expected: &ExprType,
+    expected: &MirExprType,
     _env: &mut TypeEnv,
-) -> Result<ExprType, String> {
-    if !matches!(expected, ExprType::Interpolation) {
+) -> Result<MirExprType, String> {
+    if !matches!(expected, MirExprType::Interpolation) {
         return Err(
             "internal error: validate_interpolation_type called with non-interpolation expected"
                 .into(),
@@ -301,7 +305,7 @@ fn validate_interpolation_type(
         .ok_or_else(|| "interpolation type discriminator must be a string".to_string())?;
 
     match t0 {
-        "linear" => Ok(ExprType::Interpolation),
+        "linear" => Ok(MirExprType::Interpolation),
         "exponential" => {
             if arr.len() < 2 {
                 return Err("exponential interpolation requires a numeric base".into());
@@ -309,7 +313,7 @@ fn validate_interpolation_type(
             if !arr[1].is_number() {
                 return Err("exponential interpolation base must be a number".into());
             }
-            Ok(ExprType::Interpolation)
+            Ok(MirExprType::Interpolation)
         }
         "cubic-bezier" => {
             if arr.len() != 5 {
@@ -327,7 +331,7 @@ fn validate_interpolation_type(
                     ));
                 }
             }
-            Ok(ExprType::Interpolation)
+            Ok(MirExprType::Interpolation)
         }
         other => Err(format!("unknown interpolation type {other:?}")),
     }
@@ -335,9 +339,9 @@ fn validate_interpolation_type(
 
 fn validate_literal_operator(
     args: &[Value],
-    expected: &ExprType,
+    expected: &MirExprType,
     env: &mut TypeEnv,
-) -> Result<ExprType, String> {
+) -> Result<MirExprType, String> {
     if args.len() != 1 {
         return Err(format!(
             "\"literal\" requires exactly one argument, got {}",
@@ -347,33 +351,33 @@ fn validate_literal_operator(
 
     let v = &args[0];
     let actual = match v {
-        Value::Null => ExprType::Any,
-        Value::Bool(_) => ExprType::Boolean,
-        Value::Number(_) => ExprType::Number,
-        Value::String(_) => ExprType::String,
+        Value::Null => MirExprType::Any,
+        Value::Bool(_) => MirExprType::Boolean,
+        Value::Number(_) => MirExprType::Number,
+        Value::String(_) => MirExprType::String,
         Value::Array(a) => {
             // Infer element type so downstream operators (e.g. `at`) propagate correct types.
             let element = if a.is_empty() {
                 match resolve_type(expected, env) {
-                    ExprType::Array { element, .. } => element,
+                    MirExprType::Array { element, .. } => element,
                     _ => None,
                 }
             } else if a.iter().all(|x| x.is_string()) {
-                Some(Box::new(ExprParamType::Expression(ExprType::String)))
+                Some(Box::new(MirExprParamType::Expression(MirExprType::String)))
             } else if a.iter().all(|x| x.is_number()) {
-                Some(Box::new(ExprParamType::Expression(ExprType::Number)))
+                Some(Box::new(MirExprParamType::Expression(MirExprType::Number)))
             } else if a.iter().all(|x| x.is_boolean()) {
-                Some(Box::new(ExprParamType::Expression(ExprType::Boolean)))
+                Some(Box::new(MirExprParamType::Expression(MirExprType::Boolean)))
             } else {
                 None
             };
 
-            ExprType::Array {
+            MirExprType::Array {
                 element,
                 length: Some(a.len()),
             }
         }
-        Value::Object(_) => ExprType::Object,
+        Value::Object(_) => MirExprType::Object,
     };
 
     unify_types(&actual, expected, env)?;
@@ -381,13 +385,13 @@ fn validate_literal_operator(
 }
 
 fn match_overload_params(
-    params: &crate::mir::OverloadParams,
+    params: &crate::mir::MirOverloadParams,
     args: &[Value],
-    spec: &IntermediateSpec,
+    spec: &MirSpec,
     env: &mut TypeEnv,
 ) -> Result<(), String> {
     match params {
-        crate::mir::OverloadParams::Fixed(ps) => {
+        crate::mir::MirOverloadParams::Fixed(ps) => {
             if args.len() != ps.len() {
                 return Err(format!(
                     "arity mismatch: expected {} args, got {}",
@@ -400,7 +404,7 @@ fn match_overload_params(
             }
             Ok(())
         }
-        crate::mir::OverloadParams::WithOptional { required, optional } => {
+        crate::mir::MirOverloadParams::WithOptional { required, optional } => {
             if args.len() < required.len() || args.len() > required.len() + optional.len() {
                 return Err("optional arity mismatch".into());
             }
@@ -418,7 +422,7 @@ fn match_overload_params(
             }
             Ok(())
         }
-        crate::mir::OverloadParams::Variadic {
+        crate::mir::MirOverloadParams::Variadic {
             prefix,
             repeating,
             suffix,
@@ -483,12 +487,12 @@ fn match_overload_params(
 }
 
 fn validate_operator_call(
-    operator: &crate::mir::ExpressionOperator,
+    operator: &crate::mir::MirExpressionOperator,
     args: &[Value],
-    expected: &ExprType,
-    spec: &IntermediateSpec,
+    expected: &MirExprType,
+    spec: &MirSpec,
     env: &mut TypeEnv,
-) -> Result<ExprType, String> {
+) -> Result<MirExprType, String> {
     let mut last_err = String::new();
 
     for overload in &operator.overloads {
@@ -528,7 +532,7 @@ enum ComparisonKind {
 fn validate_comparison_operator_specifics(
     op: &str,
     args: &[Value],
-    spec: &IntermediateSpec,
+    spec: &MirSpec,
 ) -> Result<(), String> {
     let is_equality = op == "==" || op == "!=";
     let is_ordering = !is_equality;
@@ -562,12 +566,12 @@ fn validate_comparison_operator_specifics(
             }
         }
         // For operator calls / computed expressions, infer the resulting kind via our type walker.
-        let ty = validate_expression_with_mir(v, &ExprType::Any, spec, &mut tmp_env)?;
+        let ty = validate_expression_with_mir(v, &MirExprType::Any, spec, &mut tmp_env)?;
         Ok(match ty {
-            ExprType::Boolean => ComparisonKind::Boolean,
-            ExprType::Number => ComparisonKind::Number,
-            ExprType::String => ComparisonKind::String,
-            ExprType::Any => ComparisonKind::Value,
+            MirExprType::Boolean => ComparisonKind::Boolean,
+            MirExprType::Number => ComparisonKind::Number,
+            MirExprType::String => ComparisonKind::String,
+            MirExprType::Any => ComparisonKind::Value,
             // Not comparable by construction for equality/ordering.
             _ => ComparisonKind::Other,
         })
@@ -651,11 +655,11 @@ fn validate_comparison_operator_specifics(
 /// used in a context with a concrete (non-`value`) expected output type.
 fn validate_coalesce_operator_specifics(
     args: &[Value],
-    expected: &ExprType,
-    spec: &IntermediateSpec,
+    expected: &MirExprType,
+    spec: &MirSpec,
 ) -> Result<(), String> {
     // Upstream can only reject args for concrete expected types, not `value`.
-    if matches!(expected, ExprType::Any | ExprType::TypeVar(_)) {
+    if matches!(expected, MirExprType::Any | MirExprType::TypeVar(_)) {
         return Ok(());
     }
 
@@ -676,10 +680,7 @@ fn validate_coalesce_operator_specifics(
 ///
 /// Upstream rejects when the first argument ("needle") is itself an array
 /// expression (see fixtures like `invalid-needle-literal-array`).
-fn validate_in_indexof_operator_specifics(
-    args: &[Value],
-    spec: &IntermediateSpec,
-) -> Result<(), String> {
+fn validate_in_indexof_operator_specifics(args: &[Value], spec: &MirSpec) -> Result<(), String> {
     if args.len() != 2 {
         return Ok(());
     }
@@ -687,10 +688,10 @@ fn validate_in_indexof_operator_specifics(
     let needle = &args[0];
 
     let mut tmp_env = TypeEnv::default();
-    let needle_ty = validate_expression_with_mir(needle, &ExprType::Any, spec, &mut tmp_env)?;
+    let needle_ty = validate_expression_with_mir(needle, &MirExprType::Any, spec, &mut tmp_env)?;
 
     // Upstream rejects array-typed needles.
-    if matches!(needle_ty, ExprType::Array { .. }) {
+    if matches!(needle_ty, MirExprType::Array { .. }) {
         return Err("`in`/`index-of` needle cannot be an array".into());
     }
 
@@ -708,24 +709,27 @@ fn is_literal_expression_value(v: &Value) -> bool {
     false
 }
 
-fn is_interpolate_output_interpolatable(op: &str, expected: &ExprType) -> bool {
+fn is_interpolate_output_interpolatable(op: &str, expected: &MirExprType) -> bool {
     // Interpolation only makes sense for numeric / color types.
     match op {
         "interpolate" => match expected {
-            ExprType::Number | ExprType::Color => true,
-            ExprType::Array {
+            MirExprType::Number | MirExprType::Color => true,
+            MirExprType::Array {
                 element: Some(el), ..
             } => matches!(
                 el.as_ref(),
-                ExprParamType::Expression(ExprType::Number | ExprType::Color)
+                MirExprParamType::Expression(MirExprType::Number | MirExprType::Color)
             ),
             _ => false,
         },
         "interpolate-hcl" | "interpolate-lab" => match expected {
-            ExprType::Color => true,
-            ExprType::Array {
+            MirExprType::Color => true,
+            MirExprType::Array {
                 element: Some(el), ..
-            } => matches!(el.as_ref(), ExprParamType::Expression(ExprType::Color)),
+            } => matches!(
+                el.as_ref(),
+                MirExprParamType::Expression(MirExprType::Color)
+            ),
             _ => false,
         },
         _ => false,
@@ -735,9 +739,9 @@ fn is_interpolate_output_interpolatable(op: &str, expected: &ExprType) -> bool {
 fn validate_interpolate_operator_specifics(
     op: &str,
     args: &[Value],
-    expected: &ExprType,
-    _spec: &IntermediateSpec,
-    _actual_output: &ExprType,
+    expected: &MirExprType,
+    _spec: &MirSpec,
+    _actual_output: &MirExprType,
 ) -> Result<(), String> {
     if args.len() < 4 {
         return Ok(());
@@ -820,7 +824,7 @@ fn validate_interpolate_operator_specifics(
     }
 
     if all_inputs_are_literals && all_outputs_are_literals {
-        let output_ty = if matches!(expected, ExprType::Any | ExprType::TypeVar(_)) {
+        let output_ty = if matches!(expected, MirExprType::Any | MirExprType::TypeVar(_)) {
             // With no explicit expected output type (common in expression-level fixtures),
             // infer interpolatability from the *literal stop outputs*.
             //
@@ -903,46 +907,46 @@ fn validate_interpolate_operator_specifics(
                 })
                 .collect();
             if kinds.len() != pair_count {
-                ExprType::Any
+                MirExprType::Any
             } else if kinds.iter().all(|k| matches!(k, StopOutKind::Number)) {
-                ExprType::Number
+                MirExprType::Number
             } else if kinds.iter().all(|k| matches!(k, StopOutKind::ColorString)) {
-                ExprType::Color
+                MirExprType::Color
             } else if kinds
                 .iter()
                 .all(|k| matches!(k, StopOutKind::ProjectionString))
             {
                 // Projection interpolation is handled as a special case below.
-                ExprType::String
+                MirExprType::String
             } else if kinds.iter().all(|k| matches!(k, StopOutKind::OtherString)) {
-                ExprType::String
+                MirExprType::String
             } else if kinds
                 .iter()
                 .all(|k| matches!(k, StopOutKind::ArrayOfNumber))
             {
-                ExprType::Array {
-                    element: Some(Box::new(ExprParamType::Expression(ExprType::Number))),
+                MirExprType::Array {
+                    element: Some(Box::new(MirExprParamType::Expression(MirExprType::Number))),
                     length: None,
                 }
             } else if kinds.iter().all(|k| matches!(k, StopOutKind::ArrayOfColor)) {
-                ExprType::Array {
-                    element: Some(Box::new(ExprParamType::Expression(ExprType::Color))),
+                MirExprType::Array {
+                    element: Some(Box::new(MirExprParamType::Expression(MirExprType::Color))),
                     length: None,
                 }
             } else {
-                ExprType::Any
+                MirExprType::Any
             }
         } else {
             expected.clone()
         };
 
-        // Our `ExprType` model currently collapses `projectionDefinition` into `ExprType::String`.
+        // Our `MirExprType` model currently collapses `projectionDefinition` into `MirExprType::String`.
         // Upstream still treats projection interpolation as interpolatable, but regular string
         // interpolation is rejected.
         //
         // Mirror upstream by accepting only *known* projection-definition literals as the
         // interpolated stop outputs.
-        if op == "interpolate" && matches!(output_ty, ExprType::String) {
+        if op == "interpolate" && matches!(output_ty, MirExprType::String) {
             const PROJECTION_TOKENS: [&str; 2] = ["mercator", "vertical-perspective"];
             let all_stops_are_projection_literals = (0..pair_count).all(|i| {
                 let stop_out = &args[3 + 2 * i];
@@ -966,27 +970,27 @@ fn validate_interpolate_operator_specifics(
 
 fn validate_expression_with_mir(
     expr: &Value,
-    expected: &ExprType,
-    spec: &IntermediateSpec,
+    expected: &MirExprType,
+    spec: &MirSpec,
     env: &mut TypeEnv,
-) -> Result<ExprType, String> {
+) -> Result<MirExprType, String> {
     match expr {
         Value::Null => {
-            unify_types(&ExprType::Any, expected, env)?;
-            Ok(ExprType::Any)
+            unify_types(&MirExprType::Any, expected, env)?;
+            Ok(MirExprType::Any)
         }
         Value::Bool(_) => {
-            let actual = ExprType::Boolean;
+            let actual = MirExprType::Boolean;
             unify_types(&actual, expected, env)?;
             Ok(resolve_type(&actual, env))
         }
         Value::Number(_) => {
-            let actual = ExprType::Number;
+            let actual = MirExprType::Number;
             unify_types(&actual, expected, env)?;
             Ok(resolve_type(&actual, env))
         }
         Value::String(_) => {
-            let actual = ExprType::String;
+            let actual = MirExprType::String;
             unify_types(&actual, expected, env)?;
             Ok(resolve_type(&actual, env))
         }
@@ -1008,10 +1012,10 @@ fn validate_expression_with_mir(
                 // Legacy interpolation expressions sometimes omit an explicit `"type"` and
                 // instead use `{"property": ..., "stops": ...}`.
                 || (map.contains_key("property") && map.contains_key("stops"));
-            let allow = matches!(resolve_type(expected, env), ExprType::Object)
-                || matches!(expected, ExprType::Object)
-                || matches!(expected, ExprType::Any)
-                || matches!(expected, ExprType::TypeVar(_));
+            let allow = matches!(resolve_type(expected, env), MirExprType::Object)
+                || matches!(expected, MirExprType::Object)
+                || matches!(expected, MirExprType::Any)
+                || matches!(expected, MirExprType::TypeVar(_));
 
             if !allow && !is_legacy_object_form_expr {
                 return Err(
@@ -1020,9 +1024,9 @@ fn validate_expression_with_mir(
             }
 
             let actual = if is_legacy_object_form_expr {
-                ExprType::Any
+                MirExprType::Any
             } else {
-                ExprType::Object
+                MirExprType::Object
             };
             unify_types(&actual, expected, env)?;
             Ok(actual)
@@ -1033,21 +1037,21 @@ fn validate_expression_with_mir(
             }
 
             let resolved_expected = resolve_type(expected, env);
-            let is_interpolation_expected = matches!(resolved_expected, ExprType::Interpolation)
-                || matches!(expected, ExprType::Interpolation)
-                || matches!(expected, ExprType::TypeVar(tv) if tv == "interpolation");
+            let is_interpolation_expected = matches!(resolved_expected, MirExprType::Interpolation)
+                || matches!(expected, MirExprType::Interpolation)
+                || matches!(expected, MirExprType::TypeVar(tv) if tv == "interpolation");
             if is_interpolation_expected {
-                let actual = validate_interpolation_type(arr, &ExprType::Interpolation, env)?;
+                let actual = validate_interpolation_type(arr, &MirExprType::Interpolation, env)?;
                 unify_types(&actual, expected, env)?;
                 return Ok(actual);
             }
 
             // Typed raw literal arrays used by `match` labels: v8.json declares them as `array<... literal>`.
-            if let ExprType::Array { element, .. } = expected
+            if let MirExprType::Array { element, .. } = expected
                 && let Some(element) = element
                 && matches!(
                     element.as_ref(),
-                    ExprParamType::Literal(_) | ExprParamType::LiteralAnyOf(_)
+                    MirExprParamType::Literal(_) | MirExprParamType::LiteralAnyOf(_)
                 )
             {
                 return validate_array_literal_of_typed_values(arr, expected, spec, env);
@@ -1072,14 +1076,14 @@ fn validate_expression_with_mir(
 
                 // Parse `itemType` + optional `length` exactly like upstream.
                 let mut idx = 0usize;
-                let element: Option<Box<ExprParamType>> = if args.len() > 1 {
+                let element: Option<Box<MirExprParamType>> = if args.len() > 1 {
                     let item_type = args[0]
                         .as_str()
                         .ok_or_else(|| "array item type must be a string literal".to_string())?;
                     let item_expr_ty = match item_type {
-                        "string" => ExprType::String,
-                        "number" => ExprType::Number,
-                        "boolean" => ExprType::Boolean,
+                        "string" => MirExprType::String,
+                        "number" => MirExprType::Number,
+                        "boolean" => MirExprType::Boolean,
                         _ => {
                             return Err(
                                 "The item type argument of \"array\" must be one of string, number, boolean"
@@ -1088,11 +1092,11 @@ fn validate_expression_with_mir(
                         }
                     };
                     idx = 1;
-                    Some(Box::new(ExprParamType::Expression(item_expr_ty)))
+                    Some(Box::new(MirExprParamType::Expression(item_expr_ty)))
                 } else {
                     // Model the omitted item type (`ValueType`) as a fresh type variable
                     // so it can unify with any expected `array<...>` element type.
-                    Some(Box::new(ExprParamType::TypeVar("__array_item".into())))
+                    Some(Box::new(MirExprParamType::TypeVar("__array_item".into())))
                 };
 
                 let mut length: Option<usize> = None;
@@ -1121,10 +1125,10 @@ fn validate_expression_with_mir(
                 // Upstream parses each candidate as a generic `ValueType` (compile-time),
                 // and only applies subtype checks at evaluation time with fallback.
                 for c in candidates {
-                    validate_expression_with_mir(c, &ExprType::Any, spec, env)?;
+                    validate_expression_with_mir(c, &MirExprType::Any, spec, env)?;
                 }
 
-                let actual = ExprType::Array { element, length };
+                let actual = MirExprType::Array { element, length };
                 unify_types(&actual, expected, env)?;
                 return Ok(actual);
             }
@@ -1135,7 +1139,7 @@ fn validate_expression_with_mir(
                 if args.is_empty() {
                     return Err("\"error\" requires at least one argument".into());
                 }
-                let actual = ExprType::Any;
+                let actual = MirExprType::Any;
                 unify_types(&actual, expected, env)?;
                 return Ok(actual);
             }
@@ -1181,7 +1185,7 @@ fn validate_expression_with_mir(
                     }
                 }
 
-                let actual = ExprType::Formatted;
+                let actual = MirExprType::Formatted;
                 unify_types(&actual, expected, env)?;
                 return Ok(actual);
             }
@@ -1216,7 +1220,7 @@ fn validate_expression_with_mir(
 }
 
 /// Build `operator -> output-type groups` from the expression preprocessor (same as codegen).
-fn operator_to_output_groups(ex: &Expressions) -> HashMap<String, Vec<String>> {
+fn operator_to_output_groups(ex: &MirExpressions) -> HashMap<String, Vec<String>> {
     let mut m: HashMap<String, Vec<String>> = HashMap::new();
     for (output_key, group) in &ex.by_output_type {
         for op in group.variants.keys() {
@@ -1226,8 +1230,8 @@ fn operator_to_output_groups(ex: &Expressions) -> HashMap<String, Vec<String>> {
     m
 }
 
-/// Convenience: build the operator → groups map once per [`Expressions`] snapshot.
-pub fn operator_groups_map(ex: &Expressions) -> HashMap<String, Vec<String>> {
+/// Convenience: build the operator → groups map once per [`MirExpressions`] snapshot.
+pub fn operator_groups_map(ex: &MirExpressions) -> HashMap<String, Vec<String>> {
     operator_to_output_groups(ex)
 }
 
@@ -1300,7 +1304,7 @@ fn camel_to_kebab(s: &str) -> String {
 /// Deserialize `expr` for upstream compile parity: recurse through assertions and Decisions.
 pub fn validate_expression_with_spec(
     expr: &ExprOrLiteral,
-    expected: &ExprType,
+    expected: &MirExprType,
     _op_to_groups: &HashMap<String, Vec<String>>,
     _known_ops: &HashSet<String>,
 ) -> Result<(), String> {
@@ -1317,13 +1321,13 @@ mod tests {
 
     use super::{operator_groups_map, validate_expression_with_spec};
     use crate::decoder::StyleReference;
-    use crate::mir::{ExprType, IntermediateSpec};
+    use crate::mir::{MirExprType, MirSpec};
     use crate::spec::ExprOrLiteral;
 
     fn setup() -> (HashMap<String, Vec<String>>, HashSet<String>) {
         let v8 = include_str!("../../upstream/src/reference/v8.json");
         let reference: StyleReference = serde_json::from_str(v8).expect("v8.json should parse");
-        let spec = IntermediateSpec::from(reference);
+        let spec = MirSpec::from(reference);
         let op_to_groups = operator_groups_map(&spec.expressions);
         let known_ops: HashSet<String> = spec.expressions.operators.keys().cloned().collect();
         (op_to_groups, known_ops)
@@ -1333,7 +1337,7 @@ mod tests {
     fn dump_expression_output_groups() {
         let v8 = include_str!("../../upstream/src/reference/v8.json");
         let reference: StyleReference = serde_json::from_str(v8).expect("v8");
-        let spec = IntermediateSpec::from(reference);
+        let spec = MirSpec::from(reference);
         let keys: Vec<_> = spec.expressions.by_output_type.keys().cloned().collect();
         assert!(
             !keys.is_empty(),
@@ -1383,7 +1387,7 @@ mod tests {
         ]);
         let typed: ExprOrLiteral = serde_json::from_value(expr).expect("expr should deserialize");
         assert!(
-            validate_expression_with_spec(&typed, &ExprType::Any, &op_to_groups, &known_ops)
+            validate_expression_with_spec(&typed, &MirExprType::Any, &op_to_groups, &known_ops)
                 .is_ok()
         );
     }
@@ -1407,7 +1411,7 @@ mod tests {
         ]);
         let typed: ExprOrLiteral = serde_json::from_value(expr).expect("expr should deserialize");
         assert!(
-            validate_expression_with_spec(&typed, &ExprType::Any, &op_to_groups, &known_ops)
+            validate_expression_with_spec(&typed, &MirExprType::Any, &op_to_groups, &known_ops)
                 .is_ok()
         );
     }
@@ -1418,7 +1422,7 @@ mod tests {
         let expr = serde_json::json!(["step", ["get", "point_count"], 20, 100, 30, 750, 40]);
         let typed: ExprOrLiteral = serde_json::from_value(expr).expect("expr should deserialize");
         assert!(
-            validate_expression_with_spec(&typed, &ExprType::Any, &op_to_groups, &known_ops)
+            validate_expression_with_spec(&typed, &MirExprType::Any, &op_to_groups, &known_ops)
                 .is_ok()
         );
     }
@@ -1429,7 +1433,7 @@ mod tests {
         let expr = serde_json::json!(["<", ["get", "mag"], 2]);
         let typed: ExprOrLiteral = serde_json::from_value(expr).expect("expr should deserialize");
         assert!(
-            validate_expression_with_spec(&typed, &ExprType::Any, &op_to_groups, &known_ops)
+            validate_expression_with_spec(&typed, &MirExprType::Any, &op_to_groups, &known_ops)
                 .is_ok()
         );
     }
@@ -1450,7 +1454,7 @@ mod tests {
         ]);
         let typed: ExprOrLiteral = serde_json::from_value(expr).expect("expr should deserialize");
         assert!(
-            validate_expression_with_spec(&typed, &ExprType::Any, &op_to_groups, &known_ops)
+            validate_expression_with_spec(&typed, &MirExprType::Any, &op_to_groups, &known_ops)
                 .is_ok()
         );
     }
@@ -1461,7 +1465,7 @@ mod tests {
         let expr = serde_json::json!(["number-format", ["get", "mag"], {}]);
         let typed: ExprOrLiteral = serde_json::from_value(expr).expect("expr should deserialize");
         assert!(
-            validate_expression_with_spec(&typed, &ExprType::Any, &op_to_groups, &known_ops)
+            validate_expression_with_spec(&typed, &MirExprType::Any, &op_to_groups, &known_ops)
                 .is_ok()
         );
     }
@@ -1472,7 +1476,7 @@ mod tests {
         let expr = serde_json::json!(["+", ["var", "x"], 2]);
         let typed: ExprOrLiteral = serde_json::from_value(expr).expect("expr should deserialize");
         assert!(
-            validate_expression_with_spec(&typed, &ExprType::Any, &op_to_groups, &known_ops)
+            validate_expression_with_spec(&typed, &MirExprType::Any, &op_to_groups, &known_ops)
                 .is_ok()
         );
     }
@@ -1487,11 +1491,11 @@ mod tests {
         let typed_min: ExprOrLiteral =
             serde_json::from_value(min_expr).expect("min_expr should deserialize");
         assert!(
-            validate_expression_with_spec(&typed_max, &ExprType::Any, &op_to_groups, &known_ops)
+            validate_expression_with_spec(&typed_max, &MirExprType::Any, &op_to_groups, &known_ops)
                 .is_ok()
         );
         assert!(
-            validate_expression_with_spec(&typed_min, &ExprType::Any, &op_to_groups, &known_ops)
+            validate_expression_with_spec(&typed_min, &MirExprType::Any, &op_to_groups, &known_ops)
                 .is_ok()
         );
     }

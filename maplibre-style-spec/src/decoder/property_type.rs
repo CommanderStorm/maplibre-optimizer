@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 
 #[derive(PartialEq, Debug, Clone, Deserialize, Serialize)]
 #[serde(rename_all = "kebab-case")]
-pub enum PropertyType {
+pub enum DecodedPropertyType {
     /// Property should be specified using a color ramp from which the output color can be sampled based on a property calculation.
     ColorRamp,
     /// Property is constant across all zoom levels and property values.
@@ -32,7 +32,7 @@ mod tests {
         let top: HashMap<String, Value> = serde_json::from_str(content).unwrap();
         let property_type = top.get("property-type").unwrap().as_object().unwrap();
         for k in property_type.keys() {
-            let _: PropertyType = serde_json::from_str(&format!("\"{k}\"")).unwrap();
+            let _: DecodedPropertyType = serde_json::from_str(&format!("\"{k}\"")).unwrap();
         }
     }
 }

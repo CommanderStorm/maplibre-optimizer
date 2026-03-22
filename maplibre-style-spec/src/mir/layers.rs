@@ -2,49 +2,49 @@ use std::collections::BTreeMap;
 
 use serde::{Deserialize, Serialize};
 
-use crate::mir::types::{ExpressionCapabilities, IntermediateType};
+use crate::mir::types::{MirExpressionCapabilities, MirType};
 
 /// Which sub-object of a layer a property belongs to.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-pub enum PropertySection {
+pub enum MirPropertySection {
     Paint,
     Layout,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct IntermediateLayerField {
-    pub r#type: IntermediateType,
+pub struct MirLayerField {
+    pub r#type: MirType,
     pub default: Option<serde_json::Value>,
     pub doc: String,
     pub required: bool,
-    pub expression: Option<ExpressionCapabilities>,
+    pub expression: Option<MirExpressionCapabilities>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct IntermediateLayers {
-    /// Fields common to every layer type.
-    pub common_fields: BTreeMap<String, IntermediateLayerField>,
-    pub layer_types: BTreeMap<String, IntermediateLayerType>,
+pub struct MirLayers {
+    /// DecodedFields common to every layer type.
+    pub common_fields: BTreeMap<String, MirLayerField>,
+    pub layer_types: BTreeMap<String, MirLayerType>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct IntermediateLayerType {
-    pub layout: BTreeMap<String, IntermediateLayerField>,
-    pub paint: BTreeMap<String, IntermediateLayerField>,
+pub struct MirLayerType {
+    pub layout: BTreeMap<String, MirLayerField>,
+    pub paint: BTreeMap<String, MirLayerField>,
 }
 
-impl IntermediateLayers {
+impl MirLayers {
     /// Look up a field definition by layer type, section, and property name.
     pub fn field_for(
         &self,
         layer_type: &str,
-        section: PropertySection,
+        section: MirPropertySection,
         property: &str,
-    ) -> Option<&IntermediateLayerField> {
+    ) -> Option<&MirLayerField> {
         let lt = self.layer_types.get(layer_type)?;
         match section {
-            PropertySection::Paint => lt.paint.get(property),
-            PropertySection::Layout => lt.layout.get(property),
+            MirPropertySection::Paint => lt.paint.get(property),
+            MirPropertySection::Layout => lt.layout.get(property),
         }
     }
 
@@ -52,7 +52,7 @@ impl IntermediateLayers {
     pub fn field_default(
         &self,
         layer_type: &str,
-        section: PropertySection,
+        section: MirPropertySection,
         property: &str,
     ) -> Option<&serde_json::Value> {
         self.field_for(layer_type, section, property)?

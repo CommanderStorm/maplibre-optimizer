@@ -8,14 +8,14 @@ pub use expressions::preprocess_expression;
 pub use layers::preprocess_layers;
 pub use sources::preprocess_sources;
 
-use crate::decoder::{ParsedItem, TopLevelItem};
+use crate::decoder::{DecodedParsedItem, DecodedTopLevelItem};
 
 /// Pops a `OneOf` entry keyed by `key` from `fields`, then removes each referenced
 /// group from `fields` and returns them as a map from (stripped) group name → fields.
 pub fn pop_one_of_as_group(
-    fields: &mut BTreeMap<String, TopLevelItem>,
+    fields: &mut BTreeMap<String, DecodedTopLevelItem>,
     key: &str,
-) -> HashMap<String, BTreeMap<String, ParsedItem>> {
+) -> HashMap<String, BTreeMap<String, DecodedParsedItem>> {
     let one_of = fields
         .remove(key)
         .unwrap_or_else(|| panic!("expected '{key}' in fields"));
