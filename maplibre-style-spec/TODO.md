@@ -1,8 +1,8 @@
-# A fussable e2e round-tripable style
+# A fuzzable e2e round-trippable style
 
 - implement deserialization
 - -> add fuzzing
-- implement arbitrairy::Arbitrary
+- implement arbitrary::Arbitrary
 - -> add fuzzing
 
-# can desrialize real styles
+# can deserialize real styles
