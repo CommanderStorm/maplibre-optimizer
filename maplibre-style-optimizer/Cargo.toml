@@ -18,5 +18,10 @@ maplibre-style-spec = { path = "../maplibre-style-spec", features = ["full"] }
 serde = { workspace = true, features = ["derive"] }
 serde_json.workspace = true
 
+[dev-dependencies]
+arbitrary = { workspace = true }
+maplibre-style-spec = { path = "../maplibre-style-spec", features = ["full", "fuzz"] }
+proptest = "1"
+
 [lints]
 workspace = true
