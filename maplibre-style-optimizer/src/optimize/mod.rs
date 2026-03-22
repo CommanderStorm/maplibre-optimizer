@@ -2,13 +2,14 @@
 //!
 //! Two entry points:
 //!
-//! - [`optimize_style`] operates on the typed [`MaplibreStyleSpecification`].
-//!   Structural passes work directly on typed structs; expression passes use a
-//!   parallel JSON `Value`.
+//! - [`optimize_style`] operates on the typed [`MaplibreStyleSpecification`] as
+//!   the canonical representation.  All structural passes work directly on the
+//!   typed struct; expression passes temporarily serialize to JSON for the
+//!   schema-guided walker, then deserialize back.
 //!
 //! - [`optimize_style_json_value`] / [`optimize_style_json_value_with_stats`]
-//!   operate on raw `serde_json::Value`.  They build a typed struct for
-//!   structural passes and fall back to JSON for expression passes.
+//!   operate on raw `serde_json::Value` by deserializing into a typed struct,
+//!   running the same typed pipeline, and serializing back.
 
 mod defaults;
 pub(crate) mod expr;
@@ -82,40 +83,45 @@ pub fn optimize_style_json_value(v: &mut Value, mir: &MirSpec, passes: &OptPasse
     optimize_style_json_value_with_stats(v, mir, passes, None);
 }
 
-/// Primary JSON entry point.  Structural passes use typed structs internally;
-/// expression passes operate on the JSON directly.
+/// JSON entry point.  Deserializes into a typed struct, runs the typed
+/// pipeline, and serializes back.
 pub fn optimize_style_json_value_with_stats(
     v: &mut Value,
     mir: &MirSpec,
     passes: &OptPasses,
     stats: Option<&TileStatistics>,
 ) {
-    run_pipeline(v, mir, passes, stats);
+    let Ok(mut style) = serde_json::from_value::<MaplibreStyleSpecification>(v.clone()) else {
+        return;
+    };
+    run_pipeline(&mut style, mir, passes, stats);
+    if let Ok(updated) = serde_json::to_value(&style) {
+        *v = updated;
+    }
 }
 
-/// Primary typed entry point.  Builds a parallel JSON value for expression
-/// passes and syncs results between the two representations.
+/// Primary typed entry point.  The typed struct is the canonical
+/// representation; no JSON roundtrip of the whole style is needed.
 pub fn optimize_style(
     style: &mut MaplibreStyleSpecification,
     mir: &MirSpec,
     passes: &OptPasses,
     stats: Option<&TileStatistics>,
 ) {
-    let Ok(mut v) = serde_json::to_value(&*style) else {
-        return;
-    };
-    run_pipeline(&mut v, mir, passes, stats);
-    // Sync final JSON state back to the typed struct (best-effort).
-    if let Ok(updated) = serde_json::from_value::<MaplibreStyleSpecification>(v) {
-        *style = updated;
-    }
+    run_pipeline(style, mir, passes, stats);
 }
 
 // ── Pipeline implementation ─────────────────────────────────────────────────
 
-/// Single pipeline that takes a mutable JSON `Value` and uses typed structs
-/// internally for the structural passes.
-fn run_pipeline(v: &mut Value, mir: &MirSpec, passes: &OptPasses, stats: Option<&TileStatistics>) {
+/// Typed pipeline.  All structural passes operate directly on the typed struct.
+/// Expression passes temporarily serialize to JSON for the schema-guided
+/// walker, then deserialize back.
+fn run_pipeline(
+    style: &mut MaplibreStyleSpecification,
+    mir: &MirSpec,
+    passes: &OptPasses,
+    stats: Option<&TileStatistics>,
+) {
     if !passes.strip_metadata
         && !wants_normalize_fold(passes)
         && !passes.dead_elimination
@@ -127,41 +133,36 @@ fn run_pipeline(v: &mut Value, mir: &MirSpec, passes: &OptPasses, stats: Option<
         return;
     }
 
-    // 1. Strip metadata (typed).
-    if passes.strip_metadata
-        && let Ok(mut style) = serde_json::from_value::<MaplibreStyleSpecification>(v.clone())
-    {
-        strip_metadata_typed(&mut style);
-        sync_typed_to_json(&style, v);
+    // 1. Strip metadata (typed, direct).
+    if passes.strip_metadata {
+        strip_metadata_typed(style);
     }
 
-    // 2. Expression passes (JSON walker).
-    run_json_expression_passes(v, mir, passes, stats);
-
-    // 3. Dead elimination (typed).
-    if passes.dead_elimination
-        && let Ok(mut style) = serde_json::from_value::<MaplibreStyleSpecification>(v.clone())
+    // 2. Expression passes: serialize → JSON walker → deserialize back.
+    if (wants_normalize_fold(passes) || passes.strip_defaults || passes.selectivity_reorder)
+        && let Ok(mut v) = serde_json::to_value(&*style)
     {
-        let layer_info = stats.map(|_| precompute_vector_layer_info_typed(&style));
-        dead_elimination_typed(&mut style, stats, layer_info.as_deref());
-        sync_typed_to_json(&style, v);
+        run_json_expression_passes(&mut v, mir, passes, stats);
+        if let Ok(updated) = serde_json::from_value(v) {
+            *style = updated;
+        }
     }
 
-    // 4. Metadata refinement (typed).
-    if passes.metadata_refinement
-        && let Ok(mut style) = serde_json::from_value::<MaplibreStyleSpecification>(v.clone())
-    {
-        let layer_info = stats.map(|_| precompute_vector_layer_info_typed(&style));
-        metadata_refinement_typed(&mut style, stats, layer_info.as_deref());
-        sync_typed_to_json(&style, v);
+    // 3. Dead elimination (typed, direct).
+    if passes.dead_elimination {
+        let layer_info = stats.map(|_| precompute_vector_layer_info_typed(style));
+        dead_elimination_typed(style, stats, layer_info.as_deref());
     }
 
-    // 5. Cleanup (typed).
-    if passes.cleanup
-        && let Ok(mut style) = serde_json::from_value::<MaplibreStyleSpecification>(v.clone())
-    {
-        cleanup_typed(&mut style);
-        sync_typed_to_json(&style, v);
+    // 4. Metadata refinement (typed, direct).
+    if passes.metadata_refinement {
+        let layer_info = stats.map(|_| precompute_vector_layer_info_typed(style));
+        metadata_refinement_typed(style, stats, layer_info.as_deref());
+    }
+
+    // 5. Cleanup (typed, direct).
+    if passes.cleanup {
+        cleanup_typed(style);
     }
 }
 
@@ -211,70 +212,6 @@ fn run_json_expression_passes(
             },
         );
     }
-}
-
-// ── Sync helpers ────────────────────────────────────────────────────────────
-
-/// Sync typed struct → JSON.  Merges typed scalar fields into the JSON while
-/// preserving paint/layout from the JSON side.
-fn sync_typed_to_json(style: &MaplibreStyleSpecification, v: &mut Value) {
-    let Some(obj) = v.as_object_mut() else { return };
-
-    if style.metadata.is_none() {
-        obj.remove("metadata");
-    }
-
-    if let Ok(sources_val) = serde_json::to_value(&style.sources) {
-        obj.insert("sources".to_string(), sources_val);
-    }
-
-    if let Ok(typed_layers_val) = serde_json::to_value(&style.layers) {
-        if let (Some(json_layers), Some(typed_layers)) = (
-            obj.get("layers").and_then(Value::as_array).cloned(),
-            typed_layers_val.as_array(),
-        ) {
-            if json_layers.len() == typed_layers.len() {
-                let merged: Vec<Value> = json_layers
-                    .into_iter()
-                    .zip(typed_layers)
-                    .map(|(jl, tl)| merge_layer_json(jl, tl))
-                    .collect();
-                obj.insert("layers".to_string(), Value::Array(merged));
-            } else {
-                obj.insert("layers".to_string(), typed_layers_val);
-            }
-        } else {
-            obj.insert("layers".to_string(), typed_layers_val);
-        }
-    }
-}
-
-/// Merge typed scalar fields into a JSON layer, keeping original paint/layout.
-fn merge_layer_json(mut original: Value, typed: &Value) -> Value {
-    let (Some(orig_obj), Some(typed_obj)) = (original.as_object_mut(), typed.as_object()) else {
-        return original;
-    };
-    for key in &[
-        "id",
-        "type",
-        "source",
-        "source-layer",
-        "filter",
-        "minzoom",
-        "maxzoom",
-        "metadata",
-        "ref",
-    ] {
-        match typed_obj.get(*key) {
-            Some(val) if !val.is_null() => {
-                orig_obj.insert((*key).to_string(), val.clone());
-            }
-            _ => {
-                orig_obj.remove(*key);
-            }
-        }
-    }
-    original
 }
 
 // ── Tests ───────────────────────────────────────────────────────────────────
