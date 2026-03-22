@@ -381,6 +381,7 @@ fn is_serialized_empty(v: &impl serde::Serialize) -> bool {
     val.as_object().is_some_and(serde_json::Map::is_empty)
 }
 
+#[expect(clippy::too_many_lines)]
 fn is_invisible_typed(layer: &AnyLayer) -> bool {
     let AnyLayer::Typed(t) = layer else {
         return false;

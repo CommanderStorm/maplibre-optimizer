@@ -185,23 +185,13 @@ impl serde::Serialize for ExpressionName {
                 seq.serialize_element("format")?;
                 if let serde_json::Value::Array(top) = &inner_val {
                     for elem in top {
-                        if let serde_json::Value::Array(sub) = elem {
-                            if sub.is_empty() {
-                                // Empty Vec — nothing to flatten.
-                            } else if sub[0].is_array() {
-                                // An array-of-arrays is the Vec<(A,B)> — flatten it.
-                                for pair in sub {
-                                    if let serde_json::Value::Array(pair_elems) = pair {
-                                        for pe in pair_elems {
-                                            seq.serialize_element(pe)?;
-                                        }
-                                    } else {
-                                        seq.serialize_element(pair)?;
-                                    }
-                                }
-                            } else {
-                                // Plain array value (e.g. a sub-expression like ["zoom"]).
-                                seq.serialize_element(elem)?;
+                        if let serde_json::Value::Array(pair_elems) = elem {
+                            let mut trimmed = pair_elems.clone();
+                            while trimmed.last().is_some_and(serde_json::Value::is_null) {
+                                trimmed.pop();
+                            }
+                            for pe in &trimmed {
+                                seq.serialize_element(pe)?;
                             }
                         } else {
                             seq.serialize_element(elem)?;

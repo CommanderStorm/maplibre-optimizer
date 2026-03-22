@@ -113,7 +113,7 @@ impl serde::Serialize for InterpolationName {
         match self {
             InterpolationName::Linear => {
                 let mut elems = vec![];
-                while elems.last().is_some_and(serde_json::Value::is_null) {
+                while !elems.is_empty() && elems.last().is_some_and(serde_json::Value::is_null) {
                     elems.pop();
                 }
                 let mut seq = serializer.serialize_seq(None)?;

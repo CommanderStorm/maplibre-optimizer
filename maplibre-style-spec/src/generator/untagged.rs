@@ -13,7 +13,7 @@ pub struct Variant {
     pub is_unit: bool,
     /// Optional condition to skip this variant during deserialization (e.g. `"value.is_array()"`).
     /// When set, the variant is only tried if the condition evaluates to false.
-    #[allow(clippy::struct_field_names)]
+    #[expect(clippy::struct_field_names)]
     pub skip_when: Option<String>,
 }
 
@@ -26,7 +26,6 @@ pub struct Variant {
 /// each variant in order.  On total failure the error message lists every variant that
 /// was attempted together with the per-variant error.
 pub fn emit_untagged_serde(scope: &mut Scope, enum_name: &str, variants: &[Variant]) {
-    // ── Serialize ────────────────────────────────────────────────────────
     let ser_arms: String = variants
         .iter()
         .map(|v| {
