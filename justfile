@@ -201,17 +201,21 @@ clean-gen:
 bench-proxy *ARGS:
     npx tsx tile-proxy.ts {{ARGS}}
 
+# Number of CPU cores to pin benchmarks to (reduces run-to-run variance by
+# preventing the process tree from migrating across all cores).
+bench_cores := env('BENCH_CORES', '0-4')
+
 # Run performance benchmarks comparing original vs optimised styles.
 # Requires tile proxy running (start with: just bench-proxy)
 [working-directory: 'tests/bench']
 bench *ARGS:
     npm install
-    npx tsx run.ts {{ARGS}}
+    taskset -c {{bench_cores}} npx tsx run.ts {{ARGS}}
 
 # Run benchmarks with browser console debug output
 [working-directory: 'tests/bench']
 bench-debug *ARGS:
-    npx tsx run.ts --debug {{ARGS}}
+    taskset -c {{bench_cores}} npx tsx run.ts --debug {{ARGS}}
 
 # Sync bench Python venv from lockfile
 [private]
