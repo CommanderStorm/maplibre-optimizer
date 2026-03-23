@@ -57,6 +57,7 @@ flate2 = "1"
 prost = "0.13"
 prost-build = "0.13"
 rand = "0.9"
+mlt-core = { version = "0.4", features = ["fastpfor-cpp"] }
 
 [profile.dev.package]
 # See https://docs.rs/insta/latest/insta/#optional-faster-runs
