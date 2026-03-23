@@ -66,12 +66,15 @@ fn is_dead_by_geometry(
     };
 
     let gt = &layer_stats.geometry_types;
-    match layer.layer_type() {
-        "fill" | "fill-extrusion" => gt.polygon == 0,
-        "circle" | "heatmap" => gt.point == 0,
-        "line" => gt.linestring == 0 && gt.polygon == 0,
-        "symbol" => gt.point == 0 && gt.linestring == 0,
-        _ => false,
+    match layer {
+        TypedLayer::Fill { .. } | TypedLayer::FillExtrusion { .. } => gt.polygon == 0,
+        TypedLayer::Circle { .. } | TypedLayer::Heatmap { .. } => gt.point == 0,
+        TypedLayer::Line { .. } => gt.linestring == 0 && gt.polygon == 0,
+        TypedLayer::Symbol { .. } => gt.point == 0 && gt.linestring == 0,
+        TypedLayer::Background { .. }
+        | TypedLayer::ColorRelief { .. }
+        | TypedLayer::Hillshade { .. }
+        | TypedLayer::Raster { .. } => false,
     }
 }
 

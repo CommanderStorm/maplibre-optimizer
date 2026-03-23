@@ -1394,6 +1394,12 @@ formatted_prop!(
     default = "".to_string()
 );
 
+impl Default for SymbolLayoutLayerTextField {
+    fn default() -> Self {
+        Self("".to_string())
+    }
+}
+
 array_prop!(
     SymbolLayoutLayerTextFont,
     doc = "Fonts to use for displaying text. If the `glyphs` root property is specified, this array is joined together and interpreted as a font stack name. Otherwise, it is interpreted as a cascading fallback list of local font names.",
@@ -1629,7 +1635,7 @@ color_prop!(
     default = serde_json::json!("rgba(0, 0, 0, 0)")
 );
 
-numeric_prop!(SymbolPaintLayerIconHaloWidth, doc = "Distance of halo to the icon outline.
+numeric_prop!(SymbolPaintLayerIconHaloWidth, doc = "Distance of halo to the icon outline. 
 
 The unit is in pixels only for SDF sprites that were created with a blur radius of 8, multiplied by the display density. I.e., the radius needs to be 16 for `@2x` sprites, etc.", min = 0_f64, default = serde_json::Number::from_i128(0).expect("the number is serialised from a number and is thus always valid"));
 

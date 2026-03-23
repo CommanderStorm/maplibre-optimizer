@@ -163,10 +163,19 @@ pub enum NumericPropInner {
 
 impl NumericPropInner {
     /// If this is a literal number, return it as `f64`.
+    ///
+    /// Handles both `Literal(n)` and `Expr(Number::Literal(n))` — the latter
+    /// occurs because `NumericExpression` is tried first during deserialization,
+    /// so a bare JSON number like `0` becomes `Expr(Number::Literal(...))`.
     pub fn as_f64(&self) -> Option<f64> {
         match self {
             Self::Literal(n) => n.as_f64(),
-            Self::Expr(_) => None,
+            Self::Expr(expr) => {
+                // A bare JSON number deserializes as Expr(Number::Literal(...))
+                // due to deserialization order. Fall back to serializing and checking.
+                let v = serde_json::to_value(expr.as_ref()).ok()?;
+                v.as_f64()
+            }
         }
     }
 }

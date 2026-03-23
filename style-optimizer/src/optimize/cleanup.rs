@@ -147,22 +147,62 @@ fn layout_visibility(layer: &TypedLayer) -> Option<Visibility> {
         TypedLayer::Symbol {
             layout: Some(l), ..
         } => l.visibility,
-        _ => None,
+        TypedLayer::Background { layout: None, .. }
+        | TypedLayer::Circle { layout: None, .. }
+        | TypedLayer::ColorRelief { layout: None, .. }
+        | TypedLayer::Fill { layout: None, .. }
+        | TypedLayer::FillExtrusion { layout: None, .. }
+        | TypedLayer::Heatmap { layout: None, .. }
+        | TypedLayer::Hillshade { layout: None, .. }
+        | TypedLayer::Line { layout: None, .. }
+        | TypedLayer::Raster { layout: None, .. }
+        | TypedLayer::Symbol { layout: None, .. } => None,
     }
 }
 
 /// Extract the primary opacity as a literal f64, if present.
 fn literal_opacity(layer: &TypedLayer) -> Option<f64> {
     match layer {
-        TypedLayer::Fill { paint: Some(p), .. } => p.fill_opacity.as_ref()?.0.as_f64(),
-        TypedLayer::Line { paint: Some(p), .. } => p.line_opacity.as_ref()?.0.as_f64(),
+        TypedLayer::Background { paint: Some(p), .. } => p.background_opacity.as_ref()?.0.as_f64(),
         TypedLayer::Circle { paint: Some(p), .. } => p.circle_opacity.as_ref()?.0.as_f64(),
+        TypedLayer::ColorRelief { paint: Some(p), .. } => {
+            p.color_relief_opacity.as_ref()?.0.as_f64()
+        }
+        TypedLayer::Fill { paint: Some(p), .. } => p.fill_opacity.as_ref()?.0.as_f64(),
         TypedLayer::FillExtrusion { paint: Some(p), .. } => {
             p.fill_extrusion_opacity.as_ref()?.0.as_f64()
         }
-        TypedLayer::Raster { paint: Some(p), .. } => p.raster_opacity.as_ref()?.0.as_f64(),
         TypedLayer::Heatmap { paint: Some(p), .. } => p.heatmap_opacity.as_ref()?.0.as_f64(),
-        _ => None,
+        TypedLayer::Line { paint: Some(p), .. } => p.line_opacity.as_ref()?.0.as_f64(),
+        TypedLayer::Raster { paint: Some(p), .. } => p.raster_opacity.as_ref()?.0.as_f64(),
+        TypedLayer::Symbol { paint: Some(p), .. } => {
+            // Symbol is invisible only when both icon and text opacity are zero.
+            let icon = p
+                .icon_opacity
+                .as_ref()
+                .and_then(|o| o.0.as_f64())
+                .unwrap_or(1.0);
+            let text = p
+                .text_opacity
+                .as_ref()
+                .and_then(|o| o.0.as_f64())
+                .unwrap_or(1.0);
+            if icon == 0.0 && text == 0.0 {
+                Some(0.0)
+            } else {
+                None
+            }
+        }
+        TypedLayer::Hillshade { .. }
+        | TypedLayer::Background { paint: None, .. }
+        | TypedLayer::Circle { paint: None, .. }
+        | TypedLayer::ColorRelief { paint: None, .. }
+        | TypedLayer::Fill { paint: None, .. }
+        | TypedLayer::FillExtrusion { paint: None, .. }
+        | TypedLayer::Heatmap { paint: None, .. }
+        | TypedLayer::Line { paint: None, .. }
+        | TypedLayer::Raster { paint: None, .. }
+        | TypedLayer::Symbol { paint: None, .. } => None,
     }
 }
 

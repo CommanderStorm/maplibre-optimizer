@@ -148,6 +148,7 @@ mod option_string_key_map {
 
     use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
+    #[expect(clippy::ref_option, reason = "serde demands it!")]
     pub fn serialize<K, V, S>(opt: &Option<BTreeMap<K, V>>, ser: S) -> Result<S::Ok, S::Error>
     where
         K: Display + Ord,
@@ -157,7 +158,7 @@ mod option_string_key_map {
         match opt {
             None => ser.serialize_none(),
             Some(map) => {
-                let string_map: BTreeMap<std::string::String, &V> =
+                let string_map: BTreeMap<String, &V> =
                     map.iter().map(|(k, v)| (k.to_string(), v)).collect();
                 string_map.serialize(ser)
             }
@@ -171,7 +172,7 @@ mod option_string_key_map {
         V: Deserialize<'de>,
         D: Deserializer<'de>,
     {
-        let opt = Option::<BTreeMap<std::string::String, V>>::deserialize(de)?;
+        let opt = Option::<BTreeMap<String, V>>::deserialize(de)?;
         match opt {
             None => Ok(None),
             Some(string_map) => {
@@ -196,13 +197,13 @@ mod zoom_map {
     use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
     pub fn serialize<S: Serializer>(map: &BTreeMap<u8, u64>, ser: S) -> Result<S::Ok, S::Error> {
-        let string_map: BTreeMap<std::string::String, u64> =
+        let string_map: BTreeMap<String, u64> =
             map.iter().map(|(k, v)| (k.to_string(), *v)).collect();
         string_map.serialize(ser)
     }
 
     pub fn deserialize<'de, D: Deserializer<'de>>(de: D) -> Result<BTreeMap<u8, u64>, D::Error> {
-        let string_map = BTreeMap::<std::string::String, u64>::deserialize(de)?;
+        let string_map = BTreeMap::<String, u64>::deserialize(de)?;
         string_map
             .into_iter()
             .map(|(k, v)| {

@@ -150,17 +150,10 @@ fn prop_visibility_minzoom(prop: &NumericPropInner) -> Option<f64> {
 /// produce a visible result.  Returns `None` when no constraint can be derived.
 fn paint_visibility_minzoom(layer: &TypedLayer) -> Option<f64> {
     match layer {
-        TypedLayer::Line { paint: Some(p), .. } => {
-            let size = p
-                .line_width
-                .as_ref()
-                .and_then(|w| prop_visibility_minzoom(&w.0));
-            let opacity = p
-                .line_opacity
-                .as_ref()
-                .and_then(|o| prop_visibility_minzoom(&o.0));
-            combine_size_opacity(size, opacity)
-        }
+        TypedLayer::Background { paint: Some(p), .. } => p
+            .background_opacity
+            .as_ref()
+            .and_then(|o| prop_visibility_minzoom(&o.0)),
         TypedLayer::Circle { paint: Some(p), .. } => {
             let size = p
                 .circle_radius
@@ -172,6 +165,10 @@ fn paint_visibility_minzoom(layer: &TypedLayer) -> Option<f64> {
                 .and_then(|o| prop_visibility_minzoom(&o.0));
             combine_size_opacity(size, opacity)
         }
+        TypedLayer::ColorRelief { paint: Some(p), .. } => p
+            .color_relief_opacity
+            .as_ref()
+            .and_then(|o| prop_visibility_minzoom(&o.0)),
         TypedLayer::Fill { paint: Some(p), .. } => p
             .fill_opacity
             .as_ref()
@@ -187,6 +184,25 @@ fn paint_visibility_minzoom(layer: &TypedLayer) -> Option<f64> {
                 .and_then(|o| prop_visibility_minzoom(&o.0));
             combine_size_opacity(size, opacity)
         }
+        TypedLayer::Heatmap { paint: Some(p), .. } => p
+            .heatmap_opacity
+            .as_ref()
+            .and_then(|o| prop_visibility_minzoom(&o.0)),
+        TypedLayer::Line { paint: Some(p), .. } => {
+            let size = p
+                .line_width
+                .as_ref()
+                .and_then(|w| prop_visibility_minzoom(&w.0));
+            let opacity = p
+                .line_opacity
+                .as_ref()
+                .and_then(|o| prop_visibility_minzoom(&o.0));
+            combine_size_opacity(size, opacity)
+        }
+        TypedLayer::Raster { paint: Some(p), .. } => p
+            .raster_opacity
+            .as_ref()
+            .and_then(|o| prop_visibility_minzoom(&o.0)),
         TypedLayer::Symbol { paint: Some(p), .. } => {
             // Symbol is visible if either text or icon is visible.
             let text_op = p
@@ -204,15 +220,16 @@ fn paint_visibility_minzoom(layer: &TypedLayer) -> Option<f64> {
                 (None, None) => None,
             }
         }
-        TypedLayer::Raster { paint: Some(p), .. } => p
-            .raster_opacity
-            .as_ref()
-            .and_then(|o| prop_visibility_minzoom(&o.0)),
-        TypedLayer::Heatmap { paint: Some(p), .. } => p
-            .heatmap_opacity
-            .as_ref()
-            .and_then(|o| prop_visibility_minzoom(&o.0)),
-        _ => None,
+        TypedLayer::Hillshade { .. }
+        | TypedLayer::Background { paint: None, .. }
+        | TypedLayer::Circle { paint: None, .. }
+        | TypedLayer::ColorRelief { paint: None, .. }
+        | TypedLayer::Fill { paint: None, .. }
+        | TypedLayer::FillExtrusion { paint: None, .. }
+        | TypedLayer::Heatmap { paint: None, .. }
+        | TypedLayer::Line { paint: None, .. }
+        | TypedLayer::Raster { paint: None, .. }
+        | TypedLayer::Symbol { paint: None, .. } => None,
     }
 }
 

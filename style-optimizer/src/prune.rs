@@ -244,9 +244,8 @@ fn mvt_value_matches_json(mvt_val: &mvt::tile::Value, json_val: &Value) -> bool 
 mod tests {
     use std::collections::BTreeMap;
 
-    use crate::advisory::ZoomRange;
-
     use super::*;
+    use crate::advisory::ZoomRange;
 
     fn make_string_value(s: &str) -> mvt::tile::Value {
         mvt::tile::Value {
@@ -326,13 +325,11 @@ mod tests {
                 (
                     "roads".to_string(),
                     SourceLayerAdvisory {
-                        used_properties: BTreeMap::from([(
-                            "class".to_string(),
+                        used_properties: BTreeMap::from([("class".to_string(), ZoomRange::All)]),
+                        used_geometry_types: BTreeMap::from([(
+                            GeometryType::LineString,
                             ZoomRange::All,
                         )]),
-                        used_geometry_types: BTreeMap::from([
-                            (GeometryType::LineString, ZoomRange::All),
-                        ]),
                         unused_zoom_levels: vec![0, 1, 2, 3],
                         unused_property_values: BTreeMap::from([(
                             "class".to_string(),

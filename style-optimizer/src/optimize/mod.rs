@@ -631,6 +631,74 @@ mod tests {
     }
 
     #[test]
+    fn cleanup_removes_zero_opacity_background() {
+        let mir = sample_mir();
+        let mut v = serde_json::json!({"version":8,"sources":{},"layers":[
+            {"id":"bg","type":"background","paint":{"background-opacity":0}}
+        ]});
+        optimize_style_json_value(
+            &mut v,
+            &mir,
+            &OptPasses {
+                cleanup: true,
+                ..Default::default()
+            },
+        );
+        assert_eq!(v["layers"].as_array().unwrap().len(), 0);
+    }
+
+    #[test]
+    fn cleanup_removes_zero_opacity_color_relief() {
+        let mir = sample_mir();
+        let mut v = serde_json::json!({"version":8,"sources":{"s":{"type":"raster-dem","url":"x"}},"layers":[
+            {"id":"cr","type":"color-relief","source":"s","paint":{"color-relief-opacity":0}}
+        ]});
+        optimize_style_json_value(
+            &mut v,
+            &mir,
+            &OptPasses {
+                cleanup: true,
+                ..Default::default()
+            },
+        );
+        assert_eq!(v["layers"].as_array().unwrap().len(), 0);
+    }
+
+    #[test]
+    fn cleanup_removes_zero_opacity_symbol() {
+        let mir = sample_mir();
+        let mut v = serde_json::json!({"version":8,"sources":{"s":{"type":"vector","url":"x"}},"layers":[
+            {"id":"sym","type":"symbol","source":"s","source-layer":"l","paint":{"icon-opacity":0,"text-opacity":0}}
+        ]});
+        optimize_style_json_value(
+            &mut v,
+            &mir,
+            &OptPasses {
+                cleanup: true,
+                ..Default::default()
+            },
+        );
+        assert_eq!(v["layers"].as_array().unwrap().len(), 0);
+    }
+
+    #[test]
+    fn cleanup_keeps_symbol_with_one_nonzero_opacity() {
+        let mir = sample_mir();
+        let mut v = serde_json::json!({"version":8,"sources":{"s":{"type":"vector","url":"x"}},"layers":[
+            {"id":"sym","type":"symbol","source":"s","source-layer":"l","paint":{"icon-opacity":0,"text-opacity":1}}
+        ]});
+        optimize_style_json_value(
+            &mut v,
+            &mir,
+            &OptPasses {
+                cleanup: true,
+                ..Default::default()
+            },
+        );
+        assert_eq!(v["layers"].as_array().unwrap().len(), 1);
+    }
+
+    #[test]
     fn all_passes_enabled_does_not_panic() {
         let mir = sample_mir();
         let mut v = serde_json::json!({"version":8,"metadata":{"editor":"maputnik"},"sources":{"openmaptiles":{"type":"vector","url":"https://example/tiles.json"}},"layers":[{"id":"background","type":"background","paint":{"background-color":"#f8f4f0","background-opacity":1}},{"id":"water","type":"fill","source":"openmaptiles","source-layer":"water","filter":["all",[">=",["zoom"],5],["==",["geometry-type"],"Polygon"]],"paint":{"fill-color":"#a0c8f0","fill-opacity":1}}]});
