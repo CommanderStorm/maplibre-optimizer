@@ -21,6 +21,7 @@ pub fn generate(scope: &mut Scope, name: &str, field: &MirFormattedTextField) {
             .derive("serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone")
             .attr(fuzz::CFG_DERIVE_ARBITRARY)
             .tuple_field("std::string::String");
+    }
 
     let default = &field.default;
     scope
