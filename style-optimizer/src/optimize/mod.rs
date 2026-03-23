@@ -661,6 +661,154 @@ mod tests {
         );
     }
 
+    // ── Paint-based minzoom inference tests ─────────────────────────────────
+
+    #[test]
+    #[allow(clippy::float_cmp)]
+    fn paint_minzoom_interpolate_leading_zeros() {
+        let mir = sample_mir();
+        let mut v = serde_json::json!({"version":8,"sources":{},"layers":[
+            {"id":"x","type":"line","paint":{"line-width":["interpolate",["linear"],["zoom"],13.5,0,14,2.5]}}
+        ]});
+        optimize_style_json_value(
+            &mut v,
+            &mir,
+            &OptPasses {
+                metadata_refinement: true,
+                ..Default::default()
+            },
+        );
+        assert_eq!(v["layers"][0]["minzoom"].as_f64().unwrap(), 13.5);
+    }
+
+    #[test]
+    #[allow(clippy::float_cmp)]
+    fn paint_minzoom_step_zero_default() {
+        let mir = sample_mir();
+        let mut v = serde_json::json!({"version":8,"sources":{},"layers":[
+            {"id":"x","type":"line","paint":{"line-width":["step",["zoom"],0,15,2]}}
+        ]});
+        optimize_style_json_value(
+            &mut v,
+            &mir,
+            &OptPasses {
+                metadata_refinement: true,
+                ..Default::default()
+            },
+        );
+        assert_eq!(v["layers"][0]["minzoom"].as_f64().unwrap(), 15.0);
+    }
+
+    #[test]
+    #[allow(clippy::float_cmp)]
+    fn paint_minzoom_multiple_zero_stops() {
+        let mir = sample_mir();
+        let mut v = serde_json::json!({"version":8,"sources":{},"layers":[
+            {"id":"x","type":"line","paint":{"line-width":["interpolate",["linear"],["zoom"],5,0,10,0,14,2.5]}}
+        ]});
+        optimize_style_json_value(
+            &mut v,
+            &mir,
+            &OptPasses {
+                metadata_refinement: true,
+                ..Default::default()
+            },
+        );
+        assert_eq!(v["layers"][0]["minzoom"].as_f64().unwrap(), 10.0);
+    }
+
+    #[test]
+    #[allow(clippy::float_cmp)]
+    fn paint_minzoom_combined_width_opacity() {
+        let mir = sample_mir();
+        // line-width: last zero stop at 10 (transitions 10→14),
+        // line-opacity: zero until step at 12.
+        // Both must be non-zero → max(10, 12) = 12.
+        let mut v = serde_json::json!({"version":8,"sources":{},"layers":[
+            {"id":"x","type":"line","paint":{
+                "line-width":["interpolate",["linear"],["zoom"],10,0,14,2],
+                "line-opacity":["step",["zoom"],0,12,1]
+            }}
+        ]});
+        optimize_style_json_value(
+            &mut v,
+            &mir,
+            &OptPasses {
+                metadata_refinement: true,
+                ..Default::default()
+            },
+        );
+        assert_eq!(v["layers"][0]["minzoom"].as_f64().unwrap(), 12.0);
+    }
+
+    #[test]
+    #[allow(clippy::float_cmp)]
+    fn paint_minzoom_existing_tighter_preserved() {
+        let mir = sample_mir();
+        // Existing minzoom: 16, paint suggests 14 → stays 16.
+        let mut v = serde_json::json!({"version":8,"sources":{},"layers":[
+            {"id":"x","type":"line","minzoom":16,"paint":{"line-width":["interpolate",["linear"],["zoom"],10,0,14,2]}}
+        ]});
+        optimize_style_json_value(
+            &mut v,
+            &mir,
+            &OptPasses {
+                metadata_refinement: true,
+                ..Default::default()
+            },
+        );
+        assert_eq!(v["layers"][0]["minzoom"].as_f64().unwrap(), 16.0);
+    }
+
+    #[test]
+    fn paint_minzoom_non_zoom_expression_no_change() {
+        let mir = sample_mir();
+        let mut v = serde_json::json!({"version":8,"sources":{},"layers":[
+            {"id":"x","type":"line","paint":{"line-width":["*",["get","w"],2]}}
+        ]});
+        optimize_style_json_value(
+            &mut v,
+            &mir,
+            &OptPasses {
+                metadata_refinement: true,
+                ..Default::default()
+            },
+        );
+        assert!(v["layers"][0].get("minzoom").is_none());
+    }
+
+    #[test]
+    fn paint_minzoom_all_stops_zero_no_minzoom() {
+        let mir = sample_mir();
+        // All stops zero → INFINITY → we skip setting minzoom (let cleanup handle).
+        let mut v = serde_json::json!({"version":8,"sources":{},"layers":[
+            {"id":"x","type":"line","paint":{"line-width":["interpolate",["linear"],["zoom"],5,0,10,0]}}
+        ]});
+        optimize_style_json_value(
+            &mut v,
+            &mir,
+            &OptPasses {
+                metadata_refinement: true,
+                ..Default::default()
+            },
+        );
+        assert!(v["layers"][0].get("minzoom").is_none());
+    }
+
+    #[test]
+    #[allow(clippy::float_cmp)]
+    fn paint_minzoom_end_to_end_full_pipeline() {
+        let mir = sample_mir();
+        let mut v = serde_json::json!({"version":8,"sources":{"s":{"type":"vector","url":"x"}},"layers":[
+            {"id":"road","type":"line","source":"s","source-layer":"transportation",
+             "filter":["==",["get","class"],"motorway"],
+             "paint":{"line-width":["interpolate",["linear"],["zoom"],5,0,10,0,14,2.5]}}
+        ]});
+        let passes = OptPasses::all();
+        optimize_style_json_value(&mut v, &mir, &passes);
+        assert!(v["layers"][0]["minzoom"].as_f64().unwrap() >= 10.0);
+    }
+
     // ── Stats-driven tests ──────────────────────────────────────────────────
 
     use std::collections::BTreeMap;

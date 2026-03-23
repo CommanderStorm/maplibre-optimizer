@@ -115,6 +115,112 @@ fn prev_zoom(n: f64) -> f64 {
     n.ceil() - 1.0
 }
 
+// ── Paint-based visibility minzoom ──────────────────────────────────────────
+
+/// Analyze a paint property expression and return the zoom level at which it
+/// first becomes non-zero.
+///
+/// Returns `Some(f64::INFINITY)` when the value is statically zero at all zooms
+/// (caller should let cleanup handle that).  Returns `None` when no constraint
+/// can be derived (non-zoom expression, data-driven, non-numeric stops, etc.).
+#[allow(clippy::float_cmp)]
+pub(super) fn visibility_minzoom_from_value(value: &Value) -> Option<f64> {
+    match value {
+        // Scalar literal (bare or wrapped in ["literal", n]).
+        Value::Number(n) => {
+            if n.as_f64() == Some(0.0) {
+                Some(f64::INFINITY)
+            } else {
+                None
+            }
+        }
+        Value::Array(arr) if arr.len() == 2 && arr[0].as_str() == Some("literal") => {
+            let n = arr[1].as_f64()?;
+            if n == 0.0 { Some(f64::INFINITY) } else { None }
+        }
+        Value::Array(arr) if arr.len() >= 4 => {
+            let head = arr[0].as_str()?;
+            match head {
+                "interpolate" | "interpolate-hcl" | "interpolate-lab" => {
+                    visibility_minzoom_interpolate(arr)
+                }
+                "step" => visibility_minzoom_step(arr),
+                _ => None,
+            }
+        }
+        _ => None,
+    }
+}
+
+/// `["interpolate", curve, ["zoom"], z1, v1, z2, v2, ...]`
+#[allow(clippy::float_cmp)]
+fn visibility_minzoom_interpolate(arr: &[Value]) -> Option<f64> {
+    // arr[1] = curve, arr[2] = input (must be ["zoom"]), then pairs.
+    if arr.len() < 5 {
+        return None;
+    }
+    if !is_zoom_expr(&arr[2]) {
+        return None;
+    }
+    let pairs = &arr[3..];
+    if !pairs.len().is_multiple_of(2) {
+        return None;
+    }
+
+    let mut last_zero_stop = None;
+    let mut all_zero = true;
+
+    for chunk in pairs.chunks_exact(2) {
+        let z = chunk[0].as_f64()?;
+        let v = extract_json_literal(&chunk[1]).and_then(|v| v.as_f64())?;
+        if v == 0.0 {
+            last_zero_stop = Some(z);
+        } else {
+            all_zero = false;
+        }
+    }
+
+    if all_zero {
+        return Some(f64::INFINITY);
+    }
+    last_zero_stop
+}
+
+/// `["step", ["zoom"], default, z1, v1, z2, v2, ...]`
+#[allow(clippy::float_cmp)]
+fn visibility_minzoom_step(arr: &[Value]) -> Option<f64> {
+    if arr.len() < 4 {
+        return None;
+    }
+    if !is_zoom_expr(&arr[1]) {
+        return None;
+    }
+
+    // Default output (before first stop).
+    let default_val = extract_json_literal(&arr[2]).and_then(|v| v.as_f64())?;
+    let pairs = &arr[3..];
+    if !pairs.len().is_multiple_of(2) {
+        return None;
+    }
+
+    if default_val != 0.0 {
+        // Default is non-zero → visible from the start.
+        return None;
+    }
+
+    // Walk stops to find the first non-zero value.
+    for chunk in pairs.chunks_exact(2) {
+        let z = chunk[0].as_f64()?;
+        let v = extract_json_literal(&chunk[1]).and_then(|v| v.as_f64())?;
+        if v != 0.0 {
+            return Some(z);
+        }
+    }
+
+    // All stops are zero.
+    Some(f64::INFINITY)
+}
+
 // ── Remove consumed zoom predicates ────────────────────────────────────────
 
 pub(super) fn remove_consumed_zoom_predicates(

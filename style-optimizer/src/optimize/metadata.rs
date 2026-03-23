@@ -1,8 +1,10 @@
 //! Metadata refinement pass operating on typed `MaplibreStyleSpecification`.
 
+use maplibre_style_spec::shared_expr::NumericPropInner;
 use maplibre_style_spec::spec::{AnyLayer, LayerFilter, MaplibreStyleSpecification, TypedLayer};
 
 use super::source_util::VectorLayerInfo;
+use super::zoom::visibility_minzoom_from_value;
 use crate::stats::TileStatistics;
 
 /// Extract zoom bounds from filters and tighten minzoom/maxzoom.
@@ -86,6 +88,20 @@ fn refine_typed_layer(
         }
     }
 
+    // Paint-based visibility minzoom.
+    if let Some(paint_min) = paint_visibility_minzoom(layer)
+        && paint_min != f64::INFINITY
+    {
+        let common = layer.common_mut();
+        let cur = common
+            .minzoom
+            .as_ref()
+            .and_then(maplibre_style_spec::spec::LayerMinzoom::as_f64);
+        if cur.is_none_or(|c| paint_min > c) {
+            common.minzoom = maplibre_style_spec::spec::LayerMinzoom::from_f64(paint_min);
+        }
+    }
+
     // Stats-driven zoom tightening.
     if let Some(stats) = stats
         && let Some(infos) = layer_info
@@ -112,5 +128,101 @@ fn refine_typed_layer(
         if cur_max.is_none_or(|c| data_max < c) {
             common.maxzoom = maplibre_style_spec::spec::LayerMaxzoom::from_f64(data_max);
         }
+    }
+}
+
+// ── Paint-based visibility analysis ─────────────────────────────────────────
+
+/// Compute the minzoom from a single numeric paint property.
+/// Returns `Some(zoom)` if the property evaluates to zero below that zoom.
+fn prop_visibility_minzoom(prop: &NumericPropInner) -> Option<f64> {
+    // Fast path: literal number.
+    #[allow(clippy::float_cmp)]
+    if let Some(n) = prop.as_f64() {
+        return if n == 0.0 { Some(f64::INFINITY) } else { None };
+    }
+    // Expr path: serialize and analyze.
+    let json = serde_json::to_value(prop).ok()?;
+    visibility_minzoom_from_value(&json)
+}
+
+/// Determine the zoom level at which a typed layer's paint properties first
+/// produce a visible result.  Returns `None` when no constraint can be derived.
+fn paint_visibility_minzoom(layer: &TypedLayer) -> Option<f64> {
+    match layer {
+        TypedLayer::Line { paint: Some(p), .. } => {
+            let size = p
+                .line_width
+                .as_ref()
+                .and_then(|w| prop_visibility_minzoom(&w.0));
+            let opacity = p
+                .line_opacity
+                .as_ref()
+                .and_then(|o| prop_visibility_minzoom(&o.0));
+            combine_size_opacity(size, opacity)
+        }
+        TypedLayer::Circle { paint: Some(p), .. } => {
+            let size = p
+                .circle_radius
+                .as_ref()
+                .and_then(|r| prop_visibility_minzoom(&r.0));
+            let opacity = p
+                .circle_opacity
+                .as_ref()
+                .and_then(|o| prop_visibility_minzoom(&o.0));
+            combine_size_opacity(size, opacity)
+        }
+        TypedLayer::Fill { paint: Some(p), .. } => p
+            .fill_opacity
+            .as_ref()
+            .and_then(|o| prop_visibility_minzoom(&o.0)),
+        TypedLayer::FillExtrusion { paint: Some(p), .. } => {
+            let size = p
+                .fill_extrusion_height
+                .as_ref()
+                .and_then(|h| prop_visibility_minzoom(&h.0));
+            let opacity = p
+                .fill_extrusion_opacity
+                .as_ref()
+                .and_then(|o| prop_visibility_minzoom(&o.0));
+            combine_size_opacity(size, opacity)
+        }
+        TypedLayer::Symbol { paint: Some(p), .. } => {
+            // Symbol is visible if either text or icon is visible.
+            let text_op = p
+                .text_opacity
+                .as_ref()
+                .and_then(|o| prop_visibility_minzoom(&o.0));
+            let icon_op = p
+                .icon_opacity
+                .as_ref()
+                .and_then(|o| prop_visibility_minzoom(&o.0));
+            // Visible when ANY sub-channel is visible → take min.
+            match (text_op, icon_op) {
+                (Some(a), Some(b)) => Some(a.min(b)),
+                (Some(a), None) | (None, Some(a)) => Some(a),
+                (None, None) => None,
+            }
+        }
+        TypedLayer::Raster { paint: Some(p), .. } => p
+            .raster_opacity
+            .as_ref()
+            .and_then(|o| prop_visibility_minzoom(&o.0)),
+        TypedLayer::Heatmap { paint: Some(p), .. } => p
+            .heatmap_opacity
+            .as_ref()
+            .and_then(|o| prop_visibility_minzoom(&o.0)),
+        _ => None,
+    }
+}
+
+/// Combine size and opacity constraints.
+/// Both must be non-zero for the layer to be visible → take `max`.
+/// Either alone provides a constraint.  `None` means no constraint for that axis.
+fn combine_size_opacity(size: Option<f64>, opacity: Option<f64>) -> Option<f64> {
+    match (size, opacity) {
+        (Some(s), Some(o)) => Some(s.max(o)),
+        (Some(v), None) | (None, Some(v)) => Some(v),
+        (None, None) => None,
     }
 }
