@@ -1338,6 +1338,7 @@ dependencies = [
  "arbitrary",
  "clap",
  "flate2",
+ "geo-types",
  "indexmap 2.12.1",
  "maplibre-style-spec",
  "mlt-core",
@@ -1348,6 +1349,7 @@ dependencies = [
  "rusqlite",
  "serde",
  "serde_json",
+ "tempfile",
 ]
 
 [[package]]

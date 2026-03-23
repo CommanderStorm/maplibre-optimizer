@@ -17,7 +17,7 @@ enum Command {
     /// Collect tile statistics from an `MBTiles` file.
     Stats(cmd::stats::StatsArgs),
 
-    /// Apply a tile pruning advisory (not yet implemented).
+    /// Apply a tile pruning advisory: prune + MLT-encode tiles, rewrite style.
     Advisory(cmd::advisory::AdvisoryArgs),
 }
 

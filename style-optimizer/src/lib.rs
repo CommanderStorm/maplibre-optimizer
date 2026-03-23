@@ -7,7 +7,16 @@
 //! are provided for backward compatibility.
 
 pub mod advisory;
+pub mod encode_mlt;
+pub mod mbtiles;
+#[expect(
+    clippy::doc_markdown,
+    clippy::trivially_copy_pass_by_ref,
+    clippy::must_use_candidate
+)]
+pub mod mvt;
 mod optimize;
+pub mod prune;
 pub mod stats;
 
 use std::fs;

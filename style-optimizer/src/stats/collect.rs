@@ -17,10 +17,7 @@ use super::{
     TileStatistics,
 };
 
-#[expect(clippy::doc_markdown, clippy::trivially_copy_pass_by_ref)]
-mod mvt {
-    include!(concat!(env!("OUT_DIR"), "/vector_tile.rs"));
-}
+use crate::mvt;
 
 /// Open an `MBTiles` file and validate it has the expected `tiles` table.
 pub fn open_mbtiles(path: &Path) -> anyhow::Result<Connection> {
@@ -54,7 +51,7 @@ pub fn available_zoom_levels(conn: &Connection) -> anyhow::Result<Vec<u8>> {
 }
 
 /// Decode a raw tile blob (possibly gzip-compressed) into an MVT `Tile`.
-fn decode_tile(data: &[u8]) -> anyhow::Result<mvt::Tile> {
+pub fn decode_tile(data: &[u8]) -> anyhow::Result<mvt::Tile> {
     use prost::Message;
 
     let decompressed;
