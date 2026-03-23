@@ -2,7 +2,7 @@
 #[allow(unused_imports)]
 use super::*;
 #[allow(unused_imports)]
-use crate::{boolean_prop, color_prop, numeric_prop, string_prop};
+use crate::{array_prop, boolean_prop, color_prop, numeric_prop, string_prop};
 
 /// This is a Maplibre Style Specification
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]

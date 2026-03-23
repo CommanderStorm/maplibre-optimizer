@@ -1,6 +1,7 @@
 use codegen2::Scope;
 use serde_json::Value;
 
+use super::escape_doc_for_macro;
 use crate::generator::autotest::generate_test_from_example_if_present;
 use crate::generator::formatter::to_upper_camel_case;
 use crate::generator::fuzz;
@@ -9,6 +10,18 @@ use crate::generator::untagged::{self, Variant};
 use crate::mir::types::{MirArrayElement, MirArrayField, MirRegularEnum};
 
 pub fn generate(scope: &mut Scope, name: &str, field: &MirArrayField) {
+    if field.meta.expression.is_some() {
+        let doc = escape_doc_for_macro(&field.meta.doc);
+        let mut args = format!("{name}, doc = \"{doc}\"");
+        if let Some(default) = &field.default {
+            let default_json = serde_json::to_string(default).expect("default should serialize");
+            args.push_str(&format!(", default = serde_json::json!({default_json})"));
+        }
+        scope.raw(format!("array_prop!({args});"));
+        generate_test_from_example_if_present(scope, name, field.meta.example.as_ref());
+        return;
+    }
+
     let element_type_name = to_upper_camel_case(format!("{name} Value"));
     let rust_element_type = generate_array_element(scope, &element_type_name, &field.element);
 
@@ -378,26 +391,11 @@ mod tests {
         #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
         pub struct MaplibreStyleSpecification;
 
-        /// Position of the light source relative to lit (extruded) geometries, in [r radial coordinate, a azimuthal angle, p polar angle] where r indicates the distance from the center of the base of an object to its light, a indicates the position of the light relative to 0° (0° when `light.anchor` is set to `viewport` corresponds to the top of the viewport, or 0° when `light.anchor` is set to `map` corresponds to due north, and degrees proceed clockwise), and p indicates the height of the light (from 0°, directly above, to 180°, directly below).
-        #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-        #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-        pub struct Position(
-            #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_box_3_json_number))]
-             Box<[serde_json::Number; 3]>,
+        array_prop!(
+            Position,
+            doc = "Position of the light source relative to lit (extruded) geometries, in [r radial coordinate, a azimuthal angle, p polar angle] where r indicates the distance from the center of the base of an object to its light, a indicates the position of the light relative to 0° (0° when `light.anchor` is set to `viewport` corresponds to the top of the viewport, or 0° when `light.anchor` is set to `map` corresponds to due north, and degrees proceed clockwise), and p indicates the height of the light (from 0°, directly above, to 180°, directly below).",
+            default = serde_json::json!([1.15, 210, 30])
         );
-
-        impl Default for Position {
-            fn default() -> Self {
-                Self(Box::new([
-                    serde_json::Number::from_f64(1.15)
-                        .expect("the number is serialised from a number and is thus always valid"),
-                    serde_json::Number::from_i128(210)
-                        .expect("the number is serialised from a number and is thus always valid"),
-                    serde_json::Number::from_i128(30)
-                        .expect("the number is serialised from a number and is thus always valid"),
-                ]))
-            }
-        }
 
         #[cfg(test)]
         mod test {

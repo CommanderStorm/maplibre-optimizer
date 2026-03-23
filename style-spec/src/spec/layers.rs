@@ -2,7 +2,7 @@
 #[allow(unused_imports)]
 use super::*;
 #[allow(unused_imports)]
-use crate::{boolean_prop, color_prop, numeric_prop, string_prop};
+use crate::{array_prop, boolean_prop, color_prop, numeric_prop, string_prop};
 
 /// A filter expression: a typed boolean expression, a polymorphic Any expression
 /// (`match`, `step`, `case`, …), or a literal bool.
@@ -281,27 +281,17 @@ numeric_prop!(
         .expect("the number is serialised from a number and is thus always valid")
 );
 
-/// Orientation of circle when map is pitched.
-#[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy, Default)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum CirclePaintLayerCirclePitchAlignment {
-    #[serde(rename = "map")]
-    Map,
-    #[serde(rename = "viewport")]
-    #[default]
-    Viewport,
-}
+string_prop!(
+    CirclePaintLayerCirclePitchAlignment,
+    doc = "Orientation of circle when map is pitched.",
+    default = "viewport".to_string()
+);
 
-/// Controls the scaling behavior of the circle when the map is pitched.
-#[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy, Default)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum CirclePaintLayerCirclePitchScale {
-    #[serde(rename = "map")]
-    #[default]
-    Map,
-    #[serde(rename = "viewport")]
-    Viewport,
-}
+string_prop!(
+    CirclePaintLayerCirclePitchScale,
+    doc = "Controls the scaling behavior of the circle when the map is pitched.",
+    default = "map".to_string()
+);
 
 numeric_prop!(
     CirclePaintLayerCircleRadius,
@@ -334,35 +324,17 @@ numeric_prop!(
         .expect("the number is serialised from a number and is thus always valid")
 );
 
-/// The geometry's offset. Values are [x, y] where negatives indicate left and up, respectively.
-#[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub struct CirclePaintLayerCircleTranslate(
-    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_box_2_json_number))]
-     Box<[serde_json::Number; 2]>,
+array_prop!(
+    CirclePaintLayerCircleTranslate,
+    doc = "The geometry's offset. Values are [x, y] where negatives indicate left and up, respectively.",
+    default = serde_json::json!([0, 0])
 );
 
-impl Default for CirclePaintLayerCircleTranslate {
-    fn default() -> Self {
-        Self(Box::new([
-            serde_json::Number::from_i128(0)
-                .expect("the number is serialised from a number and is thus always valid"),
-            serde_json::Number::from_i128(0)
-                .expect("the number is serialised from a number and is thus always valid"),
-        ]))
-    }
-}
-
-/// Controls the frame of reference for `circle-translate`.
-#[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy, Default)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum CirclePaintLayerCircleTranslateAnchor {
-    #[serde(rename = "map")]
-    #[default]
-    Map,
-    #[serde(rename = "viewport")]
-    Viewport,
-}
+string_prop!(
+    CirclePaintLayerCircleTranslateAnchor,
+    doc = "Controls the frame of reference for `circle-translate`.",
+    default = "map".to_string()
+);
 
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
@@ -484,35 +456,17 @@ string_prop!(
     doc = "Name of image in sprite to use for drawing image fills. For seamless patterns, image width and height must be a factor of two (2, 4, 8, ..., 512). Note that zoom-dependent expressions will be evaluated only at integer zoom levels."
 );
 
-/// The geometry's offset. Values are [x, y] where negatives indicate left and up, respectively.
-#[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub struct FillPaintLayerFillTranslate(
-    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_box_2_json_number))]
-     Box<[serde_json::Number; 2]>,
+array_prop!(
+    FillPaintLayerFillTranslate,
+    doc = "The geometry's offset. Values are [x, y] where negatives indicate left and up, respectively.",
+    default = serde_json::json!([0, 0])
 );
 
-impl Default for FillPaintLayerFillTranslate {
-    fn default() -> Self {
-        Self(Box::new([
-            serde_json::Number::from_i128(0)
-                .expect("the number is serialised from a number and is thus always valid"),
-            serde_json::Number::from_i128(0)
-                .expect("the number is serialised from a number and is thus always valid"),
-        ]))
-    }
-}
-
-/// Controls the frame of reference for `fill-translate`.
-#[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy, Default)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum FillPaintLayerFillTranslateAnchor {
-    #[serde(rename = "map")]
-    #[default]
-    Map,
-    #[serde(rename = "viewport")]
-    Viewport,
-}
+string_prop!(
+    FillPaintLayerFillTranslateAnchor,
+    doc = "Controls the frame of reference for `fill-translate`.",
+    default = "map".to_string()
+);
 
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
@@ -599,35 +553,17 @@ string_prop!(
     doc = "Name of image in sprite to use for drawing images on extruded fills. For seamless patterns, image width and height must be a factor of two (2, 4, 8, ..., 512). Note that zoom-dependent expressions will be evaluated only at integer zoom levels."
 );
 
-/// The geometry's offset. Values are [x, y] where negatives indicate left and up (on the flat plane), respectively.
-#[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub struct FillExtrusionPaintLayerFillExtrusionTranslate(
-    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_box_2_json_number))]
-     Box<[serde_json::Number; 2]>,
+array_prop!(
+    FillExtrusionPaintLayerFillExtrusionTranslate,
+    doc = "The geometry's offset. Values are [x, y] where negatives indicate left and up (on the flat plane), respectively.",
+    default = serde_json::json!([0, 0])
 );
 
-impl Default for FillExtrusionPaintLayerFillExtrusionTranslate {
-    fn default() -> Self {
-        Self(Box::new([
-            serde_json::Number::from_i128(0)
-                .expect("the number is serialised from a number and is thus always valid"),
-            serde_json::Number::from_i128(0)
-                .expect("the number is serialised from a number and is thus always valid"),
-        ]))
-    }
-}
-
-/// Controls the frame of reference for `fill-extrusion-translate`.
-#[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy, Default)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum FillExtrusionPaintLayerFillExtrusionTranslateAnchor {
-    #[serde(rename = "map")]
-    #[default]
-    Map,
-    #[serde(rename = "viewport")]
-    Viewport,
-}
+string_prop!(
+    FillExtrusionPaintLayerFillExtrusionTranslateAnchor,
+    doc = "Controls the frame of reference for `fill-extrusion-translate`.",
+    default = "map".to_string()
+);
 
 boolean_prop!(
     FillExtrusionPaintLayerFillExtrusionVerticalGradient,
@@ -787,251 +723,41 @@ numeric_prop!(
         .expect("the number is serialised from a number and is thus always valid")
 );
 
-/// The shading color of areas that faces towards the light source(s). Only when `hillshade-method` is set to `multidirectional` can you specify multiple light sources.
-#[derive(PartialEq, Debug, Clone)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum HillshadePaintLayerHillshadeHighlightColor {
-    /// A color
-    One(
-        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_dynamic_color))]
-         color::DynamicColor,
-    ),
-    /// A set of colors
-    Multiple(
-        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_vec_dynamic_color))]
-         Vec<color::DynamicColor>,
-    ),
-}
+color_prop!(
+    HillshadePaintLayerHillshadeHighlightColor,
+    doc = "The shading color of areas that faces towards the light source(s). Only when `hillshade-method` is set to `multidirectional` can you specify multiple light sources.",
+    default = serde_json::json!("#FFFFFF")
+);
 
-impl serde::Serialize for HillshadePaintLayerHillshadeHighlightColor {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        match self {
-            Self::One(v) => v.serialize(serializer),
-            Self::Multiple(v) => v.serialize(serializer),
-        }
-    }
-}
+array_prop!(
+    HillshadePaintLayerHillshadeIlluminationAltitude,
+    doc = "The altitude of the light source(s) used to generate the hillshading with 0 as sunset and 90 as noon. Only when `hillshade-method` is set to `multidirectional` can you specify multiple light sources.",
+    default = serde_json::json!(45)
+);
 
-impl<'de> serde::Deserialize<'de> for HillshadePaintLayerHillshadeHighlightColor {
-    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
-        let mut errors: Vec<(&str, std::string::String)> = Vec::new();
-        match <color::DynamicColor as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::One(v)),
-            Err(e) => errors.push(("One", e.to_string())),
-        }
-        match <Vec<color::DynamicColor> as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Multiple(v)),
-            Err(e) => errors.push(("Multiple", e.to_string())),
-        }
+string_prop!(
+    HillshadePaintLayerHillshadeIlluminationAnchor,
+    doc = "Direction of light source when map is rotated.",
+    default = "viewport".to_string()
+);
 
-        let details: Vec<std::string::String> =
-            errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
-        Err(serde::de::Error::custom(format!(
-            "HillshadePaintLayerHillshadeHighlightColor: no variant matched. Expected One(color::DynamicColor) | Multiple(Vec<color::DynamicColor>). Errors: [{}]",
-            details.join("; ")
-        )))
-    }
-}
+array_prop!(
+    HillshadePaintLayerHillshadeIlluminationDirection,
+    doc = "The direction of the light source(s) used to generate the hillshading with 0 as the top of the viewport if `hillshade-illumination-anchor` is set to `viewport` and due north if `hillshade-illumination-anchor` is set to `map`. Only when `hillshade-method` is set to `multidirectional` can you specify multiple light sources.",
+    default = serde_json::json!(335)
+);
 
-impl Default for HillshadePaintLayerHillshadeHighlightColor {
-    fn default() -> Self {
-        Self::One(
-            color::parse_color("#FFFFFF").expect("Invalid color specified as the default value"),
-        )
-    }
-}
+string_prop!(
+    HillshadePaintLayerHillshadeMethod,
+    doc = "The hillshade algorithm to use, one of `standard`, `basic`, `combined`, `igor`, or `multidirectional`. ![image](assets/hillshade_methods.png)",
+    default = "standard".to_string()
+);
 
-/// The altitude of the light source(s) used to generate the hillshading with 0 as sunset and 90 as noon. Only when `hillshade-method` is set to `multidirectional` can you specify multiple light sources.
-#[derive(PartialEq, Debug, Clone)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum HillshadePaintLayerHillshadeIlluminationAltitude {
-    One(
-        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
-        serde_json::Number,
-    ),
-    Many(
-        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_vec_json_number))]
-         Vec<serde_json::Number>,
-    ),
-}
-
-impl serde::Serialize for HillshadePaintLayerHillshadeIlluminationAltitude {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        match self {
-            Self::One(v) => v.serialize(serializer),
-            Self::Many(v) => v.serialize(serializer),
-        }
-    }
-}
-
-impl<'de> serde::Deserialize<'de> for HillshadePaintLayerHillshadeIlluminationAltitude {
-    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
-        let mut errors: Vec<(&str, std::string::String)> = Vec::new();
-        match <serde_json::Number as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::One(v)),
-            Err(e) => errors.push(("One", e.to_string())),
-        }
-        match <Vec<serde_json::Number> as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Many(v)),
-            Err(e) => errors.push(("Many", e.to_string())),
-        }
-
-        let details: Vec<std::string::String> =
-            errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
-        Err(serde::de::Error::custom(format!(
-            "HillshadePaintLayerHillshadeIlluminationAltitude: no variant matched. Expected One(serde_json::Number) | Many(Vec<serde_json::Number>). Errors: [{}]",
-            details.join("; ")
-        )))
-    }
-}
-
-impl Default for HillshadePaintLayerHillshadeIlluminationAltitude {
-    fn default() -> Self {
-        Self::One(
-            serde_json::Number::from_i128(45)
-                .expect("the number is serialised from a number and is thus always valid"),
-        )
-    }
-}
-
-/// Direction of light source when map is rotated.
-#[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy, Default)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum HillshadePaintLayerHillshadeIlluminationAnchor {
-    #[serde(rename = "map")]
-    Map,
-    #[serde(rename = "viewport")]
-    #[default]
-    Viewport,
-}
-
-/// The direction of the light source(s) used to generate the hillshading with 0 as the top of the viewport if `hillshade-illumination-anchor` is set to `viewport` and due north if `hillshade-illumination-anchor` is set to `map`. Only when `hillshade-method` is set to `multidirectional` can you specify multiple light sources.
-#[derive(PartialEq, Debug, Clone)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum HillshadePaintLayerHillshadeIlluminationDirection {
-    One(
-        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_number))]
-        serde_json::Number,
-    ),
-    Many(
-        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_vec_json_number))]
-         Vec<serde_json::Number>,
-    ),
-}
-
-impl serde::Serialize for HillshadePaintLayerHillshadeIlluminationDirection {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        match self {
-            Self::One(v) => v.serialize(serializer),
-            Self::Many(v) => v.serialize(serializer),
-        }
-    }
-}
-
-impl<'de> serde::Deserialize<'de> for HillshadePaintLayerHillshadeIlluminationDirection {
-    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
-        let mut errors: Vec<(&str, std::string::String)> = Vec::new();
-        match <serde_json::Number as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::One(v)),
-            Err(e) => errors.push(("One", e.to_string())),
-        }
-        match <Vec<serde_json::Number> as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Many(v)),
-            Err(e) => errors.push(("Many", e.to_string())),
-        }
-
-        let details: Vec<std::string::String> =
-            errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
-        Err(serde::de::Error::custom(format!(
-            "HillshadePaintLayerHillshadeIlluminationDirection: no variant matched. Expected One(serde_json::Number) | Many(Vec<serde_json::Number>). Errors: [{}]",
-            details.join("; ")
-        )))
-    }
-}
-
-impl Default for HillshadePaintLayerHillshadeIlluminationDirection {
-    fn default() -> Self {
-        Self::One(
-            serde_json::Number::from_i128(335)
-                .expect("the number is serialised from a number and is thus always valid"),
-        )
-    }
-}
-
-/// The hillshade algorithm to use, one of `standard`, `basic`, `combined`, `igor`, or `multidirectional`. ![image](assets/hillshade_methods.png)
-#[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy, Default)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum HillshadePaintLayerHillshadeMethod {
-    #[serde(rename = "basic")]
-    Basic,
-    #[serde(rename = "combined")]
-    Combined,
-    #[serde(rename = "igor")]
-    Igor,
-    #[serde(rename = "multidirectional")]
-    Multidirectional,
-    #[serde(rename = "standard")]
-    #[default]
-    Standard,
-}
-
-/// The shading color of areas that face away from the light source(s). Only when `hillshade-method` is set to `multidirectional` can you specify multiple light sources.
-#[derive(PartialEq, Debug, Clone)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum HillshadePaintLayerHillshadeShadowColor {
-    /// A color
-    One(
-        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_dynamic_color))]
-         color::DynamicColor,
-    ),
-    /// A set of colors
-    Multiple(
-        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_vec_dynamic_color))]
-         Vec<color::DynamicColor>,
-    ),
-}
-
-impl serde::Serialize for HillshadePaintLayerHillshadeShadowColor {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        match self {
-            Self::One(v) => v.serialize(serializer),
-            Self::Multiple(v) => v.serialize(serializer),
-        }
-    }
-}
-
-impl<'de> serde::Deserialize<'de> for HillshadePaintLayerHillshadeShadowColor {
-    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
-        let mut errors: Vec<(&str, std::string::String)> = Vec::new();
-        match <color::DynamicColor as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::One(v)),
-            Err(e) => errors.push(("One", e.to_string())),
-        }
-        match <Vec<color::DynamicColor> as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Multiple(v)),
-            Err(e) => errors.push(("Multiple", e.to_string())),
-        }
-
-        let details: Vec<std::string::String> =
-            errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
-        Err(serde::de::Error::custom(format!(
-            "HillshadePaintLayerHillshadeShadowColor: no variant matched. Expected One(color::DynamicColor) | Multiple(Vec<color::DynamicColor>). Errors: [{}]",
-            details.join("; ")
-        )))
-    }
-}
-
-impl Default for HillshadePaintLayerHillshadeShadowColor {
-    fn default() -> Self {
-        Self::One(
-            color::parse_color("#000000").expect("Invalid color specified as the default value"),
-        )
-    }
-}
+color_prop!(
+    HillshadePaintLayerHillshadeShadowColor,
+    doc = "The shading color of areas that face away from the light source(s). Only when `hillshade-method` is set to `multidirectional` can you specify multiple light sources.",
+    default = serde_json::json!("#000000")
+);
 
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
@@ -1061,31 +787,17 @@ pub struct LineLayoutLayer {
     pub visibility: Option<LineLayoutLayerVisibility>,
 }
 
-/// The display of line endings.
-#[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy, Default)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum LineLayoutLayerLineCap {
-    #[serde(rename = "butt")]
-    #[default]
-    Butt,
-    #[serde(rename = "round")]
-    Round,
-    #[serde(rename = "square")]
-    Square,
-}
+string_prop!(
+    LineLayoutLayerLineCap,
+    doc = "The display of line endings.",
+    default = "butt".to_string()
+);
 
-/// The display of lines when joining.
-#[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy, Default)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum LineLayoutLayerLineJoin {
-    #[serde(rename = "bevel")]
-    Bevel,
-    #[serde(rename = "miter")]
-    #[default]
-    Miter,
-    #[serde(rename = "round")]
-    Round,
-}
+string_prop!(
+    LineLayoutLayerLineJoin,
+    doc = "The display of lines when joining.",
+    default = "miter".to_string()
+);
 
 numeric_prop!(
     LineLayoutLayerLineMiterLimit,
@@ -1171,12 +883,9 @@ color_prop!(
     default = serde_json::json!("#000000")
 );
 
-/// Specifies the lengths of the alternating dashes and gaps that form the dash pattern. The lengths are later scaled by the line width. To convert a dash length to pixels, multiply the length by the current line width. GeoJSON sources with `lineMetrics: true` specified won't render dashed lines to the expected scale. Zoom-dependent expressions will be evaluated only at integer zoom levels. The only way to create an array value is using `["literal", [...]]`; arrays cannot be read from or derived from feature properties.
-#[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub struct LinePaintLayerLineDasharray(
-    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_vec_json_number))]
-    Vec<serde_json::Number>,
+array_prop!(
+    LinePaintLayerLineDasharray,
+    doc = "Specifies the lengths of the alternating dashes and gaps that form the dash pattern. The lengths are later scaled by the line width. To convert a dash length to pixels, multiply the length by the current line width. GeoJSON sources with `lineMetrics: true` specified won't render dashed lines to the expected scale. Zoom-dependent expressions will be evaluated only at integer zoom levels. The only way to create an array value is using `[\"literal\", [...]]`; arrays cannot be read from or derived from feature properties."
 );
 
 numeric_prop!(
@@ -1213,35 +922,17 @@ string_prop!(
     doc = "Name of image in sprite to use for drawing image lines. For seamless patterns, image width must be a factor of two (2, 4, 8, ..., 512). Note that zoom-dependent expressions will be evaluated only at integer zoom levels."
 );
 
-/// The geometry's offset. Values are [x, y] where negatives indicate left and up, respectively.
-#[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub struct LinePaintLayerLineTranslate(
-    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_box_2_json_number))]
-     Box<[serde_json::Number; 2]>,
+array_prop!(
+    LinePaintLayerLineTranslate,
+    doc = "The geometry's offset. Values are [x, y] where negatives indicate left and up, respectively.",
+    default = serde_json::json!([0, 0])
 );
 
-impl Default for LinePaintLayerLineTranslate {
-    fn default() -> Self {
-        Self(Box::new([
-            serde_json::Number::from_i128(0)
-                .expect("the number is serialised from a number and is thus always valid"),
-            serde_json::Number::from_i128(0)
-                .expect("the number is serialised from a number and is thus always valid"),
-        ]))
-    }
-}
-
-/// Controls the frame of reference for `line-translate`.
-#[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy, Default)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum LinePaintLayerLineTranslateAnchor {
-    #[serde(rename = "map")]
-    #[default]
-    Map,
-    #[serde(rename = "viewport")]
-    Viewport,
-}
+string_prop!(
+    LinePaintLayerLineTranslateAnchor,
+    doc = "Controls the frame of reference for `line-translate`.",
+    default = "map".to_string()
+);
 
 numeric_prop!(
     LinePaintLayerLineWidth,
@@ -1349,16 +1040,11 @@ numeric_prop!(
         .expect("the number is serialised from a number and is thus always valid")
 );
 
-/// The resampling/interpolation method to use for overscaling, also known as texture magnification filter
-#[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy, Default)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum RasterPaintLayerRasterResampling {
-    #[serde(rename = "linear")]
-    #[default]
-    Linear,
-    #[serde(rename = "nearest")]
-    Nearest,
-}
+string_prop!(
+    RasterPaintLayerRasterResampling,
+    doc = "The resampling/interpolation method to use for overscaling, also known as texture magnification filter",
+    default = "linear".to_string()
+);
 
 numeric_prop!(
     RasterPaintLayerRasterSaturation,
@@ -1573,30 +1259,11 @@ boolean_prop!(
     default = false
 );
 
-/// Part of the icon placed closest to the anchor.
-#[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy, Default)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum SymbolLayoutLayerIconAnchor {
-    #[serde(rename = "bottom")]
-    Bottom,
-    #[serde(rename = "bottom-left")]
-    BottomLeft,
-    #[serde(rename = "bottom-right")]
-    BottomRight,
-    #[serde(rename = "center")]
-    #[default]
-    Center,
-    #[serde(rename = "left")]
-    Left,
-    #[serde(rename = "right")]
-    Right,
-    #[serde(rename = "top")]
-    Top,
-    #[serde(rename = "top-left")]
-    TopLeft,
-    #[serde(rename = "top-right")]
-    TopRight,
-}
+string_prop!(
+    SymbolLayoutLayerIconAnchor,
+    doc = "Part of the icon placed closest to the anchor.",
+    default = "center".to_string()
+);
 
 boolean_prop!(
     SymbolLayoutLayerIconIgnorePlacement,
@@ -1615,24 +1282,11 @@ boolean_prop!(
     default = false
 );
 
-/// Offset distance of icon from its anchor. Positive values indicate right and down, while negative values indicate left and up. Each component is multiplied by the value of `icon-size` to obtain the final offset in pixels. When combined with `icon-rotate` the offset will be as if the rotated direction was up.
-#[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub struct SymbolLayoutLayerIconOffset(
-    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_box_2_json_number))]
-     Box<[serde_json::Number; 2]>,
+array_prop!(
+    SymbolLayoutLayerIconOffset,
+    doc = "Offset distance of icon from its anchor. Positive values indicate right and down, while negative values indicate left and up. Each component is multiplied by the value of `icon-size` to obtain the final offset in pixels. When combined with `icon-rotate` the offset will be as if the rotated direction was up.",
+    default = serde_json::json!([0, 0])
 );
-
-impl Default for SymbolLayoutLayerIconOffset {
-    fn default() -> Self {
-        Self(Box::new([
-            serde_json::Number::from_i128(0)
-                .expect("the number is serialised from a number and is thus always valid"),
-            serde_json::Number::from_i128(0)
-                .expect("the number is serialised from a number and is thus always valid"),
-        ]))
-    }
-}
 
 boolean_prop!(
     SymbolLayoutLayerIconOptional,
@@ -1640,103 +1294,23 @@ boolean_prop!(
     default = false
 );
 
-/// Allows for control over whether to show an icon when it overlaps other symbols on the map. If `icon-overlap` is not set, `icon-allow-overlap` is used instead.
-#[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum SymbolLayoutLayerIconOverlap {
-    #[serde(rename = "always")]
-    Always,
-    #[serde(rename = "cooperative")]
-    Cooperative,
-    #[serde(rename = "never")]
-    Never,
-}
+string_prop!(
+    SymbolLayoutLayerIconOverlap,
+    doc = "Allows for control over whether to show an icon when it overlaps other symbols on the map. If `icon-overlap` is not set, `icon-allow-overlap` is used instead."
+);
 
-/// Size of additional area round the icon bounding box used for detecting symbol collisions.
-#[derive(PartialEq, Debug, Clone)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum SymbolLayoutLayerIconPadding {
-    /// A single value applies to all four sides
-    One(
-        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_box_1_json_number))]
-         Box<[serde_json::Number; 1]>,
-    ),
-    /// two values apply to `[top/bottom, left/right]`
-    Two(
-        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_box_2_json_number))]
-         Box<[serde_json::Number; 2]>,
-    ),
-    /// three values apply to `[top, left/right, bottom]`
-    Three(
-        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_box_3_json_number))]
-         Box<[serde_json::Number; 3]>,
-    ),
-    /// four values apply to `[top, right, bottom, left]`
-    Four(
-        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_box_4_json_number))]
-         Box<[serde_json::Number; 4]>,
-    ),
-}
+array_prop!(
+    SymbolLayoutLayerIconPadding,
+    doc =
+        "Size of additional area round the icon bounding box used for detecting symbol collisions.",
+    default = serde_json::json!([2])
+);
 
-impl serde::Serialize for SymbolLayoutLayerIconPadding {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        match self {
-            Self::One(v) => v.as_ref().serialize(serializer),
-            Self::Two(v) => v.as_ref().serialize(serializer),
-            Self::Three(v) => v.as_ref().serialize(serializer),
-            Self::Four(v) => v.as_ref().serialize(serializer),
-        }
-    }
-}
-
-impl<'de> serde::Deserialize<'de> for SymbolLayoutLayerIconPadding {
-    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
-        let mut errors: Vec<(&str, std::string::String)> = Vec::new();
-        match <[serde_json::Number; 1] as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::One(Box::new(v))),
-            Err(e) => errors.push(("One", e.to_string())),
-        }
-        match <[serde_json::Number; 2] as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Two(Box::new(v))),
-            Err(e) => errors.push(("Two", e.to_string())),
-        }
-        match <[serde_json::Number; 3] as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Three(Box::new(v))),
-            Err(e) => errors.push(("Three", e.to_string())),
-        }
-        match <[serde_json::Number; 4] as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Four(Box::new(v))),
-            Err(e) => errors.push(("Four", e.to_string())),
-        }
-
-        let details: Vec<std::string::String> =
-            errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
-        Err(serde::de::Error::custom(format!(
-            "SymbolLayoutLayerIconPadding: no variant matched. Expected One([serde_json::Number; 1]) | Two([serde_json::Number; 2]) | Three([serde_json::Number; 3]) | Four([serde_json::Number; 4]). Errors: [{}]",
-            details.join("; ")
-        )))
-    }
-}
-
-impl Default for SymbolLayoutLayerIconPadding {
-    fn default() -> Self {
-        Self::One(Box::new([2.into()]))
-    }
-}
-
-/// Orientation of icon when map is pitched.
-#[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy, Default)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum SymbolLayoutLayerIconPitchAlignment {
-    #[serde(rename = "auto")]
-    #[default]
-    Auto,
-    #[serde(rename = "map")]
-    Map,
-    #[serde(rename = "viewport")]
-    Viewport,
-}
+string_prop!(
+    SymbolLayoutLayerIconPitchAlignment,
+    doc = "Orientation of icon when map is pitched.",
+    default = "auto".to_string()
+);
 
 numeric_prop!(
     SymbolLayoutLayerIconRotate,
@@ -1745,18 +1319,11 @@ numeric_prop!(
         .expect("the number is serialised from a number and is thus always valid")
 );
 
-/// In combination with `symbol-placement`, determines the rotation behavior of icons.
-#[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy, Default)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum SymbolLayoutLayerIconRotationAlignment {
-    #[serde(rename = "auto")]
-    #[default]
-    Auto,
-    #[serde(rename = "map")]
-    Map,
-    #[serde(rename = "viewport")]
-    Viewport,
-}
+string_prop!(
+    SymbolLayoutLayerIconRotationAlignment,
+    doc = "In combination with `symbol-placement`, determines the rotation behavior of icons.",
+    default = "auto".to_string()
+);
 
 numeric_prop!(
     SymbolLayoutLayerIconSize,
@@ -1766,43 +1333,17 @@ numeric_prop!(
         .expect("the number is serialised from a number and is thus always valid")
 );
 
-/// Scales the icon to fit around the associated text.
-#[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy, Default)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum SymbolLayoutLayerIconTextFit {
-    #[serde(rename = "both")]
-    Both,
-    #[serde(rename = "height")]
-    Height,
-    #[serde(rename = "none")]
-    #[default]
-    None,
-    #[serde(rename = "width")]
-    Width,
-}
-
-/// Size of the additional area added to dimensions determined by `icon-text-fit`, in clockwise order: top, right, bottom, left.
-#[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub struct SymbolLayoutLayerIconTextFitPadding(
-    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_box_4_json_number))]
-     Box<[serde_json::Number; 4]>,
+string_prop!(
+    SymbolLayoutLayerIconTextFit,
+    doc = "Scales the icon to fit around the associated text.",
+    default = "none".to_string()
 );
 
-impl Default for SymbolLayoutLayerIconTextFitPadding {
-    fn default() -> Self {
-        Self(Box::new([
-            serde_json::Number::from_i128(0)
-                .expect("the number is serialised from a number and is thus always valid"),
-            serde_json::Number::from_i128(0)
-                .expect("the number is serialised from a number and is thus always valid"),
-            serde_json::Number::from_i128(0)
-                .expect("the number is serialised from a number and is thus always valid"),
-            serde_json::Number::from_i128(0)
-                .expect("the number is serialised from a number and is thus always valid"),
-        ]))
-    }
-}
+array_prop!(
+    SymbolLayoutLayerIconTextFitPadding,
+    doc = "Size of the additional area added to dimensions determined by `icon-text-fit`, in clockwise order: top, right, bottom, left.",
+    default = serde_json::json!([0, 0, 0, 0])
+);
 
 boolean_prop!(
     SymbolLayoutLayerSymbolAvoidEdges,
@@ -1810,18 +1351,11 @@ boolean_prop!(
     default = false
 );
 
-/// Label placement relative to its geometry.
-#[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy, Default)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum SymbolLayoutLayerSymbolPlacement {
-    #[serde(rename = "line")]
-    Line,
-    #[serde(rename = "line-center")]
-    LineCenter,
-    #[serde(rename = "point")]
-    #[default]
-    Point,
-}
+string_prop!(
+    SymbolLayoutLayerSymbolPlacement,
+    doc = "Label placement relative to its geometry.",
+    default = "point".to_string()
+);
 
 numeric_prop!(
     SymbolLayoutLayerSymbolSortKey,
@@ -1836,18 +1370,11 @@ numeric_prop!(
         .expect("the number is serialised from a number and is thus always valid")
 );
 
-/// Determines whether overlapping symbols in the same layer are rendered in the order that they appear in the data source or by their y-position relative to the viewport. To control the order and prioritization of symbols otherwise, use `symbol-sort-key`.
-#[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy, Default)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum SymbolLayoutLayerSymbolZOrder {
-    #[serde(rename = "auto")]
-    #[default]
-    Auto,
-    #[serde(rename = "source")]
-    Source,
-    #[serde(rename = "viewport-y")]
-    ViewportY,
-}
+string_prop!(
+    SymbolLayoutLayerSymbolZOrder,
+    doc = "Determines whether overlapping symbols in the same layer are rendered in the order that they appear in the data source or by their y-position relative to the viewport. To control the order and prioritization of symbols otherwise, use `symbol-sort-key`.",
+    default = "auto".to_string()
+);
 
 boolean_prop!(
     SymbolLayoutLayerTextAllowOverlap,
@@ -1855,30 +1382,11 @@ boolean_prop!(
     default = false
 );
 
-/// Part of the text placed closest to the anchor.
-#[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy, Default)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum SymbolLayoutLayerTextAnchor {
-    #[serde(rename = "bottom")]
-    Bottom,
-    #[serde(rename = "bottom-left")]
-    BottomLeft,
-    #[serde(rename = "bottom-right")]
-    BottomRight,
-    #[serde(rename = "center")]
-    #[default]
-    Center,
-    #[serde(rename = "left")]
-    Left,
-    #[serde(rename = "right")]
-    Right,
-    #[serde(rename = "top")]
-    Top,
-    #[serde(rename = "top-left")]
-    TopLeft,
-    #[serde(rename = "top-right")]
-    TopRight,
-}
+string_prop!(
+    SymbolLayoutLayerTextAnchor,
+    doc = "Part of the text placed closest to the anchor.",
+    default = "center".to_string()
+);
 
 string_prop!(
     SymbolLayoutLayerTextField,
@@ -1886,19 +1394,11 @@ string_prop!(
     default = "".to_string()
 );
 
-/// Fonts to use for displaying text. If the `glyphs` root property is specified, this array is joined together and interpreted as a font stack name. Otherwise, it is interpreted as a cascading fallback list of local font names.
-#[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub struct SymbolLayoutLayerTextFont(Vec<std::string::String>);
-
-impl Default for SymbolLayoutLayerTextFont {
-    fn default() -> Self {
-        Self(Vec::from([
-            "Open Sans Regular".to_string(),
-            "Arial Unicode MS Regular".to_string(),
-        ]))
-    }
-}
+array_prop!(
+    SymbolLayoutLayerTextFont,
+    doc = "Fonts to use for displaying text. If the `glyphs` root property is specified, this array is joined together and interpreted as a font stack name. Otherwise, it is interpreted as a cascading fallback list of local font names.",
+    default = serde_json::json!(["Open Sans Regular", "Arial Unicode MS Regular"])
+);
 
 boolean_prop!(
     SymbolLayoutLayerTextIgnorePlacement,
@@ -1906,20 +1406,11 @@ boolean_prop!(
     default = false
 );
 
-/// Text justification options.
-#[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy, Default)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum SymbolLayoutLayerTextJustify {
-    #[serde(rename = "auto")]
-    Auto,
-    #[serde(rename = "center")]
-    #[default]
-    Center,
-    #[serde(rename = "left")]
-    Left,
-    #[serde(rename = "right")]
-    Right,
-}
+string_prop!(
+    SymbolLayoutLayerTextJustify,
+    doc = "Text justification options.",
+    default = "center".to_string()
+);
 
 boolean_prop!(
     SymbolLayoutLayerTextKeepUpright,
@@ -1956,24 +1447,11 @@ numeric_prop!(
         .expect("the number is serialised from a number and is thus always valid")
 );
 
-/// Offset distance of text from its anchor. Positive values indicate right and down, while negative values indicate left and up. If used with text-variable-anchor, input values will be taken as absolute values. Offsets along the x- and y-axis will be applied automatically based on the anchor position.
-#[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub struct SymbolLayoutLayerTextOffset(
-    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_box_2_json_number))]
-     Box<[serde_json::Number; 2]>,
+array_prop!(
+    SymbolLayoutLayerTextOffset,
+    doc = "Offset distance of text from its anchor. Positive values indicate right and down, while negative values indicate left and up. If used with text-variable-anchor, input values will be taken as absolute values. Offsets along the x- and y-axis will be applied automatically based on the anchor position.",
+    default = serde_json::json!([0, 0])
 );
-
-impl Default for SymbolLayoutLayerTextOffset {
-    fn default() -> Self {
-        Self(Box::new([
-            serde_json::Number::from_i128(0)
-                .expect("the number is serialised from a number and is thus always valid"),
-            serde_json::Number::from_i128(0)
-                .expect("the number is serialised from a number and is thus always valid"),
-        ]))
-    }
-}
 
 boolean_prop!(
     SymbolLayoutLayerTextOptional,
@@ -1981,17 +1459,10 @@ boolean_prop!(
     default = false
 );
 
-/// Allows for control over whether to show symbol text when it overlaps other symbols on the map. If `text-overlap` is not set, `text-allow-overlap` is used instead
-#[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum SymbolLayoutLayerTextOverlap {
-    #[serde(rename = "always")]
-    Always,
-    #[serde(rename = "cooperative")]
-    Cooperative,
-    #[serde(rename = "never")]
-    Never,
-}
+string_prop!(
+    SymbolLayoutLayerTextOverlap,
+    doc = "Allows for control over whether to show symbol text when it overlaps other symbols on the map. If `text-overlap` is not set, `text-allow-overlap` is used instead"
+);
 
 numeric_prop!(
     SymbolLayoutLayerTextPadding,
@@ -2001,18 +1472,11 @@ numeric_prop!(
         .expect("the number is serialised from a number and is thus always valid")
 );
 
-/// Orientation of text when map is pitched.
-#[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy, Default)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum SymbolLayoutLayerTextPitchAlignment {
-    #[serde(rename = "auto")]
-    #[default]
-    Auto,
-    #[serde(rename = "map")]
-    Map,
-    #[serde(rename = "viewport")]
-    Viewport,
-}
+string_prop!(
+    SymbolLayoutLayerTextPitchAlignment,
+    doc = "Orientation of text when map is pitched.",
+    default = "auto".to_string()
+);
 
 numeric_prop!(
     SymbolLayoutLayerTextRadialOffset,
@@ -2028,20 +1492,11 @@ numeric_prop!(
         .expect("the number is serialised from a number and is thus always valid")
 );
 
-/// In combination with `symbol-placement`, determines the rotation behavior of the individual glyphs forming the text.
-#[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy, Default)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum SymbolLayoutLayerTextRotationAlignment {
-    #[serde(rename = "auto")]
-    #[default]
-    Auto,
-    #[serde(rename = "map")]
-    Map,
-    #[serde(rename = "viewport")]
-    Viewport,
-    #[serde(rename = "viewport-glyph")]
-    ViewportGlyph,
-}
+string_prop!(
+    SymbolLayoutLayerTextRotationAlignment,
+    doc = "In combination with `symbol-placement`, determines the rotation behavior of the individual glyphs forming the text.",
+    default = "auto".to_string()
+);
 
 numeric_prop!(
     SymbolLayoutLayerTextSize,
@@ -2051,46 +1506,16 @@ numeric_prop!(
         .expect("the number is serialised from a number and is thus always valid")
 );
 
-/// Specifies how to capitalize text, similar to the CSS `text-transform` property.
-#[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy, Default)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum SymbolLayoutLayerTextTransform {
-    #[serde(rename = "lowercase")]
-    Lowercase,
-    #[serde(rename = "none")]
-    #[default]
-    None,
-    #[serde(rename = "uppercase")]
-    Uppercase,
-}
+string_prop!(
+    SymbolLayoutLayerTextTransform,
+    doc = "Specifies how to capitalize text, similar to the CSS `text-transform` property.",
+    default = "none".to_string()
+);
 
-#[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum SymbolLayoutLayerTextVariableAnchorValue {
-    #[serde(rename = "bottom")]
-    Bottom,
-    #[serde(rename = "bottom-left")]
-    BottomLeft,
-    #[serde(rename = "bottom-right")]
-    BottomRight,
-    #[serde(rename = "center")]
-    Center,
-    #[serde(rename = "left")]
-    Left,
-    #[serde(rename = "right")]
-    Right,
-    #[serde(rename = "top")]
-    Top,
-    #[serde(rename = "top-left")]
-    TopLeft,
-    #[serde(rename = "top-right")]
-    TopRight,
-}
-
-/// To increase the chance of placing high-priority labels on the map, you can provide an array of `text-anchor` locations: the renderer will attempt to place the label at each location, in order, before moving onto the next label. Use `text-justify: auto` to choose justification based on anchor position. To apply an offset, use the `text-radial-offset` or the two-dimensional `text-offset`.
-#[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub struct SymbolLayoutLayerTextVariableAnchor(Vec<SymbolLayoutLayerTextVariableAnchorValue>);
+array_prop!(
+    SymbolLayoutLayerTextVariableAnchor,
+    doc = "To increase the chance of placing high-priority labels on the map, you can provide an array of `text-anchor` locations: the renderer will attempt to place the label at each location, in order, before moving onto the next label. Use `text-justify: auto` to choose justification based on anchor position. To apply an offset, use the `text-radial-offset` or the two-dimensional `text-offset`."
+);
 
 /// To increase the chance of placing high-priority labels on the map, you can provide an array of `text-anchor` locations, each paired with an offset value. The renderer will attempt to place the label at each location, in order, before moving on to the next location+offset. Use `text-justify: auto` to choose justification based on anchor position.
 ///
@@ -2114,19 +1539,10 @@ pub struct SymbolLayoutLayerTextVariableAnchorOffset(
     serde_json::Value,
 );
 
-#[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum SymbolLayoutLayerTextWritingModeValue {
-    #[serde(rename = "horizontal")]
-    Horizontal,
-    #[serde(rename = "vertical")]
-    Vertical,
-}
-
-/// The property allows control over a symbol's orientation. Note that the property values act as a hint, so that a symbol whose language doesn’t support the provided orientation will be laid out in its natural orientation. Example: English point symbol will be rendered horizontally even if array value contains single 'vertical' enum value. The order of elements in an array define priority order for the placement of an orientation variant.
-#[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub struct SymbolLayoutLayerTextWritingMode(Vec<SymbolLayoutLayerTextWritingModeValue>);
+array_prop!(
+    SymbolLayoutLayerTextWritingMode,
+    doc = "The property allows control over a symbol's orientation. Note that the property values act as a hint, so that a symbol whose language doesn’t support the provided orientation will be laid out in its natural orientation. Example: English point symbol will be rendered horizontally even if array value contains single 'vertical' enum value. The order of elements in an array define priority order for the placement of an orientation variant."
+);
 
 pub type SymbolLayoutLayerVisibility = Visibility;
 
@@ -2226,35 +1642,17 @@ numeric_prop!(
         .expect("the number is serialised from a number and is thus always valid")
 );
 
-/// Distance that the icon's anchor is moved from its original placement. Positive values indicate right and down, while negative values indicate left and up.
-#[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub struct SymbolPaintLayerIconTranslate(
-    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_box_2_json_number))]
-     Box<[serde_json::Number; 2]>,
+array_prop!(
+    SymbolPaintLayerIconTranslate,
+    doc = "Distance that the icon's anchor is moved from its original placement. Positive values indicate right and down, while negative values indicate left and up.",
+    default = serde_json::json!([0, 0])
 );
 
-impl Default for SymbolPaintLayerIconTranslate {
-    fn default() -> Self {
-        Self(Box::new([
-            serde_json::Number::from_i128(0)
-                .expect("the number is serialised from a number and is thus always valid"),
-            serde_json::Number::from_i128(0)
-                .expect("the number is serialised from a number and is thus always valid"),
-        ]))
-    }
-}
-
-/// Controls the frame of reference for `icon-translate`.
-#[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy, Default)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum SymbolPaintLayerIconTranslateAnchor {
-    #[serde(rename = "map")]
-    #[default]
-    Map,
-    #[serde(rename = "viewport")]
-    Viewport,
-}
+string_prop!(
+    SymbolPaintLayerIconTranslateAnchor,
+    doc = "Controls the frame of reference for `icon-translate`.",
+    default = "map".to_string()
+);
 
 color_prop!(
     SymbolPaintLayerTextColor,
@@ -2293,35 +1691,17 @@ numeric_prop!(
         .expect("the number is serialised from a number and is thus always valid")
 );
 
-/// Distance that the text's anchor is moved from its original placement. Positive values indicate right and down, while negative values indicate left and up.
-#[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub struct SymbolPaintLayerTextTranslate(
-    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_box_2_json_number))]
-     Box<[serde_json::Number; 2]>,
+array_prop!(
+    SymbolPaintLayerTextTranslate,
+    doc = "Distance that the text's anchor is moved from its original placement. Positive values indicate right and down, while negative values indicate left and up.",
+    default = serde_json::json!([0, 0])
 );
 
-impl Default for SymbolPaintLayerTextTranslate {
-    fn default() -> Self {
-        Self(Box::new([
-            serde_json::Number::from_i128(0)
-                .expect("the number is serialised from a number and is thus always valid"),
-            serde_json::Number::from_i128(0)
-                .expect("the number is serialised from a number and is thus always valid"),
-        ]))
-    }
-}
-
-/// Controls the frame of reference for `text-translate`.
-#[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy, Default)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum SymbolPaintLayerTextTranslateAnchor {
-    #[serde(rename = "map")]
-    #[default]
-    Map,
-    #[serde(rename = "viewport")]
-    Viewport,
-}
+string_prop!(
+    SymbolPaintLayerTextTranslateAnchor,
+    doc = "Controls the frame of reference for `text-translate`.",
+    default = "map".to_string()
+);
 
 /// A style layer with its type-specific paint and layout properties.
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]

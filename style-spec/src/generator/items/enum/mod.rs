@@ -5,12 +5,27 @@ pub mod version;
 use codegen2::Scope;
 use serde_json::Value;
 
+use super::escape_doc_for_macro;
 use crate::generator::autotest::generate_test_from_example_if_present;
 use crate::generator::formatter::to_upper_camel_case;
 use crate::mir::types::{MirEnum, MirEnumField, MirRegularEnum};
 
 /// Dispatch an `MirEnumField` from the MIR to the appropriate enum generator.
 pub fn generate_mir(scope: &mut Scope, name: &str, field: &MirEnumField) {
+    // Expression-backed enums use string_prop!, but skip the visibility pattern
+    // (always `none`/`visible`) which uses a shared type alias instead.
+    if field.meta.expression.is_some() && !is_visibility_pattern(field) {
+        let doc = escape_doc_for_macro(&field.meta.doc);
+        let mut args = format!("{name}, doc = \"{doc}\"");
+        if let Some(s) = field.default.as_ref().and_then(|d| d.as_str()) {
+            let escaped = s.replace('\\', "\\\\").replace('"', "\\\"");
+            args.push_str(&format!(", default = \"{escaped}\".to_string()"));
+        }
+        scope.raw(format!("string_prop!({args});"));
+        generate_test_from_example_if_present(scope, name, field.meta.example.as_ref());
+        return;
+    }
+
     match &field.variants {
         MirEnum::Version(v) => version::generate_version(scope, name, &field.meta.doc, v),
         MirEnum::Regular(r) => {
@@ -38,6 +53,21 @@ pub fn generate_mir(scope: &mut Scope, name: &str, field: &MirEnumField) {
     }
     if matches!(&field.variants, MirEnum::Regular(_) | MirEnum::Version(_)) {
         generate_test_from_example_if_present(scope, name, field.meta.example.as_ref());
+    }
+}
+
+fn is_visibility_pattern(field: &MirEnumField) -> bool {
+    if let MirEnum::Regular(r) = &field.variants {
+        let keys: Vec<&str> = r.variants.keys().map(String::as_str).collect();
+        let has_none_visible =
+            keys.len() == 2 && keys.contains(&"none") && keys.contains(&"visible");
+        let default_is_visible = field
+            .default
+            .as_ref()
+            .is_some_and(|d| d.as_str() == Some("visible"));
+        has_none_visible && default_is_visible
+    } else {
+        false
     }
 }
 

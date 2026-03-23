@@ -281,6 +281,51 @@ impl<'de> serde::Deserialize<'de> for BooleanPropInner {
     }
 }
 
+/// Inner representation for array-like expression-backed properties.
+/// Uses `serde_json::Value` for the literal branch to accommodate diverse array shapes.
+#[derive(PartialEq, Debug, Clone)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+pub enum ArrayPropInner {
+    Expr(Box<StringExpression>),
+    Literal(
+        #[cfg_attr(
+            feature = "fuzz",
+            arbitrary(with = crate::fuzz_helpers::arbitrary_json_value)
+        )]
+        serde_json::Value,
+    ),
+}
+
+impl serde::Serialize for ArrayPropInner {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        match self {
+            Self::Expr(v) => v.as_ref().serialize(serializer),
+            Self::Literal(v) => v.serialize(serializer),
+        }
+    }
+}
+
+impl<'de> serde::Deserialize<'de> for ArrayPropInner {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
+        let mut errors: Vec<(&str, String)> = Vec::new();
+        match <StringExpression as serde::Deserialize>::deserialize(&value) {
+            Ok(v) => return Ok(Self::Expr(Box::new(v))),
+            Err(e) => errors.push(("Expr", e.to_string())),
+        }
+        // serde_json::Value always succeeds — must be last
+        match <serde_json::Value as serde::Deserialize>::deserialize(&value) {
+            Ok(v) => return Ok(Self::Literal(v)),
+            Err(e) => errors.push(("Literal", e.to_string())),
+        }
+        let details: Vec<String> = errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
+        Err(serde::de::Error::custom(format!(
+            "ArrayPropInner: no variant matched. Expected Expr(StringExpression) | Literal(serde_json::Value). Errors: [{}]",
+            details.join("; ")
+        )))
+    }
+}
+
 /// Inner representation for string expression-backed properties.
 #[derive(PartialEq, Debug, Clone)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
@@ -484,6 +529,41 @@ macro_rules! string_prop {
         impl Default for $name {
             fn default() -> Self {
                 Self($crate::shared_expr::StringPropInner::Literal($default))
+            }
+        }
+    };
+    (@default $name:ident) => {};
+}
+
+/// Stamp out a newtype wrapping [`ArrayPropInner`] with optional default.
+#[macro_export]
+macro_rules! array_prop {
+    ($name:ident, doc = $doc:expr $(, default = $default:expr)?) => {
+        #[doc = $doc]
+        #[derive(PartialEq, Debug, Clone)]
+        #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+        pub struct $name(pub $crate::shared_expr::ArrayPropInner);
+
+        impl serde::Serialize for $name {
+            fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+                self.0.serialize(serializer)
+            }
+        }
+
+        impl<'de> serde::Deserialize<'de> for $name {
+            fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+                let inner = <$crate::shared_expr::ArrayPropInner as serde::Deserialize>::deserialize(deserializer)?;
+                Ok(Self(inner))
+            }
+        }
+
+        $crate::array_prop!(@default $name $(, $default)?);
+    };
+
+    (@default $name:ident, $default:expr) => {
+        impl Default for $name {
+            fn default() -> Self {
+                Self($crate::shared_expr::ArrayPropInner::Literal($default))
             }
         }
     };

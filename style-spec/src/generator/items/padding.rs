@@ -1,11 +1,22 @@
 use codegen2::Scope;
 
+use super::escape_doc_for_macro;
 use crate::generator::autotest::generate_test_from_example_if_present;
 use crate::generator::fuzz;
 use crate::generator::untagged::{self, Variant};
 use crate::mir::types::MirPaddingField;
 
 pub fn generate(scope: &mut Scope, name: &str, field: &MirPaddingField) {
+    if field.meta.expression.is_some() {
+        let doc = escape_doc_for_macro(&field.meta.doc);
+        let default_items: Vec<String> = field.default.iter().map(|n| n.to_string()).collect();
+        let default_json = format!("[{}]", default_items.join(","));
+        let args = format!("{name}, doc = \"{doc}\", default = serde_json::json!({default_json})");
+        scope.raw(format!("array_prop!({args});"));
+        generate_test_from_example_if_present(scope, name, field.meta.example.as_ref());
+        return;
+    }
+
     let enu = scope
         .new_enum(name)
         .vis("pub")
