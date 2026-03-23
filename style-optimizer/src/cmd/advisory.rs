@@ -3,11 +3,10 @@ use std::{fs, io};
 
 use anyhow::Context;
 use clap::Args;
-use maplibre_style_optimizer::TilePruningAdvisory;
 use maplibre_style_optimizer::encode_mlt::mvt_to_mlt;
-use maplibre_style_optimizer::mbtiles;
 use maplibre_style_optimizer::prune::prune_tile;
 use maplibre_style_optimizer::stats::collect::{available_zoom_levels, decode_tile, open_mbtiles};
+use maplibre_style_optimizer::{TilePruningAdvisory, mbtiles};
 use prost::Message;
 
 /// Apply a tile pruning advisory to rewrite tiles and/or style.
