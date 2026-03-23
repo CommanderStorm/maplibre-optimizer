@@ -15,6 +15,7 @@
 //!   batch: one deserialize → all structural passes → one `sync_typed_to_json`.
 
 mod cleanup;
+mod color;
 mod dead;
 mod defaults;
 pub(crate) mod expr;
@@ -26,6 +27,7 @@ pub(crate) mod walk;
 mod zoom;
 
 use cleanup::cleanup;
+use color::MinifyColorsVisitor;
 use dead::dead_elimination;
 use defaults::StripDefaultsVisitor;
 use expr::{NormalizeFoldVisitor, ReorderSelectivityVisitor};
@@ -54,6 +56,7 @@ pub struct OptPasses {
     pub strip_metadata: bool,
     pub strip_defaults: bool,
     pub simplify_expressions: bool,
+    pub minify_colors: bool,
     pub cleanup: bool,
 }
 
@@ -70,6 +73,7 @@ impl OptPasses {
             strip_metadata: true,
             strip_defaults: true,
             simplify_expressions: true,
+            minify_colors: true,
             cleanup: true,
         }
     }
@@ -83,7 +87,10 @@ fn wants_normalize_fold(passes: &OptPasses) -> bool {
 }
 
 fn wants_expression_passes(passes: &OptPasses) -> bool {
-    wants_normalize_fold(passes) || passes.strip_defaults || passes.selectivity_reorder
+    wants_normalize_fold(passes)
+        || passes.strip_defaults
+        || passes.selectivity_reorder
+        || passes.minify_colors
 }
 
 fn wants_structural_passes(passes: &OptPasses) -> bool {
@@ -225,6 +232,21 @@ fn sync_typed_to_json(style: &MaplibreStyleSpecification, v: &mut Value) {
         obj.remove("metadata");
     }
 
+    // Sync root defaults that were stripped by cleanup.
+    for key in ["bearing", "pitch", "roll", "state", "transition"] {
+        let is_none = match key {
+            "bearing" => style.bearing.is_none(),
+            "pitch" => style.pitch.is_none(),
+            "roll" => style.roll.is_none(),
+            "state" => style.state.is_none(),
+            "transition" => style.transition.is_none(),
+            _ => false,
+        };
+        if is_none {
+            obj.remove(key);
+        }
+    }
+
     if let Ok(sources_val) = serde_json::to_value(&style.sources) {
         obj.insert("sources".to_string(), sources_val);
     }
@@ -285,8 +307,7 @@ fn run_json_expression_passes(
     passes: &OptPasses,
     stats: Option<&TileStatistics>,
 ) {
-    let needs = wants_normalize_fold(passes) || passes.strip_defaults || passes.selectivity_reorder;
-    if !needs {
+    if !wants_expression_passes(passes) {
         return;
     }
 
@@ -310,6 +331,10 @@ fn run_json_expression_passes(
 
     if passes.strip_defaults {
         walk_style_mut(v, mir, &mut StripDefaultsVisitor { mir });
+    }
+
+    if passes.minify_colors {
+        walk_style_mut(v, mir, &mut MinifyColorsVisitor);
     }
 
     if passes.selectivity_reorder {
@@ -1035,5 +1060,133 @@ mod tests {
         optimize_style(&mut style, &mir, &passes, None);
         let second = serde_json::to_value(&style).unwrap();
         assert_eq!(first, second);
+    }
+
+    // ── Trivially-true filter removal ───────────────────────────────────
+
+    #[test]
+    fn fold_empty_all_to_true() {
+        let mir = sample_mir();
+        let mut v = serde_json::json!({"version":8,"sources":{},"layers":[
+            {"id":"x","type":"fill","filter":["all"]}
+        ]});
+        optimize_style_json_value(
+            &mut v,
+            &mir,
+            &OptPasses {
+                constant_fold: true,
+                cleanup: true,
+                ..Default::default()
+            },
+        );
+        // ["all"] folds to true, then cleanup strips the trivial filter.
+        assert!(v["layers"][0].get("filter").is_none());
+    }
+
+    #[test]
+    fn fold_empty_any_to_false() {
+        let mir = sample_mir();
+        let mut v = serde_json::json!({"version":8,"sources":{},"layers":[
+            {"id":"x","type":"fill","filter":["any"]}
+        ]});
+        optimize_style_json_value(
+            &mut v,
+            &mir,
+            &OptPasses {
+                constant_fold: true,
+                ..Default::default()
+            },
+        );
+        assert_eq!(
+            v["layers"][0]["filter"],
+            serde_json::json!(["literal", false])
+        );
+    }
+
+    // ── Color minification ──────────────────────────────────────────────
+
+    #[test]
+    fn minify_rgba_in_paint() {
+        let mir = sample_mir();
+        let mut v = serde_json::json!({"version":8,"sources":{},"layers":[
+            {"id":"x","type":"fill","paint":{"fill-color":"rgba(255,255,255,1)"}}
+        ]});
+        optimize_style_json_value(
+            &mut v,
+            &mir,
+            &OptPasses {
+                minify_colors: true,
+                ..Default::default()
+            },
+        );
+        assert_eq!(v["layers"][0]["paint"]["fill-color"], "#fff");
+    }
+
+    #[test]
+    fn minify_rgb_in_paint() {
+        let mir = sample_mir();
+        let mut v = serde_json::json!({"version":8,"sources":{},"layers":[
+            {"id":"x","type":"fill","paint":{"fill-color":"rgb(0,0,0)"}}
+        ]});
+        optimize_style_json_value(
+            &mut v,
+            &mir,
+            &OptPasses {
+                minify_colors: true,
+                ..Default::default()
+            },
+        );
+        assert_eq!(v["layers"][0]["paint"]["fill-color"], "#000");
+    }
+
+    #[test]
+    fn minify_hsl_in_paint() {
+        let mir = sample_mir();
+        let mut v = serde_json::json!({"version":8,"sources":{},"layers":[
+            {"id":"x","type":"fill","paint":{"fill-color":"hsl(0, 0%, 100%)"}}
+        ]});
+        optimize_style_json_value(
+            &mut v,
+            &mir,
+            &OptPasses {
+                minify_colors: true,
+                ..Default::default()
+            },
+        );
+        assert_eq!(v["layers"][0]["paint"]["fill-color"], "#fff");
+    }
+
+    // ── Root default stripping ──────────────────────────────────────────
+
+    #[test]
+    fn strip_root_bearing_zero() {
+        let mir = sample_mir();
+        let mut v = serde_json::json!({"version":8,"sources":{},"layers":[],"bearing":0,"pitch":0,"roll":0});
+        optimize_style_json_value(
+            &mut v,
+            &mir,
+            &OptPasses {
+                cleanup: true,
+                ..Default::default()
+            },
+        );
+        assert!(v.get("bearing").is_none());
+        assert!(v.get("pitch").is_none());
+        assert!(v.get("roll").is_none());
+    }
+
+    #[test]
+    fn preserve_root_nonzero_bearing() {
+        let mir = sample_mir();
+        let mut v = serde_json::json!({"version":8,"sources":{},"layers":[],"bearing":45});
+        optimize_style_json_value(
+            &mut v,
+            &mir,
+            &OptPasses {
+                cleanup: true,
+                ..Default::default()
+            },
+        );
+        assert_eq!(v["bearing"], 45);
     }
 }

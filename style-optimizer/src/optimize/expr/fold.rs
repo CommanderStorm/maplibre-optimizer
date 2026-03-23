@@ -85,8 +85,11 @@ pub(super) fn try_fold_boolean_algebra(arr: &mut Vec<Value>) -> bool {
         Some("all") => "all",
         _ => return false,
     };
-    if arr.len() < 2 {
-        return false;
+    // Vacuous: ["all"] → true, ["any"] → false.
+    if arr.len() == 1 {
+        let result = op == "all"; // vacuous truth / vacuous disjunction
+        *arr = vec![Value::String("literal".to_string()), Value::Bool(result)];
+        return true;
     }
     let mut kept: Vec<Value> = Vec::new();
     let mut saw_true = false;

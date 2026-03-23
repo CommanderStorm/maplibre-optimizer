@@ -1394,12 +1394,6 @@ formatted_prop!(
     default = "".to_string()
 );
 
-impl Default for SymbolLayoutLayerTextField {
-    fn default() -> Self {
-        Self("".to_string())
-    }
-}
-
 array_prop!(
     SymbolLayoutLayerTextFont,
     doc = "Fonts to use for displaying text. If the `glyphs` root property is specified, this array is joined together and interpreted as a font stack name. Otherwise, it is interpreted as a cascading fallback list of local font names.",

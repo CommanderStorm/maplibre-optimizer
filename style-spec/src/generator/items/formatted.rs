@@ -21,15 +21,15 @@ pub fn generate(scope: &mut Scope, name: &str, field: &MirFormattedTextField) {
             .derive("serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone")
             .attr(fuzz::CFG_DERIVE_ARBITRARY)
             .tuple_field("std::string::String");
-    }
 
-    let default = &field.default;
-    scope
-        .new_impl(name)
-        .impl_trait("Default")
-        .new_fn("default")
-        .ret("Self")
-        .line(format!("Self({default:?}.to_string())"));
+        let default = &field.default;
+        scope
+            .new_impl(name)
+            .impl_trait("Default")
+            .new_fn("default")
+            .ret("Self")
+            .line(format!("Self({default:?}.to_string())"));
+    }
     generate_test_from_example_if_present(scope, name, field.meta.example.as_ref());
 }
 

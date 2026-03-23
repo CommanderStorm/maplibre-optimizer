@@ -74,6 +74,10 @@ pub struct OptimizeArgs {
     #[arg(long)]
     simplify_expressions: bool,
 
+    /// Minify CSS color strings to their shortest hex/rgba representation.
+    #[arg(long)]
+    minify_colors: bool,
+
     /// Remove empty `paint`/`layout` objects, `visibility:none` layers, and zero-opacity layers.
     #[arg(long)]
     cleanup: bool,
@@ -132,6 +136,7 @@ pub fn run(args: OptimizeArgs) -> anyhow::Result<()> {
             strip_metadata: args.strip_metadata,
             strip_defaults: args.strip_defaults,
             simplify_expressions: args.simplify_expressions,
+            minify_colors: args.minify_colors,
             cleanup: args.cleanup,
         }
     };

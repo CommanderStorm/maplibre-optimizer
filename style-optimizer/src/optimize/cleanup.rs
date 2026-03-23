@@ -2,7 +2,10 @@
 
 use std::collections::HashSet;
 
-use maplibre_style_spec::spec::{AnyLayer, MaplibreStyleSpecification, TypedLayer, Visibility};
+use maplibre_style_spec::spec::{
+    AnyLayer, LayerFilter, MaplibreStyleSpecification, RootBearing, RootPitch, RootRoll, RootState,
+    RootTransition, Transition, TransitionDelay, TransitionDuration, TypedLayer, Visibility,
+};
 
 use super::dead::{collect_used_sources, prune_sources};
 
@@ -50,6 +53,55 @@ pub(crate) fn cleanup(style: &mut MaplibreStyleSpecification) {
         // Prune unused sources.
         let used = collect_used_sources(&style.layers);
         prune_sources(style, &used);
+    }
+
+    // Strip trivially-true filters (filter that always evaluates to true is redundant).
+    strip_true_filters(style);
+
+    // Strip root-level properties that equal their spec defaults.
+    strip_root_defaults(style);
+}
+
+/// Remove `filter` when it is the literal `true` — identical to having no filter.
+fn strip_true_filters(style: &mut MaplibreStyleSpecification) {
+    for layer in &mut style.layers {
+        let filter = match layer {
+            AnyLayer::Typed(t) => &mut t.common_mut().filter,
+            AnyLayer::Ref(r) => &mut r.filter,
+        };
+        if filter.as_ref().is_some_and(LayerFilter::is_always_true) {
+            *filter = None;
+        }
+    }
+}
+
+/// Strip root-level optional fields that equal their spec-defined defaults.
+fn strip_root_defaults(style: &mut MaplibreStyleSpecification) {
+    if style.bearing.as_ref() == Some(&RootBearing::default()) {
+        style.bearing = None;
+    }
+    if style.pitch.as_ref() == Some(&RootPitch::default()) {
+        style.pitch = None;
+    }
+    if style.roll.as_ref() == Some(&RootRoll::default()) {
+        style.roll = None;
+    }
+    if style.state.as_ref() == Some(&RootState::default()) {
+        style.state = None;
+    }
+    if let Some(RootTransition(ref t)) = style.transition
+        && (*t
+            == (Transition {
+                delay: None,
+                duration: None,
+            })
+            || *t
+                == (Transition {
+                    delay: Some(TransitionDelay::default()),
+                    duration: Some(TransitionDuration::default()),
+                }))
+    {
+        style.transition = None;
     }
 }
 
