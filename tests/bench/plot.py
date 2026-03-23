@@ -62,8 +62,31 @@ METRIC_LABELS = {
 }
 
 
+VARIANT_COLORS = {
+    "original": "#3070B3",
+    "optimized": "#FED702",
+    "optimized-stats": "#D99208",
+    "optimized-rewritten": "#9FBA36",
+}
+
+
+BASELINE_VARIANT = "original"
+
+
+def non_orig_variants(df: pd.DataFrame) -> list[str]:
+    """Return variant names excluding the baseline."""
+    return [v for v in df["variant"].unique() if v != BASELINE_VARIANT]
+
+
+def variant_color_map(df: pd.DataFrame) -> dict[str, str]:
+    """Build a color map for the variants present in the data."""
+    present = df["variant"].unique()
+    return {v: VARIANT_COLORS.get(v, "#FFA15A") for v in present}
+
+
 def plot_box_comparison(df: pd.DataFrame, metrics: list[str], out: Path, fmt: str) -> None:
-    """Box plots comparing original vs optimized for each scenario."""
+    """Box plots comparing all variants for each scenario."""
+    colors = variant_color_map(df)
     for metric in metrics:
         fig = px.box(
             df,
@@ -72,7 +95,7 @@ def plot_box_comparison(df: pd.DataFrame, metrics: list[str], out: Path, fmt: st
             color="variant",
             title=f"{METRIC_LABELS.get(metric, metric)} by Scenario",
             labels={"scenario": "Scenario", metric: METRIC_LABELS.get(metric, metric)},
-            color_discrete_map={"original": "#636EFA", "optimized": "#00CC96"},
+            color_discrete_map=colors,
         )
         fig.update_layout(
             xaxis_tickangle=-45,
@@ -83,45 +106,63 @@ def plot_box_comparison(df: pd.DataFrame, metrics: list[str], out: Path, fmt: st
 
 
 def plot_delta_bar(df: pd.DataFrame, metrics: list[str], out: Path, fmt: str) -> None:
-    """Bar chart showing % change (optimized vs original) per scenario."""
+    """Bar chart showing % change (each variant vs original) per scenario."""
     medians = df.groupby(["scenario", "variant"])[metrics].median().reset_index()
-    orig = medians[medians.variant == "original"].set_index("scenario")
-    opt = medians[medians.variant == "optimized"].set_index("scenario")
+    orig = medians[medians.variant == BASELINE_VARIANT].set_index("scenario")
 
-    deltas = ((opt[metrics] - orig[metrics]) / orig[metrics] * 100).reset_index()
+    variants = non_orig_variants(df)
 
     for metric in metrics:
         lower_better = metric in LOWER_IS_BETTER
-        colors = [
-            "#00CC96" if (v < 0) == lower_better else "#EF553B"
-            for v in deltas[metric]
-        ]
-        fig = go.Figure(go.Bar(
-            x=deltas["scenario"],
-            y=deltas[metric],
-            marker_color=colors,
-            text=[f"{v:+.1f}%" for v in deltas[metric]],
-            textposition="outside",
-        ))
+        fig = go.Figure()
+
+        for variant in variants:
+            opt = medians[medians.variant == variant].set_index("scenario")
+            # Only include scenarios present in both
+            common = orig.index.intersection(opt.index)
+            if common.empty:
+                continue
+            delta_vals = ((opt.loc[common, metric] - orig.loc[common, metric]) / orig.loc[common, metric] * 100)
+            color = VARIANT_COLORS.get(variant, "#FFA15A")
+            fig.add_trace(go.Bar(
+                x=delta_vals.index,
+                y=delta_vals.values,
+                name=variant,
+                marker_color=color,
+                text=[f"{v:+.1f}%" for v in delta_vals.values],
+                textposition="outside",
+            ))
+
         fig.update_layout(
             title=f"Optimization Impact: {METRIC_LABELS.get(metric, metric)}",
             xaxis_title="Scenario",
             yaxis_title="Change (%)",
             xaxis_tickangle=-45,
+            barmode="group",
             template="plotly_white",
         )
         write_fig(fig, out, f"delta_{metric}", fmt)
 
 
 def plot_geo_map(df: pd.DataFrame, metrics: list[str], out: Path, fmt: str) -> None:
-    """Scatter map showing per-location delta for each metric."""
-    medians = df.groupby(["scenario", "variant", "location", "lat", "lng"])[metrics].median().reset_index()
-    orig = medians[medians.variant == "original"].set_index("scenario")
-    opt = medians[medians.variant == "optimized"].set_index("scenario")
+    """Scatter map showing per-location delta for each metric (best non-original variant)."""
+    variants = non_orig_variants(df)
+    # Use the last (most optimized) variant for geo maps
+    best_variant = variants[-1] if variants else None
+    if best_variant is None:
+        return
 
-    geo = orig[["location", "lat", "lng"]].copy()
+    medians = df.groupby(["scenario", "variant", "location", "lat", "lng"])[metrics].median().reset_index()
+    orig = medians[medians.variant == BASELINE_VARIANT].set_index("scenario")
+    opt = medians[medians.variant == best_variant].set_index("scenario")
+
+    common = orig.index.intersection(opt.index)
+    if common.empty:
+        return
+
+    geo = orig.loc[common, ["location", "lat", "lng"]].copy()
     for metric in metrics:
-        geo[f"delta_{metric}"] = ((opt[metric].values - orig[metric].values) / orig[metric].values * 100)
+        geo[f"delta_{metric}"] = ((opt.loc[common, metric].values - orig.loc[common, metric].values) / orig.loc[common, metric].values * 100)
 
     # Aggregate per location (average across animations at same location)
     geo_agg = geo.groupby(["location", "lat", "lng"]).mean(numeric_only=True).reset_index()
@@ -129,7 +170,6 @@ def plot_geo_map(df: pd.DataFrame, metrics: list[str], out: Path, fmt: str) -> N
     for metric in metrics:
         col = f"delta_{metric}"
         lower_better = metric in LOWER_IS_BETTER
-        # For color: green = good, red = bad
         geo_agg["improvement"] = geo_agg[col] * (-1 if lower_better else 1)
 
         fig = px.scatter_geo(
@@ -141,7 +181,7 @@ def plot_geo_map(df: pd.DataFrame, metrics: list[str], out: Path, fmt: str) -> N
             color_continuous_scale="RdYlGn",
             hover_name="location",
             hover_data={col: ":.1f", "lat": False, "lng": False, "improvement": False},
-            title=f"Optimization Impact by Location: {METRIC_LABELS.get(metric, metric)}",
+            title=f"Optimization Impact by Location ({best_variant}): {METRIC_LABELS.get(metric, metric)}",
             projection="natural earth",
         )
         fig.update_layout(
@@ -152,7 +192,8 @@ def plot_geo_map(df: pd.DataFrame, metrics: list[str], out: Path, fmt: str) -> N
 
 
 def plot_frame_time_distribution(df: pd.DataFrame, out: Path, fmt: str) -> None:
-    """Histogram of p95 frame times across all runs, original vs optimized."""
+    """Histogram of p95 frame times across all runs, all variants."""
+    colors = variant_color_map(df)
     fig = px.histogram(
         df,
         x="p95FrameMs",
@@ -162,7 +203,7 @@ def plot_frame_time_distribution(df: pd.DataFrame, out: Path, fmt: str) -> None:
         nbins=40,
         title="P95 Frame Time Distribution",
         labels={"p95FrameMs": "P95 Frame Time (ms)"},
-        color_discrete_map={"original": "#636EFA", "optimized": "#00CC96"},
+        color_discrete_map=colors,
     )
     fig.update_layout(template="plotly_white")
     write_fig(fig, out, "hist_p95", fmt)

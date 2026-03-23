@@ -6,9 +6,10 @@
  * across diverse geographic locations and camera animations using headless Chrome.
  *
  * Usage:
- *   just bench                          # run all 18 scenarios, 15 runs each
- *   just bench --runs 1 munich-zigzag   # single quick scenario
- *   just bench-debug tokyo              # with browser console output
+ *   just bench                                      # run all scenarios, 15 runs each (original + optimized)
+ *   just bench --runs 1 munich-zigzag               # single quick scenario
+ *   just bench --mbtiles /path/to/tiles.mbtiles     # enable stats & rewritten variants
+ *   just bench-debug tokyo                          # with browser console output
  */
 
 import path from "node:path";
@@ -43,13 +44,16 @@ const argv = process.argv.slice(2);
 const debug = argv.includes("--debug");
 const runsArg = argv.findIndex((a) => a === "--runs");
 const warmupArg = argv.findIndex((a) => a === "--warmup");
+const mbtilesArg = argv.findIndex((a) => a === "--mbtiles");
 const RUNS = runsArg >= 0 ? parseInt(argv[runsArg + 1], 10) : 15;
 const WARMUP = warmupArg >= 0 ? parseInt(argv[warmupArg + 1], 10) : 1;
+const MBTILES = mbtilesArg >= 0 ? argv[mbtilesArg + 1] : undefined;
 const filters = argv.filter(
   (a, i) =>
     !a.startsWith("--") &&
     i !== runsArg + 1 &&
-    i !== warmupArg + 1,
+    i !== warmupArg + 1 &&
+    i !== mbtilesArg + 1,
 );
 
 const RUN_TIMEOUT = 120_000;
@@ -73,11 +77,16 @@ interface AggregatedMetrics {
   stddev: RunMetrics;
 }
 
+interface Variant {
+  id: string;
+  label: string;
+  styleJson: string;
+}
+
 interface ScenarioResult {
   scenarioId: string;
-  original: AggregatedMetrics;
-  optimized: AggregatedMetrics;
-  delta: Record<keyof RunMetrics, number>;
+  variants: Record<string, AggregatedMetrics>;
+  deltas: Record<string, Record<keyof RunMetrics, number>>;
   scenario: Scenario;
 }
 
@@ -90,16 +99,15 @@ interface BenchResult {
     maplibreVersion: string;
     renderer: string;
     optimizerFlags: string;
-    styleSizeOriginal: number;
-    styleSizeOptimized: number;
+    variants: { id: string; label: string; sizeBytes: number }[];
   };
   scenarios: ScenarioResult[];
-  summary: {
+  summary: Record<string, {
     avgLoadDelta: number;
     avgIdleDelta: number;
     avgFpsDelta: number;
     avgP95FrameDelta: number;
-  };
+  }>;
 }
 
 // ── Puppeteer args (same SwiftShader setup as render tests) ──────────────────
@@ -143,12 +151,12 @@ async function fetchStyle(): Promise<string> {
 
 // ── optimize style via Rust binary ───────────────────────────────────────────
 
-function optimizeStyle(styleJson: string): string {
+function optimizeStyle(styleJson: string, extraArgs: string[] = []): string {
   const tmpIn = path.join(RESULTS_DIR, "_bench_input.json");
   const tmpOut = path.join(RESULTS_DIR, "_bench_output.json");
   fs.writeFileSync(tmpIn, styleJson);
   try {
-    execFileSync(OPTIMIZER, ["optimize", "--input", tmpIn, "--output", tmpOut, "--all"], {
+    execFileSync(OPTIMIZER, ["optimize", "--input", tmpIn, "--output", tmpOut, "--all", ...extraArgs], {
       timeout: 30_000,
     });
     return fs.readFileSync(tmpOut, "utf8");
@@ -156,6 +164,87 @@ function optimizeStyle(styleJson: string): string {
     try { fs.unlinkSync(tmpIn); } catch {}
     try { fs.unlinkSync(tmpOut); } catch {}
   }
+}
+
+function collectStats(mbtilesPath: string, outputPath: string): void {
+  execFileSync(OPTIMIZER, [
+    "stats", "--input", mbtilesPath, "--source-name", "openmaptiles", "--output", outputPath,
+  ], { timeout: 120_000 });
+}
+
+function optimizeWithStats(styleJson: string, statsPath: string, advisoryPath?: string): string {
+  const args = ["--stats", statsPath];
+  if (advisoryPath) args.push("--advisory", advisoryPath);
+  return optimizeStyle(styleJson, args);
+}
+
+function applyAdvisory(advisoryPath: string, mbtilesPath: string, stylePath: string, outputDir: string): { style: string; tiles: string } | null {
+  try {
+    fs.mkdirSync(outputDir, { recursive: true });
+    execFileSync(OPTIMIZER, [
+      "advisory", "--advisory", advisoryPath, "--tiles", mbtilesPath, "--style", stylePath, "--output", outputDir,
+    ], { timeout: 120_000 });
+    // Read the rewritten style from the output directory
+    const rewrittenStyle = path.join(outputDir, path.basename(stylePath));
+    if (fs.existsSync(rewrittenStyle)) {
+      return { style: fs.readFileSync(rewrittenStyle, "utf8"), tiles: path.join(outputDir, path.basename(mbtilesPath)) };
+    }
+    return null;
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.warn(`  Advisory command failed (may not be implemented yet): ${msg}`);
+    return null;
+  }
+}
+
+function formatKB(json: string): string {
+  return `${(Buffer.byteLength(json, "utf8") / 1024).toFixed(1)} KB`;
+}
+
+function buildVariants(originalStyleJson: string): Variant[] {
+  const variants: Variant[] = [
+    { id: "original", label: "Original", styleJson: originalStyleJson },
+  ];
+
+  // Optimized (no stats)
+  console.log("Optimizing style (no stats)…");
+  const optimizedJson = optimizeStyle(originalStyleJson);
+  variants.push({ id: "optimized", label: "Optimized", styleJson: optimizedJson });
+  console.log(`  Optimized: ${formatKB(optimizedJson)}`);
+
+  if (MBTILES) {
+    // Collect stats
+    const statsPath = path.join(RESULTS_DIR, "_bench_stats.json");
+    console.log(`Collecting tile statistics from ${MBTILES}…`);
+    collectStats(MBTILES, statsPath);
+
+    // Optimized with stats
+    console.log("Optimizing style (with stats)…");
+    const advisoryPath = path.join(RESULTS_DIR, "_bench_advisory.json");
+    const optimizedStatsJson = optimizeWithStats(originalStyleJson, statsPath, advisoryPath);
+    variants.push({ id: "optimized-stats", label: "Optimized+Stats", styleJson: optimizedStatsJson });
+    console.log(`  Optimized+Stats: ${formatKB(optimizedStatsJson)}`);
+
+    // Advisory rewrite
+    if (fs.existsSync(advisoryPath)) {
+      console.log("Applying advisory rewrite…");
+      const tmpStylePath = path.join(RESULTS_DIR, "_bench_stats_style.json");
+      fs.writeFileSync(tmpStylePath, optimizedStatsJson);
+      const advisoryOutputDir = path.join(RESULTS_DIR, "_bench_advisory_output");
+      const result = applyAdvisory(advisoryPath, MBTILES, tmpStylePath, advisoryOutputDir);
+      if (result) {
+        variants.push({ id: "optimized-rewritten", label: "Optimized+Rewritten", styleJson: result.style });
+        console.log(`  Optimized+Rewritten: ${formatKB(result.style)}`);
+      } else {
+        console.warn("  Skipping optimized-rewritten variant (advisory not available)");
+      }
+      try { fs.unlinkSync(tmpStylePath); } catch {}
+    }
+
+    try { fs.unlinkSync(statsPath); } catch {}
+  }
+
+  return variants;
 }
 
 // ── browser-side benchmark harness (plain JS, no tsx transforms) ─────────────
@@ -271,19 +360,21 @@ function rewriteStyleForProxy(styleJson: string): string {
 
 // ── run a single benchmark in the browser ────────────────────────────────────
 
+// Read CSS once at module level — avoid re-reading the same file on every benchmark run
+const MAPLIBRE_CSS_TEXT = fs.readFileSync(MAPLIBRE_CSS, "utf8");
+
 async function runBenchmarkInBrowser(
   page: Page,
   styleJson: string,
   scenario: Scenario,
 ): Promise<RunMetrics> {
   await page.setViewport({ width: 1024, height: 768, deviceScaleFactor: 1 });
-  const cssText = fs.readFileSync(MAPLIBRE_CSS, "utf8");
   await page.setContent(`<!DOCTYPE html>
 <html><head><meta charset="utf-8">
 <style>
 body { margin: 0; }
 #map { width: 1024px; height: 768px; }
-${cssText}
+${MAPLIBRE_CSS_TEXT}
 </style>
 </head><body><div id="map"></div></body></html>`);
 
@@ -383,18 +474,20 @@ function computeDeltas(
 
 // ── console output formatting ────────────────────────────────────────────────
 
-function printTable(results: ScenarioResult[]): void {
-  const header = [
-    "Scenario".padEnd(26),
-    "Load(ms)".padEnd(15),
-    "Idle(ms)".padEnd(15),
-    "FPS".padEnd(15),
-    "Δ Load".padEnd(9),
-    "Δ Idle".padEnd(9),
-    "Δ FPS".padEnd(9),
-    "Δ p95".padEnd(9),
-  ].join("│ ");
+const TABLE_COLUMNS: { suffix: string; key: keyof RunMetrics; lowerIsBetter: boolean }[] = [
+  { suffix: "ΔLoad", key: "loadMs", lowerIsBetter: true },
+  { suffix: "ΔFPS", key: "fps", lowerIsBetter: false },
+  { suffix: "Δp95", key: "p95FrameMs", lowerIsBetter: true },
+];
 
+function printTable(results: ScenarioResult[], nonOrigVariants: Variant[]): void {
+  const headerParts = ["Scenario".padEnd(26)];
+  for (const v of nonOrigVariants) {
+    for (const col of TABLE_COLUMNS) {
+      headerParts.push(`${v.label} ${col.suffix}`.padEnd(10));
+    }
+  }
+  const header = headerParts.join("│ ");
   const sep = "─".repeat(header.length);
 
   console.log("\n" + sep);
@@ -402,21 +495,14 @@ function printTable(results: ScenarioResult[]): void {
   console.log(sep);
 
   for (const r of results) {
-    const om = r.original.median;
-    const optm = r.optimized.median;
-    const d = r.delta;
-
-    const row = [
-      r.scenarioId.padEnd(26),
-      `${om.loadMs.toFixed(0)} / ${optm.loadMs.toFixed(0)}`.padEnd(15),
-      `${om.idleMs.toFixed(0)} / ${optm.idleMs.toFixed(0)}`.padEnd(15),
-      `${om.fps.toFixed(1)} / ${optm.fps.toFixed(1)}`.padEnd(15),
-      colorDelta(d.loadMs, true).padEnd(9),
-      colorDelta(d.idleMs, true).padEnd(9),
-      colorDelta(d.fps, false).padEnd(9),
-      colorDelta(d.p95FrameMs, true).padEnd(9),
-    ].join("│ ");
-    console.log(row);
+    const rowParts = [r.scenarioId.padEnd(26)];
+    for (const v of nonOrigVariants) {
+      const d = r.deltas[v.id];
+      for (const col of TABLE_COLUMNS) {
+        rowParts.push(d ? colorDelta(d[col.key], col.lowerIsBetter).padEnd(10) : "n/a".padEnd(10));
+      }
+    }
+    console.log(rowParts.join("│ "));
   }
   console.log(sep);
 }
@@ -455,11 +541,11 @@ async function main(): Promise<void> {
   const remoteStyleJson = await fetchStyle();
   const originalStyleJson = rewriteStyleForProxy(remoteStyleJson);
   const originalSize = Buffer.byteLength(originalStyleJson, "utf8");
-  console.log(`Original style: ${(originalSize / 1024).toFixed(1)} KB (URLs rewritten to local proxy)`);
+  console.log(`Original style: ${(originalSize / 1024).toFixed(1)} KB (URLs rewritten to local proxy)\n`);
 
-  const optimizedStyleJson = optimizeStyle(originalStyleJson);
-  const optimizedSize = Buffer.byteLength(optimizedStyleJson, "utf8");
-  console.log(`Optimized style: ${(optimizedSize / 1024).toFixed(1)} KB (${((1 - optimizedSize / originalSize) * 100).toFixed(1)}% smaller)`);
+  // Build all variants (optimize, stats, advisory — all outside the bench loop)
+  const variants = buildVariants(originalStyleJson);
+  console.log(`\nActive variants: ${variants.map((v) => v.id).join(", ")}`);
 
   // Resolve scenarios
   const allScenarios = getAllScenarios();
@@ -491,11 +577,11 @@ async function main(): Promise<void> {
     const scenario = scenarios[si];
     console.log(`[${si + 1}/${scenarios.length}] ${scenario.id} (${scenario.location.name}, ${scenario.animationType})`);
 
-    const origRuns: RunMetrics[] = [];
-    const optRuns: RunMetrics[] = [];
+    const variantRuns: Record<string, RunMetrics[]> = {};
+    for (const v of variants) variantRuns[v.id] = [];
     const totalRuns = WARMUP + RUNS;
 
-    // Interleaved: orig, opt, orig, opt, ...
+    // Interleaved: run all variants in sequence per iteration
     for (let run = 0; run < totalRuns; run++) {
       const isWarmup = run < WARMUP;
       const label = isWarmup ? `warmup ${run + 1}` : `run ${run - WARMUP + 1}/${RUNS}`;
@@ -510,21 +596,23 @@ async function main(): Promise<void> {
         timestamp,
       };
 
-      // Original run
-      {
+      const parts: string[] = [];
+
+      for (let vi = 0; vi < variants.length; vi++) {
+        const variant = variants[vi];
         const page = await browser.newPage();
         applyDebugListeners(page);
 
         try {
-          const metrics = await runBenchmarkInBrowser(page, originalStyleJson, scenario);
+          const metrics = await runBenchmarkInBrowser(page, variant.styleJson, scenario);
           if (!isWarmup) {
-            origRuns.push(metrics);
-            fs.writeSync(jsonlFd, JSON.stringify({ ...jsonlBase, variant: "original", run: run - WARMUP + 1, ...metrics }) + "\n");
+            variantRuns[variant.id].push(metrics);
+            fs.writeSync(jsonlFd, JSON.stringify({ ...jsonlBase, variant: variant.id, run: run - WARMUP + 1, ...metrics }) + "\n");
           }
-          process.stdout.write(`  ${label} orig: load=${metrics.loadMs.toFixed(0)}ms fps=${metrics.fps.toFixed(1)}`);
+          parts.push(`${variant.id}: load=${metrics.loadMs.toFixed(0)}ms fps=${metrics.fps.toFixed(1)}`);
         } catch (err: unknown) {
           const msg = err instanceof Error ? err.message : String(err);
-          process.stdout.write(`  ${label} orig: ERROR ${msg}`);
+          parts.push(`${variant.id}: ERROR ${msg}`);
           if (msg.includes("Session closed") || msg.includes("Target closed") || msg.includes("Protocol error")) {
             console.log("\n  Recovering browser…");
             try { await browser.close(); } catch {}
@@ -535,40 +623,30 @@ async function main(): Promise<void> {
         }
       }
 
-      // Optimized run
-      {
-        const page = await browser.newPage();
-        applyDebugListeners(page);
+      console.log(`  ${label} ${parts.join(" | ")}`);
+    }
 
-        try {
-          const metrics = await runBenchmarkInBrowser(page, optimizedStyleJson, scenario);
-          if (!isWarmup) {
-            optRuns.push(metrics);
-            fs.writeSync(jsonlFd, JSON.stringify({ ...jsonlBase, variant: "optimized", run: run - WARMUP + 1, ...metrics }) + "\n");
-          }
-          console.log(` | opt: load=${metrics.loadMs.toFixed(0)}ms fps=${metrics.fps.toFixed(1)}`);
-        } catch (err: unknown) {
-          const msg = err instanceof Error ? err.message : String(err);
-          console.log(` | opt: ERROR ${msg}`);
-          if (msg.includes("Session closed") || msg.includes("Target closed") || msg.includes("Protocol error")) {
-            console.log("  Recovering browser…");
-            try { await browser.close(); } catch {}
-            browser = await puppeteer.launch({ headless: true, args: PUPPETEER_ARGS });
-          }
-        } finally {
-          try { await page.close(); } catch {}
-        }
+    // Aggregate results — require at least original to have runs
+    if (variantRuns["original"].length === 0) {
+      console.log(`  Skipping ${scenario.id} — no successful original runs`);
+      continue;
+    }
+
+    const aggregated: Record<string, AggregatedMetrics> = {};
+    for (const v of variants) {
+      if (variantRuns[v.id].length > 0) {
+        aggregated[v.id] = aggregate(variantRuns[v.id]);
       }
     }
 
-    if (origRuns.length > 0 && optRuns.length > 0) {
-      const original = aggregate(origRuns);
-      const optimized = aggregate(optRuns);
-      const delta = computeDeltas(original, optimized);
-      results.push({ scenarioId: scenario.id, original, optimized, delta, scenario });
-    } else {
-      console.log(`  Skipping ${scenario.id} — insufficient successful runs`);
+    const deltas: Record<string, Record<keyof RunMetrics, number>> = {};
+    for (const v of variants) {
+      if (v.id !== "original" && aggregated[v.id]) {
+        deltas[v.id] = computeDeltas(aggregated["original"], aggregated[v.id]);
+      }
     }
+
+    results.push({ scenarioId: scenario.id, variants: aggregated, deltas, scenario });
   }
 
   await browser.close();
@@ -580,20 +658,35 @@ async function main(): Promise<void> {
     process.exit(1);
   }
 
-  printTable(results);
-
-  // Summary averages
-  const avgLoadDelta = results.reduce((s, r) => s + r.delta.loadMs, 0) / results.length;
-  const avgIdleDelta = results.reduce((s, r) => s + r.delta.idleMs, 0) / results.length;
-  const avgFpsDelta = results.reduce((s, r) => s + r.delta.fps, 0) / results.length;
-  const avgP95FrameDelta = results.reduce((s, r) => s + r.delta.p95FrameMs, 0) / results.length;
+  const nonOrigVariants = variants.filter((v) => v.id !== "original");
+  printTable(results, nonOrigVariants);
+  const summary: BenchResult["summary"] = {};
 
   console.log("\n── Summary ──");
-  console.log(`  Avg load delta:  ${colorDelta(avgLoadDelta, true)}`);
-  console.log(`  Avg idle delta:  ${colorDelta(avgIdleDelta, true)}`);
-  console.log(`  Avg FPS delta:   ${colorDelta(avgFpsDelta, false)}`);
-  console.log(`  Avg p95 frame delta: ${colorDelta(avgP95FrameDelta, true)}`);
-  console.log(`  Style size: ${(originalSize / 1024).toFixed(1)} KB → ${(optimizedSize / 1024).toFixed(1)} KB (${((1 - optimizedSize / originalSize) * 100).toFixed(1)}% reduction)`);
+  for (const v of nonOrigVariants) {
+    const withDelta = results.filter((r) => r.deltas[v.id]);
+    if (withDelta.length === 0) continue;
+    const avgLoadDelta = withDelta.reduce((s, r) => s + r.deltas[v.id].loadMs, 0) / withDelta.length;
+    const avgIdleDelta = withDelta.reduce((s, r) => s + r.deltas[v.id].idleMs, 0) / withDelta.length;
+    const avgFpsDelta = withDelta.reduce((s, r) => s + r.deltas[v.id].fps, 0) / withDelta.length;
+    const avgP95FrameDelta = withDelta.reduce((s, r) => s + r.deltas[v.id].p95FrameMs, 0) / withDelta.length;
+    summary[v.id] = { avgLoadDelta, avgIdleDelta, avgFpsDelta, avgP95FrameDelta };
+
+    console.log(`  [${v.label}]`);
+    console.log(`    Avg load delta:  ${colorDelta(avgLoadDelta, true)}`);
+    console.log(`    Avg idle delta:  ${colorDelta(avgIdleDelta, true)}`);
+    console.log(`    Avg FPS delta:   ${colorDelta(avgFpsDelta, false)}`);
+    console.log(`    Avg p95 frame delta: ${colorDelta(avgP95FrameDelta, true)}`);
+  }
+
+  // Style sizes
+  console.log("\n  Style sizes:");
+  for (const v of variants) {
+    const pct = v.id === "original"
+      ? ""
+      : ` (${((1 - Buffer.byteLength(v.styleJson, "utf8") / originalSize) * 100).toFixed(1)}% smaller)`;
+    console.log(`    ${v.label}: ${formatKB(v.styleJson)}${pct}`);
+  }
 
   fs.closeSync(jsonlFd);
 
@@ -607,11 +700,14 @@ async function main(): Promise<void> {
       maplibreVersion: getMaplibreVersion(),
       renderer: "SwiftShader (headless Chrome)",
       optimizerFlags: "--all",
-      styleSizeOriginal: originalSize,
-      styleSizeOptimized: optimizedSize,
+      variants: variants.map((v) => ({
+        id: v.id,
+        label: v.label,
+        sizeBytes: Buffer.byteLength(v.styleJson, "utf8"),
+      })),
     },
     scenarios: results,
-    summary: { avgLoadDelta, avgIdleDelta, avgFpsDelta, avgP95FrameDelta },
+    summary,
   };
 
   const outPath = path.join(RESULTS_DIR, `bench-${timestamp}.json`);
