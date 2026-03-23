@@ -12,6 +12,9 @@
  *   just render-test                     # run all
  *   just render-test background-color    # filter by name
  *   just render-test --debug             # show browser console
+ *   just render-test --stats stats.json  # pass tile stats to optimizer
+ *
+ * When a test fails, individual passes are automatically bisected to identify culprits.
  */
 
 import path from "node:path";
@@ -70,6 +73,7 @@ interface TestStyle {
 interface FailedTest {
   id: string;
   ratio: number;
+  culpritPasses?: string[];
 }
 
 interface ErroredTest {
@@ -81,7 +85,20 @@ interface ErroredTest {
 
 const argv = process.argv.slice(2);
 const debug = argv.includes("--debug");
-const filters = argv.filter((a) => !a.startsWith("--"));
+
+let statsPath: string | undefined;
+const statsIdx = argv.indexOf("--stats");
+if (statsIdx !== -1 && statsIdx + 1 < argv.length) {
+  statsPath = argv[statsIdx + 1];
+  if (!fs.existsSync(statsPath)) {
+    console.error(`Stats file not found: ${statsPath}`);
+    process.exit(1);
+  }
+}
+
+const filters = argv.filter(
+  (a, i) => !a.startsWith("--") && argv[i - 1] !== "--stats",
+);
 
 // ── asset server ─────────────────────────────────────────────────────────────
 
@@ -281,14 +298,18 @@ function discoverTests(port: number): { styles: TestStyle[]; skipped: number } {
 
 // ── optimise a style JSON via our Rust binary ────────────────────────────────
 
-function optimizeStyle(styleJSON: TestStyle): TestStyle {
+function optimizeStyleWithPasses(
+  styleJSON: TestStyle,
+  passFlags: string[],
+  stats?: string,
+): TestStyle {
   const tmpIn = path.join(RESULTS_DIR, "_opt_input.json");
   const tmpOut = path.join(RESULTS_DIR, "_opt_output.json");
   fs.writeFileSync(tmpIn, JSON.stringify(styleJSON));
   try {
-    execFileSync(OPTIMIZER, ["optimize", "--input", tmpIn, "--output", tmpOut, "--all"], {
-      timeout: 30_000,
-    });
+    const args = ["optimize", "--input", tmpIn, "--output", tmpOut, ...passFlags];
+    if (stats) args.push("--stats", stats);
+    execFileSync(OPTIMIZER, args, { timeout: 30_000 });
     return JSON.parse(fs.readFileSync(tmpOut, "utf8"));
   } finally {
     try {
@@ -298,6 +319,63 @@ function optimizeStyle(styleJSON: TestStyle): TestStyle {
       fs.unlinkSync(tmpOut);
     } catch {}
   }
+}
+
+function optimizeStyle(styleJSON: TestStyle): TestStyle {
+  return optimizeStyleWithPasses(styleJSON, ["--all"], statsPath);
+}
+
+function restoreTestMetadata(optimised: TestStyle, original: TestStyle): void {
+  optimised.metadata = optimised.metadata || ({} as TestStyle["metadata"]);
+  optimised.metadata.test = original.metadata.test;
+}
+
+// ── bisect: find which individual passes cause a diff ────────────────────────
+
+const PASS_FLAGS = [
+  "--simplify-unary",
+  "--expression-kind",
+  "--constant-fold",
+  "--dead-elimination",
+  "--metadata-refinement",
+  "--selectivity-reorder",
+  "--strip-metadata",
+  "--strip-defaults",
+  "--simplify-expressions",
+  "--cleanup",
+] as const;
+
+async function bisectPasses(
+  page: Page,
+  style: TestStyle,
+  origPixels: Uint8Array,
+  w: number,
+  h: number,
+  allowed: number,
+  threshold: number,
+): Promise<string[]> {
+  const culprits: string[] = [];
+  const styleSnapshot = JSON.stringify(style);
+  const layersSnapshot = JSON.stringify(style.layers);
+  for (const flag of PASS_FLAGS) {
+    try {
+      const opt = optimizeStyleWithPasses(JSON.parse(styleSnapshot) as TestStyle, [flag], statsPath);
+      restoreTestMetadata(opt, style);
+
+      // Skip render if this pass didn't change the style
+      if (JSON.stringify(opt.layers) === layersSnapshot) continue;
+
+      const pixels = await renderStyle(page, opt);
+      const { ratio } = comparePixels(origPixels, pixels, w, h, threshold);
+      if (ratio > allowed) {
+        culprits.push(flag);
+      }
+    } catch {
+      // If a single pass errors, note it but continue
+      culprits.push(`${flag}(error)`);
+    }
+  }
+  return culprits;
 }
 
 // ── browser-side render function (plain JS string to avoid tsx transforms) ───
@@ -511,9 +589,7 @@ async function main(): Promise<void> {
         JSON.parse(JSON.stringify(style)) as TestStyle,
       );
 
-      // The optimizer may strip metadata; restore test metadata for rendering
-      optimised.metadata = optimised.metadata || ({} as TestStyle["metadata"]);
-      optimised.metadata.test = style.metadata.test;
+      restoreTestMetadata(optimised, style);
 
       // 3. render optimised
       const optPixels = await renderStyle(page, optimised);
@@ -531,7 +607,20 @@ async function main(): Promise<void> {
         passed.push(id);
         console.log(`${index}/${styles.length}: passed ${id}`);
       } else {
-        failed.push({ id, ratio });
+        const entry: FailedTest = { id, ratio };
+
+        console.log(`  Bisecting passes for ${id}…`);
+        const culprits = await bisectPasses(
+          page, style, origPixels, w, h, allowed, threshold,
+        );
+        entry.culpritPasses = culprits;
+        if (culprits.length > 0) {
+          console.log(`  Culprits: ${culprits.join(", ")}`);
+        } else {
+          console.log(`  No single pass triggers the failure (interaction effect)`);
+        }
+
+        failed.push(entry);
         console.log(
           `\x1b[31m${index}/${styles.length}: FAILED ${id}  diff=${ratio.toFixed(6)}\x1b[0m`,
         );
@@ -591,8 +680,15 @@ async function main(): Promise<void> {
   if (failed.length || errored.length) {
     if (failed.length) {
       console.log("\nFailed tests:");
-      for (const f of failed)
-        console.log(`  ${f.id}  diff=${f.ratio.toFixed(6)}`);
+      for (const f of failed) {
+        let line = `  ${f.id}  diff=${f.ratio.toFixed(6)}`;
+        if (f.culpritPasses) {
+          line += f.culpritPasses.length > 0
+            ? `  culprits: ${f.culpritPasses.join(", ")}`
+            : "  culprits: (interaction effect)";
+        }
+        console.log(line);
+      }
     }
     if (errored.length) {
       console.log("\nErrored tests:");
