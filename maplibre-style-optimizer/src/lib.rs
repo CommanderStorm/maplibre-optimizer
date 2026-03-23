@@ -6,6 +6,7 @@
 //! JSON wrappers [`optimize_style_json_value`] / [`optimize_style_json_value_with_stats`]
 //! are provided for backward compatibility.
 
+pub mod advisory;
 mod optimize;
 pub mod stats;
 
@@ -15,6 +16,7 @@ use std::path::Path;
 use anyhow::Context;
 use maplibre_style_spec::decoder::StyleReference;
 use maplibre_style_spec::mir::MirSpec;
+pub use advisory::{TilePruningAdvisory, compute_advisory};
 pub use optimize::{
     OptPasses, optimize_style, optimize_style_json_value, optimize_style_json_value_with_stats,
 };

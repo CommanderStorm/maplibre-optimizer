@@ -19,10 +19,10 @@ mod dead;
 mod defaults;
 pub(crate) mod expr;
 mod metadata;
-mod selectivity;
+pub(crate) mod selectivity;
 pub(crate) mod source_util;
 mod strip;
-mod walk;
+pub(crate) mod walk;
 mod zoom;
 
 use cleanup::cleanup;

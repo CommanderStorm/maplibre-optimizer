@@ -306,7 +306,7 @@ fn is_get_expr(v: &Value) -> bool {
     matches!(v, Value::Array(a) if a.len() == 2 && a[0].as_str() == Some("get"))
 }
 
-fn get_prop_name(v: &Value) -> Option<&str> {
+pub(crate) fn get_prop_name(v: &Value) -> Option<&str> {
     let Value::Array(a) = v else { return None };
     if a.len() == 2 && a[0].as_str() == Some("get") {
         a[1].as_str()
@@ -315,7 +315,7 @@ fn get_prop_name(v: &Value) -> Option<&str> {
     }
 }
 
-fn extract_get_and_literal<'a>(lhs: &'a Value, rhs: &'a Value) -> Option<(&'a str, Value)> {
+pub(crate) fn extract_get_and_literal<'a>(lhs: &'a Value, rhs: &'a Value) -> Option<(&'a str, Value)> {
     if let Some(prop) = get_prop_name(lhs) {
         let lit = extract_json_literal(rhs)?;
         return Some((prop, lit));

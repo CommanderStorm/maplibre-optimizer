@@ -4,8 +4,8 @@ use std::path::PathBuf;
 use anyhow::Context;
 use clap::Parser;
 use maplibre_style_optimizer::{
-    OptPasses, TileStatistics, ensure_expression_operator, load_intermediate_spec_from_v8_path,
-    optimize_style_json_value_with_stats,
+    OptPasses, TileStatistics, compute_advisory, ensure_expression_operator,
+    load_intermediate_spec_from_v8_path, optimize_style_json_value_with_stats,
 };
 use maplibre_style_spec::validate::validate_style_value;
 
@@ -86,6 +86,10 @@ struct Cli {
     /// Pretty-print JSON output (default: compact).
     #[arg(long)]
     pretty: bool,
+
+    /// Write a tile pruning advisory JSON to this path (requires --stats).
+    #[arg(long)]
+    advisory: Option<PathBuf>,
 }
 
 fn default_reference_path() -> PathBuf {
@@ -134,6 +138,16 @@ fn main() -> anyhow::Result<()> {
         }
     };
     optimize_style_json_value_with_stats(&mut value, &mir, &passes, tile_stats.as_ref());
+
+    if let Some(advisory_path) = &cli.advisory {
+        let stats = tile_stats
+            .as_ref()
+            .ok_or_else(|| anyhow::anyhow!("--advisory requires --stats"))?;
+        let advisory = compute_advisory(&value, stats);
+        let advisory_json = serde_json::to_string_pretty(&advisory)?;
+        fs::write(advisory_path, advisory_json)
+            .with_context(|| advisory_path.display().to_string())?;
+    }
 
     if cli.validate {
         validate_style_value(&value).map_err(anyhow::Error::msg)?;

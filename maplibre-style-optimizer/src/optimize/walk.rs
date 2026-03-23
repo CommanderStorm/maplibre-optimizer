@@ -128,7 +128,7 @@ pub(crate) fn walk_style_mut(style: &mut Value, mir: &MirSpec, visitor: &mut imp
 
 /// Collect the effective layer type for every layer in the style (following `ref` chains).
 /// Returns `None` for layers whose type cannot be resolved.
-fn collect_layer_types(style: &Value) -> Vec<Option<String>> {
+pub(crate) fn collect_layer_types(style: &Value) -> Vec<Option<String>> {
     let Some(root) = style.as_object() else {
         return vec![];
     };
