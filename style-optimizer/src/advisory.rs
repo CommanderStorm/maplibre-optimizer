@@ -45,6 +45,9 @@ pub struct SourceLayerAdvisory {
     /// Per-property value advisories: values that no filter ever selects.
     /// Only populated when stats have full `value_counts` and all filters are analyzable.
     pub unused_property_values: BTreeMap<String, UnusedValues>,
+    /// Whether any targeting layer references feature IDs via `["id"]` or `["feature-state", ...]`.
+    /// When `false`, feature IDs can be stripped from tiles (zeroed out) to save space.
+    pub feature_ids_needed: bool,
     /// Combined filter from all style layers targeting this source-layer.
     /// `None` means "keep all features" (at least one layer has no filter).
     /// When present, features not matching this filter can be pruned.
@@ -123,6 +126,8 @@ pub fn compute_advisory(style: &Value, stats: &TileStatistics) -> TilePruningAdv
                 .filter(|r| r.source == *source_name && r.source_layer == *sl_name)
                 .collect();
 
+            let feature_ids_needed = targeting.iter().any(|r| r.uses_feature_id);
+
             layer_advisories.insert(
                 sl_name.clone(),
                 SourceLayerAdvisory {
@@ -130,6 +135,7 @@ pub fn compute_advisory(style: &Value, stats: &TileStatistics) -> TilePruningAdv
                     used_geometry_types: compute_used_geometry_types(&targeting, layer_stats),
                     unused_zoom_levels: compute_unused_zoom_levels(&targeting, layer_stats),
                     unused_property_values: compute_unused_property_values(&targeting, layer_stats),
+                    feature_ids_needed,
                     combined_filter: compute_combined_filter(&targeting),
                 },
             );
@@ -156,6 +162,8 @@ struct StyleLayerRef {
     maxzoom: Option<u8>,
     /// Property names accessed by `["get", prop]` or `["has", prop]` in filter/paint/layout.
     referenced_properties: HashSet<String>,
+    /// Whether this layer uses `["id"]` or `["feature-state", ...]` expressions.
+    uses_feature_id: bool,
     /// Filter expression (if any), for value analysis.
     filter: Option<Value>,
 }
@@ -223,6 +231,24 @@ fn collect_style_info(style: &Value) -> StyleInfo {
             }
         }
 
+        // Check if any expression in the layer references feature IDs.
+        let uses_feature_id = [obj.get("filter")]
+            .into_iter()
+            .flatten()
+            .chain(
+                obj.get("paint")
+                    .and_then(Value::as_object)
+                    .into_iter()
+                    .flat_map(|m| m.values()),
+            )
+            .chain(
+                obj.get("layout")
+                    .and_then(Value::as_object)
+                    .into_iter()
+                    .flat_map(|m| m.values()),
+            )
+            .any(expr_uses_feature_id);
+
         layer_refs.push(StyleLayerRef {
             source: info.source.clone(),
             source_layer: info.source_layer.clone(),
@@ -230,11 +256,31 @@ fn collect_style_info(style: &Value) -> StyleInfo {
             minzoom,
             maxzoom,
             referenced_properties,
+            uses_feature_id,
             filter: obj.get("filter").cloned(),
         });
     }
 
     StyleInfo { layer_refs }
+}
+
+/// Check whether an expression tree references feature IDs (`["id"]` or `["feature-state", ...]`).
+fn expr_uses_feature_id(expr: &Value) -> bool {
+    match expr {
+        Value::Array(arr) => {
+            // ["id"] — direct feature ID access
+            if arr.len() == 1 && arr[0].as_str() == Some("id") {
+                return true;
+            }
+            // ["feature-state", ...] — runtime state keyed by feature ID
+            if arr.first().and_then(Value::as_str) == Some("feature-state") {
+                return true;
+            }
+            arr.iter().any(expr_uses_feature_id)
+        }
+        Value::Object(map) => map.values().any(expr_uses_feature_id),
+        _ => false,
+    }
 }
 
 /// Recursively collect property names from `["get", "prop"]` and `["has", "prop"]` expressions.
@@ -1345,5 +1391,96 @@ mod tests {
                 ["==", ["get", "class"], "secondary"]
             ]))
         );
+    }
+
+    #[test]
+    fn feature_ids_not_needed_when_unused() {
+        let style = sample_style();
+        let stats = sample_stats();
+        let advisory = compute_advisory(&style, &stats);
+
+        let transport = &advisory.sources["openmaptiles"].layers["transportation"];
+        assert!(
+            !transport.feature_ids_needed,
+            "no layer uses [\"id\"] or [\"feature-state\"]"
+        );
+    }
+
+    #[test]
+    fn feature_ids_needed_when_id_used() {
+        let style = json!({
+            "version": 8,
+            "sources": {
+                "s": { "type": "vector", "url": "https://example.com/tiles.json" }
+            },
+            "layers": [{
+                "id": "roads",
+                "type": "line",
+                "source": "s",
+                "source-layer": "roads",
+                "filter": ["==", ["id"], 42]
+            }]
+        });
+        let stats = TileStatistics {
+            sources: BTreeMap::from([(
+                "s".to_string(),
+                SourceStats {
+                    layers: BTreeMap::from([(
+                        "roads".to_string(),
+                        LayerStats {
+                            total_features: 100,
+                            features_by_zoom: BTreeMap::from([(5, 100)]),
+                            geometry_types: GeometryTypeStats::default(),
+                            has_feature_ids: true,
+                            properties: BTreeMap::new(),
+                        },
+                    )]),
+                },
+            )]),
+        };
+        let advisory = compute_advisory(&style, &stats);
+        assert!(advisory.sources["s"].layers["roads"].feature_ids_needed);
+    }
+
+    #[test]
+    fn feature_ids_needed_when_feature_state_used() {
+        let style = json!({
+            "version": 8,
+            "sources": {
+                "s": { "type": "vector", "url": "https://example.com/tiles.json" }
+            },
+            "layers": [{
+                "id": "roads",
+                "type": "line",
+                "source": "s",
+                "source-layer": "roads",
+                "paint": {
+                    "line-color": ["case",
+                        ["boolean", ["feature-state", "hover"], false],
+                        "#f00",
+                        "#000"
+                    ]
+                }
+            }]
+        });
+        let stats = TileStatistics {
+            sources: BTreeMap::from([(
+                "s".to_string(),
+                SourceStats {
+                    layers: BTreeMap::from([(
+                        "roads".to_string(),
+                        LayerStats {
+                            total_features: 100,
+                            features_by_zoom: BTreeMap::from([(5, 100)]),
+                            geometry_types: GeometryTypeStats::default(),
+                            has_feature_ids: true,
+                            properties: BTreeMap::new(),
+                        },
+                    )]),
+                },
+            )]),
+        };
+        let advisory = compute_advisory(&style, &stats);
+        assert!(advisory.sources["s"].layers["roads"].feature_ids_needed);
     }
 }

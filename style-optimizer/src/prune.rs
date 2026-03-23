@@ -59,6 +59,13 @@ fn prune_layer(layer: &mut mvt::tile::Layer, advisory: &SourceLayerAdvisory, zoo
     // Filter by unused property values.
     filter_by_property_values(layer, &advisory.unused_property_values);
 
+    // Strip feature IDs when no targeting layer uses them.
+    if !advisory.feature_ids_needed {
+        for feature in &mut layer.features {
+            feature.id = None;
+        }
+    }
+
     // Strip properties that are either not in used_properties or outside their zoom range.
     let props_to_strip: Vec<String> = layer
         .keys
@@ -335,6 +342,7 @@ mod tests {
                             "class".to_string(),
                             UnusedValues::Specific(vec![Value::String("secondary".to_string())]),
                         )]),
+                        feature_ids_needed: false,
                         combined_filter: None,
                     },
                 ),
@@ -345,6 +353,7 @@ mod tests {
                         used_geometry_types: BTreeMap::new(),
                         unused_zoom_levels: vec![],
                         unused_property_values: BTreeMap::new(),
+                        feature_ids_needed: false,
                         combined_filter: None,
                     },
                 ),
@@ -373,9 +382,12 @@ mod tests {
         let roads = tile.layers.iter().find(|l| l.name == "roads").unwrap();
         // Point features should be removed, leaving only linestrings.
         // But feature id=2 (secondary) is also removed by value filter.
-        // So only feature id=1 (primary, linestring) should remain.
+        // So only the primary linestring feature should remain.
         assert_eq!(roads.features.len(), 1);
-        assert_eq!(roads.features[0].id, Some(1));
+        assert_eq!(
+            roads.features[0].r#type,
+            Some(mvt::tile::GeomType::Linestring.into())
+        );
     }
 
     #[test]
@@ -424,6 +436,7 @@ mod tests {
                         "class".to_string(),
                         UnusedValues::Specific(vec![Value::String("secondary".to_string())]),
                     )]),
+                    feature_ids_needed: false,
                     combined_filter: None,
                 },
             )]),
@@ -431,11 +444,13 @@ mod tests {
         prune_tile(&mut tile, &advisory, 10);
 
         let roads = tile.layers.iter().find(|l| l.name == "roads").unwrap();
-        // Feature id=2 (class=secondary) should be removed.
-        let ids: Vec<u64> = roads.features.iter().filter_map(|f| f.id).collect();
-        assert!(!ids.contains(&2));
-        assert!(ids.contains(&1));
-        assert!(ids.contains(&3));
+        // Feature id=2 (class=secondary) should be removed, leaving 2 features.
+        assert_eq!(roads.features.len(), 2);
+        // IDs are stripped (feature_ids_needed: false), so check geometry types instead.
+        // Remaining: primary linestring (id was 1) and primary+paved point (id was 3).
+        let geom_types: Vec<_> = roads.features.iter().map(|f| f.r#type).collect();
+        assert!(geom_types.contains(&Some(mvt::tile::GeomType::Linestring.into())));
+        assert!(geom_types.contains(&Some(mvt::tile::GeomType::Point.into())));
     }
 
     #[test]
@@ -454,6 +469,7 @@ mod tests {
                     used_geometry_types: BTreeMap::new(),
                     unused_zoom_levels: vec![],
                     unused_property_values: BTreeMap::new(),
+                    feature_ids_needed: false,
                     combined_filter: None,
                 },
             )]),
@@ -489,6 +505,7 @@ mod tests {
                     ]),
                     unused_zoom_levels: vec![],
                     unused_property_values: BTreeMap::new(),
+                    feature_ids_needed: false,
                     combined_filter: None,
                 },
             )]),
@@ -512,5 +529,38 @@ mod tests {
             .iter()
             .any(|f| f.r#type == Some(mvt::tile::GeomType::Point.into()));
         assert!(!has_point, "Point features should be stripped at z5");
+    }
+
+    #[test]
+    fn strips_feature_ids_when_not_needed() {
+        let mut tile = make_test_tile();
+        let advisory = make_advisory();
+        // make_advisory sets feature_ids_needed: false for both layers.
+        prune_tile(&mut tile, &advisory, 10);
+
+        for layer in &tile.layers {
+            for feature in &layer.features {
+                assert_eq!(
+                    feature.id, None,
+                    "feature IDs should be stripped when not needed"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn preserves_feature_ids_when_needed() {
+        let mut tile = make_test_tile();
+        let mut advisory = make_advisory();
+        // Mark roads as needing feature IDs.
+        advisory.layers.get_mut("roads").unwrap().feature_ids_needed = true;
+
+        prune_tile(&mut tile, &advisory, 10);
+
+        let roads = tile.layers.iter().find(|l| l.name == "roads").unwrap();
+        assert!(
+            roads.features.iter().all(|f| f.id.is_some()),
+            "feature IDs should be preserved when needed"
+        );
     }
 }
