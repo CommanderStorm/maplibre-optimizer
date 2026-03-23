@@ -1,5 +1,5 @@
 ---
-source: maplibre-style-spec/src/mir/preprocessing/sources.rs
+source: style-spec/src/mir/preprocessing/sources.rs
 expression: sources
 ---
 {

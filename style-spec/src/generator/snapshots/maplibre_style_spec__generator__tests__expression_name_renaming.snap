@@ -1,5 +1,5 @@
 ---
-source: maplibre-style-spec/src/generator/mod.rs
+source: style-spec/src/generator/mod.rs
 expression: reference
 ---
 {

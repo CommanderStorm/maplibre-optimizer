@@ -157,6 +157,10 @@ pub fn arbitrary_vec_json_value(u: &mut Unstructured<'_>) -> arbitrary::Result<V
     Ok(v)
 }
 
+#[expect(
+    dead_code,
+    reason = "referenced in generator test snapshots but not in current generated spec"
+)]
 pub fn arbitrary_vec_json_number(u: &mut Unstructured<'_>) -> arbitrary::Result<Vec<Number>> {
     let n = u.int_in_range(0..=MAX_JSON_ARRAY_LEN)?;
     let mut v = Vec::with_capacity(n);
@@ -179,6 +183,10 @@ fn arbitrary_box_json_numbers<const N: usize>(
     Ok(Box::new(a))
 }
 
+#[expect(
+    dead_code,
+    reason = "referenced in generator test snapshots but not in current generated spec"
+)]
 pub fn arbitrary_box_1_json_number(
     u: &mut Unstructured<'_>,
 ) -> arbitrary::Result<Box<[Number; 1]>> {
@@ -191,6 +199,10 @@ pub fn arbitrary_box_2_json_number(
     arbitrary_box_json_numbers::<2>(u)
 }
 
+#[expect(
+    dead_code,
+    reason = "referenced in generator test snapshots but not in current generated spec"
+)]
 pub fn arbitrary_box_3_json_number(
     u: &mut Unstructured<'_>,
 ) -> arbitrary::Result<Box<[Number; 3]>> {
@@ -203,6 +215,10 @@ pub fn arbitrary_box_4_json_number(
     arbitrary_box_json_numbers::<4>(u)
 }
 
+#[expect(
+    dead_code,
+    reason = "referenced in generator test snapshots but not in current generated spec"
+)]
 pub fn arbitrary_vec_dynamic_color(
     u: &mut Unstructured<'_>,
 ) -> arbitrary::Result<Vec<DynamicColor>> {

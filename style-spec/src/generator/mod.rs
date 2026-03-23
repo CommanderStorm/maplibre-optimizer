@@ -482,9 +482,8 @@ impl<'de> serde::de::Visitor<'de> for LayerFilterVisitor {
         }
         let arr = serde_json::Value::Array(elements);
         // Try Boolean first (fixed-output-type operators like `all`, `any`, `==`, …).
-        match serde_json::from_value::<Boolean>(arr.clone()) {
-            Ok(expr) => return Ok(LayerFilter::Expr(Box::new(expr))),
-            Err(_) => {}
+        if let Ok(expr) = serde_json::from_value::<Boolean>(arr.clone()) {
+            return Ok(LayerFilter::Expr(Box::new(expr)));
         }
         // Fall back to Any (polymorphic operators like `match`, `step`, `case`, …).
         let expr = serde_json::from_value::<Any>(arr).map_err(serde::de::Error::custom)?;

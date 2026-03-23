@@ -1,5 +1,5 @@
 ---
-source: maplibre-style-spec/src/mir/preprocessing/layers.rs
+source: style-spec/src/mir/preprocessing/layers.rs
 expression: layers
 ---
 {

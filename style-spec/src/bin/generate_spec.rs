@@ -53,7 +53,7 @@ fn main() {
     for (domain_name, module) in generated_scope.modules() {
         let body = module.body_to_string();
         let content = format!(
-            "#![allow(clippy::large_enum_variant)]\n#[allow(unused_imports)]\nuse super::*;\n#[allow(unused_imports)]\nuse crate::{{numeric_prop, color_prop, boolean_prop, string_prop}};\n\n{body}\n"
+            "#![allow(clippy::large_enum_variant)]\n#[allow(unused_imports)]\nuse super::*;\n#[allow(unused_imports)]\nuse crate::{{array_prop, numeric_prop, color_prop, boolean_prop, string_prop}};\n\n{body}\n"
         );
         let out_path = spec_dir.join(format!("{domain_name}.rs"));
         println!("Generating spec module {domain_name} at {out_path:?}");

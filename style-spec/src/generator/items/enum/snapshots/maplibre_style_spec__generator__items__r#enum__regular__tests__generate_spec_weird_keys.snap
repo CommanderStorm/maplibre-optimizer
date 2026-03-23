@@ -1,5 +1,5 @@
 ---
-source: maplibre-style-spec/src/generator/items/enum/regular.rs
+source: style-spec/src/generator/items/enum/regular.rs
 expression: "crate::generator::generate_spec_scope(&spec)"
 ---
 /// JSON number in an expression position
