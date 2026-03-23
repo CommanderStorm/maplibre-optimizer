@@ -12,7 +12,7 @@ pub fn generate(scope: &mut Scope, name: &str, field: &MirFormattedTextField) {
         let escaped = default.replace('\\', "\\\\").replace('"', "\\\"");
         let mut args = format!("{name}, doc = \"{doc}\"");
         args.push_str(&format!(", default = \"{escaped}\".to_string()"));
-        scope.raw(format!("string_prop!({args});"));
+        scope.raw(format!("formatted_prop!({args});"));
     } else {
         scope
             .new_struct(name)

@@ -2,7 +2,7 @@
 #[allow(unused_imports)]
 use super::*;
 #[allow(unused_imports)]
-use crate::{array_prop, boolean_prop, color_prop, numeric_prop, string_prop};
+use crate::{array_prop, boolean_prop, color_prop, formatted_prop, numeric_prop, string_prop};
 
 boolean_prop!(
     Filter,

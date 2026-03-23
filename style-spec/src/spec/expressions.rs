@@ -2,7 +2,7 @@
 #[allow(unused_imports)]
 use super::*;
 #[allow(unused_imports)]
-use crate::{array_prop, boolean_prop, color_prop, numeric_prop, string_prop};
+use crate::{array_prop, boolean_prop, color_prop, formatted_prop, numeric_prop, string_prop};
 
 /// An expression node or a literal JSON value in expression positions.
 #[derive(PartialEq, Debug, Clone)]
@@ -2214,8 +2214,23 @@ impl<'de> serde::de::Visitor<'de> for FormattedVisitor {
         match op.as_str() {
             "format" => {
                 let mut inputs = Vec::new();
-                while let Some(input_i) = seq.next_element()? {
-                    let style_overrides_i = seq.next_element()?; // optional param
+                let mut rest: Vec<serde_json::Value> = Vec::new();
+                while let Some(v) = seq.next_element()? {
+                    rest.push(v);
+                }
+                let mut idx = 0;
+                while idx < rest.len() {
+                    let input_i = serde_json::from_value(rest[idx].clone())
+                        .map_err(serde::de::Error::custom)?;
+                    idx += 1;
+                    let style_overrides_i = if idx < rest.len() && rest[idx].is_object() {
+                        let v = serde_json::from_value(rest[idx].clone())
+                            .map_err(serde::de::Error::custom)?;
+                        idx += 1;
+                        Some(v)
+                    } else {
+                        None
+                    };
                     let element = FormattedFormatVariadicRow(input_i, style_overrides_i);
                     inputs.push(element);
                 }

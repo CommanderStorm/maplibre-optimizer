@@ -2,7 +2,7 @@
 #[allow(unused_imports)]
 use super::*;
 #[allow(unused_imports)]
-use crate::{array_prop, boolean_prop, color_prop, numeric_prop, string_prop};
+use crate::{array_prop, boolean_prop, color_prop, formatted_prop, numeric_prop, string_prop};
 
 /// A filter expression: a typed boolean expression, a polymorphic Any expression
 /// (`match`, `step`, `case`, …), or a literal bool.
@@ -1388,7 +1388,7 @@ string_prop!(
     default = "center".to_string()
 );
 
-string_prop!(
+formatted_prop!(
     SymbolLayoutLayerTextField,
     doc = "Value to use for a text label. If a plain `string` is provided, it will be treated as a `formatted` with default/inherited formatting options.",
     default = "".to_string()

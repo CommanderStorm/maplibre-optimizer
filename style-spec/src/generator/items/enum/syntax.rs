@@ -1821,8 +1821,13 @@ fn generate_syntax_enum_deserializer_regular_variadic_variant(
     let suffix_params = variadic_non_template_suffix_parameters(overload);
     let suffix_len = suffix_params.len();
     visit_seq.line("let mut inputs = Vec::new();");
-    if suffix_params.is_empty() {
-        // No suffix: safe to stream with `while let Some(...)`.
+    // Check if any non-base parameter in the variadic group is optional.
+    let has_optional_in_group = overload.parameters[1..position_of_variadic_separator]
+        .iter()
+        .any(|p| p.ends_with('?'));
+
+    if suffix_params.is_empty() && !has_optional_in_group {
+        // No suffix, no optional params: safe to stream with `while let Some(...)`.
         if position_of_variadic_separator == 1 {
             visit_seq.line("while let Some(element) = seq.next_element()? {");
         } else {
@@ -1834,16 +1839,10 @@ fn generate_syntax_enum_deserializer_regular_variadic_variant(
                 .iter()
                 .map(|p| (to_snake_case(p).replace("_1", "_i"), p.ends_with('?')))
                 .collect::<Vec<_>>();
-            for (param_name, is_optional) in non_base_parameters {
-                if *is_optional {
-                    visit_seq.line(format!(
-                        "let {param_name} = seq.next_element()?; // optional param"
-                    ));
-                } else {
-                    visit_seq.line(format!(
-                        "let {param_name} = seq.next_element()?.ok_or_else(|| serde::de::Error::custom(\"expected {param_name} in {name}::{variant_name}\"))?;"
-                    ));
-                }
+            for (param_name, _is_optional) in non_base_parameters {
+                visit_seq.line(format!(
+                    "let {param_name} = seq.next_element()?.ok_or_else(|| serde::de::Error::custom(\"expected {param_name} in {name}::{variant_name}\"))?;"
+                ));
             }
             let tuple_inner = non_base_parameters
                 .iter()
@@ -1855,6 +1854,52 @@ fn generate_syntax_enum_deserializer_regular_variadic_variant(
             } else {
                 visit_seq.line(format!("let element = ({base_name},{tuple_inner});"));
             }
+        }
+        visit_seq.line("inputs.push(element);");
+        visit_seq.line("}");
+    } else if suffix_params.is_empty() && has_optional_in_group {
+        // No suffix but optional params in group: buffer all elements and peek
+        // at types to decide whether each optional param is present.
+        // Optional params are always object-typed (style overrides); content is never an object.
+        visit_seq.line("let mut rest: Vec<serde_json::Value> = Vec::new();");
+        visit_seq.line("while let Some(v) = seq.next_element()? { rest.push(v); }");
+        visit_seq.line("let mut idx = 0;");
+        visit_seq.line("while idx < rest.len() {");
+        let base_name = to_snake_case(&overload.parameters[0]).replace("_1", "_i");
+        visit_seq.line(format!(
+            "let {base_name} = serde_json::from_value(rest[idx].clone()).map_err(serde::de::Error::custom)?;"
+        ));
+        visit_seq.line("idx += 1;");
+        let non_base_parameters = &overload.parameters[1..position_of_variadic_separator]
+            .iter()
+            .map(|p| (to_snake_case(p).replace("_1", "_i"), p.ends_with('?')))
+            .collect::<Vec<_>>();
+        for (param_name, is_optional) in non_base_parameters {
+            if *is_optional {
+                visit_seq.line(format!(
+                    "let {param_name} = if idx < rest.len() && rest[idx].is_object() {{"
+                ));
+                visit_seq.line(
+                    "let v = serde_json::from_value(rest[idx].clone()).map_err(serde::de::Error::custom)?;",
+                );
+                visit_seq.line("idx += 1;");
+                visit_seq.line("Some(v)");
+                visit_seq.line("} else { None };");
+            } else {
+                visit_seq.line(format!(
+                    "let {param_name} = if idx < rest.len() {{ let v = serde_json::from_value(rest[idx].clone()).map_err(serde::de::Error::custom)?; idx += 1; v }} else {{ return Err(serde::de::Error::custom(\"expected {param_name} in {name}::{variant_name}\")); }};"
+                ));
+            }
+        }
+        let tuple_inner = non_base_parameters
+            .iter()
+            .map(|(p, _)| p.as_str())
+            .collect::<Vec<_>>()
+            .join(", ");
+        if let Some(row) = row_struct_name {
+            visit_seq.line(format!("let element = {row}({base_name},{tuple_inner});"));
+        } else {
+            visit_seq.line(format!("let element = ({base_name},{tuple_inner});"));
         }
         visit_seq.line("inputs.push(element);");
         visit_seq.line("}");
