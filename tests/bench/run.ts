@@ -148,7 +148,7 @@ function optimizeStyle(styleJson: string): string {
   const tmpOut = path.join(RESULTS_DIR, "_bench_output.json");
   fs.writeFileSync(tmpIn, styleJson);
   try {
-    execFileSync(OPTIMIZER, ["--input", tmpIn, "--output", tmpOut, "--all"], {
+    execFileSync(OPTIMIZER, ["optimize", "--input", tmpIn, "--output", tmpOut, "--all"], {
       timeout: 30_000,
     });
     return fs.readFileSync(tmpOut, "utf8");

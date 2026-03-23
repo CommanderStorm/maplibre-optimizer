@@ -4,6 +4,8 @@
 //! It is consumed optionally by the optimizer to enable data-driven optimizations such as
 //! selectivity reordering, geometry-type dead elimination, and zoom coverage tightening.
 
+pub mod collect;
+
 use std::collections::BTreeMap;
 
 use indexmap::IndexMap;
