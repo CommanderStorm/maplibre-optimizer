@@ -40,6 +40,7 @@ pub struct LayerStats {
     pub total_features: u64,
     /// Feature occurrence count broken down by zoom level.
     /// Use `features_by_zoom.keys()` to derive which zoom levels have coverage.
+    #[serde(with = "zoom_map")]
     pub features_by_zoom: BTreeMap<u8, u64>,
     /// Geometry type breakdown.
     pub geometry_types: GeometryTypeStats,
@@ -82,8 +83,9 @@ pub enum PropertyStats {
         min: i64,
         max: i64,
         cardinality: u64,
-        /// Full value → frequency map. `None` if cardinality exceeded threshold.
+        /// Full value → frequency map. `None` if cardinality exceeded a threshold.
         /// `BTreeMap` so range-predicate prefix sums are efficient.
+        #[serde(with = "option_string_key_map")]
         value_counts: Option<BTreeMap<i64, u64>>,
     },
     UnsignedInteger {
@@ -91,7 +93,8 @@ pub enum PropertyStats {
         min: u64,
         max: u64,
         cardinality: u64,
-        /// Full value → frequency map. `None` if cardinality exceeded threshold.
+        /// Full value → frequency map. `None` if cardinality exceeded a threshold.
+        #[serde(with = "option_string_key_map")]
         value_counts: Option<BTreeMap<u64, u64>>,
     },
     Double {
@@ -134,5 +137,79 @@ impl TileStatistics {
     #[must_use]
     pub fn layer_stats(&self, source: &str, source_layer: &str) -> Option<&LayerStats> {
         self.sources.get(source)?.layers.get(source_layer)
+    }
+}
+
+/// Serde helper: `Option<BTreeMap<K, V>>` where K is numeric but JSON keys are strings.
+mod option_string_key_map {
+    use std::collections::BTreeMap;
+    use std::fmt::Display;
+    use std::str::FromStr;
+
+    use serde::{Deserialize, Deserializer, Serialize, Serializer};
+
+    pub fn serialize<K, V, S>(opt: &Option<BTreeMap<K, V>>, ser: S) -> Result<S::Ok, S::Error>
+    where
+        K: Display + Ord,
+        V: Serialize,
+        S: Serializer,
+    {
+        match opt {
+            None => ser.serialize_none(),
+            Some(map) => {
+                let string_map: BTreeMap<std::string::String, &V> =
+                    map.iter().map(|(k, v)| (k.to_string(), v)).collect();
+                string_map.serialize(ser)
+            }
+        }
+    }
+
+    pub fn deserialize<'de, K, V, D>(de: D) -> Result<Option<BTreeMap<K, V>>, D::Error>
+    where
+        K: FromStr + Ord,
+        K::Err: Display,
+        V: Deserialize<'de>,
+        D: Deserializer<'de>,
+    {
+        let opt = Option::<BTreeMap<std::string::String, V>>::deserialize(de)?;
+        match opt {
+            None => Ok(None),
+            Some(string_map) => {
+                let map = string_map
+                    .into_iter()
+                    .map(|(k, v)| {
+                        k.parse::<K>()
+                            .map(|key| (key, v))
+                            .map_err(serde::de::Error::custom)
+                    })
+                    .collect::<Result<BTreeMap<K, V>, _>>()?;
+                Ok(Some(map))
+            }
+        }
+    }
+}
+
+/// Serde helper: `BTreeMap<u8, u64>` ↔ JSON object with string keys.
+mod zoom_map {
+    use std::collections::BTreeMap;
+
+    use serde::{Deserialize, Deserializer, Serialize, Serializer};
+
+    pub fn serialize<S: Serializer>(map: &BTreeMap<u8, u64>, ser: S) -> Result<S::Ok, S::Error> {
+        let string_map: BTreeMap<std::string::String, u64> =
+            map.iter().map(|(k, v)| (k.to_string(), *v)).collect();
+        string_map.serialize(ser)
+    }
+
+    pub fn deserialize<'de, D: Deserializer<'de>>(de: D) -> Result<BTreeMap<u8, u64>, D::Error> {
+        let string_map = BTreeMap::<std::string::String, u64>::deserialize(de)?;
+        string_map
+            .into_iter()
+            .map(|(k, v)| {
+                k.parse::<u8>()
+                    .map(|z| (z, v))
+                    .map_err(serde::de::Error::custom)
+            })
+            .collect()
     }
 }

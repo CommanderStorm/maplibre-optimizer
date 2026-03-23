@@ -16,7 +16,6 @@ use super::{
     CARDINALITY_THRESHOLD, GeometryTypeStats, LayerStats, PropertyStats, SourceStats,
     TileStatistics,
 };
-
 use crate::mvt;
 
 /// Open an `MBTiles` file and validate it has the expected `tiles` table.
@@ -27,7 +26,7 @@ pub fn open_mbtiles(path: &Path) -> anyhow::Result<Connection> {
     // Validate that the tiles table exists.
     let has_tiles: bool = conn
         .query_row(
-            "SELECT COUNT(*) > 0 FROM sqlite_master WHERE type='table' AND name='tiles'",
+            "SELECT COUNT(*) > 0 FROM sqlite_master WHERE type IN ('table','view') AND name='tiles'",
             [],
             |row| row.get(0),
         )
