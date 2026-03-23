@@ -480,11 +480,15 @@ fn generate_expression_any_of(scope: &mut Scope, types: &[MirParameterType]) -> 
     let has_string_expr = arms.iter().any(|(_, ty)| ty == "Box<String>");
     let has_number_expr = arms.iter().any(|(_, ty)| ty == "Box<Number>");
     let has_boolean_expr = arms.iter().any(|(_, ty)| ty == "Box<Boolean>");
-    let has_self_contained_expr = has_string_expr || has_number_expr || has_boolean_expr;
+    let has_color_expr = arms
+        .iter()
+        .any(|(_, ty)| ty == "Box<Color>" || ty == "Color");
+    let has_self_contained_expr =
+        has_string_expr || has_number_expr || has_boolean_expr || has_color_expr;
 
     arms.retain(|(label, _)| {
-        // StringLiteral subsumed by String::Literal
-        if has_string_expr && label == "StringLiteral" {
+        // StringLiteral subsumed by String::Literal or Color::Literal
+        if (has_string_expr || has_color_expr) && label == "StringLiteral" {
             return false;
         }
         // NumberLiteral subsumed by Number::Literal
@@ -498,18 +502,9 @@ fn generate_expression_any_of(scope: &mut Scope, types: &[MirParameterType]) -> 
         true
     });
 
-    // `interpolate-hcl` / `interpolate-lab` accept CSS color strings (e.g. `"#f00"`) as stop outputs.
-    let mut arm_labels: Vec<&str> = arms.iter().map(|(l, _)| l.as_str()).collect();
-    arm_labels.sort_unstable();
-    arm_labels.dedup();
+    // CSS color strings (e.g. `"#f00"`) in interpolate stop outputs are now handled by
+    // `Color::Literal(StringLiteral)`, so no extra `StringLiteral` arm is needed.
     let mut extra_untagged = false;
-    if arm_labels.contains(&"ArrayOfColor") && arm_labels.contains(&"Color") {
-        arms.insert(
-            0,
-            ("StringLiteral".to_string(), "StringLiteral".to_string()),
-        );
-        extra_untagged = true;
-    }
     // `Number` <-> `NumberLiteral` and projection<->string stops share one serde shape; without `untagged`
     // serde expects externally-tagged enums and rejects plain JSON scalars / arrays.
     if has_projection_stop {
@@ -884,6 +879,14 @@ fn generate_syntax_enum_body(
             .doc("A polymorphic expression (`case`, `match`, `get`, …) in a numeric position.")
             .tuple("Box<Any>");
     }
+    if name == "Color" {
+        enu.new_variant("Literal")
+            .doc("A CSS color string literal (e.g. `\"#ff0000\"`, `\"rgba(255,0,0,1)\"`).")
+            .tuple("StringLiteral");
+        enu.new_variant("AnyExpr")
+            .doc("A polymorphic expression (`case`, `match`, `get`, …) in a color position.")
+            .tuple("Box<Any>");
+    }
 
     variadic_row_struct_names
 }
@@ -1249,14 +1252,9 @@ fn generate_parameter_variant(scope: &mut Scope, param: &MirParameterType) -> St
             // `String` now has `Literal(StringLiteral)` and `AnyExpr(Box<Any>)` variants directly,
             // so string parameter positions just use `String` — no union wrapper needed.
             MirExpression::String => "String".to_string(),
-            // `"color"` can be a CSS color string literal (e.g. `"#ff0000"`) or a Color expression.
-            MirExpression::Color => generate_expression_any_of(
-                scope,
-                &[
-                    MirParameterType::Literal(MirLiteral::String),
-                    MirParameterType::Expression(Box::new(MirExpression::Color)),
-                ],
-            ),
+            // `Color` now has `Literal(StringLiteral)` and `AnyExpr(Box<Any>)` variants directly.
+            // CSS color strings (e.g. `"#ff0000"`) deserialize as `Color::Literal`.
+            MirExpression::Color => "Color".to_string(),
             // `Boolean` now has `Literal(bool)` and `AnyExpr(Box<Any>)` variants directly,
             // so boolean parameter positions just use `Boolean` — no union wrapper needed.
             MirExpression::Boolean => "Boolean".to_string(),
@@ -1611,7 +1609,7 @@ fn generate_syntax_enum_deserializer(
     }
 
     let variants = values.keys().cloned().collect::<Vec<_>>();
-    if matches!(name, "Boolean" | "String" | "Number") {
+    if matches!(name, "Boolean" | "String" | "Number" | "Color") {
         // Unknown operators may be polymorphic Any expressions (case, match, get, …).
         // Collect remaining elements, reconstruct the full array, and try parsing as Any.
         visit_seq.line("_ => {");
@@ -1637,9 +1635,9 @@ fn generate_syntax_enum_deserializer(
 fn generate_visitor<'a>(scope: &'a mut Scope, name: &str, example: &Value) -> &'a mut Impl {
     let visitor_name = format!("{name}Visitor");
 
-    // Boolean, String, and Number use `deserialize_any` so bare literals map to `Literal`.
+    // Expression enums with Literal variants use `deserialize_any` so bare literals map to `Literal`.
     // Other expression enums use `deserialize_seq` (only arrays).
-    let deserialize_method = if matches!(name, "Boolean" | "String" | "Number") {
+    let deserialize_method = if matches!(name, "Boolean" | "String" | "Number" | "Color") {
         "deserialize_any"
     } else {
         "deserialize_seq"
@@ -1719,6 +1717,22 @@ fn generate_visitor<'a>(scope: &'a mut Scope, name: &str, example: &Value) -> &'
             .arg("v", "std::string::String")
             .ret("Result<Self::Value, E>")
             .line("Ok(String::Literal(StringLiteral::from(v)))");
+    }
+
+    // Color: accept bare CSS color strings (e.g. "#ff0000") as Literal variant.
+    if name == "Color" {
+        vis.new_fn("visit_str")
+            .generic("E: serde::de::Error")
+            .arg_self()
+            .arg("v", "&str")
+            .ret("Result<Self::Value, E>")
+            .line("Ok(Color::Literal(StringLiteral::from(v.to_string())))");
+        vis.new_fn("visit_string")
+            .generic("E: serde::de::Error")
+            .arg_self()
+            .arg("v", "std::string::String")
+            .ret("Result<Self::Value, E>")
+            .line("Ok(Color::Literal(StringLiteral::from(v)))");
     }
 
     vis
@@ -2054,6 +2068,10 @@ fn generate_syntax_enum_serializer(
     if name == "Number" {
         arms.push_str("            Number::Literal(n) => n.serialize(serializer),\n");
         arms.push_str("            Number::AnyExpr(a) => a.serialize(serializer),\n");
+    }
+    if name == "Color" {
+        arms.push_str("            Color::Literal(s) => s.serialize(serializer),\n");
+        arms.push_str("            Color::AnyExpr(a) => a.serialize(serializer),\n");
     }
 
     scope.raw(format!(

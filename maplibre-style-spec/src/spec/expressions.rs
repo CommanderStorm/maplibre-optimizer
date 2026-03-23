@@ -847,51 +847,6 @@ mod test {
     }
 }
 
-/// Either of the below variants
-#[derive(PartialEq, Debug, Clone)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum StringLiteralOrColorOrAnyAsUnion {
-    StringLiteral(StringLiteral),
-    Color(Color),
-    Any(Box<Any>),
-}
-
-impl serde::Serialize for StringLiteralOrColorOrAnyAsUnion {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        match self {
-            Self::StringLiteral(v) => v.serialize(serializer),
-            Self::Color(v) => v.serialize(serializer),
-            Self::Any(v) => v.serialize(serializer),
-        }
-    }
-}
-
-impl<'de> serde::Deserialize<'de> for StringLiteralOrColorOrAnyAsUnion {
-    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
-        let mut errors: Vec<(&str, std::string::String)> = Vec::new();
-        match <StringLiteral as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::StringLiteral(v)),
-            Err(e) => errors.push(("StringLiteral", e.to_string())),
-        }
-        match <Color as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Color(v)),
-            Err(e) => errors.push(("Color", e.to_string())),
-        }
-        match <Box<Any> as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Any(v)),
-            Err(e) => errors.push(("Any", e.to_string())),
-        }
-
-        let details: Vec<std::string::String> =
-            errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
-        Err(serde::de::Error::custom(format!(
-            "StringLiteralOrColorOrAnyAsUnion: no variant matched. Expected StringLiteral(StringLiteral) | Color(Color) | Any(Box<Any>). Errors: [{}]",
-            details.join("; ")
-        )))
-    }
-}
-
 /// "Array"
 #[derive(PartialEq, Debug, Clone)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
@@ -905,7 +860,7 @@ pub enum Array {
     /// Returns a subarray from an array or a substring from a string from a specified start index, or between a start index and an end index if set. The return value is inclusive of the start index but not of the end index. In a string, a UTF-16 surrogate pair counts as a single position.
     Slice(ExprOrLiteral, Box<Number>, Option<Box<Number>>),
     /// Returns a four-element array containing the input color's red, green, blue, and alpha components, in that order.
-    ToRgba(StringLiteralOrColorOrAnyAsUnion),
+    ToRgba(Box<Color>),
 }
 
 impl<'de> serde::Deserialize<'de> for Array {
@@ -1796,6 +1751,10 @@ pub enum Color {
     ///
     ///  - [Visualize population density](https://maplibre.org/maplibre-gl-js/docs/examples/visualize-population-density/)
     To(Vec<ExprOrLiteral>),
+    /// A CSS color string literal (e.g. `"#ff0000"`, `"rgba(255,0,0,1)"`).
+    Literal(StringLiteral),
+    /// A polymorphic expression (`case`, `match`, `get`, …) in a color position.
+    AnyExpr(Box<Any>),
 }
 
 impl<'de> serde::Deserialize<'de> for Color {
@@ -1803,7 +1762,7 @@ impl<'de> serde::Deserialize<'de> for Color {
     where
         D: serde::Deserializer<'de>,
     {
-        deserializer.deserialize_seq(ColorVisitor)
+        deserializer.deserialize_any(ColorVisitor)
     }
 }
 
@@ -1815,6 +1774,14 @@ impl<'de> serde::de::Visitor<'de> for ColorVisitor {
 
     fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
         formatter.write_str("an Color expression (example: [\"rgb\",255,0,0])")
+    }
+
+    fn visit_str<E: serde::de::Error>(self, v: &str) -> Result<Self::Value, E> {
+        Ok(Color::Literal(StringLiteral::from(v.to_string())))
+    }
+
+    fn visit_string<E: serde::de::Error>(self, v: std::string::String) -> Result<Self::Value, E> {
+        Ok(Color::Literal(StringLiteral::from(v)))
     }
 
     fn visit_seq<A: serde::de::SeqAccess<'de>>(self, mut seq: A) -> Result<Self::Value, A::Error> {
@@ -1854,10 +1821,16 @@ impl<'de> serde::de::Visitor<'de> for ColorVisitor {
                 }
                 Ok(Color::To(inputs))
             }
-            _ => Err(serde::de::Error::unknown_variant(
-                &op,
-                &["rgb", "rgba", "to-color"],
-            )),
+            _ => {
+                let mut elems = vec![serde_json::Value::String(op)];
+                while let Some(v) = seq.next_element::<serde_json::Value>()? {
+                    elems.push(v);
+                }
+                let arr = serde_json::Value::Array(elems);
+                let any_expr =
+                    serde_json::from_value::<Any>(arr).map_err(serde::de::Error::custom)?;
+                Ok(Color::AnyExpr(Box::new(any_expr)))
+            }
         }
     }
 }
@@ -1915,6 +1888,8 @@ impl serde::Serialize for Color {
                 }
                 seq.end()
             }
+            Color::Literal(s) => s.serialize(serializer),
+            Color::AnyExpr(a) => a.serialize(serializer),
         }
     }
 }
@@ -1922,32 +1897,24 @@ impl serde::Serialize for Color {
 /// Either of the below variants
 #[derive(PartialEq, Debug, Clone)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum StringLiteralOrColorOrArrayOfColorOrAnyAsUnion {
-    StringLiteral(StringLiteral),
+pub enum ColorOrArrayOfColorAsUnion {
     Color(Color),
     ArrayOfColor(ColorOrArrayOfColor),
-    Any(Box<Any>),
 }
 
-impl serde::Serialize for StringLiteralOrColorOrArrayOfColorOrAnyAsUnion {
+impl serde::Serialize for ColorOrArrayOfColorAsUnion {
     fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         match self {
-            Self::StringLiteral(v) => v.serialize(serializer),
             Self::Color(v) => v.serialize(serializer),
             Self::ArrayOfColor(v) => v.serialize(serializer),
-            Self::Any(v) => v.serialize(serializer),
         }
     }
 }
 
-impl<'de> serde::Deserialize<'de> for StringLiteralOrColorOrArrayOfColorOrAnyAsUnion {
+impl<'de> serde::Deserialize<'de> for ColorOrArrayOfColorAsUnion {
     fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
         let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
         let mut errors: Vec<(&str, std::string::String)> = Vec::new();
-        match <StringLiteral as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::StringLiteral(v)),
-            Err(e) => errors.push(("StringLiteral", e.to_string())),
-        }
         match <Color as serde::Deserialize>::deserialize(&value) {
             Ok(v) => return Ok(Self::Color(v)),
             Err(e) => errors.push(("Color", e.to_string())),
@@ -1956,15 +1923,11 @@ impl<'de> serde::Deserialize<'de> for StringLiteralOrColorOrArrayOfColorOrAnyAsU
             Ok(v) => return Ok(Self::ArrayOfColor(v)),
             Err(e) => errors.push(("ArrayOfColor", e.to_string())),
         }
-        match <Box<Any> as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Any(v)),
-            Err(e) => errors.push(("Any", e.to_string())),
-        }
 
         let details: Vec<std::string::String> =
             errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
         Err(serde::de::Error::custom(format!(
-            "StringLiteralOrColorOrArrayOfColorOrAnyAsUnion: no variant matched. Expected StringLiteral(StringLiteral) | Color(Color) | ArrayOfColor(ColorOrArrayOfColor) | Any(Box<Any>). Errors: [{}]",
+            "ColorOrArrayOfColorAsUnion: no variant matched. Expected Color(Color) | ArrayOfColor(ColorOrArrayOfColor). Errors: [{}]",
             details.join("; ")
         )))
     }
@@ -1979,10 +1942,7 @@ pub enum ColorOrArrayOfColor {
         (
             Interpolation,
             Number,
-            Vec<(
-                NumberLiteral,
-                StringLiteralOrColorOrArrayOfColorOrAnyAsUnion,
-            )>,
+            Vec<(NumberLiteral, ColorOrArrayOfColorAsUnion)>,
         ),
     ),
     /// Produces continuous, smooth results by interpolating between pairs of input and output values ("stops"). Works like `interpolate`, but the output type must be `color` or `array<color>`, and the interpolation is performed in the CIELAB color space.
@@ -1990,10 +1950,7 @@ pub enum ColorOrArrayOfColor {
         (
             Interpolation,
             Number,
-            Vec<(
-                NumberLiteral,
-                StringLiteralOrColorOrArrayOfColorOrAnyAsUnion,
-            )>,
+            Vec<(NumberLiteral, ColorOrArrayOfColorAsUnion)>,
         ),
     ),
 }
@@ -2040,7 +1997,7 @@ impl<'de> serde::de::Visitor<'de> for ColorOrArrayOfColorVisitor {
                 let input: Number = visit_seq_field(&mut seq, "input")?;
                 let mut stops = Vec::new();
                 while let Some(stop_input_i) = seq.next_element::<NumberLiteral>()? {
-                    let stop_output_i: StringLiteralOrColorOrArrayOfColorOrAnyAsUnion =
+                    let stop_output_i: ColorOrArrayOfColorAsUnion =
                         seq.next_element()?.ok_or_else(|| {
                             serde::de::Error::custom(
                                 "expected stop_output_i in ColorOrArrayOfColor::InterpolateHcl",
@@ -2060,7 +2017,7 @@ impl<'de> serde::de::Visitor<'de> for ColorOrArrayOfColorVisitor {
                 let input: Number = visit_seq_field(&mut seq, "input")?;
                 let mut stops = Vec::new();
                 while let Some(stop_input_i) = seq.next_element::<NumberLiteral>()? {
-                    let stop_output_i: StringLiteralOrColorOrArrayOfColorOrAnyAsUnion =
+                    let stop_output_i: ColorOrArrayOfColorAsUnion =
                         seq.next_element()?.ok_or_else(|| {
                             serde::de::Error::custom(
                                 "expected stop_output_i in ColorOrArrayOfColor::InterpolateLab",
@@ -3201,8 +3158,7 @@ impl serde::Serialize for Number {
 /// Either of the below variants
 #[derive(PartialEq, Debug, Clone)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum StringLiteralOrNumberOrArrayOfNumberOrColorOrArrayOfColorOrProjectionOrAnyAsUnion {
-    StringLiteral(StringLiteral),
+pub enum NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjectionAsUnion {
     Number(NumberLiteral),
     ArrayOfNumber(
         #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
@@ -3211,35 +3167,26 @@ pub enum StringLiteralOrNumberOrArrayOfNumberOrColorOrArrayOfColorOrProjectionOr
     Color(Color),
     ArrayOfColor(ColorOrArrayOfColor),
     Projection(Box<ProjectionType>),
-    Any(Box<Any>),
 }
 
-impl serde::Serialize
-    for StringLiteralOrNumberOrArrayOfNumberOrColorOrArrayOfColorOrProjectionOrAnyAsUnion
-{
+impl serde::Serialize for NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjectionAsUnion {
     fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         match self {
-            Self::StringLiteral(v) => v.serialize(serializer),
             Self::Number(v) => v.serialize(serializer),
             Self::ArrayOfNumber(v) => v.serialize(serializer),
             Self::Color(v) => v.serialize(serializer),
             Self::ArrayOfColor(v) => v.serialize(serializer),
             Self::Projection(v) => v.serialize(serializer),
-            Self::Any(v) => v.serialize(serializer),
         }
     }
 }
 
 impl<'de> serde::Deserialize<'de>
-    for StringLiteralOrNumberOrArrayOfNumberOrColorOrArrayOfColorOrProjectionOrAnyAsUnion
+    for NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjectionAsUnion
 {
     fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
         let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
         let mut errors: Vec<(&str, std::string::String)> = Vec::new();
-        match <StringLiteral as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::StringLiteral(v)),
-            Err(e) => errors.push(("StringLiteral", e.to_string())),
-        }
         match <NumberLiteral as serde::Deserialize>::deserialize(&value) {
             Ok(v) => return Ok(Self::Number(v)),
             Err(e) => errors.push(("Number", e.to_string())),
@@ -3256,10 +3203,6 @@ impl<'de> serde::Deserialize<'de>
             Ok(v) => return Ok(Self::Projection(v)),
             Err(e) => errors.push(("Projection", e.to_string())),
         }
-        match <Box<Any> as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Any(v)),
-            Err(e) => errors.push(("Any", e.to_string())),
-        }
         match <serde_json::Value as serde::Deserialize>::deserialize(&value) {
             Ok(v) => return Ok(Self::ArrayOfNumber(v)),
             Err(e) => errors.push(("ArrayOfNumber", e.to_string())),
@@ -3268,7 +3211,7 @@ impl<'de> serde::Deserialize<'de>
         let details: Vec<std::string::String> =
             errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
         Err(serde::de::Error::custom(format!(
-            "StringLiteralOrNumberOrArrayOfNumberOrColorOrArrayOfColorOrProjectionOrAnyAsUnion: no variant matched. Expected StringLiteral(StringLiteral) | Number(NumberLiteral) | ArrayOfNumber(serde_json::Value) | Color(Color) | ArrayOfColor(ColorOrArrayOfColor) | Projection(Box<ProjectionType>) | Any(Box<Any>). Errors: [{}]",
+            "NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjectionAsUnion: no variant matched. Expected Number(NumberLiteral) | ArrayOfNumber(serde_json::Value) | Color(Color) | ArrayOfColor(ColorOrArrayOfColor) | Projection(Box<ProjectionType>). Errors: [{}]",
             details.join("; ")
         )))
     }
@@ -3293,7 +3236,7 @@ pub enum NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection {
             Number,
             Vec<(
                 NumberLiteral,
-                StringLiteralOrNumberOrArrayOfNumberOrColorOrArrayOfColorOrProjectionOrAnyAsUnion,
+                NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjectionAsUnion,
             )>,
         ),
     ),
@@ -3343,7 +3286,7 @@ impl<'de> serde::de::Visitor<'de>
                 let input: Number = visit_seq_field(&mut seq, "input")?;
                 let mut stops = Vec::new();
                 while let Some(stop_input_i) = seq.next_element::<NumberLiteral>()? {
-                    let stop_output_i: StringLiteralOrNumberOrArrayOfNumberOrColorOrArrayOfColorOrProjectionOrAnyAsUnion = seq.next_element()?.ok_or_else(|| serde::de::Error::custom("expected stop_output_i in NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection::Interpolate"))?;
+                    let stop_output_i: NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjectionAsUnion = seq.next_element()?.ok_or_else(|| serde::de::Error::custom("expected stop_output_i in NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection::Interpolate"))?;
                     stops.push((stop_input_i, stop_output_i));
                 }
                 Ok(
