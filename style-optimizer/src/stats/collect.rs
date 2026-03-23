@@ -7,14 +7,14 @@ use std::collections::BTreeMap;
 use std::io::Read;
 use std::path::Path;
 
-use anyhow::{ensure, Context};
+use anyhow::{Context, ensure};
 use indexmap::IndexMap;
 use rand::Rng;
 use rusqlite::Connection;
 
 use super::{
-    GeometryTypeStats, LayerStats, PropertyStats, SourceStats, TileStatistics,
-    CARDINALITY_THRESHOLD,
+    CARDINALITY_THRESHOLD, GeometryTypeStats, LayerStats, PropertyStats, SourceStats,
+    TileStatistics,
 };
 
 #[expect(clippy::doc_markdown, clippy::trivially_copy_pass_by_ref)]
@@ -674,10 +674,11 @@ mod tests {
 
     #[test]
     fn integration_gzip_tile() {
+        use std::io::Write;
+
         use flate2::Compression;
         use flate2::write::GzEncoder;
         use prost::Message;
-        use std::io::Write;
 
         let conn = Connection::open_in_memory().unwrap();
         conn.execute_batch(

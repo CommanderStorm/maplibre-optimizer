@@ -415,11 +415,8 @@ pub(super) fn try_algebraic_simplify(arr: &mut Vec<Value>) -> bool {
                 replace_arr_with_value(arr, x);
                 return true;
             }
-            // x * 0 → 0, 0 * x → 0
-            if is_num(&arr[1], 0.0) || is_num(&arr[2], 0.0) {
-                *arr = vec![Value::String("literal".to_string()), Value::from(0.0)];
-                return true;
-            }
+            // NOTE: `x * 0 → 0` is unsound because x may be NaN at runtime
+            // (0 * NaN = NaN, not 0). Same for `0 * x`.
         }
         "+" => {
             if is_num(&arr[2], 0.0) {
@@ -438,17 +435,11 @@ pub(super) fn try_algebraic_simplify(arr: &mut Vec<Value>) -> bool {
             replace_arr_with_value(arr, x);
             return true;
         }
-        "/" => {
-            if is_num(&arr[2], 1.0) {
-                let x = arr[1].clone();
-                replace_arr_with_value(arr, x);
-                return true;
-            }
-            // 0 / x → 0 (x is non-literal or non-zero since try_fold_pure_operator handles all-literal)
-            if is_num(&arr[1], 0.0) {
-                *arr = vec![Value::String("literal".to_string()), Value::from(0.0)];
-                return true;
-            }
+        // NOTE: `0 / x → 0` is unsound (0 / 0 = NaN in IEEE 754, not 0).
+        "/" if is_num(&arr[2], 1.0) => {
+            let x = arr[1].clone();
+            replace_arr_with_value(arr, x);
+            return true;
         }
         "^" => {
             if is_num(&arr[2], 1.0) {

@@ -8,6 +8,14 @@ use serde_json::Value;
 
 use super::walk::StyleVisitor;
 
+/// Properties whose mere *presence* suppresses another property via the v8.json
+/// `requires: [{"!": "<suppressor>"}]` mechanism.  Stripping a suppressor to its
+/// default would re-enable the suppressed property and change rendering.
+///
+/// Derived from v8.json — the only case where a suppressor has a strippable
+/// default is `text-radial-offset: 0` suppressing `text-offset`.
+const PRESENCE_SUPPRESSORS: &[(&str, &str)] = &[("text-radial-offset", "text-offset")];
+
 // ── Visitor ───────────────────────────────────────────────────────────────────
 
 pub(crate) struct StripDefaultsVisitor<'a> {
@@ -51,11 +59,16 @@ fn strip_section(
                 return None; // never strip expressions
             }
             let default = mir.layers.field_default(layer_type, section, prop)?;
-            if value == default {
-                Some(prop.clone())
-            } else {
-                None
+            if value != default {
+                return None;
             }
+            // Don't strip a property whose presence suppresses a sibling that is set.
+            for &(suppressor, suppressed) in PRESENCE_SUPPRESSORS {
+                if prop == suppressor && section_obj.contains_key(suppressed) {
+                    return None;
+                }
+            }
+            Some(prop.clone())
         })
         .collect();
 
@@ -160,6 +173,46 @@ mod tests {
         walk_style_mut(&mut v, &mir, &mut StripDefaultsVisitor { mir: &mir });
         // Must NOT be stripped — it's an expression
         assert!(v["layers"][0]["paint"].get("fill-opacity").is_some());
+    }
+
+    #[test]
+    fn preserves_suppressor_when_suppressed_sibling_present() {
+        let mir = sample_mir();
+        let mut v = json!({
+            "layers": [{
+                "id": "x",
+                "type": "symbol",
+                "layout": {
+                    "text-field": "x",
+                    "text-radial-offset": 0,
+                    "text-offset": [2, 2],
+                    "text-variable-anchor": ["top", "bottom"]
+                }
+            }]
+        });
+        walk_style_mut(&mut v, &mir, &mut StripDefaultsVisitor { mir: &mir });
+        // text-radial-offset: 0 is the default, but its presence suppresses
+        // text-offset via v8.json requires constraint — must NOT be stripped.
+        assert!(v["layers"][0]["layout"].get("text-radial-offset").is_some());
+    }
+
+    #[test]
+    fn strips_suppressor_when_suppressed_sibling_absent() {
+        let mir = sample_mir();
+        let mut v = json!({
+            "layers": [{
+                "id": "x",
+                "type": "symbol",
+                "layout": {
+                    "text-field": "x",
+                    "text-radial-offset": 0,
+                    "text-variable-anchor": ["top", "bottom"]
+                }
+            }]
+        });
+        walk_style_mut(&mut v, &mir, &mut StripDefaultsVisitor { mir: &mir });
+        // text-offset is absent, so stripping text-radial-offset is safe.
+        assert!(v["layers"][0]["layout"].get("text-radial-offset").is_none());
     }
 
     #[test]

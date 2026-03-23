@@ -7,8 +7,10 @@
  * harness talks to it over plain HTTP — same codepath as production.
  *
  * Usage:
- *   npx tsx tile-proxy.ts              # start on port 8765
- *   npx tsx tile-proxy.ts --port 9999  # custom port
+ *   npx tsx tile-proxy.ts                    # start on port 8765, no throttling
+ *   npx tsx tile-proxy.ts --bandwidth 10     # simulate 10 Mbps (fast 4G)
+ *   npx tsx tile-proxy.ts --bandwidth 1.5    # simulate 1.5 Mbps (3G)
+ *   npx tsx tile-proxy.ts --port 9999        # custom port
  */
 
 import http from "node:http";
@@ -21,6 +23,10 @@ const UPSTREAM = "https://tiles.openfreemap.org";
 const argv = process.argv.slice(2);
 const portIdx = argv.findIndex((a) => a === "--port");
 const PORT = portIdx >= 0 ? parseInt(argv[portIdx + 1], 10) : 8765;
+const bwIdx = argv.findIndex((a) => a === "--bandwidth");
+/** Simulated bandwidth in megabits per second. 0 = unlimited (no throttling). */
+const BANDWIDTH_MBPS = bwIdx >= 0 ? parseFloat(argv[bwIdx + 1]) : 0;
+const BYTES_PER_SEC = BANDWIDTH_MBPS > 0 ? (BANDWIDTH_MBPS * 1_000_000) / 8 : 0;
 
 fs.mkdirSync(CACHE_DIR, { recursive: true });
 
@@ -46,6 +52,14 @@ const server = http.createServer(async (req, res) => {
   if (fs.existsSync(body) && fs.existsSync(meta)) {
     hits++;
     const { status, headers } = JSON.parse(fs.readFileSync(meta, "utf8"));
+
+    if (BYTES_PER_SEC > 0) {
+      // Simulate network transfer time proportional to response size
+      const size = fs.statSync(body).size;
+      const delayMs = (size / BYTES_PER_SEC) * 1000;
+      await new Promise((resolve) => setTimeout(resolve, delayMs));
+    }
+
     res.writeHead(status, headers);
     fs.createReadStream(body).pipe(res);
     return;
@@ -92,6 +106,11 @@ server.listen(PORT, () => {
   console.log(`Tile caching proxy listening on http://localhost:${PORT}`);
   console.log(`Cache directory: ${CACHE_DIR}`);
   console.log(`Upstream: ${UPSTREAM}`);
+  if (BANDWIDTH_MBPS > 0) {
+    console.log(`Bandwidth throttle: ${BANDWIDTH_MBPS} Mbps (${(BYTES_PER_SEC / 1024).toFixed(0)} KB/s)`);
+  } else {
+    console.log("Bandwidth throttle: off (use --bandwidth <Mbps> to simulate network)");
+  }
   console.log("Press Ctrl+C to stop\n");
 });
 

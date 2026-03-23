@@ -315,7 +315,10 @@ pub(crate) fn get_prop_name(v: &Value) -> Option<&str> {
     }
 }
 
-pub(crate) fn extract_get_and_literal<'a>(lhs: &'a Value, rhs: &'a Value) -> Option<(&'a str, Value)> {
+pub(crate) fn extract_get_and_literal<'a>(
+    lhs: &'a Value,
+    rhs: &'a Value,
+) -> Option<(&'a str, Value)> {
     if let Some(prop) = get_prop_name(lhs) {
         let lit = extract_json_literal(rhs)?;
         return Some((prop, lit));

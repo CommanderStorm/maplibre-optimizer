@@ -13,15 +13,15 @@ pub mod stats;
 use std::fs;
 use std::path::Path;
 
-pub use advisory::{compute_advisory, TilePruningAdvisory};
+pub use advisory::{TilePruningAdvisory, compute_advisory};
 use anyhow::Context;
 use maplibre_style_spec::decoder::StyleReference;
 use maplibre_style_spec::mir::MirSpec;
 pub use optimize::{
-    optimize_style, optimize_style_json_value, optimize_style_json_value_with_stats, OptPasses,
+    OptPasses, optimize_style, optimize_style_json_value, optimize_style_json_value_with_stats,
 };
-pub use stats::collect::collect_statistics;
 pub use stats::TileStatistics;
+pub use stats::collect::collect_statistics;
 
 /// Load MIR from a `MapLibre` style reference `v8.json` on disk.
 pub fn load_intermediate_spec_from_v8_path(path: &Path) -> anyhow::Result<MirSpec> {

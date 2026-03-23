@@ -1,6 +1,5 @@
-use std::fs;
 use std::path::PathBuf;
-use std::process;
+use std::{fs, process};
 
 use anyhow::Context;
 use clap::Args;
@@ -51,7 +50,9 @@ pub fn run(args: &AdvisoryArgs) -> anyhow::Result<()> {
         "Advisory parsed successfully ({} source(s)).",
         advisory.sources.len()
     );
-    eprintln!("Advisory application transforms (MVT rewriting, string interning) are not yet implemented.");
+    eprintln!(
+        "Advisory application transforms (MVT rewriting, string interning) are not yet implemented."
+    );
 
     process::exit(1);
 }
