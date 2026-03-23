@@ -42,28 +42,37 @@ fn prune_layer(layer: &mut mvt::tile::Layer, advisory: &SourceLayerAdvisory, zoo
         return;
     }
 
-    // Filter by geometry type.
-    if !advisory.unused_geometry_types.is_empty() {
-        let unused_geom: HashSet<i32> = advisory
-            .unused_geometry_types
-            .iter()
-            .map(|gt| match gt {
-                GeometryType::Point => mvt::tile::GeomType::Point.into(),
-                GeometryType::LineString => mvt::tile::GeomType::Linestring.into(),
-                GeometryType::Polygon => mvt::tile::GeomType::Polygon.into(),
-            })
-            .collect();
+    // Filter by geometry type: keep only types that are used at this zoom.
+    let allowed_geom: HashSet<i32> = advisory
+        .used_geometry_types
+        .iter()
+        .filter(|(_, zr)| zr.contains(zoom))
+        .map(|(gt, _)| geom_type_to_mvt(*gt))
+        .collect();
+    // Only filter if we have any geometry type info (empty map = no info, keep all).
+    if !advisory.used_geometry_types.is_empty() {
         layer
             .features
-            .retain(|f| !unused_geom.contains(&f.r#type.unwrap_or(0)));
+            .retain(|f| allowed_geom.contains(&f.r#type.unwrap_or(0)));
     }
 
     // Filter by unused property values.
     filter_by_property_values(layer, &advisory.unused_property_values);
 
-    // Strip unused properties from remaining features.
-    if !advisory.unused_properties.is_empty() {
-        strip_unused_properties(layer, &advisory.unused_properties);
+    // Strip properties that are either not in used_properties or outside their zoom range.
+    let props_to_strip: Vec<String> = layer
+        .keys
+        .iter()
+        .filter(|key| {
+            !advisory
+                .used_properties
+                .get(key.as_str())
+                .is_some_and(|zr| zr.contains(zoom))
+        })
+        .cloned()
+        .collect();
+    if !props_to_strip.is_empty() {
+        strip_unused_properties(layer, &props_to_strip);
     }
 }
 
@@ -198,6 +207,14 @@ fn strip_unused_properties(layer: &mut mvt::tile::Layer, unused_props: &[String]
     layer.values = new_values;
 }
 
+fn geom_type_to_mvt(gt: GeometryType) -> i32 {
+    match gt {
+        GeometryType::Point => mvt::tile::GeomType::Point.into(),
+        GeometryType::LineString => mvt::tile::GeomType::Linestring.into(),
+        GeometryType::Polygon => mvt::tile::GeomType::Polygon.into(),
+    }
+}
+
 /// Check whether an MVT `Value` matches a JSON `Value`.
 fn mvt_value_matches_json(mvt_val: &mvt::tile::Value, json_val: &Value) -> bool {
     match json_val {
@@ -226,6 +243,8 @@ fn mvt_value_matches_json(mvt_val: &mvt::tile::Value, json_val: &Value) -> bool 
 #[cfg(test)]
 mod tests {
     use std::collections::BTreeMap;
+
+    use crate::advisory::ZoomRange;
 
     use super::*;
 
@@ -307,22 +326,29 @@ mod tests {
                 (
                     "roads".to_string(),
                     SourceLayerAdvisory {
-                        unused_properties: vec!["surface".to_string()],
-                        unused_geometry_types: vec![GeometryType::Point],
+                        used_properties: BTreeMap::from([(
+                            "class".to_string(),
+                            ZoomRange::All,
+                        )]),
+                        used_geometry_types: BTreeMap::from([
+                            (GeometryType::LineString, ZoomRange::All),
+                        ]),
                         unused_zoom_levels: vec![0, 1, 2, 3],
                         unused_property_values: BTreeMap::from([(
                             "class".to_string(),
                             UnusedValues::Specific(vec![Value::String("secondary".to_string())]),
                         )]),
+                        combined_filter: None,
                     },
                 ),
                 (
                     "water".to_string(),
                     SourceLayerAdvisory {
-                        unused_properties: vec![],
-                        unused_geometry_types: vec![],
+                        used_properties: BTreeMap::new(),
+                        used_geometry_types: BTreeMap::new(),
                         unused_zoom_levels: vec![],
                         unused_property_values: BTreeMap::new(),
+                        combined_filter: None,
                     },
                 ),
             ]),
@@ -391,13 +417,17 @@ mod tests {
             layers: BTreeMap::from([(
                 "roads".to_string(),
                 SourceLayerAdvisory {
-                    unused_properties: vec![],
-                    unused_geometry_types: vec![],
+                    used_properties: BTreeMap::from([
+                        ("class".to_string(), ZoomRange::All),
+                        ("surface".to_string(), ZoomRange::All),
+                    ]),
+                    used_geometry_types: BTreeMap::new(),
                     unused_zoom_levels: vec![],
                     unused_property_values: BTreeMap::from([(
                         "class".to_string(),
                         UnusedValues::Specific(vec![Value::String("secondary".to_string())]),
                     )]),
+                    combined_filter: None,
                 },
             )]),
         };
@@ -409,5 +439,81 @@ mod tests {
         assert!(!ids.contains(&2));
         assert!(ids.contains(&1));
         assert!(ids.contains(&3));
+    }
+
+    #[test]
+    fn per_zoom_property_stripping() {
+        // Property "surface" has zoom range 10-16. At z14 it should be kept, at z5 stripped.
+        let mut tile = make_test_tile();
+        let advisory = SourceAdvisory {
+            unused_source_layers: vec![],
+            layers: BTreeMap::from([(
+                "roads".to_string(),
+                SourceLayerAdvisory {
+                    used_properties: BTreeMap::from([
+                        ("class".to_string(), ZoomRange::All),
+                        ("surface".to_string(), ZoomRange::Range(10, 16)),
+                    ]),
+                    used_geometry_types: BTreeMap::new(),
+                    unused_zoom_levels: vec![],
+                    unused_property_values: BTreeMap::new(),
+                    combined_filter: None,
+                },
+            )]),
+        };
+
+        // At z14 (inside range), surface should be kept.
+        let mut tile_z14 = tile.clone();
+        prune_tile(&mut tile_z14, &advisory, 14);
+        let roads = tile_z14.layers.iter().find(|l| l.name == "roads").unwrap();
+        assert!(roads.keys.contains(&"surface".to_string()));
+
+        // At z5 (outside range), surface should be stripped.
+        prune_tile(&mut tile, &advisory, 5);
+        let roads = tile.layers.iter().find(|l| l.name == "roads").unwrap();
+        assert!(!roads.keys.contains(&"surface".to_string()));
+        // "class" should still be there (ZoomRange::All).
+        assert!(roads.keys.contains(&"class".to_string()));
+    }
+
+    #[test]
+    fn per_zoom_geometry_filtering() {
+        // Point geometry type has zoom range 10-16. At z12 kept, at z5 stripped.
+        let mut tile = make_test_tile();
+        let advisory = SourceAdvisory {
+            unused_source_layers: vec![],
+            layers: BTreeMap::from([(
+                "roads".to_string(),
+                SourceLayerAdvisory {
+                    used_properties: BTreeMap::new(),
+                    used_geometry_types: BTreeMap::from([
+                        (GeometryType::Point, ZoomRange::Range(10, 16)),
+                        (GeometryType::LineString, ZoomRange::All),
+                    ]),
+                    unused_zoom_levels: vec![],
+                    unused_property_values: BTreeMap::new(),
+                    combined_filter: None,
+                },
+            )]),
+        };
+
+        // At z12 (inside range), Point features should be kept.
+        let mut tile_z12 = tile.clone();
+        prune_tile(&mut tile_z12, &advisory, 12);
+        let roads = tile_z12.layers.iter().find(|l| l.name == "roads").unwrap();
+        let has_point = roads
+            .features
+            .iter()
+            .any(|f| f.r#type == Some(mvt::tile::GeomType::Point.into()));
+        assert!(has_point, "Point features should be kept at z12");
+
+        // At z5 (outside range), Point features should be removed.
+        prune_tile(&mut tile, &advisory, 5);
+        let roads = tile.layers.iter().find(|l| l.name == "roads").unwrap();
+        let has_point = roads
+            .features
+            .iter()
+            .any(|f| f.r#type == Some(mvt::tile::GeomType::Point.into()));
+        assert!(!has_point, "Point features should be stripped at z5");
     }
 }

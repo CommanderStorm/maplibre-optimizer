@@ -34,15 +34,41 @@ pub struct SourceAdvisory {
 /// Advisory for a single source-layer.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SourceLayerAdvisory {
-    /// Properties never referenced by any expression in any layer targeting this source-layer.
-    pub unused_properties: Vec<String>,
-    /// Geometry types that no style layer can render from this source-layer.
-    pub unused_geometry_types: Vec<GeometryType>,
+    /// Properties referenced by at least one targeting layer, with their zoom range.
+    /// Properties present in tile stats but absent here are never referenced and can be stripped.
+    pub used_properties: BTreeMap<String, ZoomRange>,
+    /// Geometry types needed by at least one targeting layer, with their zoom range.
+    /// Types present in the tile but absent here are never rendered and can be filtered.
+    pub used_geometry_types: BTreeMap<GeometryType, ZoomRange>,
     /// Zoom levels where no style layer is active for this source-layer.
     pub unused_zoom_levels: Vec<u8>,
     /// Per-property value advisories: values that no filter ever selects.
     /// Only populated when stats have full `value_counts` and all filters are analyzable.
     pub unused_property_values: BTreeMap<String, UnusedValues>,
+    /// Combined filter from all style layers targeting this source-layer.
+    /// `None` means "keep all features" (at least one layer has no filter).
+    /// When present, features not matching this filter can be pruned.
+    pub combined_filter: Option<Value>,
+}
+
+/// Zoom range in which a property or geometry type is needed.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum ZoomRange {
+    /// Needed at all data zooms.
+    All,
+    /// Needed only within this inclusive range.
+    Range(u8, u8),
+}
+
+impl ZoomRange {
+    /// Returns `true` if the given zoom is within this range.
+    #[must_use]
+    pub fn contains(self, zoom: u8) -> bool {
+        match self {
+            Self::All => true,
+            Self::Range(min, max) => zoom >= min && zoom <= max,
+        }
+    }
 }
 
 /// MVT geometry type for advisory output.
@@ -100,10 +126,11 @@ pub fn compute_advisory(style: &Value, stats: &TileStatistics) -> TilePruningAdv
             layer_advisories.insert(
                 sl_name.clone(),
                 SourceLayerAdvisory {
-                    unused_properties: compute_unused_properties(&targeting, layer_stats),
-                    unused_geometry_types: compute_unused_geometry_types(&targeting, layer_stats),
+                    used_properties: compute_used_properties(&targeting, layer_stats),
+                    used_geometry_types: compute_used_geometry_types(&targeting, layer_stats),
                     unused_zoom_levels: compute_unused_zoom_levels(&targeting, layer_stats),
                     unused_property_values: compute_unused_property_values(&targeting, layer_stats),
+                    combined_filter: compute_combined_filter(&targeting),
                 },
             );
         }
@@ -235,69 +262,105 @@ fn collect_property_refs(expr: &Value, out: &mut HashSet<String>) {
     }
 }
 
-// ── Pass 1: Unused properties ────────────────────────────────────────────────
+// ── Pass 1: Used properties with zoom ranges ────────────────────────────────
 
-fn compute_unused_properties(
+/// For each property referenced by at least one targeting layer, compute the zoom range.
+fn compute_used_properties(
     targeting: &[&StyleLayerRef],
     layer_stats: &crate::stats::LayerStats,
-) -> Vec<String> {
-    let referenced: HashSet<&str> = targeting
-        .iter()
-        .flat_map(|r| r.referenced_properties.iter().map(String::as_str))
-        .collect();
+) -> BTreeMap<String, ZoomRange> {
+    let all_zooms: BTreeSet<u8> = layer_stats.features_by_zoom.keys().copied().collect();
+    let data_min = all_zooms.first().copied().unwrap_or(0);
+    let data_max = all_zooms.last().copied().unwrap_or(22);
 
-    let mut unused: Vec<String> = layer_stats
-        .properties
-        .keys()
-        .filter(|prop| !referenced.contains(prop.as_str()))
-        .cloned()
-        .collect();
-    unused.sort();
-    unused
-}
-
-// ── Pass 2: Unused geometry types ────────────────────────────────────────────
-
-/// Determine which geometry types are needed based on the layer types targeting this source-layer.
-fn compute_unused_geometry_types(
-    targeting: &[&StyleLayerRef],
-    layer_stats: &crate::stats::LayerStats,
-) -> Vec<GeometryType> {
-    let mut needed = HashSet::new();
-
+    // Group: property → layers that reference it.
+    let mut prop_layers: BTreeMap<&str, Vec<&StyleLayerRef>> = BTreeMap::new();
     for r in targeting {
-        match r.layer_type.as_str() {
-            "fill" | "fill-extrusion" => {
-                needed.insert(GeometryType::Polygon);
-            }
-            "circle" | "heatmap" => {
-                needed.insert(GeometryType::Point);
-            }
-            "line" => {
-                needed.insert(GeometryType::LineString);
-                needed.insert(GeometryType::Polygon);
-            }
-            "symbol" => {
-                needed.insert(GeometryType::Point);
-                needed.insert(GeometryType::LineString);
-            }
-            // Unknown or other types — conservatively assume all are needed.
-            _ => return vec![],
+        for prop in &r.referenced_properties {
+            prop_layers.entry(prop.as_str()).or_default().push(r);
         }
     }
 
-    let gt = &layer_stats.geometry_types;
-    let mut unused = Vec::new();
-    if gt.point > 0 && !needed.contains(&GeometryType::Point) {
-        unused.push(GeometryType::Point);
+    let mut result = BTreeMap::new();
+    for (prop, layers) in &prop_layers {
+        result.insert(
+            (*prop).to_string(),
+            zoom_envelope(layers, data_min, data_max),
+        );
     }
-    if gt.linestring > 0 && !needed.contains(&GeometryType::LineString) {
-        unused.push(GeometryType::LineString);
+    result
+}
+
+// ── Pass 2: Used geometry types with zoom ranges ────────────────────────────
+
+/// For each geometry type needed by at least one targeting layer, compute the zoom range.
+fn compute_used_geometry_types(
+    targeting: &[&StyleLayerRef],
+    layer_stats: &crate::stats::LayerStats,
+) -> BTreeMap<GeometryType, ZoomRange> {
+    let all_zooms: BTreeSet<u8> = layer_stats.features_by_zoom.keys().copied().collect();
+    let data_min = all_zooms.first().copied().unwrap_or(0);
+    let data_max = all_zooms.last().copied().unwrap_or(22);
+
+    // Group: geometry type → layers that need it.
+    let mut geom_layers: BTreeMap<GeometryType, Vec<&StyleLayerRef>> = BTreeMap::new();
+    for r in targeting {
+        let geom_types = geometry_types_for_layer_type(&r.layer_type);
+        if geom_types.is_empty() {
+            // Unknown layer type — conservatively assume all types needed at all zooms.
+            let mut all = BTreeMap::new();
+            for gt in [
+                GeometryType::Point,
+                GeometryType::LineString,
+                GeometryType::Polygon,
+            ] {
+                if geom_type_exists_in_stats(gt, layer_stats) {
+                    all.insert(gt, ZoomRange::All);
+                }
+            }
+            return all;
+        }
+        for gt in geom_types {
+            geom_layers.entry(gt).or_default().push(r);
+        }
     }
-    if gt.polygon > 0 && !needed.contains(&GeometryType::Polygon) {
-        unused.push(GeometryType::Polygon);
+
+    let mut result = BTreeMap::new();
+    for (gt, layers) in &geom_layers {
+        if geom_type_exists_in_stats(*gt, layer_stats) {
+            result.insert(*gt, zoom_envelope(layers, data_min, data_max));
+        }
     }
-    unused
+    result
+}
+
+fn geom_type_exists_in_stats(gt: GeometryType, stats: &crate::stats::LayerStats) -> bool {
+    match gt {
+        GeometryType::Point => stats.geometry_types.point > 0,
+        GeometryType::LineString => stats.geometry_types.linestring > 0,
+        GeometryType::Polygon => stats.geometry_types.polygon > 0,
+    }
+}
+
+/// Compute the zoom envelope for a set of layers, returning `All` when the range
+/// covers the full data extent.
+fn zoom_envelope(layers: &[&StyleLayerRef], data_min: u8, data_max: u8) -> ZoomRange {
+    let min_z = layers
+        .iter()
+        .map(|r| r.minzoom.unwrap_or(data_min))
+        .min()
+        .unwrap_or(data_min);
+    let max_z = layers
+        .iter()
+        .map(|r| r.maxzoom.unwrap_or(data_max))
+        .max()
+        .unwrap_or(data_max);
+
+    if min_z <= data_min && max_z >= data_max {
+        ZoomRange::All
+    } else {
+        ZoomRange::Range(min_z, max_z)
+    }
 }
 
 // ── Pass 3: Unused zoom levels ───────────────────────────────────────────────
@@ -488,6 +551,41 @@ fn extract_selected_values(filter: &Value, prop_name: &str, out: &mut HashSet<St
             true
         }
         _ => false,
+    }
+}
+
+/// Return the geometry types a given layer type can render.
+fn geometry_types_for_layer_type(layer_type: &str) -> Vec<GeometryType> {
+    match layer_type {
+        "fill" | "fill-extrusion" => vec![GeometryType::Polygon],
+        "circle" | "heatmap" => vec![GeometryType::Point],
+        "line" => vec![GeometryType::LineString, GeometryType::Polygon],
+        "symbol" => vec![GeometryType::Point, GeometryType::LineString],
+        _ => vec![],
+    }
+}
+
+// ── Pass 7: Combined filter ─────────────────────────────────────────────────
+
+/// Merge filters from all targeting layers into a single combined filter.
+fn compute_combined_filter(targeting: &[&StyleLayerRef]) -> Option<Value> {
+    let mut filters: Vec<Value> = Vec::new();
+
+    for r in targeting {
+        match &r.filter {
+            None => return None, // One layer has no filter → all features needed.
+            Some(f) => filters.push(f.clone()),
+        }
+    }
+
+    match filters.as_slice() {
+        [] => None,
+        [f] => Some(f.clone()),
+        fs => {
+            let mut any_expr = vec![Value::String("any".to_string())];
+            any_expr.extend(fs.iter().cloned());
+            Some(Value::Array(any_expr))
+        }
     }
 }
 
@@ -694,46 +792,51 @@ mod tests {
     }
 
     #[test]
-    fn unused_properties() {
+    fn used_properties() {
         let style = sample_style();
         let stats = sample_stats();
         let advisory = compute_advisory(&style, &stats);
 
         let transport = &advisory.sources["openmaptiles"].layers["transportation"];
-        assert!(!transport.unused_properties.contains(&"class".to_string()));
-        assert!(
-            transport
-                .unused_properties
-                .contains(&"subclass".to_string())
-        );
-        assert!(transport.unused_properties.contains(&"brunnel".to_string()));
+        // "class" is referenced → present in used_properties.
+        assert!(transport.used_properties.contains_key("class"));
+        // "subclass" and "brunnel" are never referenced → absent.
+        assert!(!transport.used_properties.contains_key("subclass"));
+        assert!(!transport.used_properties.contains_key("brunnel"));
     }
 
     #[test]
-    fn unused_geometry_types() {
+    fn used_geometry_types() {
         let style = sample_style();
         let stats = sample_stats();
         let advisory = compute_advisory(&style, &stats);
 
         let transport = &advisory.sources["openmaptiles"].layers["transportation"];
+        // Point is not needed by any line layer → absent from used_geometry_types.
+        assert!(
+            !transport
+                .used_geometry_types
+                .contains_key(&GeometryType::Point)
+        );
+        // LineString and Polygon are needed by line layers → present.
         assert!(
             transport
-                .unused_geometry_types
-                .contains(&GeometryType::Point)
+                .used_geometry_types
+                .contains_key(&GeometryType::LineString)
         );
         assert!(
-            !transport
-                .unused_geometry_types
-                .contains(&GeometryType::LineString)
-        );
-        assert!(
-            !transport
-                .unused_geometry_types
-                .contains(&GeometryType::Polygon)
+            transport
+                .used_geometry_types
+                .contains_key(&GeometryType::Polygon)
         );
 
         let water = &advisory.sources["openmaptiles"].layers["water"];
-        assert!(water.unused_geometry_types.is_empty());
+        // Fill layer needs Polygon, and that's all that exists in water stats.
+        assert!(
+            water
+                .used_geometry_types
+                .contains_key(&GeometryType::Polygon)
+        );
     }
 
     #[test]
@@ -901,5 +1004,346 @@ mod tests {
         let json = serde_json::to_string_pretty(&advisory).unwrap();
         let parsed: TilePruningAdvisory = serde_json::from_str(&json).unwrap();
         assert_eq!(advisory.sources.len(), parsed.sources.len());
+    }
+
+    #[test]
+    fn property_zoom_ranges() {
+        // Two layers targeting same source-layer at different zooms, referencing different props.
+        let style = json!({
+            "version": 8,
+            "sources": { "s": { "type": "vector" } },
+            "layers": [
+                {
+                    "id": "low",
+                    "type": "line",
+                    "source": "s",
+                    "source-layer": "roads",
+                    "minzoom": 4,
+                    "maxzoom": 8,
+                    "paint": { "line-width": ["get", "width"] }
+                },
+                {
+                    "id": "high",
+                    "type": "line",
+                    "source": "s",
+                    "source-layer": "roads",
+                    "minzoom": 12,
+                    "maxzoom": 16,
+                    "paint": { "line-color": ["get", "color"] }
+                }
+            ]
+        });
+
+        let mut props = BTreeMap::new();
+        props.insert(
+            "width".to_string(),
+            PropertyStats::String {
+                present_count: 100,
+                cardinality: 5,
+                value_counts: None,
+            },
+        );
+        props.insert(
+            "color".to_string(),
+            PropertyStats::String {
+                present_count: 100,
+                cardinality: 3,
+                value_counts: None,
+            },
+        );
+
+        let stats = TileStatistics {
+            sources: BTreeMap::from([(
+                "s".to_string(),
+                SourceStats {
+                    layers: BTreeMap::from([(
+                        "roads".to_string(),
+                        LayerStats {
+                            total_features: 200,
+                            features_by_zoom: BTreeMap::from([
+                                (2, 10),
+                                (4, 20),
+                                (8, 30),
+                                (12, 40),
+                                (16, 50),
+                                (18, 60),
+                            ]),
+                            geometry_types: GeometryTypeStats::default(),
+                            has_feature_ids: false,
+                            properties: props,
+                        },
+                    )]),
+                },
+            )]),
+        };
+
+        let advisory = compute_advisory(&style, &stats);
+        let roads = &advisory.sources["s"].layers["roads"];
+
+        assert_eq!(
+            roads.used_properties.get("width"),
+            Some(&ZoomRange::Range(4, 8))
+        );
+        assert_eq!(
+            roads.used_properties.get("color"),
+            Some(&ZoomRange::Range(12, 16))
+        );
+    }
+
+    #[test]
+    fn zoom_range_all_when_full() {
+        // Property needed at all data zooms → ZoomRange::All.
+        let style = json!({
+            "version": 8,
+            "sources": { "s": { "type": "vector" } },
+            "layers": [{
+                "id": "l",
+                "type": "line",
+                "source": "s",
+                "source-layer": "roads",
+                "paint": { "line-width": ["get", "width"] }
+            }]
+        });
+
+        let mut props = BTreeMap::new();
+        props.insert(
+            "width".to_string(),
+            PropertyStats::String {
+                present_count: 100,
+                cardinality: 5,
+                value_counts: None,
+            },
+        );
+
+        let stats = TileStatistics {
+            sources: BTreeMap::from([(
+                "s".to_string(),
+                SourceStats {
+                    layers: BTreeMap::from([(
+                        "roads".to_string(),
+                        LayerStats {
+                            total_features: 100,
+                            features_by_zoom: BTreeMap::from([(4, 10), (10, 50), (16, 40)]),
+                            geometry_types: GeometryTypeStats::default(),
+                            has_feature_ids: false,
+                            properties: props,
+                        },
+                    )]),
+                },
+            )]),
+        };
+
+        let advisory = compute_advisory(&style, &stats);
+        let roads = &advisory.sources["s"].layers["roads"];
+
+        assert_eq!(roads.used_properties.get("width"), Some(&ZoomRange::All));
+    }
+
+    #[test]
+    fn geometry_type_zoom_ranges() {
+        // Line layer z5-10 + symbol layer z12-16 → LineString z5-16, Point z12-16.
+        let style = json!({
+            "version": 8,
+            "sources": { "s": { "type": "vector" } },
+            "layers": [
+                {
+                    "id": "lines",
+                    "type": "line",
+                    "source": "s",
+                    "source-layer": "roads",
+                    "minzoom": 5,
+                    "maxzoom": 10
+                },
+                {
+                    "id": "labels",
+                    "type": "symbol",
+                    "source": "s",
+                    "source-layer": "roads",
+                    "minzoom": 12,
+                    "maxzoom": 16
+                }
+            ]
+        });
+
+        let stats = TileStatistics {
+            sources: BTreeMap::from([(
+                "s".to_string(),
+                SourceStats {
+                    layers: BTreeMap::from([(
+                        "roads".to_string(),
+                        LayerStats {
+                            total_features: 500,
+                            features_by_zoom: BTreeMap::from([
+                                (2, 10),
+                                (5, 50),
+                                (10, 100),
+                                (12, 200),
+                                (16, 150),
+                                (18, 60),
+                            ]),
+                            geometry_types: GeometryTypeStats {
+                                point: 100,
+                                linestring: 400,
+                                polygon: 0,
+                                unknown: 0,
+                            },
+                            has_feature_ids: false,
+                            properties: BTreeMap::new(),
+                        },
+                    )]),
+                },
+            )]),
+        };
+
+        let advisory = compute_advisory(&style, &stats);
+        let roads = &advisory.sources["s"].layers["roads"];
+
+        assert_eq!(
+            roads.used_geometry_types.get(&GeometryType::Point),
+            Some(&ZoomRange::Range(12, 16))
+        );
+        assert_eq!(
+            roads.used_geometry_types.get(&GeometryType::LineString),
+            Some(&ZoomRange::Range(5, 16))
+        );
+    }
+
+    #[test]
+    fn combined_filter_none_when_no_filter() {
+        let style = json!({
+            "version": 8,
+            "sources": { "s": { "type": "vector" } },
+            "layers": [
+                {
+                    "id": "a",
+                    "type": "line",
+                    "source": "s",
+                    "source-layer": "roads",
+                    "filter": ["==", ["get", "class"], "primary"]
+                },
+                {
+                    "id": "b",
+                    "type": "line",
+                    "source": "s",
+                    "source-layer": "roads"
+                }
+            ]
+        });
+
+        let stats = TileStatistics {
+            sources: BTreeMap::from([(
+                "s".to_string(),
+                SourceStats {
+                    layers: BTreeMap::from([(
+                        "roads".to_string(),
+                        LayerStats {
+                            total_features: 100,
+                            features_by_zoom: BTreeMap::from([(5, 100)]),
+                            geometry_types: GeometryTypeStats::default(),
+                            has_feature_ids: false,
+                            properties: BTreeMap::new(),
+                        },
+                    )]),
+                },
+            )]),
+        };
+
+        let advisory = compute_advisory(&style, &stats);
+        let roads = &advisory.sources["s"].layers["roads"];
+        // One layer has no filter → combined_filter must be None.
+        assert!(roads.combined_filter.is_none());
+    }
+
+    #[test]
+    fn combined_filter_single() {
+        let style = json!({
+            "version": 8,
+            "sources": { "s": { "type": "vector" } },
+            "layers": [{
+                "id": "a",
+                "type": "line",
+                "source": "s",
+                "source-layer": "roads",
+                "filter": ["==", ["get", "class"], "primary"]
+            }]
+        });
+
+        let stats = TileStatistics {
+            sources: BTreeMap::from([(
+                "s".to_string(),
+                SourceStats {
+                    layers: BTreeMap::from([(
+                        "roads".to_string(),
+                        LayerStats {
+                            total_features: 100,
+                            features_by_zoom: BTreeMap::from([(5, 100)]),
+                            geometry_types: GeometryTypeStats::default(),
+                            has_feature_ids: false,
+                            properties: BTreeMap::new(),
+                        },
+                    )]),
+                },
+            )]),
+        };
+
+        let advisory = compute_advisory(&style, &stats);
+        let roads = &advisory.sources["s"].layers["roads"];
+        assert_eq!(
+            roads.combined_filter,
+            Some(json!(["==", ["get", "class"], "primary"]))
+        );
+    }
+
+    #[test]
+    fn combined_filter_multiple_merged_with_any() {
+        let style = json!({
+            "version": 8,
+            "sources": { "s": { "type": "vector" } },
+            "layers": [
+                {
+                    "id": "a",
+                    "type": "line",
+                    "source": "s",
+                    "source-layer": "roads",
+                    "filter": ["==", ["get", "class"], "primary"]
+                },
+                {
+                    "id": "b",
+                    "type": "line",
+                    "source": "s",
+                    "source-layer": "roads",
+                    "filter": ["==", ["get", "class"], "secondary"]
+                }
+            ]
+        });
+
+        let stats = TileStatistics {
+            sources: BTreeMap::from([(
+                "s".to_string(),
+                SourceStats {
+                    layers: BTreeMap::from([(
+                        "roads".to_string(),
+                        LayerStats {
+                            total_features: 100,
+                            features_by_zoom: BTreeMap::from([(5, 100)]),
+                            geometry_types: GeometryTypeStats::default(),
+                            has_feature_ids: false,
+                            properties: BTreeMap::new(),
+                        },
+                    )]),
+                },
+            )]),
+        };
+
+        let advisory = compute_advisory(&style, &stats);
+        let roads = &advisory.sources["s"].layers["roads"];
+        assert_eq!(
+            roads.combined_filter,
+            Some(json!([
+                "any",
+                ["==", ["get", "class"], "primary"],
+                ["==", ["get", "class"], "secondary"]
+            ]))
+        );
     }
 }
