@@ -9,6 +9,10 @@ use maplibre_style_optimizer::prune::{intern_string_properties, prune_tile};
 use maplibre_style_optimizer::stats::collect::{available_zoom_levels, decode_tile, open_mbtiles};
 use maplibre_style_optimizer::{TilePruningAdvisory, mbtiles};
 use prost::Message;
+use rayon::iter::{IntoParallelIterator, ParallelIterator};
+
+/// Number of tiles to read, process in parallel, then write back per batch.
+const TILE_BATCH_SIZE: usize = 1024;
 
 /// Apply a tile pruning advisory to rewrite tiles and/or style.
 ///
@@ -130,63 +134,12 @@ fn process_tiles(
             continue;
         }
 
-        let mut stmt = src_conn
-            .prepare("SELECT tile_column, tile_row, tile_data FROM tiles WHERE zoom_level = ?1")?;
-        let rows = stmt.query_map([z], |row| {
-            let col: i32 = row.get(0)?;
-            let row_val: i32 = row.get(1)?;
-            let data: Vec<u8> = row.get(2)?;
-            Ok((col, row_val, data))
-        })?;
+        let (zoom_in, zoom_out) =
+            process_zoom(&src_conn, &dst_conn, z, *zoom, source_advisory)?;
 
-        let mut zoom_in = 0u64;
-        let mut zoom_out = 0u64;
-
-        for row in rows {
-            let (col, row_val, data) = row?;
-            total_in += 1;
-            zoom_in += 1;
-
-            // Decode MVT.
-            let mut tile = match decode_tile(&data) {
-                Ok(t) => t,
-                Err(e) => {
-                    eprintln!("  warning: skipping tile z{zoom}/{col}/{row_val}: {e}");
-                    continue;
-                }
-            };
-
-            // Prune.
-            prune_tile(&mut tile, source_advisory, *zoom);
-
-            // Intern string properties.
-            for layer in &mut tile.layers {
-                if let Some(la) = source_advisory.layers.get(&layer.name) {
-                    intern_string_properties(layer, &la.interned_properties);
-                }
-            }
-
-            if tile.layers.is_empty() {
-                continue;
-            }
-
-            // Re-encode pruned MVT to bytes.
-            let mvt_bytes = tile.encode_to_vec();
-
-            // Convert to MLT.
-            match mvt_to_mlt(mvt_bytes) {
-                Ok(encoded) => {
-                    mbtiles::insert_tile(&dst_conn, z, col, row_val, &encoded)?;
-                    zoom_out += 1;
-                    total_out += 1;
-                    tiles_written += 1;
-                }
-                Err(e) => {
-                    eprintln!("  warning: MLT encode failed for z{zoom}/{col}/{row_val}: {e}");
-                }
-            }
-        }
-
+        total_in += zoom_in;
+        total_out += zoom_out;
+        tiles_written += zoom_out;
         eprintln!("  z{zoom}: {zoom_in} → {zoom_out} tiles");
     }
 
@@ -196,6 +149,96 @@ fn process_tiles(
     );
 
     Ok(())
+}
+
+/// Process all tiles at a single zoom level in batches, returning `(input_count, output_count)`.
+fn process_zoom(
+    src_conn: &rusqlite::Connection,
+    dst_conn: &rusqlite::Connection,
+    z: i32,
+    zoom: u8,
+    source_advisory: &maplibre_style_optimizer::advisory::SourceAdvisory,
+) -> anyhow::Result<(u64, u64)> {
+    let mut stmt =
+        src_conn.prepare("SELECT tile_column, tile_row, tile_data FROM tiles WHERE zoom_level = ?1")?;
+    let mut rows = stmt.query([z])?;
+
+    let mut zoom_in = 0u64;
+    let mut zoom_out = 0u64;
+
+    loop {
+        // Read a batch of raw tiles from SQLite.
+        let mut batch: Vec<(i32, i32, Vec<u8>)> = Vec::with_capacity(TILE_BATCH_SIZE);
+        while batch.len() < TILE_BATCH_SIZE {
+            let Some(row) = rows.next()? else { break };
+            let col: i32 = row.get(0)?;
+            let row_val: i32 = row.get(1)?;
+            let data: Vec<u8> = row.get(2)?;
+            batch.push((col, row_val, data));
+        }
+        if batch.is_empty() {
+            break;
+        }
+        zoom_in += batch.len() as u64;
+
+        // Process the batch in parallel: decode → prune → intern → encode → MLT.
+        let results: Vec<_> = batch
+            .into_par_iter()
+            .filter_map(|(col, row_val, data)| {
+                process_single_tile(&data, col, row_val, zoom, source_advisory)
+            })
+            .collect();
+
+        // Write results to SQLite inside a transaction.
+        let tx = dst_conn.unchecked_transaction()?;
+        for (col, row_val, encoded) in &results {
+            mbtiles::insert_tile(&tx, z, *col, *row_val, encoded)?;
+        }
+        tx.commit()?;
+
+        zoom_out += results.len() as u64;
+    }
+
+    Ok((zoom_in, zoom_out))
+}
+
+/// Decode, prune, intern, and re-encode a single tile. Returns `None` if the tile
+/// is empty after pruning or if encoding fails.
+fn process_single_tile(
+    data: &[u8],
+    col: i32,
+    row_val: i32,
+    zoom: u8,
+    source_advisory: &maplibre_style_optimizer::advisory::SourceAdvisory,
+) -> Option<(i32, i32, Vec<u8>)> {
+    let mut tile = match decode_tile(data) {
+        Ok(t) => t,
+        Err(e) => {
+            eprintln!("  warning: skipping tile z{zoom}/{col}/{row_val}: {e}");
+            return None;
+        }
+    };
+
+    prune_tile(&mut tile, source_advisory, zoom);
+
+    for layer in &mut tile.layers {
+        if let Some(la) = source_advisory.layers.get(&layer.name) {
+            intern_string_properties(layer, &la.interned_properties);
+        }
+    }
+
+    if tile.layers.is_empty() {
+        return None;
+    }
+
+    let mvt_bytes = tile.encode_to_vec();
+    match mvt_to_mlt(mvt_bytes) {
+        Ok(encoded) => Some((col, row_val, encoded)),
+        Err(e) => {
+            eprintln!("  warning: MLT encode failed for z{zoom}/{col}/{row_val}: {e}");
+            None
+        }
+    }
 }
 
 fn process_style(
