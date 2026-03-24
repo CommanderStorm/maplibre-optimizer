@@ -134,8 +134,7 @@ fn process_tiles(
             continue;
         }
 
-        let (zoom_in, zoom_out) =
-            process_zoom(&src_conn, &dst_conn, z, *zoom, source_advisory)?;
+        let (zoom_in, zoom_out) = process_zoom(&src_conn, &dst_conn, z, *zoom, source_advisory)?;
 
         total_in += zoom_in;
         total_out += zoom_out;
@@ -159,8 +158,8 @@ fn process_zoom(
     zoom: u8,
     source_advisory: &maplibre_style_optimizer::advisory::SourceAdvisory,
 ) -> anyhow::Result<(u64, u64)> {
-    let mut stmt =
-        src_conn.prepare("SELECT tile_column, tile_row, tile_data FROM tiles WHERE zoom_level = ?1")?;
+    let mut stmt = src_conn
+        .prepare("SELECT tile_column, tile_row, tile_data FROM tiles WHERE zoom_level = ?1")?;
     let mut rows = stmt.query([z])?;
 
     let mut zoom_in = 0u64;

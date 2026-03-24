@@ -46,12 +46,15 @@ impl<'de> serde::Deserialize<'de> for NumericExpression {
     }
 }
 
-/// Nested expression: ramp (`interpolate-hcl`, …) or [`Color`](crate::spec::Color) operators.
+/// Nested expression: `interpolate` / `interpolate-hcl` / `interpolate-lab` ramps,
+/// or [`Color`](crate::spec::Color) operators.
 #[derive(PartialEq, Debug, Clone)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum ColorExpression {
     Color(crate::spec::Color),
     Ramp(crate::spec::ColorOrArrayOfColor),
+    /// Generic `interpolate` — can produce colors as well as numbers/arrays.
+    Interpolate(crate::spec::NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection),
 }
 
 impl serde::Serialize for ColorExpression {
@@ -59,6 +62,7 @@ impl serde::Serialize for ColorExpression {
         match self {
             Self::Color(v) => v.serialize(serializer),
             Self::Ramp(v) => v.serialize(serializer),
+            Self::Interpolate(v) => v.serialize(serializer),
         }
     }
 }
@@ -75,14 +79,17 @@ impl<'de> serde::Deserialize<'de> for ColorExpression {
             Ok(v) => return Ok(Self::Ramp(v)),
             Err(e) => errors.push(("Ramp", e.to_string())),
         }
+        match <crate::spec::NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection as serde::Deserialize>::deserialize(&value) {
+            Ok(v) => return Ok(Self::Interpolate(v)),
+            Err(e) => errors.push(("Interpolate", e.to_string())),
+        }
         let details: Vec<String> = errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
         Err(serde::de::Error::custom(format!(
-            "ColorExpression: no variant matched. Expected Color(Color) | Ramp(ColorOrArrayOfColor). Errors: [{}]",
+            "ColorExpression: no variant matched. Expected Color(Color) | Ramp(ColorOrArrayOfColor) | Interpolate(NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection). Errors: [{}]",
             details.join("; ")
         )))
     }
 }
-
 
 // ── Shared Inner Prop Enums ─────────────────────────────────────────────────
 
@@ -148,51 +155,6 @@ impl<'de> serde::Deserialize<'de> for NumericPropInner {
     }
 }
 
-/// Inner representation for color expression-backed properties.
-#[derive(PartialEq, Debug, Clone)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum ColorPropInner {
-    Expr(Box<ColorExpression>),
-    Literal(
-        #[cfg_attr(
-            feature = "fuzz",
-            arbitrary(with = crate::fuzz_helpers::arbitrary_json_value)
-        )]
-        serde_json::Value,
-    ),
-}
-
-impl serde::Serialize for ColorPropInner {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        match self {
-            Self::Expr(v) => v.as_ref().serialize(serializer),
-            Self::Literal(v) => v.serialize(serializer),
-        }
-    }
-}
-
-impl<'de> serde::Deserialize<'de> for ColorPropInner {
-    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
-        let mut errors: Vec<(&str, String)> = Vec::new();
-        match <ColorExpression as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Expr(Box::new(v))),
-            Err(e) => errors.push(("Expr", e.to_string())),
-        }
-        // serde_json::Value always succeeds — must be last
-        match <serde_json::Value as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Literal(v)),
-            Err(e) => errors.push(("Literal", e.to_string())),
-        }
-        let details: Vec<String> = errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
-        Err(serde::de::Error::custom(format!(
-            "ColorPropInner: no variant matched. Expected Expr(ColorExpression) | Literal(serde_json::Value). Errors: [{}]",
-            details.join("; ")
-        )))
-    }
-}
-
-
 /// Inner representation for array-like expression-backed properties.
 /// Uses `serde_json::Value` for the literal branch to accommodate diverse array shapes.
 #[derive(PartialEq, Debug, Clone)]
@@ -237,7 +199,6 @@ impl<'de> serde::Deserialize<'de> for ArrayPropInner {
         )))
     }
 }
-
 
 /// Inner representation for formatted expression-backed properties.
 /// Accepts `Formatted` expressions (e.g. `["format", ...]`), string expressions, or plain string literals.
@@ -350,14 +311,17 @@ macro_rules! numeric_prop {
     (@default $name:ident) => {};
 }
 
-/// Stamp out a newtype wrapping [`ColorPropInner`] with optional default.
+/// Stamp out a newtype wrapping [`ColorExpression`] with optional default.
+///
+/// `ColorExpression` already handles bare string literals via `Color::Literal(StringLiteral)`,
+/// so no separate `ColorPropInner` wrapper is needed.
 #[macro_export]
 macro_rules! color_prop {
     ($name:ident, doc = $doc:expr $(, default = $default:expr)?) => {
         #[doc = $doc]
         #[derive(PartialEq, Debug, Clone)]
         #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-        pub struct $name(pub $crate::shared_expr::ColorPropInner);
+        pub struct $name(pub $crate::shared_expr::ColorExpression);
 
         impl serde::Serialize for $name {
             fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
@@ -367,7 +331,7 @@ macro_rules! color_prop {
 
         impl<'de> serde::Deserialize<'de> for $name {
             fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-                let inner = <$crate::shared_expr::ColorPropInner as serde::Deserialize>::deserialize(deserializer)?;
+                let inner = <$crate::shared_expr::ColorExpression as serde::Deserialize>::deserialize(deserializer)?;
                 Ok(Self(inner))
             }
         }
@@ -378,7 +342,9 @@ macro_rules! color_prop {
     (@default $name:ident, $default:expr) => {
         impl Default for $name {
             fn default() -> Self {
-                Self($crate::shared_expr::ColorPropInner::Literal($default))
+                let value = $default;
+                let expr = serde_json::from_value(value).expect("invalid color default");
+                Self(expr)
             }
         }
     };
