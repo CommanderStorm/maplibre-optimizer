@@ -118,7 +118,7 @@ gen: clean-gen
     rustfmt style-spec/src/spec/*.rs
 
 # Run the serde round-trip fuzz target
-[working-directory: 'maplibre-style-spec/fuzz']
+[working-directory: 'style-spec/fuzz']
 fuzz *args:
     #!/usr/bin/env bash
     set -euo pipefail
