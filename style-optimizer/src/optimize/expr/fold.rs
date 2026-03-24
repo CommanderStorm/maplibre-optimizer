@@ -832,7 +832,7 @@ pub(super) fn try_fold_redundant_properties(arr: &mut Vec<Value>) -> bool {
 }
 
 /// Fold `["has", p]` → `["literal", true]` when statistics show the property is present in
-/// every feature (`present_count` == `total_features`).
+/// every feature, or → `["literal", false]` when the property is never present.
 pub(super) fn try_fold_has_from_stats(
     arr: &mut Vec<Value>,
     stats: Option<&crate::stats::TileStatistics>,
@@ -857,14 +857,114 @@ pub(super) fn try_fold_has_from_stats(
     let Some(layer_stats) = stats.layer_stats(&info.source, &info.source_layer) else {
         return false;
     };
-    let Some(prop_stats) = layer_stats.properties.get(prop_name) else {
+    if layer_stats.total_features == 0 {
         return false;
+    }
+    let Some(prop_stats) = layer_stats.properties.get(prop_name) else {
+        // Property not in stats at all — never observed on any feature.
+        *arr = vec![Value::String("literal".to_string()), Value::Bool(false)];
+        return true;
     };
-    if layer_stats.total_features > 0 && prop_stats.present_count() == layer_stats.total_features {
+    if prop_stats.present_count() == 0 {
+        // Property exists in stats but was never present on any feature.
+        *arr = vec![Value::String("literal".to_string()), Value::Bool(false)];
+        return true;
+    }
+    if prop_stats.present_count() == layer_stats.total_features {
         *arr = vec![Value::String("literal".to_string()), Value::Bool(true)];
         return true;
     }
     false
+}
+
+/// Fold `["==", ["geometry-type"], "Point"]` → `true`/`false` (and `!=` variant) based on
+/// geometry type statistics.
+///
+/// - `==`: fold to `true` if the queried type is the only non-zero type; fold to `false` if
+///   its count is 0.
+/// - `!=`: inverse of the above.
+pub(super) fn try_fold_geometry_type_from_stats(
+    arr: &mut Vec<Value>,
+    stats: Option<&crate::stats::TileStatistics>,
+    layer_info: Option<&[Option<crate::optimize::source_util::VectorLayerInfo>]>,
+    layer_index: usize,
+) -> bool {
+    if arr.len() != 3 {
+        return false;
+    }
+    let Some(op) = arr[0].as_str() else {
+        return false;
+    };
+    if op != "==" && op != "!=" {
+        return false;
+    }
+
+    // Detect pattern: one operand is ["geometry-type"], the other is a string literal.
+    let (geom_type_str, _geom_idx) = if is_geometry_type_expr(&arr[1]) && arr[2].is_string() {
+        (arr[2].as_str().unwrap(), 1)
+    } else if is_geometry_type_expr(&arr[2]) && arr[1].is_string() {
+        (arr[1].as_str().unwrap(), 2)
+    } else {
+        return false;
+    };
+
+    // Only handle the three standard geometry type strings.
+    if !matches!(geom_type_str, "Point" | "LineString" | "Polygon") {
+        return false;
+    }
+
+    let Some(stats) = stats else {
+        return false;
+    };
+    let Some(infos) = layer_info else {
+        return false;
+    };
+    let Some(Some(info)) = infos.get(layer_index) else {
+        return false;
+    };
+    let Some(layer_stats) = stats.layer_stats(&info.source, &info.source_layer) else {
+        return false;
+    };
+    if layer_stats.total_features == 0 {
+        return false;
+    }
+
+    let gt = &layer_stats.geometry_types;
+    let queried_count = match geom_type_str {
+        "Point" => gt.point,
+        "LineString" => gt.linestring,
+        "Polygon" => gt.polygon,
+        _ => unreachable!(),
+    };
+
+    // Count how many geometry types are present (excluding unknown).
+    let non_zero_types =
+        u8::from(gt.point > 0) + u8::from(gt.linestring > 0) + u8::from(gt.polygon > 0);
+
+    let fold_value = if queried_count == 0 {
+        // This geometry type never appears → == is false, != is true.
+        Some(op == "!=")
+    } else if non_zero_types == 1 && queried_count > 0 {
+        // This is the only geometry type → == is true, != is false.
+        Some(op == "==")
+    } else {
+        None
+    };
+
+    if let Some(val) = fold_value {
+        *arr = vec![Value::String("literal".to_string()), Value::Bool(val)];
+        return true;
+    }
+    false
+}
+
+/// Check if a value is `["geometry-type"]` (a 1-element array).
+fn is_geometry_type_expr(v: &Value) -> bool {
+    if let Value::Array(a) = v {
+        a.len() == 1 && a[0].as_str() == Some("geometry-type")
+    } else {
+        false
+    }
 }
 
 /// Fold `["get", p]` → `["literal", v]` when statistics show the property has exactly one
@@ -985,7 +1085,9 @@ fn single_value_literal(stats: &crate::stats::PropertyStats) -> Option<Value> {
 mod tests {
     use serde_json::{Value, json};
 
-    use super::try_fold_redundant_properties;
+    use super::{
+        try_fold_geometry_type_from_stats, try_fold_has_from_stats, try_fold_redundant_properties,
+    };
 
     #[test]
     fn get_with_properties_is_simplified() {
@@ -1031,5 +1133,345 @@ mod tests {
         let mut arr: Vec<Value> = serde_json::from_value(original.clone()).unwrap();
         assert!(!try_fold_redundant_properties(&mut arr));
         assert_eq!(Value::Array(arr), original);
+    }
+
+    // ── Stats-driven fold helpers ────────────────────────────────────────
+
+    use std::collections::BTreeMap;
+
+    use crate::optimize::source_util::VectorLayerInfo;
+    use crate::stats::{GeometryTypeStats, LayerStats, PropertyStats, SourceStats, TileStatistics};
+
+    fn make_stats(layer_name: &str, layer_stats: LayerStats) -> TileStatistics {
+        let mut layers = BTreeMap::new();
+        layers.insert(layer_name.to_string(), layer_stats);
+        let mut sources = BTreeMap::new();
+        sources.insert("src".to_string(), SourceStats { layers });
+        TileStatistics {
+            sources,
+            sample_rate: 1.0,
+        }
+    }
+
+    fn make_layer_info() -> Vec<Option<VectorLayerInfo>> {
+        vec![Some(VectorLayerInfo {
+            source: "src".to_string(),
+            source_layer: "lyr".to_string(),
+        })]
+    }
+
+    // ── has→false tests ─────────────────────────────────────────────────
+
+    #[test]
+    fn has_folds_false_when_property_absent_from_stats() {
+        let stats = make_stats(
+            "lyr",
+            LayerStats {
+                total_features: 100,
+                properties: BTreeMap::new(),
+                ..Default::default()
+            },
+        );
+        let info = make_layer_info();
+        let mut arr: Vec<Value> = serde_json::from_value(json!(["has", "missing"])).unwrap();
+        assert!(try_fold_has_from_stats(
+            &mut arr,
+            Some(&stats),
+            Some(&info),
+            0
+        ));
+        assert_eq!(Value::Array(arr), json!(["literal", false]));
+    }
+
+    #[test]
+    fn has_folds_false_when_present_count_zero() {
+        let mut props = BTreeMap::new();
+        props.insert(
+            "empty".to_string(),
+            PropertyStats::String {
+                present_count: 0,
+                cardinality: 0,
+                value_counts: None,
+            },
+        );
+        let stats = make_stats(
+            "lyr",
+            LayerStats {
+                total_features: 100,
+                properties: props,
+                ..Default::default()
+            },
+        );
+        let info = make_layer_info();
+        let mut arr: Vec<Value> = serde_json::from_value(json!(["has", "empty"])).unwrap();
+        assert!(try_fold_has_from_stats(
+            &mut arr,
+            Some(&stats),
+            Some(&info),
+            0
+        ));
+        assert_eq!(Value::Array(arr), json!(["literal", false]));
+    }
+
+    #[test]
+    fn has_folds_true_when_always_present() {
+        let mut props = BTreeMap::new();
+        props.insert(
+            "name".to_string(),
+            PropertyStats::String {
+                present_count: 100,
+                cardinality: 5,
+                value_counts: None,
+            },
+        );
+        let stats = make_stats(
+            "lyr",
+            LayerStats {
+                total_features: 100,
+                properties: props,
+                ..Default::default()
+            },
+        );
+        let info = make_layer_info();
+        let mut arr: Vec<Value> = serde_json::from_value(json!(["has", "name"])).unwrap();
+        assert!(try_fold_has_from_stats(
+            &mut arr,
+            Some(&stats),
+            Some(&info),
+            0
+        ));
+        assert_eq!(Value::Array(arr), json!(["literal", true]));
+    }
+
+    #[test]
+    fn has_no_fold_when_partially_present() {
+        let mut props = BTreeMap::new();
+        props.insert(
+            "name".to_string(),
+            PropertyStats::String {
+                present_count: 50,
+                cardinality: 5,
+                value_counts: None,
+            },
+        );
+        let stats = make_stats(
+            "lyr",
+            LayerStats {
+                total_features: 100,
+                properties: props,
+                ..Default::default()
+            },
+        );
+        let info = make_layer_info();
+        let mut arr: Vec<Value> = serde_json::from_value(json!(["has", "name"])).unwrap();
+        assert!(!try_fold_has_from_stats(
+            &mut arr,
+            Some(&stats),
+            Some(&info),
+            0
+        ));
+    }
+
+    #[test]
+    fn has_no_fold_when_zero_features() {
+        let stats = make_stats(
+            "lyr",
+            LayerStats {
+                total_features: 0,
+                ..Default::default()
+            },
+        );
+        let info = make_layer_info();
+        let mut arr: Vec<Value> = serde_json::from_value(json!(["has", "x"])).unwrap();
+        assert!(!try_fold_has_from_stats(
+            &mut arr,
+            Some(&stats),
+            Some(&info),
+            0
+        ));
+    }
+
+    // ── geometry-type fold tests ────────────────────────────────────────
+
+    #[test]
+    fn geometry_type_eq_folds_true_when_only_type() {
+        let stats = make_stats(
+            "lyr",
+            LayerStats {
+                total_features: 500,
+                geometry_types: GeometryTypeStats {
+                    point: 500,
+                    linestring: 0,
+                    polygon: 0,
+                    unknown: 0,
+                },
+                ..Default::default()
+            },
+        );
+        let info = make_layer_info();
+        let mut arr: Vec<Value> =
+            serde_json::from_value(json!(["==", ["geometry-type"], "Point"])).unwrap();
+        assert!(try_fold_geometry_type_from_stats(
+            &mut arr,
+            Some(&stats),
+            Some(&info),
+            0
+        ));
+        assert_eq!(Value::Array(arr), json!(["literal", true]));
+    }
+
+    #[test]
+    fn geometry_type_eq_folds_false_when_absent() {
+        let stats = make_stats(
+            "lyr",
+            LayerStats {
+                total_features: 500,
+                geometry_types: GeometryTypeStats {
+                    point: 0,
+                    linestring: 500,
+                    polygon: 0,
+                    unknown: 0,
+                },
+                ..Default::default()
+            },
+        );
+        let info = make_layer_info();
+        let mut arr: Vec<Value> =
+            serde_json::from_value(json!(["==", ["geometry-type"], "Point"])).unwrap();
+        assert!(try_fold_geometry_type_from_stats(
+            &mut arr,
+            Some(&stats),
+            Some(&info),
+            0
+        ));
+        assert_eq!(Value::Array(arr), json!(["literal", false]));
+    }
+
+    #[test]
+    fn geometry_type_neq_folds_true_when_absent() {
+        let stats = make_stats(
+            "lyr",
+            LayerStats {
+                total_features: 500,
+                geometry_types: GeometryTypeStats {
+                    point: 0,
+                    linestring: 500,
+                    polygon: 0,
+                    unknown: 0,
+                },
+                ..Default::default()
+            },
+        );
+        let info = make_layer_info();
+        let mut arr: Vec<Value> =
+            serde_json::from_value(json!(["!=", ["geometry-type"], "Point"])).unwrap();
+        assert!(try_fold_geometry_type_from_stats(
+            &mut arr,
+            Some(&stats),
+            Some(&info),
+            0
+        ));
+        assert_eq!(Value::Array(arr), json!(["literal", true]));
+    }
+
+    #[test]
+    fn geometry_type_neq_folds_false_when_only_type() {
+        let stats = make_stats(
+            "lyr",
+            LayerStats {
+                total_features: 500,
+                geometry_types: GeometryTypeStats {
+                    point: 500,
+                    linestring: 0,
+                    polygon: 0,
+                    unknown: 0,
+                },
+                ..Default::default()
+            },
+        );
+        let info = make_layer_info();
+        let mut arr: Vec<Value> =
+            serde_json::from_value(json!(["!=", ["geometry-type"], "Point"])).unwrap();
+        assert!(try_fold_geometry_type_from_stats(
+            &mut arr,
+            Some(&stats),
+            Some(&info),
+            0
+        ));
+        assert_eq!(Value::Array(arr), json!(["literal", false]));
+    }
+
+    #[test]
+    fn geometry_type_no_fold_when_mixed_types() {
+        let stats = make_stats(
+            "lyr",
+            LayerStats {
+                total_features: 500,
+                geometry_types: GeometryTypeStats {
+                    point: 200,
+                    linestring: 300,
+                    polygon: 0,
+                    unknown: 0,
+                },
+                ..Default::default()
+            },
+        );
+        let info = make_layer_info();
+        let mut arr: Vec<Value> =
+            serde_json::from_value(json!(["==", ["geometry-type"], "Point"])).unwrap();
+        assert!(!try_fold_geometry_type_from_stats(
+            &mut arr,
+            Some(&stats),
+            Some(&info),
+            0
+        ));
+    }
+
+    #[test]
+    fn geometry_type_reversed_operand_order() {
+        let stats = make_stats(
+            "lyr",
+            LayerStats {
+                total_features: 500,
+                geometry_types: GeometryTypeStats {
+                    point: 500,
+                    linestring: 0,
+                    polygon: 0,
+                    unknown: 0,
+                },
+                ..Default::default()
+            },
+        );
+        let info = make_layer_info();
+        // String literal on the left, geometry-type on the right.
+        let mut arr: Vec<Value> =
+            serde_json::from_value(json!(["==", "Point", ["geometry-type"]])).unwrap();
+        assert!(try_fold_geometry_type_from_stats(
+            &mut arr,
+            Some(&stats),
+            Some(&info),
+            0
+        ));
+        assert_eq!(Value::Array(arr), json!(["literal", true]));
+    }
+
+    #[test]
+    fn geometry_type_no_fold_zero_features() {
+        let stats = make_stats(
+            "lyr",
+            LayerStats {
+                total_features: 0,
+                ..Default::default()
+            },
+        );
+        let info = make_layer_info();
+        let mut arr: Vec<Value> =
+            serde_json::from_value(json!(["==", ["geometry-type"], "Point"])).unwrap();
+        assert!(!try_fold_geometry_type_from_stats(
+            &mut arr,
+            Some(&stats),
+            Some(&info),
+            0
+        ));
     }
 }

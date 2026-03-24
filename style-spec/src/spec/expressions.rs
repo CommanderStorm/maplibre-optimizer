@@ -204,25 +204,25 @@ Accumulated,
 /// Retrieves an item from an array.
 At(Box<Number>, ExprOrLiteral),
 /// Selects the first output whose corresponding test condition evaluates to true, or the fallback value otherwise.
-///
+/// 
 ///  - [Create a hover effect](https://maplibre.org/maplibre-gl-js/docs/examples/create-a-hover-effect/)
-///
+/// 
 ///  - [Display HTML clusters with custom properties](https://maplibre.org/maplibre-gl-js/docs/examples/display-html-clusters-with-custom-properties/)
 Case((Vec<(Box<Boolean>,ExprOrLiteral)>,ExprOrLiteral)),
 /// Evaluates each expression in turn until the first non-null value is obtained, and returns that value.
-///
+/// 
 ///  - [Use a fallback image](https://maplibre.org/maplibre-gl-js/docs/examples/use-a-fallback-image/)
 Coalesce(Vec<ExprOrLiteral>),
 /// Retrieves a property value from the current feature's state. Returns null if the requested property is not present on the feature's state. A feature's state is not part of the GeoJSON or vector tile data, and must be set programmatically on each feature. When `source.promoteId` is not provided, features are identified by their `id` attribute, which must be an integer or a string that can be cast to an integer. When `source.promoteId` is provided, features are identified by their `promoteId` property, which may be a number, string, or any primitive data type. Note that ["feature-state"] can only be used with paint properties that support data-driven styling.
-///
+/// 
 ///  - [Create a hover effect](https://maplibre.org/maplibre-gl-js/docs/examples/create-a-hover-effect/)
 FeatureState(Box<String>),
 /// Retrieves a property value from the current feature's properties, or from another object if a second argument is provided. Returns null if the requested property is missing.
-///
+/// 
 ///  - [Change the case of labels](https://maplibre.org/maplibre-gl-js/docs/examples/change-case-of-labels/)
-///
+/// 
 ///  - [Display HTML clusters with custom properties](https://maplibre.org/maplibre-gl-js/docs/examples/display-html-clusters-with-custom-properties/)
-///
+/// 
 ///  - [Extrude polygons for 3D indoor mapping](https://maplibre.org/maplibre-gl-js/docs/examples/extrude-polygons-for-3d-indoor-mapping/)
 Get(Box<String>, Option<Box<Object>>),
 /// Retrieves a property value from global state that can be set with platform-specific APIs. Defaults can be provided using the [`state`](https://maplibre.org/maplibre-style-spec/root/#state) root property. Returns `null` if no value nor default value is set for the retrieved property.
@@ -230,25 +230,25 @@ GlobalState(StringLiteral),
 /// Gets the feature's id, if it has one.
 Id,
 /// Binds expressions to named variables, which can then be referenced in the result expression using `["var", "variable_name"]`.
-///
+/// 
 ///  - [Visualize population density](https://maplibre.org/maplibre-gl-js/docs/examples/visualize-population-density/)
 Let((Vec<(StringLiteral,ExprOrLiteral)>,ExprOrLiteral)),
 /// Selects the output whose label value matches the input value, or the fallback value if no match is found. The input can be any expression (e.g. `["get", "building_type"]`). Each label must be either:
-///
+/// 
 ///  - a single literal value; or
-///
+/// 
 ///  - an array of literal values, whose values must be all strings or all numbers (e.g. `[100, 101]` or `["c", "b"]`). The input matches if any of the values in the array matches, similar to the `"in"` operator.
-///
+/// 
 /// Each label must be unique. If the input type does not match the type of the labels, the result will be the fallback value.
 Match((ExprOrLiteral, Vec<(StringLiteralOrNumberLiteralOrArrayOfStringLiteralOrArrayOfNumberLiteralOrAnyAsUnion,ExprOrLiteral)>, ExprOrLiteral)),
 /// Produces discrete, stepped results by evaluating a piecewise-constant function defined by pairs of input and output values ("stops"). The `input` may be any numeric expression (e.g., `["get", "population"]`). Stop inputs must be numeric literals in strictly ascending order.
-///
+/// 
 /// Returns the output value of the stop just less than the input, or the first output if the input is less than the first stop.
-///
+/// 
 ///  - [Create and style clusters](https://maplibre.org/maplibre-gl-js/docs/examples/create-and-style-clusters/)
 Step((Box<Number>,ExprOrLiteral,Vec<(NumberLiteral,ExprOrLiteral)>)),
 /// References variable bound using `let`.
-///
+/// 
 ///  - [Visualize population density](https://maplibre.org/maplibre-gl-js/docs/examples/visualize-population-density/)
 Var(StringLiteral),
 }

@@ -8,9 +8,10 @@ pub(crate) mod util;
 use fold::{
     try_algebraic_simplify, try_dead_branch_case, try_dead_branch_match_literal,
     try_filter_contradiction, try_fold_boolean_algebra, try_fold_comparison,
-    try_fold_get_from_stats, try_fold_has_from_stats, try_fold_not, try_fold_pure_operator,
-    try_fold_redundant_coercion, try_fold_redundant_properties, try_negate_comparison,
-    try_predicate_subsumption, try_range_tightening,
+    try_fold_geometry_type_from_stats, try_fold_get_from_stats, try_fold_has_from_stats,
+    try_fold_not, try_fold_pure_operator, try_fold_redundant_coercion,
+    try_fold_redundant_properties, try_negate_comparison, try_predicate_subsumption,
+    try_range_tightening,
 };
 use maplibre_style_spec::mir::MirSpec;
 use reorder::{LayerContext, reorder_selectivity};
@@ -59,6 +60,16 @@ impl StyleVisitor for NormalizeFoldVisitor<'_> {
         // Stats-driven: fold ["get", p] → ["literal", v] when property is constant.
         if self.passes.constant_fold {
             fold_get_in_tree(
+                filter,
+                self.stats,
+                self.layer_info,
+                layer_index,
+                &mut self.changed,
+            );
+        }
+        // Stats-driven: fold ["=="|"!=", ["geometry-type"], T] → true/false.
+        if self.passes.constant_fold {
+            fold_geometry_type_in_tree(
                 filter,
                 self.stats,
                 self.layer_info,
@@ -167,6 +178,26 @@ fn fold_get_in_tree(
     }
     for child in arr.iter_mut() {
         fold_get_in_tree(child, stats, layer_info, layer_index, changed);
+    }
+}
+
+/// Recursively fold `["=="|"!=", ["geometry-type"], T]` → `true`/`false` based on geometry stats.
+fn fold_geometry_type_in_tree(
+    v: &mut Value,
+    stats: Option<&TileStatistics>,
+    layer_info: Option<&[Option<VectorLayerInfo>]>,
+    layer_index: usize,
+    changed: &mut bool,
+) {
+    let Value::Array(arr) = v else {
+        return;
+    };
+    if try_fold_geometry_type_from_stats(arr, stats, layer_info, layer_index) {
+        *changed = true;
+        return;
+    }
+    for child in arr.iter_mut() {
+        fold_geometry_type_in_tree(child, stats, layer_info, layer_index, changed);
     }
 }
 
