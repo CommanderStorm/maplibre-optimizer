@@ -806,6 +806,31 @@ pub(super) fn try_fold_redundant_coercion(arr: &mut Vec<Value>) -> bool {
     false
 }
 
+/// Rewrite `["get", key, ["properties"]]` → `["get", key]` and
+/// `["has", key, ["properties"]]` → `["has", key]`.
+///
+/// The `["properties"]` object is the current feature's property bag — the default context
+/// for `get`/`has` — so the explicit argument is redundant.
+pub(super) fn try_fold_redundant_properties(arr: &mut Vec<Value>) -> bool {
+    if arr.len() != 3 {
+        return false;
+    }
+    let Some("get" | "has") = arr[0].as_str() else {
+        return false;
+    };
+    if !arr[1].is_string() {
+        return false;
+    }
+    let Value::Array(obj) = &arr[2] else {
+        return false;
+    };
+    if obj.len() == 1 && obj[0].as_str() == Some("properties") {
+        arr.truncate(2);
+        return true;
+    }
+    false
+}
+
 /// Fold `["has", p]` → `["literal", true]` when statistics show the property is present in
 /// every feature (`present_count` == `total_features`).
 pub(super) fn try_fold_has_from_stats(
@@ -953,5 +978,58 @@ fn single_value_literal(stats: &crate::stats::PropertyStats) -> Option<Value> {
             Some(Value::String(val.clone()))
         }
         PropertyStats::Mixed { .. } => None,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use serde_json::{Value, json};
+
+    use super::try_fold_redundant_properties;
+
+    #[test]
+    fn get_with_properties_is_simplified() {
+        let mut arr: Vec<Value> =
+            serde_json::from_value(json!(["get", "name", ["properties"]])).unwrap();
+        assert!(try_fold_redundant_properties(&mut arr));
+        assert_eq!(Value::Array(arr), json!(["get", "name"]));
+    }
+
+    #[test]
+    fn has_with_properties_is_simplified() {
+        let mut arr: Vec<Value> =
+            serde_json::from_value(json!(["has", "name", ["properties"]])).unwrap();
+        assert!(try_fold_redundant_properties(&mut arr));
+        assert_eq!(Value::Array(arr), json!(["has", "name"]));
+    }
+
+    #[test]
+    fn get_without_properties_unchanged() {
+        let mut arr: Vec<Value> = serde_json::from_value(json!(["get", "name"])).unwrap();
+        assert!(!try_fold_redundant_properties(&mut arr));
+        assert_eq!(Value::Array(arr), json!(["get", "name"]));
+    }
+
+    #[test]
+    fn has_without_properties_unchanged() {
+        let mut arr: Vec<Value> = serde_json::from_value(json!(["has", "name"])).unwrap();
+        assert!(!try_fold_redundant_properties(&mut arr));
+        assert_eq!(Value::Array(arr), json!(["has", "name"]));
+    }
+
+    #[test]
+    fn get_with_non_properties_object_unchanged() {
+        let original = json!(["get", "name", ["literal", {"a": 1}]]);
+        let mut arr: Vec<Value> = serde_json::from_value(original.clone()).unwrap();
+        assert!(!try_fold_redundant_properties(&mut arr));
+        assert_eq!(Value::Array(arr), original);
+    }
+
+    #[test]
+    fn get_with_other_object_expr_unchanged() {
+        let original = json!(["get", "name", ["object-expr"]]);
+        let mut arr: Vec<Value> = serde_json::from_value(original.clone()).unwrap();
+        assert!(!try_fold_redundant_properties(&mut arr));
+        assert_eq!(Value::Array(arr), original);
     }
 }

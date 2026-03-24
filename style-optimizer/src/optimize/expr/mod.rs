@@ -9,8 +9,8 @@ use fold::{
     try_algebraic_simplify, try_dead_branch_case, try_dead_branch_match_literal,
     try_filter_contradiction, try_fold_boolean_algebra, try_fold_comparison,
     try_fold_get_from_stats, try_fold_has_from_stats, try_fold_not, try_fold_pure_operator,
-    try_fold_redundant_coercion, try_negate_comparison, try_predicate_subsumption,
-    try_range_tightening,
+    try_fold_redundant_coercion, try_fold_redundant_properties, try_negate_comparison,
+    try_predicate_subsumption, try_range_tightening,
 };
 use maplibre_style_spec::mir::MirSpec;
 use reorder::{LayerContext, reorder_selectivity};
@@ -299,6 +299,9 @@ fn apply_one_rewrite_pass(arr: &mut Vec<Value>, mir: &MirSpec, passes: &OptPasse
         if try_fold_redundant_coercion(arr) {
             return true;
         }
+        if try_fold_redundant_properties(arr) {
+            return true;
+        }
     }
     if passes.simplify_expressions {
         if try_simplify_interpolate_or_step(arr) {
@@ -333,4 +336,40 @@ fn apply_one_rewrite_pass(arr: &mut Vec<Value>, mir: &MirSpec, passes: &OptPasse
         }
     }
     false
+}
+
+#[cfg(test)]
+mod tests {
+    use std::path::Path;
+
+    use serde_json::json;
+
+    use super::*;
+    use crate::load_intermediate_spec_from_v8_path;
+
+    fn sample_mir() -> MirSpec {
+        let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("../upstream/src/reference/v8.json");
+        load_intermediate_spec_from_v8_path(&path).expect("v8.json")
+    }
+
+    fn all_passes() -> OptPasses {
+        OptPasses {
+            constant_fold: true,
+            simplify_unary: true,
+            expression_kind: true,
+            simplify_expressions: true,
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn normalize_and_fold_removes_properties_in_comparison() {
+        let mir = sample_mir();
+        let passes = all_passes();
+        let mut expr = json!(["==", ["get", "k", ["properties"]], "v"]);
+        let mut changed = false;
+        normalize_and_fold(&mut expr, &mir, &passes, &mut changed);
+        assert!(changed);
+        assert_eq!(expr, json!(["==", ["get", "k"], "v"]));
+    }
 }

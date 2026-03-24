@@ -587,10 +587,7 @@ mod tests {
             },
         );
         // Step with identical outputs → ["literal", 2] → unwrapped to bare 2.
-        assert_eq!(
-            v["layers"][0]["paint"]["line-width"],
-            serde_json::json!(2)
-        );
+        assert_eq!(v["layers"][0]["paint"]["line-width"], serde_json::json!(2));
     }
 
     #[test]
@@ -1047,10 +1044,7 @@ mod tests {
                     crate::stats::PropertyStats::String {
                         present_count: 500,
                         cardinality: 1,
-                        value_counts: Some(indexmap::IndexMap::from([(
-                            "lake".to_string(),
-                            500,
-                        )])),
+                        value_counts: Some(indexmap::IndexMap::from([("lake".to_string(), 500)])),
                     },
                 )]),
                 ..Default::default()
@@ -1158,10 +1152,7 @@ mod tests {
                     crate::stats::PropertyStats::String {
                         present_count: 400, // not on all features
                         cardinality: 1,
-                        value_counts: Some(indexmap::IndexMap::from([(
-                            "lake".to_string(),
-                            400,
-                        )])),
+                        value_counts: Some(indexmap::IndexMap::from([("lake".to_string(), 400)])),
                     },
                 )]),
                 ..Default::default()
@@ -1214,7 +1205,10 @@ mod tests {
             Some(&stats),
         );
         // ["get","depth"] → 5, [">=",5,3] → true, ["case",true,1,0.5] → 1.
-        assert_eq!(v["layers"][0]["paint"]["fill-opacity"], serde_json::json!(1));
+        assert_eq!(
+            v["layers"][0]["paint"]["fill-opacity"],
+            serde_json::json!(1)
+        );
     }
 
     #[test]

@@ -162,6 +162,8 @@ struct StyleLayerRef {
     maxzoom: Option<u8>,
     /// Property names accessed by `["get", prop]` or `["has", prop]` in filter/paint/layout.
     referenced_properties: HashSet<String>,
+    /// Set when `["properties"]` is used, meaning the entire property bag is accessed.
+    all_properties_used: bool,
     /// Whether this layer uses `["id"]` or `["feature-state", ...]` expressions.
     uses_feature_id: bool,
     /// Filter expression (if any), for value analysis.
@@ -217,17 +219,18 @@ fn collect_style_info(style: &Value) -> StyleInfo {
             .and_then(|v| u8::try_from(v).ok());
 
         let mut referenced_properties = HashSet::new();
+        let mut all_properties_used = false;
         if let Some(filter) = obj.get("filter") {
-            collect_property_refs(filter, &mut referenced_properties);
+            collect_property_refs(filter, &mut referenced_properties, &mut all_properties_used);
         }
         if let Some(paint) = obj.get("paint").and_then(Value::as_object) {
             for v in paint.values() {
-                collect_property_refs(v, &mut referenced_properties);
+                collect_property_refs(v, &mut referenced_properties, &mut all_properties_used);
             }
         }
         if let Some(layout) = obj.get("layout").and_then(Value::as_object) {
             for v in layout.values() {
-                collect_property_refs(v, &mut referenced_properties);
+                collect_property_refs(v, &mut referenced_properties, &mut all_properties_used);
             }
         }
 
@@ -256,6 +259,7 @@ fn collect_style_info(style: &Value) -> StyleInfo {
             minzoom,
             maxzoom,
             referenced_properties,
+            all_properties_used,
             uses_feature_id,
             filter: obj.get("filter").cloned(),
         });
@@ -283,25 +287,32 @@ fn expr_uses_feature_id(expr: &Value) -> bool {
     }
 }
 
-/// Recursively collect property names from `["get", "prop"]` and `["has", "prop"]` expressions.
-fn collect_property_refs(expr: &Value, out: &mut HashSet<String>) {
+/// Recursively collect property names from `["get", "prop"]` / `["has", "prop"]` expressions.
+///
+/// Also detects bare `["properties"]` usage which means the entire property bag is accessed
+/// and no properties are safe to strip. When encountered, `all_used` is set to `true`.
+fn collect_property_refs(expr: &Value, out: &mut HashSet<String>, all_used: &mut bool) {
     match expr {
         Value::Array(arr) => {
-            if arr.len() == 2 {
-                let op = arr[0].as_str();
-                if (op == Some("get") || op == Some("has"))
-                    && let Some(prop) = arr[1].as_str()
-                {
-                    out.insert(prop.to_string());
-                }
+            // Bare ["properties"] — entire property bag accessed.
+            if arr.len() == 1 && arr[0].as_str() == Some("properties") {
+                *all_used = true;
+            }
+            let op = arr[0].as_str();
+            // ["get", prop] or ["get", prop, ["properties"]] (and same for "has").
+            if matches!(arr.len(), 2 | 3)
+                && (op == Some("get") || op == Some("has"))
+                && let Some(prop) = arr[1].as_str()
+            {
+                out.insert(prop.to_string());
             }
             for child in arr {
-                collect_property_refs(child, out);
+                collect_property_refs(child, out, all_used);
             }
         }
         Value::Object(map) => {
             for v in map.values() {
-                collect_property_refs(v, out);
+                collect_property_refs(v, out, all_used);
             }
         }
         _ => {}
@@ -311,6 +322,9 @@ fn collect_property_refs(expr: &Value, out: &mut HashSet<String>) {
 // ── Pass 1: Used properties with zoom ranges ────────────────────────────────
 
 /// For each property referenced by at least one targeting layer, compute the zoom range.
+///
+/// When any targeting layer uses `["properties"]` (accessing the entire property bag),
+/// all properties from tile stats are reported as used — nothing is safe to strip.
 fn compute_used_properties(
     targeting: &[&StyleLayerRef],
     layer_stats: &crate::stats::LayerStats,
@@ -318,6 +332,15 @@ fn compute_used_properties(
     let all_zooms: BTreeSet<u8> = layer_stats.features_by_zoom.keys().copied().collect();
     let data_min = all_zooms.first().copied().unwrap_or(0);
     let data_max = all_zooms.last().copied().unwrap_or(22);
+
+    // If any targeting layer accesses the whole property bag, all properties are used.
+    if targeting.iter().any(|r| r.all_properties_used) {
+        return layer_stats
+            .properties
+            .keys()
+            .map(|p| (p.clone(), ZoomRange::All))
+            .collect();
+    }
 
     // Group: property → layers that reference it.
     let mut prop_layers: BTreeMap<&str, Vec<&StyleLayerRef>> = BTreeMap::new();
@@ -1027,7 +1050,8 @@ mod tests {
             ["*", ["get", "lanes"], 2]
         ]);
         let mut out = HashSet::new();
-        collect_property_refs(&expr, &mut out);
+        let mut all_used = false;
+        collect_property_refs(&expr, &mut out, &mut all_used);
         assert!(out.contains("width"));
         assert!(out.contains("lanes"));
         assert_eq!(out.len(), 2);
@@ -1482,5 +1506,89 @@ mod tests {
         };
         let advisory = compute_advisory(&style, &stats);
         assert!(advisory.sources["s"].layers["roads"].feature_ids_needed);
+    }
+
+    #[test]
+    fn collect_property_refs_detects_bare_properties() {
+        let expr = json!(["object", ["properties"]]);
+        let mut props = HashSet::new();
+        let mut all_used = false;
+        collect_property_refs(&expr, &mut props, &mut all_used);
+        assert!(all_used, "bare [\"properties\"] should set all_used");
+    }
+
+    #[test]
+    fn collect_property_refs_get_with_properties_collects_name() {
+        let expr = json!(["get", "name", ["properties"]]);
+        let mut props = HashSet::new();
+        let mut all_used = false;
+        collect_property_refs(&expr, &mut props, &mut all_used);
+        assert!(props.contains("name"));
+        // ["properties"] as second arg to get is redundant but still triggers all_used
+        // because we detect it recursively.
+        assert!(all_used);
+    }
+
+    #[test]
+    fn bare_properties_makes_all_props_used_in_advisory() {
+        let style = json!({
+            "version": 8,
+            "sources": {
+                "s": {"type": "vector", "url": "https://example.com"}
+            },
+            "layers": [
+                {
+                    "id": "layer1",
+                    "type": "line",
+                    "source": "s",
+                    "source-layer": "roads",
+                    "paint": {
+                        "line-color": ["to-string", ["properties"]]
+                    }
+                }
+            ]
+        });
+        let stats = TileStatistics {
+            sources: BTreeMap::from([(
+                "s".to_string(),
+                SourceStats {
+                    layers: BTreeMap::from([(
+                        "roads".to_string(),
+                        LayerStats {
+                            total_features: 100,
+                            features_by_zoom: BTreeMap::from([(5, 100)]),
+                            geometry_types: GeometryTypeStats {
+                                linestring: 100,
+                                ..Default::default()
+                            },
+                            has_feature_ids: false,
+                            properties: BTreeMap::from([
+                                (
+                                    "name".to_string(),
+                                    PropertyStats::String {
+                                        present_count: 100,
+                                        cardinality: 5,
+                                        value_counts: None,
+                                    },
+                                ),
+                                (
+                                    "class".to_string(),
+                                    PropertyStats::String {
+                                        present_count: 100,
+                                        cardinality: 3,
+                                        value_counts: None,
+                                    },
+                                ),
+                            ]),
+                        },
+                    )]),
+                },
+            )]),
+        };
+        let advisory = compute_advisory(&style, &stats);
+        let layer_adv = &advisory.sources["s"].layers["roads"];
+        // Both properties should be reported as used since ["properties"] accesses the whole bag.
+        assert!(layer_adv.used_properties.contains_key("name"));
+        assert!(layer_adv.used_properties.contains_key("class"));
     }
 }
