@@ -17,9 +17,12 @@ pub const CARDINALITY_THRESHOLD: u64 = 200;
 
 /// Statistics gathered from a set of vector tiles, keyed by source name then source-layer name.
 /// "Source name" matches the key in the style's root `"sources"` map.
-#[derive(Debug, Default, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TileStatistics {
     pub sources: BTreeMap<String, SourceStats>,
+    /// Fraction of tiles that were sampled (1.0 = full scan).
+    /// Only a full scan (`sample_rate == 1.0`) is suitable for interning decisions.
+    pub sample_rate: f64,
 }
 
 #[derive(Debug, Default, Clone, Serialize, Deserialize)]

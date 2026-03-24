@@ -166,7 +166,10 @@ pub fn collect_statistics(
         },
     );
 
-    Ok(TileStatistics { sources })
+    Ok(TileStatistics {
+        sources,
+        sample_rate,
+    })
 }
 
 // ── Accumulators ─────────────────────────────────────────────────────────────

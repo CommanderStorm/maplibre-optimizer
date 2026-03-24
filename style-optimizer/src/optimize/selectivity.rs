@@ -409,7 +409,10 @@ mod tests {
         let mut sources = BTreeMap::new();
         sources.insert("openmaptiles".to_string(), SourceStats { layers });
 
-        TileStatistics { sources }
+        TileStatistics {
+            sources,
+            sample_rate: 1.0,
+        }
     }
 
     #[test]

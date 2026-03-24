@@ -1,10 +1,11 @@
+use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 use std::{fs, io};
 
 use anyhow::Context;
 use clap::Args;
 use maplibre_style_optimizer::encode_mlt::mvt_to_mlt;
-use maplibre_style_optimizer::prune::prune_tile;
+use maplibre_style_optimizer::prune::{intern_string_properties, prune_tile};
 use maplibre_style_optimizer::stats::collect::{available_zoom_levels, decode_tile, open_mbtiles};
 use maplibre_style_optimizer::{TilePruningAdvisory, mbtiles};
 use prost::Message;
@@ -158,6 +159,13 @@ fn process_tiles(
             // Prune.
             prune_tile(&mut tile, source_advisory, *zoom);
 
+            // Intern string properties.
+            for layer in &mut tile.layers {
+                if let Some(la) = source_advisory.layers.get(&layer.name) {
+                    intern_string_properties(layer, &la.interned_properties);
+                }
+            }
+
             if tile.layers.is_empty() {
                 continue;
             }
@@ -219,6 +227,9 @@ fn process_style(
         }
     }
 
+    // Rewrite filter expressions to use interned integer values.
+    rewrite_style_interning(&mut style, advisory);
+
     let out_path = output_dir.join(
         style_path
             .file_name()
@@ -234,4 +245,176 @@ fn process_style(
     eprintln!("Style written to {}", out_path.display());
 
     Ok(())
+}
+
+/// Rewrite filter expressions in the style to replace interned string literals with integers.
+fn rewrite_style_interning(style: &mut serde_json::Value, advisory: &TilePruningAdvisory) {
+    // Build lookup: source_name → source_layer → prop_name → interning table.
+    let lookup: BTreeMap<&str, BTreeMap<&str, &BTreeMap<String, Vec<String>>>> = advisory
+        .sources
+        .iter()
+        .map(|(src, sa)| {
+            let layer_map = sa
+                .layers
+                .iter()
+                .filter(|(_, la)| !la.interned_properties.is_empty())
+                .map(|(sl, la)| (sl.as_str(), &la.interned_properties))
+                .collect();
+            (src.as_str(), layer_map)
+        })
+        .collect();
+
+    let Some(layers) = style
+        .as_object_mut()
+        .and_then(|o| o.get_mut("layers"))
+        .and_then(|v| v.as_array_mut())
+    else {
+        return;
+    };
+
+    for layer in layers {
+        let Some(obj) = layer.as_object_mut() else {
+            continue;
+        };
+
+        // Resolve source and source-layer for this style layer.
+        let source = obj
+            .get("source")
+            .and_then(serde_json::Value::as_str)
+            .unwrap_or("");
+        let source_layer = obj
+            .get("source-layer")
+            .and_then(serde_json::Value::as_str)
+            .unwrap_or("");
+
+        let Some(interned_props) = lookup.get(source).and_then(|m| m.get(source_layer)) else {
+            continue;
+        };
+
+        // Rewrite the filter expression.
+        if let Some(filter) = obj.get_mut("filter") {
+            rewrite_filter_interning(filter, interned_props);
+        }
+    }
+}
+
+/// Recursively rewrite a filter expression, replacing interned string literals with integers.
+fn rewrite_filter_interning(
+    expr: &mut serde_json::Value,
+    interned: &BTreeMap<String, Vec<String>>,
+) {
+    let serde_json::Value::Array(arr) = expr else {
+        return;
+    };
+    if arr.is_empty() {
+        return;
+    }
+    let Some(op) = arr[0].as_str().map(str::to_string) else {
+        return;
+    };
+
+    match op.as_str() {
+        "==" | "!=" if arr.len() == 3 => {
+            if let Some(prop) = get_prop_from_get(&arr[1])
+                && let Some(table) = interned.get(prop)
+            {
+                intern_value(&mut arr[2], table);
+            } else if let Some(prop) = get_prop_from_get(&arr[2])
+                && let Some(table) = interned.get(prop)
+            {
+                intern_value(&mut arr[1], table);
+            }
+        }
+        "match" if arr.len() >= 3 => {
+            if let Some(prop) = get_prop_from_get(&arr[1])
+                && let Some(table) = interned.get(prop)
+            {
+                // Labels are at even positions in rest; last element is default if count is odd.
+                let rest_start = 2;
+                let rest_len = arr.len() - rest_start;
+                let pairs_end = if rest_len % 2 == 1 {
+                    arr.len() - 1
+                } else {
+                    arr.len()
+                };
+
+                for i in (rest_start..pairs_end).step_by(2) {
+                    intern_match_label(&mut arr[i], table);
+                }
+            }
+        }
+        "in" if arr.len() == 3 => {
+            if let Some(prop) = get_prop_from_get(&arr[1])
+                && let Some(table) = interned.get(prop)
+            {
+                intern_literal_array(&mut arr[2], table);
+            }
+        }
+        "all" | "any" | "none" | "!" => {
+            for child in arr.iter_mut().skip(1) {
+                rewrite_filter_interning(child, interned);
+            }
+        }
+        _ => {
+            // Recurse into unrecognized nodes.
+            for child in arr.iter_mut() {
+                rewrite_filter_interning(child, interned);
+            }
+        }
+    }
+}
+
+/// Extract property name from `["get", "prop"]`.
+fn get_prop_from_get(v: &serde_json::Value) -> Option<&str> {
+    let arr = v.as_array()?;
+    if arr.len() == 2 && arr[0].as_str() == Some("get") {
+        arr[1].as_str()
+    } else {
+        None
+    }
+}
+
+/// Replace a string literal with its interning index.
+fn intern_value(v: &mut serde_json::Value, table: &[String]) {
+    if let Some(s) = v.as_str()
+        && let Some(idx) = table.iter().position(|t| t == s)
+    {
+        *v = serde_json::Value::Number(serde_json::Number::from(idx as u64));
+    }
+}
+
+/// Replace strings in a match label (single value or array of values).
+fn intern_match_label(v: &mut serde_json::Value, table: &[String]) {
+    match v {
+        serde_json::Value::String(_) => intern_value(v, table),
+        serde_json::Value::Array(arr) => {
+            // Could be ["literal", [...]] or a plain array of labels.
+            if arr.len() == 2
+                && arr[0].as_str() == Some("literal")
+                && let serde_json::Value::Array(ref mut vals) = arr[1]
+            {
+                for val in vals.iter_mut() {
+                    intern_value(val, table);
+                }
+            } else {
+                for val in arr.iter_mut() {
+                    intern_value(val, table);
+                }
+            }
+        }
+        _ => {}
+    }
+}
+
+/// Replace strings in `["literal", [...]]` array used with `in`.
+fn intern_literal_array(v: &mut serde_json::Value, table: &[String]) {
+    let Some(arr) = v.as_array_mut() else { return };
+    if arr.len() == 2
+        && arr[0].as_str() == Some("literal")
+        && let serde_json::Value::Array(ref mut vals) = arr[1]
+    {
+        for val in vals.iter_mut() {
+            intern_value(val, table);
+        }
+    }
 }

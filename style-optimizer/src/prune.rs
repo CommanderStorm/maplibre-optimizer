@@ -214,6 +214,99 @@ fn strip_unused_properties(layer: &mut mvt::tile::Layer, unused_props: &[String]
     layer.values = new_values;
 }
 
+/// Replace string property values with frequency-ordered unsigned integers.
+///
+/// For each `(prop_name, value_table)` in `interned`, finds the property key in the layer,
+/// maps each string value to its index in `value_table`, and replaces the MVT value entry
+/// with a uint value. After all properties are processed, unused values are compacted.
+pub fn intern_string_properties(
+    layer: &mut mvt::tile::Layer,
+    interned: &std::collections::BTreeMap<String, Vec<String>>,
+) {
+    if interned.is_empty() {
+        return;
+    }
+
+    for (prop_name, value_table) in interned {
+        let Some(key_idx) = layer.keys.iter().position(|k| k == prop_name) else {
+            continue;
+        };
+        #[expect(clippy::cast_possible_truncation)]
+        let key_idx = key_idx as u32;
+
+        // Build string → uint mapping from the value table.
+        let str_to_uint: std::collections::HashMap<&str, u64> = value_table
+            .iter()
+            .enumerate()
+            .map(|(i, s)| (s.as_str(), i as u64))
+            .collect();
+
+        // Walk all features' tags and replace matching string values with uint values.
+        for feature in &mut layer.features {
+            let mut i = 0;
+            while i + 1 < feature.tags.len() {
+                if feature.tags[i] == key_idx {
+                    let val_idx = feature.tags[i + 1] as usize;
+                    if let Some(val) = layer.values.get(val_idx)
+                        && let Some(s) = val.string_value.as_deref()
+                        && let Some(&uint_val) = str_to_uint.get(s)
+                    {
+                        let new_vi = find_or_create_uint_value(&mut layer.values, uint_val);
+                        feature.tags[i + 1] = new_vi;
+                    }
+                }
+                i += 2;
+            }
+        }
+    }
+
+    // Compact unused values.
+    let mut used_values: HashSet<u32> = HashSet::new();
+    for feature in &layer.features {
+        let mut i = 0;
+        while i + 1 < feature.tags.len() {
+            used_values.insert(feature.tags[i + 1]);
+            i += 2;
+        }
+    }
+
+    let (val_remap, new_values) = build_remap(&layer.values, &used_values);
+    for feature in &mut layer.features {
+        let mut i = 0;
+        while i + 1 < feature.tags.len() {
+            let vi = feature.tags[i + 1] as usize;
+            if let Some(new_vi) = val_remap.get(vi).copied().flatten() {
+                feature.tags[i + 1] = new_vi;
+            }
+            i += 2;
+        }
+    }
+    layer.values = new_values;
+}
+
+/// Find an existing uint value entry or append one. Returns the index.
+#[expect(clippy::cast_possible_truncation)]
+fn find_or_create_uint_value(values: &mut Vec<mvt::tile::Value>, uint_val: u64) -> u32 {
+    for (i, v) in values.iter().enumerate() {
+        if v.uint_value == Some(uint_val)
+            && v.string_value.is_none()
+            && v.int_value.is_none()
+            && v.sint_value.is_none()
+            && v.float_value.is_none()
+            && v.double_value.is_none()
+            && v.bool_value.is_none()
+        {
+            return i as u32;
+        }
+    }
+    let idx = values.len() as u32;
+    values.push(mvt::tile::Value {
+        uint_value: Some(uint_val),
+        ..Default::default()
+    });
+    idx
+}
+
 fn geom_type_to_mvt(gt: GeometryType) -> i32 {
     match gt {
         GeometryType::Point => mvt::tile::GeomType::Point.into(),
@@ -342,6 +435,7 @@ mod tests {
                             "class".to_string(),
                             UnusedValues::Specific(vec![Value::String("secondary".to_string())]),
                         )]),
+                        interned_properties: BTreeMap::new(),
                         feature_ids_needed: false,
                         combined_filter: None,
                     },
@@ -353,6 +447,7 @@ mod tests {
                         used_geometry_types: BTreeMap::new(),
                         unused_zoom_levels: vec![],
                         unused_property_values: BTreeMap::new(),
+                        interned_properties: BTreeMap::new(),
                         feature_ids_needed: false,
                         combined_filter: None,
                     },
@@ -436,6 +531,7 @@ mod tests {
                         "class".to_string(),
                         UnusedValues::Specific(vec![Value::String("secondary".to_string())]),
                     )]),
+                    interned_properties: BTreeMap::new(),
                     feature_ids_needed: false,
                     combined_filter: None,
                 },
@@ -469,6 +565,7 @@ mod tests {
                     used_geometry_types: BTreeMap::new(),
                     unused_zoom_levels: vec![],
                     unused_property_values: BTreeMap::new(),
+                    interned_properties: BTreeMap::new(),
                     feature_ids_needed: false,
                     combined_filter: None,
                 },
@@ -505,6 +602,7 @@ mod tests {
                     ]),
                     unused_zoom_levels: vec![],
                     unused_property_values: BTreeMap::new(),
+                    interned_properties: BTreeMap::new(),
                     feature_ids_needed: false,
                     combined_filter: None,
                 },
@@ -561,6 +659,99 @@ mod tests {
         assert!(
             roads.features.iter().all(|f| f.id.is_some()),
             "feature IDs should be preserved when needed"
+        );
+    }
+
+    #[test]
+    fn intern_string_properties_replaces_values() {
+        let mut layer = mvt::tile::Layer {
+            version: 2,
+            name: "roads".to_string(),
+            features: vec![
+                mvt::tile::Feature {
+                    id: None,
+                    tags: vec![0, 0], // class=primary
+                    r#type: Some(mvt::tile::GeomType::Linestring.into()),
+                    geometry: vec![],
+                },
+                mvt::tile::Feature {
+                    id: None,
+                    tags: vec![0, 1], // class=secondary
+                    r#type: Some(mvt::tile::GeomType::Linestring.into()),
+                    geometry: vec![],
+                },
+                mvt::tile::Feature {
+                    id: None,
+                    tags: vec![0, 0, 1, 2], // class=primary, surface=paved
+                    r#type: Some(mvt::tile::GeomType::Linestring.into()),
+                    geometry: vec![],
+                },
+            ],
+            keys: vec!["class".to_string(), "surface".to_string()],
+            values: vec![
+                make_string_value("primary"),
+                make_string_value("secondary"),
+                make_string_value("paved"),
+            ],
+            extent: Some(4096),
+        };
+
+        let interned = BTreeMap::from([(
+            "class".to_string(),
+            vec!["primary".to_string(), "secondary".to_string()],
+        )]);
+
+        intern_string_properties(&mut layer, &interned);
+
+        // "class" values should now be uint: primary=0, secondary=1.
+        // "surface" values should be unchanged.
+        for feature in &layer.features {
+            let mut i = 0;
+            while i + 1 < feature.tags.len() {
+                let key = &layer.keys[feature.tags[i] as usize];
+                let val = &layer.values[feature.tags[i + 1] as usize];
+                if key == "class" {
+                    assert!(
+                        val.uint_value.is_some(),
+                        "class value should be uint, got {val:?}"
+                    );
+                    assert!(val.string_value.is_none());
+                } else if key == "surface" {
+                    assert_eq!(
+                        val.string_value.as_deref(),
+                        Some("paved"),
+                        "surface should remain a string"
+                    );
+                }
+                i += 2;
+            }
+        }
+
+        // Check specific interned values.
+        let f0_class_val = &layer.values[layer.features[0].tags[1] as usize];
+        assert_eq!(f0_class_val.uint_value, Some(0)); // "primary" → 0
+
+        let f1_class_val = &layer.values[layer.features[1].tags[1] as usize];
+        assert_eq!(f1_class_val.uint_value, Some(1)); // "secondary" → 1
+
+        // Unused original string values for "primary"/"secondary" should be compacted away.
+        let string_values: Vec<&str> = layer
+            .values
+            .iter()
+            .filter_map(|v| v.string_value.as_deref())
+            .collect();
+        assert!(
+            !string_values.contains(&"primary"),
+            "original string 'primary' should be compacted"
+        );
+        assert!(
+            !string_values.contains(&"secondary"),
+            "original string 'secondary' should be compacted"
+        );
+        // "paved" should still exist since surface wasn't interned.
+        assert!(
+            string_values.contains(&"paved"),
+            "'paved' should remain in values"
         );
     }
 }
