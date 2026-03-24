@@ -28,7 +28,7 @@
       "source-layer": "poi",
       "filter": ["has", "name"],
       "paint": {
-        "circle-radius": ["literal", 4]
+        "circle-radius": 4
       }
     },
     {

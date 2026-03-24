@@ -8,8 +8,9 @@ pub(crate) mod util;
 use fold::{
     try_algebraic_simplify, try_dead_branch_case, try_dead_branch_match_literal,
     try_filter_contradiction, try_fold_boolean_algebra, try_fold_comparison,
-    try_fold_has_from_stats, try_fold_not, try_fold_pure_operator, try_fold_redundant_coercion,
-    try_negate_comparison, try_predicate_subsumption, try_range_tightening,
+    try_fold_get_from_stats, try_fold_has_from_stats, try_fold_not, try_fold_pure_operator,
+    try_fold_redundant_coercion, try_negate_comparison, try_predicate_subsumption,
+    try_range_tightening,
 };
 use maplibre_style_spec::mir::MirSpec;
 use reorder::{LayerContext, reorder_selectivity};
@@ -55,11 +56,44 @@ impl StyleVisitor for NormalizeFoldVisitor<'_> {
                 &mut self.changed,
             );
         }
+        // Stats-driven: fold ["get", p] → ["literal", v] when property is constant.
+        if self.passes.constant_fold {
+            fold_get_in_tree(
+                filter,
+                self.stats,
+                self.layer_info,
+                layer_index,
+                &mut self.changed,
+            );
+        }
         normalize_and_fold(filter, self.mir, self.passes, &mut self.changed);
     }
 
-    fn visit_property(&mut self, _: &PropertyContext<'_>, value: &mut Value) {
+    fn visit_property(&mut self, ctx: &PropertyContext<'_>, value: &mut Value) {
+        // Stats-driven: fold ["get", p] → ["literal", v] in paint/layout expressions too.
+        if self.passes.constant_fold {
+            fold_get_in_tree(
+                value,
+                self.stats,
+                self.layer_info,
+                ctx.layer_index,
+                &mut self.changed,
+            );
+        }
         normalize_and_fold(value, self.mir, self.passes, &mut self.changed);
+        // Unwrap ["literal", scalar] → scalar for paint/layout properties.
+        // Only safe for non-array, non-object types (numbers, strings, bools, null).
+        // Arrays/objects inside ["literal", ...] encode literal array/object values
+        // that would be misinterpreted as expressions if unwrapped.
+        if let Value::Array(arr) = value
+            && arr.len() == 2
+            && arr[0].as_str() == Some("literal")
+            && !arr[1].is_array()
+            && !arr[1].is_object()
+        {
+            *value = arr[1].take();
+            self.changed = true;
+        }
     }
 }
 
@@ -113,6 +147,26 @@ fn fold_has_in_tree(
     }
     for child in arr.iter_mut() {
         fold_has_in_tree(child, stats, layer_info, layer_index, changed);
+    }
+}
+
+/// Recursively fold `["get", p]` → `["literal", v]` when stats show a single constant value.
+fn fold_get_in_tree(
+    v: &mut Value,
+    stats: Option<&TileStatistics>,
+    layer_info: Option<&[Option<VectorLayerInfo>]>,
+    layer_index: usize,
+    changed: &mut bool,
+) {
+    let Value::Array(arr) = v else {
+        return;
+    };
+    if try_fold_get_from_stats(arr, stats, layer_info, layer_index) {
+        *changed = true;
+        return;
+    }
+    for child in arr.iter_mut() {
+        fold_get_in_tree(child, stats, layer_info, layer_index, changed);
     }
 }
 

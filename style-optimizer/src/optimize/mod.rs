@@ -567,9 +567,10 @@ mod tests {
                 ..Default::default()
             },
         );
+        // Interpolate with identical stops → ["literal", 0.5] → unwrapped to bare 0.5.
         assert_eq!(
             v["layers"][0]["paint"]["fill-opacity"],
-            serde_json::json!(["literal", 0.5])
+            serde_json::json!(0.5)
         );
     }
 
@@ -585,9 +586,10 @@ mod tests {
                 ..Default::default()
             },
         );
+        // Step with identical outputs → ["literal", 2] → unwrapped to bare 2.
         assert_eq!(
             v["layers"][0]["paint"]["line-width"],
-            serde_json::json!(["literal", 2])
+            serde_json::json!(2)
         );
     }
 
@@ -1029,6 +1031,213 @@ mod tests {
             v["layers"][0]["filter"],
             serde_json::json!(["literal", false])
         );
+    }
+
+    // ── Single-value property folding ──────────────────────────────────────
+
+    #[test]
+    fn fold_get_single_value_string() {
+        let mir = sample_mir();
+        let stats = make_stats(
+            "water",
+            LayerStats {
+                total_features: 500,
+                properties: BTreeMap::from([(
+                    "class".to_string(),
+                    crate::stats::PropertyStats::String {
+                        present_count: 500,
+                        cardinality: 1,
+                        value_counts: Some(indexmap::IndexMap::from([(
+                            "lake".to_string(),
+                            500,
+                        )])),
+                    },
+                )]),
+                ..Default::default()
+            },
+        );
+        let mut v = serde_json::json!({"version":8,"sources":{"openmaptiles":{"type":"vector","url":"x"}},"layers":[{"id":"w","type":"fill","source":"openmaptiles","source-layer":"water","filter":["==",["get","class"],"lake"]}]});
+        optimize_style_json_value_with_stats(
+            &mut v,
+            &mir,
+            &OptPasses {
+                constant_fold: true,
+                ..Default::default()
+            },
+            Some(&stats),
+        );
+        // ["get","class"] → "lake", then ["==","lake","lake"] → true.
+        assert_eq!(
+            v["layers"][0]["filter"],
+            serde_json::json!(["literal", true])
+        );
+    }
+
+    #[test]
+    fn fold_get_single_value_integer() {
+        let mir = sample_mir();
+        let stats = make_stats(
+            "water",
+            LayerStats {
+                total_features: 100,
+                properties: BTreeMap::from([(
+                    "level".to_string(),
+                    crate::stats::PropertyStats::Integer {
+                        present_count: 100,
+                        min: 3,
+                        max: 3,
+                        cardinality: 1,
+                        value_counts: Some(BTreeMap::from([(3, 100)])),
+                    },
+                )]),
+                ..Default::default()
+            },
+        );
+        let mut v = serde_json::json!({"version":8,"sources":{"openmaptiles":{"type":"vector","url":"x"}},"layers":[{"id":"w","type":"fill","source":"openmaptiles","source-layer":"water","filter":[">=",["get","level"],2]}]});
+        optimize_style_json_value_with_stats(
+            &mut v,
+            &mir,
+            &OptPasses {
+                constant_fold: true,
+                ..Default::default()
+            },
+            Some(&stats),
+        );
+        // ["get","level"] → 3, then [">=",3,2] → true.
+        assert_eq!(
+            v["layers"][0]["filter"],
+            serde_json::json!(["literal", true])
+        );
+    }
+
+    #[test]
+    fn no_fold_get_when_cardinality_gt_1() {
+        let mir = sample_mir();
+        let stats = make_stats(
+            "water",
+            LayerStats {
+                total_features: 500,
+                properties: BTreeMap::from([(
+                    "class".to_string(),
+                    crate::stats::PropertyStats::String {
+                        present_count: 500,
+                        cardinality: 2,
+                        value_counts: Some(indexmap::IndexMap::from([
+                            ("lake".to_string(), 300),
+                            ("river".to_string(), 200),
+                        ])),
+                    },
+                )]),
+                ..Default::default()
+            },
+        );
+        let mut v = serde_json::json!({"version":8,"sources":{"openmaptiles":{"type":"vector","url":"x"}},"layers":[{"id":"w","type":"fill","source":"openmaptiles","source-layer":"water","filter":["==",["get","class"],"lake"]}]});
+        let original_filter = v["layers"][0]["filter"].clone();
+        optimize_style_json_value_with_stats(
+            &mut v,
+            &mir,
+            &OptPasses {
+                constant_fold: true,
+                ..Default::default()
+            },
+            Some(&stats),
+        );
+        // Should NOT fold — property has two distinct values.
+        assert_eq!(v["layers"][0]["filter"], original_filter);
+    }
+
+    #[test]
+    fn no_fold_get_when_not_present_on_all_features() {
+        let mir = sample_mir();
+        let stats = make_stats(
+            "water",
+            LayerStats {
+                total_features: 500,
+                properties: BTreeMap::from([(
+                    "class".to_string(),
+                    crate::stats::PropertyStats::String {
+                        present_count: 400, // not on all features
+                        cardinality: 1,
+                        value_counts: Some(indexmap::IndexMap::from([(
+                            "lake".to_string(),
+                            400,
+                        )])),
+                    },
+                )]),
+                ..Default::default()
+            },
+        );
+        let mut v = serde_json::json!({"version":8,"sources":{"openmaptiles":{"type":"vector","url":"x"}},"layers":[{"id":"w","type":"fill","source":"openmaptiles","source-layer":"water","filter":["==",["get","class"],"lake"]}]});
+        let original_filter = v["layers"][0]["filter"].clone();
+        optimize_style_json_value_with_stats(
+            &mut v,
+            &mir,
+            &OptPasses {
+                constant_fold: true,
+                ..Default::default()
+            },
+            Some(&stats),
+        );
+        // Should NOT fold — property is not present on all features.
+        assert_eq!(v["layers"][0]["filter"], original_filter);
+    }
+
+    #[test]
+    fn fold_get_in_paint_expression() {
+        let mir = sample_mir();
+        let stats = make_stats(
+            "water",
+            LayerStats {
+                total_features: 100,
+                properties: BTreeMap::from([(
+                    "depth".to_string(),
+                    crate::stats::PropertyStats::Integer {
+                        present_count: 100,
+                        min: 5,
+                        max: 5,
+                        cardinality: 1,
+                        value_counts: Some(BTreeMap::from([(5, 100)])),
+                    },
+                )]),
+                ..Default::default()
+            },
+        );
+        // ["get","depth"] in a paint expression should also be folded.
+        let mut v = serde_json::json!({"version":8,"sources":{"openmaptiles":{"type":"vector","url":"x"}},"layers":[{"id":"w","type":"fill","source":"openmaptiles","source-layer":"water","paint":{"fill-opacity":["case",[">=",["get","depth"],3],1,0.5]}}]});
+        optimize_style_json_value_with_stats(
+            &mut v,
+            &mir,
+            &OptPasses {
+                constant_fold: true,
+                ..Default::default()
+            },
+            Some(&stats),
+        );
+        // ["get","depth"] → 5, [">=",5,3] → true, ["case",true,1,0.5] → 1.
+        assert_eq!(v["layers"][0]["paint"]["fill-opacity"], serde_json::json!(1));
+    }
+
+    #[test]
+    fn literal_inside_expression_not_unwrapped() {
+        // ["literal", 1] inside a non-fully-foldable expression must NOT be unwrapped.
+        // ["+", ["literal", 1], ["get", "foo"]] must remain unchanged.
+        let mir = sample_mir();
+        let mut v = serde_json::json!({"version":8,"sources":{},"layers":[{
+            "id":"x","type":"fill",
+            "paint":{"fill-opacity":["+",["literal",1],["get","foo"]]}
+        }]});
+        let expected = v["layers"][0]["paint"]["fill-opacity"].clone();
+        optimize_style_json_value(
+            &mut v,
+            &mir,
+            &OptPasses {
+                constant_fold: true,
+                simplify_unary: true,
+                simplify_expressions: true,
+                ..Default::default()
+            },
+        );
+        assert_eq!(v["layers"][0]["paint"]["fill-opacity"], expected);
     }
 
     // ── Typed entry point tests ─────────────────────────────────────────────

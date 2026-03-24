@@ -841,3 +841,117 @@ pub(super) fn try_fold_has_from_stats(
     }
     false
 }
+
+/// Fold `["get", p]` → `["literal", v]` when statistics show the property has exactly one
+/// value across all features (cardinality == 1, present on every feature).
+pub(super) fn try_fold_get_from_stats(
+    arr: &mut Vec<Value>,
+    stats: Option<&crate::stats::TileStatistics>,
+    layer_info: Option<&[Option<crate::optimize::source_util::VectorLayerInfo>]>,
+    layer_index: usize,
+) -> bool {
+    if arr.len() != 2 || arr[0].as_str() != Some("get") {
+        return false;
+    }
+    let Some(prop_name) = arr[1].as_str() else {
+        return false;
+    };
+    let Some(stats) = stats else {
+        return false;
+    };
+    let Some(infos) = layer_info else {
+        return false;
+    };
+    let Some(Some(info)) = infos.get(layer_index) else {
+        return false;
+    };
+    let Some(layer_stats) = stats.layer_stats(&info.source, &info.source_layer) else {
+        return false;
+    };
+    if layer_stats.total_features == 0 {
+        return false;
+    }
+    let Some(prop_stats) = layer_stats.properties.get(prop_name) else {
+        return false;
+    };
+    // Must be present on every feature and have exactly one distinct value.
+    if prop_stats.present_count() != layer_stats.total_features {
+        return false;
+    }
+    let Some(literal) = single_value_literal(prop_stats) else {
+        return false;
+    };
+    replace_arr_with_value(arr, literal);
+    true
+}
+
+/// Extract the sole value from a single-cardinality property as a JSON literal.
+fn single_value_literal(stats: &crate::stats::PropertyStats) -> Option<Value> {
+    use crate::stats::PropertyStats;
+    match stats {
+        PropertyStats::Bool {
+            present_count,
+            true_count,
+        } => {
+            // Bool always has cardinality ≤ 2. Single-value when all true or all false.
+            if *true_count == *present_count {
+                Some(Value::Bool(true))
+            } else if *true_count == 0 {
+                Some(Value::Bool(false))
+            } else {
+                None
+            }
+        }
+        PropertyStats::Integer {
+            cardinality,
+            value_counts,
+            ..
+        } => {
+            if *cardinality != 1 {
+                return None;
+            }
+            let counts = value_counts.as_ref()?;
+            let (&val, _) = counts.iter().next()?;
+            Some(Value::Number(val.into()))
+        }
+        PropertyStats::UnsignedInteger {
+            cardinality,
+            value_counts,
+            ..
+        } => {
+            if *cardinality != 1 {
+                return None;
+            }
+            let counts = value_counts.as_ref()?;
+            let (&val, _) = counts.iter().next()?;
+            Some(Value::Number(val.into()))
+        }
+        PropertyStats::Double {
+            cardinality,
+            min,
+            max,
+            ..
+        } => {
+            // Doubles don't have value_counts, but if cardinality==1 then min==max.
+            if *cardinality != 1 {
+                return None;
+            }
+            serde_json::Number::from_f64(*min)
+                .filter(|_| (min - max).abs() < f64::EPSILON)
+                .map(Value::Number)
+        }
+        PropertyStats::String {
+            cardinality,
+            value_counts,
+            ..
+        } => {
+            if *cardinality != 1 {
+                return None;
+            }
+            let counts = value_counts.as_ref()?;
+            let (val, _) = counts.iter().next()?;
+            Some(Value::String(val.clone()))
+        }
+        PropertyStats::Mixed { .. } => None,
+    }
+}
