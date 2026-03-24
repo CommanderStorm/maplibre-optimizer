@@ -452,28 +452,28 @@ impl Expression {
     pub fn to_expression_type(&self) -> &'static str {
         match self {
             Expression::Any => "Box<Expression>",
-            Expression::Boolean => "Box<BooleanExpression>",
+            Expression::Boolean => "Box<Boolean>",
             Expression::Number => "Box<NumberExpression>",
-            Expression::String => "Box<StringExpression>",
+            Expression::String => "Box<String>",
             Expression::Collator => "Box<CollatorExpression>",
-            Expression::Formatted => "Box<StringExpression>",
-            Expression::Image => "Box<StringExpression>",
+            Expression::Formatted => "Box<String>",
+            Expression::Image => "Box<String>",
             Expression::Object => "Box<ObjectExpression>",
-            Expression::Color => "Box<StringExpression>",
+            Expression::Color => "Box<String>",
             Expression::Array { .. } => "Box<ArrayExpression>",
         }
     }
     pub fn to_upper_camel_case(&self) -> &'static str {
         match self {
             Expression::Any => "Expression",
-            Expression::Boolean => "BooleanExpression",
+            Expression::Boolean => "Boolean",
             Expression::Number => "NumberExpression",
-            Expression::String => "StringExpression",
+            Expression::String => "String",
             Expression::Collator => "CollatorExpression",
-            Expression::Formatted => "StringExpression",
-            Expression::Image => "StringExpression",
+            Expression::Formatted => "String",
+            Expression::Image => "String",
             Expression::Object => "ObjectExpression",
-            Expression::Color => "StringExpression",
+            Expression::Color => "String",
             Expression::Array { .. } => "ArrayExpression",
         }
     }

@@ -83,67 +83,6 @@ impl<'de> serde::Deserialize<'de> for ColorExpression {
     }
 }
 
-/// Nested expression: [`Boolean`](crate::spec::Boolean) operators.
-#[derive(PartialEq, Debug, Clone)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum BooleanExpression {
-    Boolean(crate::spec::Boolean),
-}
-
-impl serde::Serialize for BooleanExpression {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        match self {
-            Self::Boolean(v) => v.serialize(serializer),
-        }
-    }
-}
-
-impl<'de> serde::Deserialize<'de> for BooleanExpression {
-    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
-        let mut errors: Vec<(&str, String)> = Vec::new();
-        match <crate::spec::Boolean as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Boolean(v)),
-            Err(e) => errors.push(("Boolean", e.to_string())),
-        }
-        let details: Vec<String> = errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
-        Err(serde::de::Error::custom(format!(
-            "BooleanExpression: no variant matched. Expected Boolean(Boolean). Errors: [{}]",
-            details.join("; ")
-        )))
-    }
-}
-
-/// Nested expression: [`String`](crate::spec::String) operators.
-#[derive(PartialEq, Debug, Clone)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum StringExpression {
-    String(crate::spec::String),
-}
-
-impl serde::Serialize for StringExpression {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        match self {
-            Self::String(v) => v.serialize(serializer),
-        }
-    }
-}
-
-impl<'de> serde::Deserialize<'de> for StringExpression {
-    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
-        let mut errors: Vec<(&str, String)> = Vec::new();
-        match <crate::spec::String as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::String(v)),
-            Err(e) => errors.push(("String", e.to_string())),
-        }
-        let details: Vec<String> = errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
-        Err(serde::de::Error::custom(format!(
-            "StringExpression: no variant matched. Expected String(String). Errors: [{}]",
-            details.join("; ")
-        )))
-    }
-}
 
 // ── Shared Inner Prop Enums ─────────────────────────────────────────────────
 
@@ -253,49 +192,13 @@ impl<'de> serde::Deserialize<'de> for ColorPropInner {
     }
 }
 
-/// Inner representation for boolean expression-backed properties.
-#[derive(PartialEq, Debug, Clone)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum BooleanPropInner {
-    Expr(Box<BooleanExpression>),
-    Literal(bool),
-}
-
-impl serde::Serialize for BooleanPropInner {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        match self {
-            Self::Expr(v) => v.as_ref().serialize(serializer),
-            Self::Literal(v) => v.serialize(serializer),
-        }
-    }
-}
-
-impl<'de> serde::Deserialize<'de> for BooleanPropInner {
-    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
-        let mut errors: Vec<(&str, String)> = Vec::new();
-        match <BooleanExpression as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Expr(Box::new(v))),
-            Err(e) => errors.push(("Expr", e.to_string())),
-        }
-        match <bool as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Literal(v)),
-            Err(e) => errors.push(("Literal", e.to_string())),
-        }
-        let details: Vec<String> = errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
-        Err(serde::de::Error::custom(format!(
-            "BooleanPropInner: no variant matched. Expected Expr(BooleanExpression) | Literal(bool). Errors: [{}]",
-            details.join("; ")
-        )))
-    }
-}
 
 /// Inner representation for array-like expression-backed properties.
 /// Uses `serde_json::Value` for the literal branch to accommodate diverse array shapes.
 #[derive(PartialEq, Debug, Clone)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum ArrayPropInner {
-    Expr(Box<StringExpression>),
+    Expr(Box<crate::spec::String>),
     Literal(
         #[cfg_attr(
             feature = "fuzz",
@@ -318,7 +221,7 @@ impl<'de> serde::Deserialize<'de> for ArrayPropInner {
     fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
         let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
         let mut errors: Vec<(&str, String)> = Vec::new();
-        match <StringExpression as serde::Deserialize>::deserialize(&value) {
+        match <crate::spec::String as serde::Deserialize>::deserialize(&value) {
             Ok(v) => return Ok(Self::Expr(Box::new(v))),
             Err(e) => errors.push(("Expr", e.to_string())),
         }
@@ -329,48 +232,12 @@ impl<'de> serde::Deserialize<'de> for ArrayPropInner {
         }
         let details: Vec<String> = errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
         Err(serde::de::Error::custom(format!(
-            "ArrayPropInner: no variant matched. Expected Expr(StringExpression) | Literal(serde_json::Value). Errors: [{}]",
+            "ArrayPropInner: no variant matched. Expected Expr(String) | Literal(serde_json::Value). Errors: [{}]",
             details.join("; ")
         )))
     }
 }
 
-/// Inner representation for string expression-backed properties.
-#[derive(PartialEq, Debug, Clone)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum StringPropInner {
-    Expr(Box<StringExpression>),
-    Literal(std::string::String),
-}
-
-impl serde::Serialize for StringPropInner {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        match self {
-            Self::Expr(v) => v.as_ref().serialize(serializer),
-            Self::Literal(v) => v.serialize(serializer),
-        }
-    }
-}
-
-impl<'de> serde::Deserialize<'de> for StringPropInner {
-    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
-        let mut errors: Vec<(&str, String)> = Vec::new();
-        match <StringExpression as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Expr(Box::new(v))),
-            Err(e) => errors.push(("Expr", e.to_string())),
-        }
-        match <std::string::String as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Literal(v)),
-            Err(e) => errors.push(("Literal", e.to_string())),
-        }
-        let details: Vec<String> = errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
-        Err(serde::de::Error::custom(format!(
-            "StringPropInner: no variant matched. Expected Expr(StringExpression) | Literal(std::string::String). Errors: [{}]",
-            details.join("; ")
-        )))
-    }
-}
 
 /// Inner representation for formatted expression-backed properties.
 /// Accepts `Formatted` expressions (e.g. `["format", ...]`), string expressions, or plain string literals.
@@ -378,7 +245,7 @@ impl<'de> serde::Deserialize<'de> for StringPropInner {
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum FormattedPropInner {
     Formatted(Box<crate::spec::Formatted>),
-    Expr(Box<StringExpression>),
+    Expr(Box<crate::spec::String>),
     Literal(std::string::String),
 }
 
@@ -400,7 +267,7 @@ impl<'de> serde::Deserialize<'de> for FormattedPropInner {
             Ok(v) => return Ok(Self::Formatted(Box::new(v))),
             Err(e) => errors.push(("Formatted", e.to_string())),
         }
-        match <StringExpression as serde::Deserialize>::deserialize(&value) {
+        match <crate::spec::String as serde::Deserialize>::deserialize(&value) {
             Ok(v) => return Ok(Self::Expr(Box::new(v))),
             Err(e) => errors.push(("Expr", e.to_string())),
         }
@@ -410,7 +277,7 @@ impl<'de> serde::Deserialize<'de> for FormattedPropInner {
         }
         let details: Vec<String> = errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
         Err(serde::de::Error::custom(format!(
-            "FormattedPropInner: no variant matched. Expected Formatted | Expr(StringExpression) | Literal(std::string::String). Errors: [{}]",
+            "FormattedPropInner: no variant matched. Expected Formatted | Expr(String) | Literal(std::string::String). Errors: [{}]",
             details.join("; ")
         )))
     }
@@ -518,14 +385,17 @@ macro_rules! color_prop {
     (@default $name:ident) => {};
 }
 
-/// Stamp out a newtype wrapping [`BooleanPropInner`] with optional default.
+/// Stamp out a newtype wrapping [`Boolean`](crate::spec::Boolean) with optional default.
+///
+/// `Boolean` already has `Literal(bool)` and handles bare `true`/`false` via `visit_bool`,
+/// so no separate `BooleanPropInner` wrapper is needed.
 #[macro_export]
 macro_rules! boolean_prop {
     ($name:ident, doc = $doc:expr $(, default = $default:expr)?) => {
         #[doc = $doc]
         #[derive(PartialEq, Debug, Clone)]
         #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-        pub struct $name(pub $crate::shared_expr::BooleanPropInner);
+        pub struct $name(pub $crate::spec::Boolean);
 
         impl serde::Serialize for $name {
             fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
@@ -535,7 +405,7 @@ macro_rules! boolean_prop {
 
         impl<'de> serde::Deserialize<'de> for $name {
             fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-                let inner = <$crate::shared_expr::BooleanPropInner as serde::Deserialize>::deserialize(deserializer)?;
+                let inner = <$crate::spec::Boolean as serde::Deserialize>::deserialize(deserializer)?;
                 Ok(Self(inner))
             }
         }
@@ -546,21 +416,24 @@ macro_rules! boolean_prop {
     (@default $name:ident, $default:expr) => {
         impl Default for $name {
             fn default() -> Self {
-                Self($crate::shared_expr::BooleanPropInner::Literal($default))
+                Self($crate::spec::Boolean::Literal($default))
             }
         }
     };
     (@default $name:ident) => {};
 }
 
-/// Stamp out a newtype wrapping [`StringPropInner`] with optional default.
+/// Stamp out a newtype wrapping [`String`](crate::spec::String) with optional default.
+///
+/// `spec::String` already has `Literal(StringLiteral)` and handles bare strings via
+/// `visit_str`/`visit_string`, so no separate `StringPropInner` wrapper is needed.
 #[macro_export]
 macro_rules! string_prop {
     ($name:ident, doc = $doc:expr $(, default = $default:expr)?) => {
         #[doc = $doc]
         #[derive(PartialEq, Debug, Clone)]
         #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-        pub struct $name(pub $crate::shared_expr::StringPropInner);
+        pub struct $name(pub $crate::spec::String);
 
         impl serde::Serialize for $name {
             fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
@@ -570,7 +443,7 @@ macro_rules! string_prop {
 
         impl<'de> serde::Deserialize<'de> for $name {
             fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-                let inner = <$crate::shared_expr::StringPropInner as serde::Deserialize>::deserialize(deserializer)?;
+                let inner = <$crate::spec::String as serde::Deserialize>::deserialize(deserializer)?;
                 Ok(Self(inner))
             }
         }
@@ -581,7 +454,7 @@ macro_rules! string_prop {
     (@default $name:ident, $default:expr) => {
         impl Default for $name {
             fn default() -> Self {
-                Self($crate::shared_expr::StringPropInner::Literal($default))
+                Self($crate::spec::String::Literal($crate::spec::StringLiteral::from($default)))
             }
         }
     };
