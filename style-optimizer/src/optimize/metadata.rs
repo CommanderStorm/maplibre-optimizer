@@ -1,6 +1,6 @@
 //! Metadata refinement pass operating on typed `MaplibreStyleSpecification`.
 
-use maplibre_style_spec::shared_expr::NumericPropInner;
+use maplibre_style_spec::shared_expr::NumericExpression;
 use maplibre_style_spec::spec::{AnyLayer, Boolean, MaplibreStyleSpecification, TypedLayer};
 
 use super::source_util::VectorLayerInfo;
@@ -135,7 +135,7 @@ fn refine_typed_layer(
 
 /// Compute the minzoom from a single numeric paint property.
 /// Returns `Some(zoom)` if the property evaluates to zero below that zoom.
-fn prop_visibility_minzoom(prop: &NumericPropInner) -> Option<f64> {
+fn prop_visibility_minzoom(prop: &NumericExpression) -> Option<f64> {
     // Fast path: literal number.
     #[allow(clippy::float_cmp)]
     if let Some(n) = prop.as_f64() {

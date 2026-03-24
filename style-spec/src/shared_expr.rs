@@ -17,6 +17,16 @@ pub enum NumericExpression {
     Ramp(crate::spec::NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection),
 }
 
+impl NumericExpression {
+    /// If this represents a literal number, return it as `f64`.
+    ///
+    /// Handles `Number::Literal(NumberLiteral(n))` for bare JSON numbers.
+    pub fn as_f64(&self) -> Option<f64> {
+        let v = serde_json::to_value(self).ok()?;
+        v.as_f64()
+    }
+}
+
 impl serde::Serialize for NumericExpression {
     fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         match self {
@@ -92,68 +102,6 @@ impl<'de> serde::Deserialize<'de> for ColorExpression {
 }
 
 // ── Shared Inner Prop Enums ─────────────────────────────────────────────────
-
-/// Inner representation for numeric expression-backed properties.
-#[derive(PartialEq, Debug, Clone)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum NumericPropInner {
-    Expr(Box<NumericExpression>),
-    Literal(
-        #[cfg_attr(
-            feature = "fuzz",
-            arbitrary(with = crate::fuzz_helpers::arbitrary_json_number)
-        )]
-        serde_json::Number,
-    ),
-}
-
-impl NumericPropInner {
-    /// If this is a literal number, return it as `f64`.
-    ///
-    /// Handles both `Literal(n)` and `Expr(Number::Literal(n))` — the latter
-    /// occurs because `NumericExpression` is tried first during deserialization,
-    /// so a bare JSON number like `0` becomes `Expr(Number::Literal(...))`.
-    pub fn as_f64(&self) -> Option<f64> {
-        match self {
-            Self::Literal(n) => n.as_f64(),
-            Self::Expr(expr) => {
-                // A bare JSON number deserializes as Expr(Number::Literal(...))
-                // due to deserialization order. Fall back to serializing and checking.
-                let v = serde_json::to_value(expr.as_ref()).ok()?;
-                v.as_f64()
-            }
-        }
-    }
-}
-
-impl serde::Serialize for NumericPropInner {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        match self {
-            Self::Expr(v) => v.as_ref().serialize(serializer),
-            Self::Literal(v) => v.serialize(serializer),
-        }
-    }
-}
-
-impl<'de> serde::Deserialize<'de> for NumericPropInner {
-    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
-        let mut errors: Vec<(&str, String)> = Vec::new();
-        match <NumericExpression as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Expr(Box::new(v))),
-            Err(e) => errors.push(("Expr", e.to_string())),
-        }
-        match <serde_json::Number as serde::Deserialize>::deserialize(&value) {
-            Ok(v) => return Ok(Self::Literal(v)),
-            Err(e) => errors.push(("Literal", e.to_string())),
-        }
-        let details: Vec<String> = errors.iter().map(|(v, e)| format!("{v}: {e}")).collect();
-        Err(serde::de::Error::custom(format!(
-            "NumericPropInner: no variant matched. Expected Expr(NumericExpression) | Literal(serde_json::Number). Errors: [{}]",
-            details.join("; ")
-        )))
-    }
-}
 
 /// Inner representation for array-like expression-backed properties.
 /// Uses `serde_json::Value` for the literal branch to accommodate diverse array shapes.
@@ -259,16 +207,18 @@ pub enum Visibility {
 
 // ── Per-Property Newtype Macros ─────────────────────────────────────────────
 
-/// Stamp out a newtype wrapping [`NumericPropInner`] with optional bounds validation and default.
+/// Stamp out a newtype wrapping [`NumericExpression`] with optional bounds validation and default.
 ///
-/// Bounds are validated on the `Literal` arm during deserialization.
+/// `NumericExpression` already handles bare number literals via `Number::Literal(NumberLiteral)`,
+/// so no separate `NumericPropInner` wrapper is needed.
+/// Bounds are validated on literal values during deserialization.
 #[macro_export]
 macro_rules! numeric_prop {
     ($name:ident, doc = $doc:expr $(, min = $min:expr)? $(, max = $max:expr)? $(, default = $default:expr)?) => {
         #[doc = $doc]
         #[derive(PartialEq, Debug, Clone)]
         #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-        pub struct $name(pub $crate::shared_expr::NumericPropInner);
+        pub struct $name(pub $crate::shared_expr::NumericExpression);
 
         impl serde::Serialize for $name {
             fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
@@ -278,9 +228,8 @@ macro_rules! numeric_prop {
 
         impl<'de> serde::Deserialize<'de> for $name {
             fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-                let inner = <$crate::shared_expr::NumericPropInner as serde::Deserialize>::deserialize(deserializer)?;
-                if let $crate::shared_expr::NumericPropInner::Literal(ref n) = inner {
-                    let _v = n.as_f64().unwrap_or(f64::NAN);
+                let inner = <$crate::shared_expr::NumericExpression as serde::Deserialize>::deserialize(deserializer)?;
+                if let Some(_v) = inner.as_f64() {
                     $(if _v < $min {
                         return Err(serde::de::Error::custom(
                             format!(concat!(stringify!($name), ": {} < minimum {}"), _v, $min)
@@ -303,7 +252,9 @@ macro_rules! numeric_prop {
     (@default $name:ident, $default:expr) => {
         impl Default for $name {
             fn default() -> Self {
-                Self($crate::shared_expr::NumericPropInner::Literal($default))
+                let value = serde_json::Value::Number($default);
+                let expr = serde_json::from_value(value).expect("invalid numeric default");
+                Self(expr)
             }
         }
     };
