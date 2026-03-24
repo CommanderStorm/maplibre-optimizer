@@ -70,3 +70,26 @@ pub(super) fn finite(n: f64) -> Option<Value> {
 pub(super) fn clamp_channel(v: f64) -> u8 {
     v.round().clamp(0.0, 255.0) as u8
 }
+
+pub(crate) fn is_get_expr(v: &Value) -> bool {
+    matches!(v, Value::Array(a) if a.len() == 2 && a[0].as_str() == Some("get"))
+}
+
+pub(crate) fn get_prop_name(v: &Value) -> Option<&str> {
+    let Value::Array(a) = v else { return None };
+    if a.len() == 2 && a[0].as_str() == Some("get") {
+        a[1].as_str()
+    } else {
+        None
+    }
+}
+
+#[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+pub(crate) fn json_as_i64(v: &Value) -> Option<i64> {
+    v.as_i64().or_else(|| v.as_f64().map(|f| f as i64))
+}
+
+#[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+pub(crate) fn json_as_u64(v: &Value) -> Option<u64> {
+    v.as_u64().or_else(|| v.as_f64().map(|f| f as u64))
+}

@@ -10,7 +10,8 @@ use std::collections::{BTreeMap, BTreeSet, HashSet};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-use crate::optimize::selectivity::{extract_get_and_literal, get_prop_name};
+use crate::optimize::expr::util::get_prop_name;
+use crate::optimize::selectivity::extract_get_and_literal;
 use crate::optimize::source_util::precompute_vector_layer_info;
 use crate::optimize::walk::collect_layer_types;
 use crate::stats::TileStatistics;

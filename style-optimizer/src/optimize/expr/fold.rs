@@ -1081,6 +1081,171 @@ fn single_value_literal(stats: &crate::stats::PropertyStats) -> Option<Value> {
     }
 }
 
+/// Fold comparisons (`<`, `<=`, `>`, `>=`, `==`, `!=`) to `true`/`false` when tile statistics
+/// prove the result is constant across all features.
+pub(super) fn try_fold_comparison_from_stats(
+    arr: &mut Vec<Value>,
+    stats: Option<&crate::stats::TileStatistics>,
+    layer_info: Option<&[Option<crate::optimize::source_util::VectorLayerInfo>]>,
+    layer_index: usize,
+) -> bool {
+    if let Some(result) = try_fold_comparison_inner(arr, stats, layer_info, layer_index) {
+        *arr = vec![Value::String("literal".to_string()), Value::Bool(result)];
+        return true;
+    }
+    false
+}
+
+fn try_fold_comparison_inner(
+    arr: &[Value],
+    stats: Option<&crate::stats::TileStatistics>,
+    layer_info: Option<&[Option<crate::optimize::source_util::VectorLayerInfo>]>,
+    layer_index: usize,
+) -> Option<bool> {
+    use super::util::{get_prop_name, is_get_expr, json_as_i64, json_as_u64};
+    use crate::stats::PropertyStats;
+
+    if arr.len() != 3 {
+        return None;
+    }
+    let Some(op @ ("<" | "<=" | ">" | ">=" | "==" | "!=")) = arr[0].as_str() else {
+        return None;
+    };
+
+    // Extract ["get", prop] from one operand and literal from the other.
+    // Normalize so we always have: op(get(prop), n).
+    // If the get is on the right, flip the operator.
+    let (prop, lit, effective_op) = if is_get_expr(&arr[1]) {
+        let prop = get_prop_name(&arr[1])?;
+        let lit = extract_json_literal(&arr[2])?;
+        (prop, lit, op)
+    } else if is_get_expr(&arr[2]) {
+        let prop = get_prop_name(&arr[2])?;
+        let lit = extract_json_literal(&arr[1])?;
+        // Flip: ["<", n, ["get", p]] ≡ [">", ["get", p], n]
+        let flipped = match op {
+            "<" => ">",
+            "<=" => ">=",
+            ">" => "<",
+            ">=" => "<=",
+            other => other, // == and != are symmetric
+        };
+        (prop, lit, flipped)
+    } else {
+        return None;
+    };
+
+    let infos = layer_info?;
+    let info = infos.get(layer_index)?.as_ref()?;
+    let layer_stats = stats?.layer_stats(&info.source, &info.source_layer)?;
+    if layer_stats.total_features == 0 {
+        return None;
+    }
+    let prop_stats = layer_stats.properties.get(prop)?;
+    let all_present = prop_stats.present_count() == layer_stats.total_features;
+
+    match prop_stats {
+        PropertyStats::Integer {
+            min,
+            max,
+            value_counts,
+            ..
+        } => {
+            let n = json_as_i64(&lit)?;
+            fold_comparison_numeric(effective_op, &n, min, max, all_present, || {
+                value_counts.as_ref().map(|vc| vc.contains_key(&n))
+            })
+        }
+        PropertyStats::UnsignedInteger {
+            min,
+            max,
+            value_counts,
+            ..
+        } => {
+            let n = json_as_u64(&lit)?;
+            fold_comparison_numeric(effective_op, &n, min, max, all_present, || {
+                value_counts.as_ref().map(|vc| vc.contains_key(&n))
+            })
+        }
+        PropertyStats::Double { min, max, .. } => {
+            let n = lit.as_f64()?;
+            fold_comparison_numeric(effective_op, &n, min, max, all_present, || None)
+        }
+        _ => None,
+    }
+}
+
+/// Generic comparison folding using min/max bounds.
+///
+/// `value_in_counts` is called only for `==`/`!=` to check if `n` exists in `value_counts`.
+/// Returns `Some(bool)` if the comparison can be folded, `None` otherwise.
+fn fold_comparison_numeric<T: PartialOrd, F: FnOnce() -> Option<bool>>(
+    op: &str,
+    n: &T,
+    min: &T,
+    max: &T,
+    all_present: bool,
+    value_in_counts: F,
+) -> Option<bool> {
+    match op {
+        "<" => {
+            if min >= n {
+                Some(false)
+            } else if max < n && all_present {
+                Some(true)
+            } else {
+                None
+            }
+        }
+        "<=" => {
+            if min > n {
+                Some(false)
+            } else if max <= n && all_present {
+                Some(true)
+            } else {
+                None
+            }
+        }
+        ">" => {
+            if max <= n {
+                Some(false)
+            } else if min > n && all_present {
+                Some(true)
+            } else {
+                None
+            }
+        }
+        ">=" => {
+            if max < n {
+                Some(false)
+            } else if min >= n && all_present {
+                Some(true)
+            } else {
+                None
+            }
+        }
+        "==" => {
+            if n < min || n > max {
+                Some(false)
+            } else if let Some(false) = value_in_counts() {
+                Some(false)
+            } else {
+                None
+            }
+        }
+        "!=" => {
+            if n < min || n > max {
+                if all_present { Some(true) } else { None }
+            } else if let Some(false) = value_in_counts() {
+                if all_present { Some(true) } else { None }
+            } else {
+                None
+            }
+        }
+        _ => None,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use serde_json::{Value, json};
@@ -1468,6 +1633,248 @@ mod tests {
         let mut arr: Vec<Value> =
             serde_json::from_value(json!(["==", ["geometry-type"], "Point"])).unwrap();
         assert!(!try_fold_geometry_type_from_stats(
+            &mut arr,
+            Some(&stats),
+            Some(&info),
+            0
+        ));
+    }
+
+    // ── comparison fold tests ─────────────────────────────────────────
+
+    use super::try_fold_comparison_from_stats;
+
+    fn int_stats(
+        min: i64,
+        max: i64,
+        present: u64,
+        total: u64,
+    ) -> (TileStatistics, Vec<Option<VectorLayerInfo>>) {
+        let mut props = BTreeMap::new();
+        props.insert(
+            "x".to_string(),
+            PropertyStats::Integer {
+                present_count: present,
+                min,
+                max,
+                cardinality: 10,
+                value_counts: None,
+            },
+        );
+        let stats = make_stats(
+            "lyr",
+            LayerStats {
+                total_features: total,
+                properties: props,
+                ..Default::default()
+            },
+        );
+        (stats, make_layer_info())
+    }
+
+    #[test]
+    fn lt_folds_false_when_min_ge_n() {
+        // ["<", ["get", "x"], 2] with min=5 → always false
+        let (stats, info) = int_stats(5, 10, 100, 100);
+        let mut arr: Vec<Value> = serde_json::from_value(json!(["<", ["get", "x"], 2])).unwrap();
+        assert!(try_fold_comparison_from_stats(
+            &mut arr,
+            Some(&stats),
+            Some(&info),
+            0
+        ));
+        assert_eq!(Value::Array(arr), json!(["literal", false]));
+    }
+
+    #[test]
+    fn lt_folds_true_when_max_lt_n_and_all_present() {
+        // ["<", ["get", "x"], 20] with max=10, present=total → always true
+        let (stats, info) = int_stats(5, 10, 100, 100);
+        let mut arr: Vec<Value> = serde_json::from_value(json!(["<", ["get", "x"], 20])).unwrap();
+        assert!(try_fold_comparison_from_stats(
+            &mut arr,
+            Some(&stats),
+            Some(&info),
+            0
+        ));
+        assert_eq!(Value::Array(arr), json!(["literal", true]));
+    }
+
+    #[test]
+    fn lt_no_fold_when_not_all_present() {
+        // ["<", ["get", "x"], 20] with max=10 but present < total → can't fold to true
+        let (stats, info) = int_stats(5, 10, 80, 100);
+        let mut arr: Vec<Value> = serde_json::from_value(json!(["<", ["get", "x"], 20])).unwrap();
+        assert!(!try_fold_comparison_from_stats(
+            &mut arr,
+            Some(&stats),
+            Some(&info),
+            0
+        ));
+    }
+
+    #[test]
+    fn lte_folds_false_when_min_gt_n() {
+        // ["<=", ["get", "x"], 4] with min=5 → always false
+        let (stats, info) = int_stats(5, 10, 100, 100);
+        let mut arr: Vec<Value> = serde_json::from_value(json!(["<=", ["get", "x"], 4])).unwrap();
+        assert!(try_fold_comparison_from_stats(
+            &mut arr,
+            Some(&stats),
+            Some(&info),
+            0
+        ));
+        assert_eq!(Value::Array(arr), json!(["literal", false]));
+    }
+
+    #[test]
+    fn gte_folds_true_when_min_ge_n_and_all_present() {
+        // [">=", ["get", "x"], 5] with min=5, present=total → always true
+        let (stats, info) = int_stats(5, 10, 100, 100);
+        let mut arr: Vec<Value> = serde_json::from_value(json!([">=", ["get", "x"], 5])).unwrap();
+        assert!(try_fold_comparison_from_stats(
+            &mut arr,
+            Some(&stats),
+            Some(&info),
+            0
+        ));
+        assert_eq!(Value::Array(arr), json!(["literal", true]));
+    }
+
+    #[test]
+    fn gt_reversed_operand() {
+        // [">", 10, ["get", "x"]] ≡ ["<", ["get", "x"], 10] → with min=5, can't fold
+        // But [">", 2, ["get", "x"]] ≡ ["<", ["get", "x"], 2] → with min=5 → false
+        let (stats, info) = int_stats(5, 10, 100, 100);
+        let mut arr: Vec<Value> = serde_json::from_value(json!([">", 2, ["get", "x"]])).unwrap();
+        assert!(try_fold_comparison_from_stats(
+            &mut arr,
+            Some(&stats),
+            Some(&info),
+            0
+        ));
+        assert_eq!(Value::Array(arr), json!(["literal", false]));
+    }
+
+    #[test]
+    fn eq_folds_false_when_out_of_range() {
+        // ["==", ["get", "x"], 100] with min=0, max=10 → always false
+        let (stats, info) = int_stats(0, 10, 100, 100);
+        let mut arr: Vec<Value> = serde_json::from_value(json!(["==", ["get", "x"], 100])).unwrap();
+        assert!(try_fold_comparison_from_stats(
+            &mut arr,
+            Some(&stats),
+            Some(&info),
+            0
+        ));
+        assert_eq!(Value::Array(arr), json!(["literal", false]));
+    }
+
+    #[test]
+    fn neq_folds_true_when_out_of_range_and_all_present() {
+        // ["!=", ["get", "x"], 100] with min=0, max=10, present=total → always true
+        let (stats, info) = int_stats(0, 10, 100, 100);
+        let mut arr: Vec<Value> = serde_json::from_value(json!(["!=", ["get", "x"], 100])).unwrap();
+        assert!(try_fold_comparison_from_stats(
+            &mut arr,
+            Some(&stats),
+            Some(&info),
+            0
+        ));
+        assert_eq!(Value::Array(arr), json!(["literal", true]));
+    }
+
+    #[test]
+    fn double_lt_folds_false_when_min_ge_n() {
+        // ["<", ["get", "x"], 0.5] with Double min=1.0 → always false
+        let mut props = BTreeMap::new();
+        props.insert(
+            "x".to_string(),
+            PropertyStats::Double {
+                present_count: 100,
+                min: 1.0,
+                max: 5.0,
+                cardinality: 10,
+            },
+        );
+        let stats = make_stats(
+            "lyr",
+            LayerStats {
+                total_features: 100,
+                properties: props,
+                ..Default::default()
+            },
+        );
+        let info = make_layer_info();
+        let mut arr: Vec<Value> = serde_json::from_value(json!(["<", ["get", "x"], 0.5])).unwrap();
+        assert!(try_fold_comparison_from_stats(
+            &mut arr,
+            Some(&stats),
+            Some(&info),
+            0
+        ));
+        assert_eq!(Value::Array(arr), json!(["literal", false]));
+    }
+
+    #[test]
+    fn eq_folds_false_with_value_counts() {
+        // ["==", ["get", "x"], 7] with value_counts={2: 500, 4: 4000} → 7 not in counts → false
+        let mut int_vc = BTreeMap::new();
+        int_vc.insert(2i64, 500u64);
+        int_vc.insert(4, 4000);
+        let mut props = BTreeMap::new();
+        props.insert(
+            "x".to_string(),
+            PropertyStats::Integer {
+                present_count: 4500,
+                min: 2,
+                max: 4,
+                cardinality: 2,
+                value_counts: Some(int_vc),
+            },
+        );
+        let stats = make_stats(
+            "lyr",
+            LayerStats {
+                total_features: 4500,
+                properties: props,
+                ..Default::default()
+            },
+        );
+        let info = make_layer_info();
+        let mut arr: Vec<Value> = serde_json::from_value(json!(["==", ["get", "x"], 7])).unwrap();
+        assert!(try_fold_comparison_from_stats(
+            &mut arr,
+            Some(&stats),
+            Some(&info),
+            0
+        ));
+        assert_eq!(Value::Array(arr), json!(["literal", false]));
+    }
+
+    #[test]
+    fn non_numeric_property_no_fold() {
+        // String property → comparison folding not supported
+        let mut props = BTreeMap::new();
+        props.insert(
+            "x".to_string(),
+            PropertyStats::String {
+                present_count: 100,
+                cardinality: 5,
+                value_counts: None,
+            },
+        );
+        let stats = make_stats(
+            "lyr",
+            LayerStats {
+                total_features: 100,
+                properties: props,
+                ..Default::default()
+            },
+        );
+        let info = make_layer_info();
+        let mut arr: Vec<Value> = serde_json::from_value(json!(["<", ["get", "x"], 5])).unwrap();
+        assert!(!try_fold_comparison_from_stats(
             &mut arr,
             Some(&stats),
             Some(&info),
