@@ -169,7 +169,7 @@ function optimizeStyle(styleJson: string, extraArgs: string[] = []): string {
 function collectStats(mbtilesPath: string, outputPath: string): void {
   execFileSync(OPTIMIZER, [
     "stats", "--input", mbtilesPath, "--source-name", "openmaptiles", "--output", outputPath,
-  ], { timeout: 120_000 });
+  ]);
 }
 
 function optimizeWithStats(styleJson: string, statsPath: string, advisoryPath?: string): string {
@@ -183,7 +183,7 @@ function applyAdvisory(advisoryPath: string, mbtilesPath: string, stylePath: str
     fs.mkdirSync(outputDir, { recursive: true });
     execFileSync(OPTIMIZER, [
       "advisory", "--advisory", advisoryPath, "--tiles", mbtilesPath, "--style", stylePath, "--output", outputDir,
-    ], { timeout: 120_000 });
+    ]);
     // Read the rewritten style from the output directory
     const rewrittenStyle = path.join(outputDir, path.basename(stylePath));
     if (fs.existsSync(rewrittenStyle)) {
