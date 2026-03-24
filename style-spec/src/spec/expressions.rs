@@ -168,7 +168,7 @@ impl ExprOrLiteral {
                 other => ExprOrLiteral::ArrayExpr(Box::new(other)),
             },
             ExprOrLiteral::ObjectExpr(o) => match *o {
-                Object::Literal(v) => ExprOrLiteral::JSONObjectLiteral(v),
+                Object::Literal(v) => ExprOrLiteral::JSONObjectLiteral(v).normalize(),
                 other => ExprOrLiteral::ObjectExpr(Box::new(other)),
             },
             // JSONObjectLiteral/JSONArrayLiteral can wrap any serde_json::Value;

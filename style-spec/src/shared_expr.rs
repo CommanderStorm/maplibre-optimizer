@@ -25,6 +25,15 @@ impl NumericExpression {
         let v = serde_json::to_value(self).ok()?;
         v.as_f64()
     }
+
+    /// Build a literal `NumericExpression` from an `f64`.
+    #[cfg(feature = "fuzz")]
+    pub fn from_f64(v: f64) -> Self {
+        let n = serde_json::Number::from_f64(v).unwrap_or_else(|| serde_json::Number::from(0));
+        Self::Number(crate::spec::Number::Literal(
+            crate::spec::NumberLiteral::from(n),
+        ))
+    }
 }
 
 impl serde::Serialize for NumericExpression {
@@ -217,8 +226,23 @@ macro_rules! numeric_prop {
     ($name:ident, doc = $doc:expr $(, min = $min:expr)? $(, max = $max:expr)? $(, default = $default:expr)?) => {
         #[doc = $doc]
         #[derive(PartialEq, Debug, Clone)]
-        #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
         pub struct $name(pub $crate::shared_expr::NumericExpression);
+
+        #[cfg(feature = "fuzz")]
+        impl<'a> arbitrary::Arbitrary<'a> for $name {
+            fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
+                let inner = $crate::shared_expr::NumericExpression::arbitrary(u)?;
+                if let Some(v) = inner.as_f64() {
+                    let mut _clamped = v;
+                    $(_clamped = _clamped.max($min as f64);)?
+                    $(_clamped = _clamped.min($max as f64);)?
+                    if _clamped != v {
+                        return Ok(Self($crate::shared_expr::NumericExpression::from_f64(_clamped)));
+                    }
+                }
+                Ok(Self(inner))
+            }
+        }
 
         impl serde::Serialize for $name {
             fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
