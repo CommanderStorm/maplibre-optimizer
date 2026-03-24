@@ -357,6 +357,8 @@ fn run_json_expression_passes(
 mod tests {
     use std::path::Path;
 
+    use insta::assert_json_snapshot;
+
     use super::*;
     use crate::load_intermediate_spec_from_v8_path;
 
@@ -377,7 +379,17 @@ mod tests {
         let mir = sample_mir();
         let mut v = serde_json::json!({"version":8,"sources":{},"layers":[{"id":"x","type":"fill","filter":["any",["==",1,1]]}]});
         optimize_style_json_value(&mut v, &mir, &passes_unary_only());
-        assert_eq!(v["layers"][0]["filter"], serde_json::json!(["==", 1, 1]));
+        assert_json_snapshot!(v["layers"][0], @r#"
+        {
+          "filter": [
+            "==",
+            1,
+            1
+          ],
+          "id": "x",
+          "type": "fill"
+        }
+        "#);
     }
 
     #[test]
@@ -394,7 +406,17 @@ mod tests {
         let mir = sample_mir();
         let mut v = serde_json::json!({"version":8,"sources":{},"layers":[{"id":"x","type":"fill","filter":["any",["any",["==",1,1]]]}]});
         optimize_style_json_value(&mut v, &mir, &passes_unary_only());
-        assert_eq!(v["layers"][0]["filter"], serde_json::json!(["==", 1, 1]));
+        assert_json_snapshot!(v["layers"][0], @r#"
+        {
+          "filter": [
+            "==",
+            1,
+            1
+          ],
+          "id": "x",
+          "type": "fill"
+        }
+        "#);
     }
 
     #[test]
@@ -402,7 +424,17 @@ mod tests {
         let mir = sample_mir();
         let mut v = serde_json::json!({"version":8,"sources":{},"layers":[{"id":"x","type":"fill","filter":["all",["==",1,1]]}]});
         optimize_style_json_value(&mut v, &mir, &passes_unary_only());
-        assert_eq!(v["layers"][0]["filter"], serde_json::json!(["==", 1, 1]));
+        assert_json_snapshot!(v["layers"][0], @r#"
+        {
+          "filter": [
+            "==",
+            1,
+            1
+          ],
+          "id": "x",
+          "type": "fill"
+        }
+        "#);
     }
 
     #[test]
@@ -419,7 +451,16 @@ mod tests {
         let mir = sample_mir();
         let mut v = serde_json::json!({"version":8,"sources":{},"layers":[{"id":"x","type":"fill","filter":["!",["!",["has","x"]]]}]});
         optimize_style_json_value(&mut v, &mir, &passes_unary_only());
-        assert_eq!(v["layers"][0]["filter"], serde_json::json!(["has", "x"]));
+        assert_json_snapshot!(v["layers"][0], @r#"
+        {
+          "filter": [
+            "has",
+            "x"
+          ],
+          "id": "x",
+          "type": "fill"
+        }
+        "#);
     }
 
     #[test]
@@ -427,10 +468,19 @@ mod tests {
         let mir = sample_mir();
         let mut v = serde_json::json!({"version":8,"sources":{},"layers":[{"id":"x","type":"fill","filter":["!",["!",["!",["has","x"]]]]}]});
         optimize_style_json_value(&mut v, &mir, &passes_unary_only());
-        assert_eq!(
-            v["layers"][0]["filter"],
-            serde_json::json!(["!", ["has", "x"]])
-        );
+        assert_json_snapshot!(v["layers"][0], @r#"
+        {
+          "filter": [
+            "!",
+            [
+              "has",
+              "x"
+            ]
+          ],
+          "id": "x",
+          "type": "fill"
+        }
+        "#);
     }
 
     #[test]
@@ -445,10 +495,20 @@ mod tests {
                 ..Default::default()
             },
         );
-        assert_eq!(
-            v["layers"][0]["filter"],
-            serde_json::json!(["!=", ["get", "a"], 1])
-        );
+        assert_json_snapshot!(v["layers"][0], @r#"
+        {
+          "filter": [
+            "!=",
+            [
+              "get",
+              "a"
+            ],
+            1
+          ],
+          "id": "x",
+          "type": "fill"
+        }
+        "#);
     }
 
     #[test]
@@ -463,10 +523,16 @@ mod tests {
                 ..Default::default()
             },
         );
-        assert_eq!(
-            v["layers"][0]["filter"],
-            serde_json::json!(["literal", false])
-        );
+        assert_json_snapshot!(v["layers"][0], @r#"
+        {
+          "filter": [
+            "literal",
+            false
+          ],
+          "id": "x",
+          "type": "fill"
+        }
+        "#);
     }
 
     #[test]
@@ -481,9 +547,30 @@ mod tests {
                 ..Default::default()
             },
         );
-        assert_eq!(v["sources"].as_object().unwrap().len(), 1);
-        assert_eq!(v["layers"].as_array().unwrap().len(), 1);
-        assert_eq!(v["layers"][0]["id"], "y");
+        assert_json_snapshot!(v, @r#"
+        {
+          "layers": [
+            {
+              "filter": [
+                "==",
+                1,
+                1
+              ],
+              "id": "y",
+              "source": "b",
+              "source-layer": "r",
+              "type": "line"
+            }
+          ],
+          "sources": {
+            "b": {
+              "type": "vector",
+              "url": "https://example/b.json"
+            }
+          },
+          "version": 8
+        }
+        "#);
     }
 
     #[test]
@@ -498,7 +585,14 @@ mod tests {
                 ..Default::default()
             },
         );
-        assert!((v["layers"][0]["minzoom"].as_f64().expect("minzoom") - 7.0).abs() < f64::EPSILON);
+        assert_json_snapshot!(v["layers"][0], @r#"
+        {
+          "filter": true,
+          "id": "x",
+          "minzoom": 7.0,
+          "type": "fill"
+        }
+        "#);
     }
 
     #[test]
@@ -513,10 +607,24 @@ mod tests {
                 ..Default::default()
             },
         );
-        assert_eq!(
-            v["layers"][0]["filter"].as_array().unwrap()[1],
-            serde_json::json!(["literal", true])
-        );
+        assert_json_snapshot!(v["layers"][0], @r#"
+        {
+          "filter": [
+            "any",
+            [
+              "literal",
+              true
+            ],
+            [
+              "==",
+              1,
+              2
+            ]
+          ],
+          "id": "x",
+          "type": "fill"
+        }
+        "#);
     }
 
     #[test]
@@ -531,10 +639,16 @@ mod tests {
                 ..Default::default()
             },
         );
-        assert_eq!(
-            v["layers"][0]["filter"],
-            serde_json::json!(["literal", 3.0])
-        );
+        assert_json_snapshot!(v["layers"][0], @r#"
+        {
+          "filter": [
+            "literal",
+            3.0
+          ],
+          "id": "x",
+          "type": "fill"
+        }
+        "#);
     }
 
     #[test]
@@ -549,10 +663,16 @@ mod tests {
                 ..Default::default()
             },
         );
-        assert_eq!(
-            v["layers"][0]["filter"],
-            serde_json::json!(["literal", "hello world"])
-        );
+        assert_json_snapshot!(v["layers"][0], @r#"
+        {
+          "filter": [
+            "literal",
+            "hello world"
+          ],
+          "id": "x",
+          "type": "fill"
+        }
+        "#);
     }
 
     #[test]
@@ -567,11 +687,15 @@ mod tests {
                 ..Default::default()
             },
         );
-        // Interpolate with identical stops → ["literal", 0.5] → unwrapped to bare 0.5.
-        assert_eq!(
-            v["layers"][0]["paint"]["fill-opacity"],
-            serde_json::json!(0.5)
-        );
+        assert_json_snapshot!(v["layers"][0], @r#"
+        {
+          "id": "x",
+          "paint": {
+            "fill-opacity": 0.5
+          },
+          "type": "fill"
+        }
+        "#);
     }
 
     #[test]
@@ -586,8 +710,15 @@ mod tests {
                 ..Default::default()
             },
         );
-        // Step with identical outputs → ["literal", 2] → unwrapped to bare 2.
-        assert_eq!(v["layers"][0]["paint"]["line-width"], serde_json::json!(2));
+        assert_json_snapshot!(v["layers"][0], @r#"
+        {
+          "id": "x",
+          "paint": {
+            "line-width": 2
+          },
+          "type": "line"
+        }
+        "#);
     }
 
     #[test]
@@ -602,9 +733,29 @@ mod tests {
                 ..Default::default()
             },
         );
-        let arr = v["layers"][0]["paint"]["line-color"].as_array().unwrap();
-        assert_eq!(arr[0], "match");
-        assert_eq!(arr[2], serde_json::json!(["motorway", "trunk"]));
+        assert_json_snapshot!(v["layers"][0], @r##"
+        {
+          "id": "x",
+          "paint": {
+            "line-color": [
+              "match",
+              [
+                "get",
+                "class"
+              ],
+              [
+                "motorway",
+                "trunk"
+              ],
+              "#ff0000",
+              "primary",
+              "#ff6600",
+              "#cccccc"
+            ]
+          },
+          "type": "line"
+        }
+        "##);
     }
 
     #[test]
@@ -619,8 +770,18 @@ mod tests {
                 ..Default::default()
             },
         );
-        assert!(v.get("metadata").is_none());
-        assert!(v["layers"][0].get("metadata").is_none());
+        assert_json_snapshot!(v, @r#"
+        {
+          "layers": [
+            {
+              "id": "x",
+              "type": "fill"
+            }
+          ],
+          "sources": {},
+          "version": 8
+        }
+        "#);
     }
 
     #[test]
@@ -635,8 +796,15 @@ mod tests {
                 ..Default::default()
             },
         );
-        assert!(v["layers"][0]["paint"].get("fill-opacity").is_none());
-        assert!(v["layers"][0]["paint"].get("fill-color").is_some());
+        assert_json_snapshot!(v["layers"][0], @r##"
+        {
+          "id": "x",
+          "paint": {
+            "fill-color": "#f00"
+          },
+          "type": "fill"
+        }
+        "##);
     }
 
     #[test]
@@ -651,7 +819,7 @@ mod tests {
                 ..Default::default()
             },
         );
-        assert_eq!(v["layers"].as_array().unwrap().len(), 0);
+        assert_json_snapshot!(v["layers"], @"[]");
     }
 
     #[test]
@@ -668,7 +836,7 @@ mod tests {
                 ..Default::default()
             },
         );
-        assert_eq!(v["layers"].as_array().unwrap().len(), 0);
+        assert_json_snapshot!(v["layers"], @"[]");
     }
 
     #[test]
@@ -685,7 +853,7 @@ mod tests {
                 ..Default::default()
             },
         );
-        assert_eq!(v["layers"].as_array().unwrap().len(), 0);
+        assert_json_snapshot!(v["layers"], @"[]");
     }
 
     #[test]
@@ -702,7 +870,7 @@ mod tests {
                 ..Default::default()
             },
         );
-        assert_eq!(v["layers"].as_array().unwrap().len(), 0);
+        assert_json_snapshot!(v["layers"], @"[]");
     }
 
     #[test]
@@ -719,7 +887,20 @@ mod tests {
                 ..Default::default()
             },
         );
-        assert_eq!(v["layers"].as_array().unwrap().len(), 1);
+        assert_json_snapshot!(v["layers"], @r#"
+        [
+          {
+            "id": "sym",
+            "paint": {
+              "icon-opacity": 0,
+              "text-opacity": 1
+            },
+            "source": "s",
+            "source-layer": "l",
+            "type": "symbol"
+          }
+        ]
+        "#);
     }
 
     #[test]
@@ -734,7 +915,6 @@ mod tests {
     }
 
     #[test]
-    #[allow(clippy::float_cmp)]
     fn zoom_predicate_removed_after_metadata_extraction() {
         let mir = sample_mir();
         let mut v = serde_json::json!({"version":8,"sources":{},"layers":[{"id":"x","type":"fill","filter":["all",[">=",["zoom"],7],["==",["get","class"],"river"]]}]});
@@ -746,17 +926,26 @@ mod tests {
                 ..Default::default()
             },
         );
-        assert_eq!(v["layers"][0]["minzoom"].as_f64().unwrap(), 7.0);
-        assert_eq!(
-            v["layers"][0]["filter"],
-            serde_json::json!(["==", ["get", "class"], "river"])
-        );
+        assert_json_snapshot!(v["layers"][0], @r#"
+        {
+          "filter": [
+            "==",
+            [
+              "get",
+              "class"
+            ],
+            "river"
+          ],
+          "id": "x",
+          "minzoom": 7.0,
+          "type": "fill"
+        }
+        "#);
     }
 
     // ── Paint-based minzoom inference tests ─────────────────────────────────
 
     #[test]
-    #[allow(clippy::float_cmp)]
     fn paint_minzoom_interpolate_leading_zeros() {
         let mir = sample_mir();
         let mut v = serde_json::json!({"version":8,"sources":{},"layers":[
@@ -770,11 +959,31 @@ mod tests {
                 ..Default::default()
             },
         );
-        assert_eq!(v["layers"][0]["minzoom"].as_f64().unwrap(), 13.5);
+        assert_json_snapshot!(v["layers"][0], @r#"
+        {
+          "id": "x",
+          "minzoom": 13.5,
+          "paint": {
+            "line-width": [
+              "interpolate",
+              [
+                "linear"
+              ],
+              [
+                "zoom"
+              ],
+              13.5,
+              0,
+              14,
+              2.5
+            ]
+          },
+          "type": "line"
+        }
+        "#);
     }
 
     #[test]
-    #[allow(clippy::float_cmp)]
     fn paint_minzoom_step_zero_default() {
         let mir = sample_mir();
         let mut v = serde_json::json!({"version":8,"sources":{},"layers":[
@@ -788,11 +997,27 @@ mod tests {
                 ..Default::default()
             },
         );
-        assert_eq!(v["layers"][0]["minzoom"].as_f64().unwrap(), 15.0);
+        assert_json_snapshot!(v["layers"][0], @r#"
+        {
+          "id": "x",
+          "minzoom": 15.0,
+          "paint": {
+            "line-width": [
+              "step",
+              [
+                "zoom"
+              ],
+              0,
+              15,
+              2
+            ]
+          },
+          "type": "line"
+        }
+        "#);
     }
 
     #[test]
-    #[allow(clippy::float_cmp)]
     fn paint_minzoom_multiple_zero_stops() {
         let mir = sample_mir();
         let mut v = serde_json::json!({"version":8,"sources":{},"layers":[
@@ -806,11 +1031,33 @@ mod tests {
                 ..Default::default()
             },
         );
-        assert_eq!(v["layers"][0]["minzoom"].as_f64().unwrap(), 10.0);
+        assert_json_snapshot!(v["layers"][0], @r#"
+        {
+          "id": "x",
+          "minzoom": 10.0,
+          "paint": {
+            "line-width": [
+              "interpolate",
+              [
+                "linear"
+              ],
+              [
+                "zoom"
+              ],
+              5,
+              0,
+              10,
+              0,
+              14,
+              2.5
+            ]
+          },
+          "type": "line"
+        }
+        "#);
     }
 
     #[test]
-    #[allow(clippy::float_cmp)]
     fn paint_minzoom_combined_width_opacity() {
         let mir = sample_mir();
         // line-width: last zero stop at 10 (transitions 10→14),
@@ -830,11 +1077,40 @@ mod tests {
                 ..Default::default()
             },
         );
-        assert_eq!(v["layers"][0]["minzoom"].as_f64().unwrap(), 12.0);
+        assert_json_snapshot!(v["layers"][0], @r#"
+        {
+          "id": "x",
+          "minzoom": 12.0,
+          "paint": {
+            "line-opacity": [
+              "step",
+              [
+                "zoom"
+              ],
+              0,
+              12,
+              1
+            ],
+            "line-width": [
+              "interpolate",
+              [
+                "linear"
+              ],
+              [
+                "zoom"
+              ],
+              10,
+              0,
+              14,
+              2
+            ]
+          },
+          "type": "line"
+        }
+        "#);
     }
 
     #[test]
-    #[allow(clippy::float_cmp)]
     fn paint_minzoom_existing_tighter_preserved() {
         let mir = sample_mir();
         // Existing minzoom: 16, paint suggests 14 → stays 16.
@@ -849,7 +1125,28 @@ mod tests {
                 ..Default::default()
             },
         );
-        assert_eq!(v["layers"][0]["minzoom"].as_f64().unwrap(), 16.0);
+        assert_json_snapshot!(v["layers"][0], @r#"
+        {
+          "id": "x",
+          "minzoom": 16,
+          "paint": {
+            "line-width": [
+              "interpolate",
+              [
+                "linear"
+              ],
+              [
+                "zoom"
+              ],
+              10,
+              0,
+              14,
+              2
+            ]
+          },
+          "type": "line"
+        }
+        "#);
     }
 
     #[test]
@@ -866,7 +1163,22 @@ mod tests {
                 ..Default::default()
             },
         );
-        assert!(v["layers"][0].get("minzoom").is_none());
+        assert_json_snapshot!(v["layers"][0], @r#"
+        {
+          "id": "x",
+          "paint": {
+            "line-width": [
+              "*",
+              [
+                "get",
+                "w"
+              ],
+              2
+            ]
+          },
+          "type": "line"
+        }
+        "#);
     }
 
     #[test]
@@ -884,11 +1196,30 @@ mod tests {
                 ..Default::default()
             },
         );
-        assert!(v["layers"][0].get("minzoom").is_none());
+        assert_json_snapshot!(v["layers"][0], @r#"
+        {
+          "id": "x",
+          "paint": {
+            "line-width": [
+              "interpolate",
+              [
+                "linear"
+              ],
+              [
+                "zoom"
+              ],
+              5,
+              0,
+              10,
+              0
+            ]
+          },
+          "type": "line"
+        }
+        "#);
     }
 
     #[test]
-    #[allow(clippy::float_cmp)]
     fn paint_minzoom_end_to_end_full_pipeline() {
         let mir = sample_mir();
         let mut v = serde_json::json!({"version":8,"sources":{"s":{"type":"vector","url":"x"}},"layers":[
@@ -898,7 +1229,40 @@ mod tests {
         ]});
         let passes = OptPasses::all();
         optimize_style_json_value(&mut v, &mir, &passes);
-        assert!(v["layers"][0]["minzoom"].as_f64().unwrap() >= 10.0);
+        assert_json_snapshot!(v["layers"][0], @r#"
+        {
+          "filter": [
+            "==",
+            [
+              "get",
+              "class"
+            ],
+            "motorway"
+          ],
+          "id": "road",
+          "minzoom": 10.0,
+          "paint": {
+            "line-width": [
+              "interpolate",
+              [
+                "linear"
+              ],
+              [
+                "zoom"
+              ],
+              5,
+              0,
+              10,
+              0,
+              14,
+              2.5
+            ]
+          },
+          "source": "s",
+          "source-layer": "transportation",
+          "type": "line"
+        }
+        "#);
     }
 
     // ── Stats-driven tests ──────────────────────────────────────────────────
@@ -944,7 +1308,7 @@ mod tests {
             },
             Some(&stats),
         );
-        assert_eq!(v["layers"].as_array().unwrap().len(), 0);
+        assert_json_snapshot!(v["layers"], @"[]");
     }
 
     #[test]
@@ -977,7 +1341,6 @@ mod tests {
     }
 
     #[test]
-    #[allow(clippy::float_cmp)]
     fn metadata_refinement_zoom_from_stats() {
         let mir = sample_mir();
         let mut fbz = BTreeMap::new();
@@ -1002,8 +1365,16 @@ mod tests {
             },
             Some(&stats),
         );
-        assert_eq!(v["layers"][0]["minzoom"].as_f64().unwrap(), 6.0);
-        assert_eq!(v["layers"][0]["maxzoom"].as_f64().unwrap(), 14.0);
+        assert_json_snapshot!(v["layers"][0], @r#"
+        {
+          "id": "water-fill",
+          "maxzoom": 14.0,
+          "minzoom": 6.0,
+          "source": "openmaptiles",
+          "source-layer": "water",
+          "type": "fill"
+        }
+        "#);
     }
 
     #[test]
@@ -1027,10 +1398,18 @@ mod tests {
             },
             Some(&stats),
         );
-        assert_eq!(
-            v["layers"][0]["filter"],
-            serde_json::json!(["literal", false])
-        );
+        assert_json_snapshot!(v["layers"][0], @r#"
+        {
+          "filter": [
+            "literal",
+            false
+          ],
+          "id": "water-fill",
+          "source": "openmaptiles",
+          "source-layer": "water",
+          "type": "fill"
+        }
+        "#);
     }
 
     // ── Single-value property folding ──────────────────────────────────────
@@ -1063,11 +1442,18 @@ mod tests {
             },
             Some(&stats),
         );
-        // ["get","class"] → "lake", then ["==","lake","lake"] → true.
-        assert_eq!(
-            v["layers"][0]["filter"],
-            serde_json::json!(["literal", true])
-        );
+        assert_json_snapshot!(v["layers"][0], @r#"
+        {
+          "filter": [
+            "literal",
+            true
+          ],
+          "id": "w",
+          "source": "openmaptiles",
+          "source-layer": "water",
+          "type": "fill"
+        }
+        "#);
     }
 
     #[test]
@@ -1100,11 +1486,18 @@ mod tests {
             },
             Some(&stats),
         );
-        // ["get","level"] → 3, then [">=",3,2] → true.
-        assert_eq!(
-            v["layers"][0]["filter"],
-            serde_json::json!(["literal", true])
-        );
+        assert_json_snapshot!(v["layers"][0], @r#"
+        {
+          "filter": [
+            "literal",
+            true
+          ],
+          "id": "w",
+          "source": "openmaptiles",
+          "source-layer": "water",
+          "type": "fill"
+        }
+        "#);
     }
 
     #[test]
@@ -1207,11 +1600,17 @@ mod tests {
             },
             Some(&stats),
         );
-        // ["get","depth"] → 5, [">=",5,3] → true, ["case",true,1,0.5] → 1.
-        assert_eq!(
-            v["layers"][0]["paint"]["fill-opacity"],
-            serde_json::json!(1)
-        );
+        assert_json_snapshot!(v["layers"][0], @r#"
+        {
+          "id": "w",
+          "paint": {
+            "fill-opacity": 1
+          },
+          "source": "openmaptiles",
+          "source-layer": "water",
+          "type": "fill"
+        }
+        "#);
     }
 
     #[test]
@@ -1285,8 +1684,12 @@ mod tests {
                 ..Default::default()
             },
         );
-        // ["all"] folds to true, then cleanup strips the trivial filter.
-        assert!(v["layers"][0].get("filter").is_none());
+        assert_json_snapshot!(v["layers"][0], @r#"
+        {
+          "id": "x",
+          "type": "fill"
+        }
+        "#);
     }
 
     #[test]
@@ -1303,10 +1706,16 @@ mod tests {
                 ..Default::default()
             },
         );
-        assert_eq!(
-            v["layers"][0]["filter"],
-            serde_json::json!(["literal", false])
-        );
+        assert_json_snapshot!(v["layers"][0], @r#"
+        {
+          "filter": [
+            "literal",
+            false
+          ],
+          "id": "x",
+          "type": "fill"
+        }
+        "#);
     }
 
     // ── Color minification ──────────────────────────────────────────────
@@ -1325,7 +1734,15 @@ mod tests {
                 ..Default::default()
             },
         );
-        assert_eq!(v["layers"][0]["paint"]["fill-color"], "#fff");
+        assert_json_snapshot!(v["layers"][0], @r##"
+        {
+          "id": "x",
+          "paint": {
+            "fill-color": "#fff"
+          },
+          "type": "fill"
+        }
+        "##);
     }
 
     #[test]
@@ -1342,7 +1759,15 @@ mod tests {
                 ..Default::default()
             },
         );
-        assert_eq!(v["layers"][0]["paint"]["fill-color"], "#000");
+        assert_json_snapshot!(v["layers"][0], @r##"
+        {
+          "id": "x",
+          "paint": {
+            "fill-color": "#000"
+          },
+          "type": "fill"
+        }
+        "##);
     }
 
     #[test]
@@ -1359,7 +1784,15 @@ mod tests {
                 ..Default::default()
             },
         );
-        assert_eq!(v["layers"][0]["paint"]["fill-color"], "#fff");
+        assert_json_snapshot!(v["layers"][0], @r##"
+        {
+          "id": "x",
+          "paint": {
+            "fill-color": "#fff"
+          },
+          "type": "fill"
+        }
+        "##);
     }
 
     // ── Root default stripping ──────────────────────────────────────────
@@ -1376,9 +1809,13 @@ mod tests {
                 ..Default::default()
             },
         );
-        assert!(v.get("bearing").is_none());
-        assert!(v.get("pitch").is_none());
-        assert!(v.get("roll").is_none());
+        assert_json_snapshot!(v, @r#"
+        {
+          "layers": [],
+          "sources": {},
+          "version": 8
+        }
+        "#);
     }
 
     #[test]
@@ -1393,6 +1830,13 @@ mod tests {
                 ..Default::default()
             },
         );
-        assert_eq!(v["bearing"], 45);
+        assert_json_snapshot!(v, @r#"
+        {
+          "bearing": 45,
+          "layers": [],
+          "sources": {},
+          "version": 8
+        }
+        "#);
     }
 }

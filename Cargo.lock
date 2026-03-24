@@ -1340,6 +1340,7 @@ dependencies = [
  "flate2",
  "geo-types",
  "indexmap 2.12.1",
+ "insta",
  "maplibre-style-spec",
  "mlt-core",
  "proptest",

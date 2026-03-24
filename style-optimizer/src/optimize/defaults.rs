@@ -101,6 +101,7 @@ fn strip_layer_defaults(layer: &mut Value, layer_type: &str, mir: &MirSpec) {
 
 #[cfg(test)]
 mod tests {
+    use insta::assert_json_snapshot;
     use serde_json::json;
 
     use super::*;
@@ -124,10 +125,15 @@ mod tests {
             }]
         });
         walk_style_mut(&mut v, &mir, &mut StripDefaultsVisitor { mir: &mir });
-        // fill-opacity: 1 is the default → removed
-        assert!(v["layers"][0]["paint"].get("fill-opacity").is_none());
-        // fill-color is not a default → kept
-        assert_eq!(v["layers"][0]["paint"]["fill-color"], json!("#ff0000"));
+        assert_json_snapshot!(v["layers"][0], @r##"
+        {
+          "id": "x",
+          "paint": {
+            "fill-color": "#ff0000"
+          },
+          "type": "fill"
+        }
+        "##);
     }
 
     #[test]
@@ -141,8 +147,12 @@ mod tests {
             }]
         });
         walk_style_mut(&mut v, &mir, &mut StripDefaultsVisitor { mir: &mir });
-        // After stripping, the layout should be empty and then removed
-        assert!(v["layers"][0].get("layout").is_none());
+        assert_json_snapshot!(v["layers"][0], @r#"
+        {
+          "id": "x",
+          "type": "fill"
+        }
+        "#);
     }
 
     #[test]
@@ -156,7 +166,15 @@ mod tests {
             }]
         });
         walk_style_mut(&mut v, &mir, &mut StripDefaultsVisitor { mir: &mir });
-        assert_eq!(v["layers"][0]["paint"]["fill-opacity"], json!(0.5));
+        assert_json_snapshot!(v["layers"][0], @r#"
+        {
+          "id": "x",
+          "paint": {
+            "fill-opacity": 0.5
+          },
+          "type": "fill"
+        }
+        "#);
     }
 
     #[test]
@@ -171,8 +189,18 @@ mod tests {
             }]
         });
         walk_style_mut(&mut v, &mir, &mut StripDefaultsVisitor { mir: &mir });
-        // Must NOT be stripped — it's an expression
-        assert!(v["layers"][0]["paint"].get("fill-opacity").is_some());
+        assert_json_snapshot!(v["layers"][0], @r#"
+        {
+          "id": "x",
+          "paint": {
+            "fill-opacity": [
+              "literal",
+              1
+            ]
+          },
+          "type": "fill"
+        }
+        "#);
     }
 
     #[test]
@@ -191,9 +219,24 @@ mod tests {
             }]
         });
         walk_style_mut(&mut v, &mir, &mut StripDefaultsVisitor { mir: &mir });
-        // text-radial-offset: 0 is the default, but its presence suppresses
-        // text-offset via v8.json requires constraint — must NOT be stripped.
-        assert!(v["layers"][0]["layout"].get("text-radial-offset").is_some());
+        assert_json_snapshot!(v["layers"][0], @r#"
+        {
+          "id": "x",
+          "layout": {
+            "text-field": "x",
+            "text-offset": [
+              2,
+              2
+            ],
+            "text-radial-offset": 0,
+            "text-variable-anchor": [
+              "top",
+              "bottom"
+            ]
+          },
+          "type": "symbol"
+        }
+        "#);
     }
 
     #[test]
@@ -211,8 +254,19 @@ mod tests {
             }]
         });
         walk_style_mut(&mut v, &mir, &mut StripDefaultsVisitor { mir: &mir });
-        // text-offset is absent, so stripping text-radial-offset is safe.
-        assert!(v["layers"][0]["layout"].get("text-radial-offset").is_none());
+        assert_json_snapshot!(v["layers"][0], @r#"
+        {
+          "id": "x",
+          "layout": {
+            "text-field": "x",
+            "text-variable-anchor": [
+              "top",
+              "bottom"
+            ]
+          },
+          "type": "symbol"
+        }
+        "#);
     }
 
     #[test]
@@ -226,7 +280,11 @@ mod tests {
             }]
         });
         walk_style_mut(&mut v, &mir, &mut StripDefaultsVisitor { mir: &mir });
-        // Both are defaults → paint becomes empty → removed
-        assert!(v["layers"][0].get("paint").is_none());
+        assert_json_snapshot!(v["layers"][0], @r#"
+        {
+          "id": "x",
+          "type": "line"
+        }
+        "#);
     }
 }

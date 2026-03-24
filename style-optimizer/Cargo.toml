@@ -29,6 +29,7 @@ prost-build.workspace = true
 [dev-dependencies]
 arbitrary = { workspace = true }
 geo-types = "0.7"
+insta.workspace = true
 maplibre-style-spec = { path = "../style-spec", features = ["full", "fuzz"] }
 proptest = "1"
 rusqlite.workspace = true
