@@ -89,6 +89,9 @@ fn build_by_output_type(
                             .parameters
                             .first()
                             .is_some_and(|p| p == "substring");
+                    // Comparison operators: merge string/number overloads into one
+                    // with `any`-typed params (like == / !=).
+                    let skip = skip || matches!(expr_key.as_str(), "<" | "<=" | ">" | ">=");
                     if !skip {
                         def.syntax.overloads.push(mir_overload.clone());
                     }
@@ -112,6 +115,15 @@ fn build_by_output_type(
                         group: syntax_enum.group.clone(),
                     }
                 });
+        }
+    }
+
+    // Merge comparison overloads: rename params to input_1/input_2 with `any` type.
+    if let Some(boolean_group) = by_output_type.get_mut("Boolean") {
+        for (expr_key, def) in &mut boolean_group.variants {
+            if matches!(expr_key.as_str(), "<" | "<=" | ">" | ">=") {
+                MirSyntax::merge_comparison_overloads(expr_key, &mut def.syntax);
+            }
         }
     }
 

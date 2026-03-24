@@ -6,7 +6,6 @@ use crate::{array_prop, boolean_prop, color_prop, formatted_prop, numeric_prop, 
 
 /// An expression node or a literal JSON value in expression positions.
 #[derive(PartialEq, Debug, Clone)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum ExprOrLiteral {
     Null,
     Bool(bool),
@@ -134,6 +133,89 @@ impl<'de> serde::Deserialize<'de> for ExprOrLiteral {
     }
 }
 
+impl ExprOrLiteral {
+    /// Collapse expression-wrapping-literal into the canonical literal variant.
+    ///
+    /// Expression enums (`Boolean`, `Number`, `String`, `Color`) have `Literal` and
+    /// `AnyExpr` variants for top-level use (e.g. filter position). When boxed inside
+    /// `ExprOrLiteral`, those overlap with `Bool`, `NumberLiteral`, `StringLiteral`,
+    /// and `AnyExpr`. This method normalises to the canonical form.
+    #[must_use]
+    pub fn normalize(self) -> Self {
+        match self {
+            ExprOrLiteral::BooleanExpr(b) => match *b {
+                Boolean::Literal(v) => ExprOrLiteral::Bool(v),
+                Boolean::AnyExpr(a) => ExprOrLiteral::AnyExpr(a),
+                other => ExprOrLiteral::BooleanExpr(Box::new(other)),
+            },
+            ExprOrLiteral::NumberExpr(n) => match *n {
+                Number::Literal(v) => ExprOrLiteral::NumberLiteral(v),
+                Number::AnyExpr(a) => ExprOrLiteral::AnyExpr(a),
+                other => ExprOrLiteral::NumberExpr(Box::new(other)),
+            },
+            ExprOrLiteral::StringExpr(s) => match *s {
+                String::Literal(v) => ExprOrLiteral::StringLiteral(v),
+                String::AnyExpr(a) => ExprOrLiteral::AnyExpr(a),
+                other => ExprOrLiteral::StringExpr(Box::new(other)),
+            },
+            ExprOrLiteral::ColorExpr(c) => match *c {
+                Color::Literal(v) => ExprOrLiteral::StringLiteral(v),
+                Color::AnyExpr(a) => ExprOrLiteral::AnyExpr(a),
+                other => ExprOrLiteral::ColorExpr(Box::new(other)),
+            },
+            ExprOrLiteral::ArrayExpr(a) => match *a {
+                Array::Literal(v) => ExprOrLiteral::JSONArrayLiteral(v),
+                other => ExprOrLiteral::ArrayExpr(Box::new(other)),
+            },
+            ExprOrLiteral::ObjectExpr(o) => match *o {
+                Object::Literal(v) => ExprOrLiteral::JSONObjectLiteral(v),
+                other => ExprOrLiteral::ObjectExpr(Box::new(other)),
+            },
+            // JSONObjectLiteral/JSONArrayLiteral can wrap any serde_json::Value;
+            // normalise primitive contents to the matching literal variant.
+            ExprOrLiteral::JSONObjectLiteral(JSONObjectLiteral(v)) => match v {
+                serde_json::Value::Null => ExprOrLiteral::Null,
+                serde_json::Value::Bool(b) => ExprOrLiteral::Bool(b),
+                serde_json::Value::Number(n) => {
+                    ExprOrLiteral::NumberLiteral(NumberLiteral::from(n))
+                }
+                serde_json::Value::String(s) => {
+                    ExprOrLiteral::StringLiteral(StringLiteral::from(s))
+                }
+                other => ExprOrLiteral::JSONObjectLiteral(JSONObjectLiteral(other)),
+            },
+            other => other,
+        }
+    }
+}
+
+#[cfg(feature = "fuzz")]
+impl<'a> arbitrary::Arbitrary<'a> for ExprOrLiteral {
+    fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
+        let tag: u8 = u.arbitrary()?;
+        Ok(match tag % 17 {
+            0 => ExprOrLiteral::Null,
+            1 => ExprOrLiteral::Bool(u.arbitrary()?),
+            2 => ExprOrLiteral::NumberLiteral(u.arbitrary()?),
+            3 => ExprOrLiteral::StringLiteral(u.arbitrary()?),
+            4 => ExprOrLiteral::GeoJSONObjectLiteral(u.arbitrary()?),
+            5 => ExprOrLiteral::JSONObjectLiteral(u.arbitrary()?),
+            6 => ExprOrLiteral::JSONArrayLiteral(u.arbitrary()?),
+            7 => ExprOrLiteral::AnyExpr(u.arbitrary()?),
+            8 => ExprOrLiteral::ArrayExpr(u.arbitrary()?),
+            9 => ExprOrLiteral::BooleanExpr(u.arbitrary()?),
+            10 => ExprOrLiteral::CollatorExpr(u.arbitrary()?),
+            11 => ExprOrLiteral::ColorExpr(u.arbitrary()?),
+            12 => ExprOrLiteral::FormattedExpr(u.arbitrary()?),
+            13 => ExprOrLiteral::ImageExpr(u.arbitrary()?),
+            14 => ExprOrLiteral::NumberExpr(u.arbitrary()?),
+            15 => ExprOrLiteral::ObjectExpr(u.arbitrary()?),
+            _ => ExprOrLiteral::StringExpr(u.arbitrary()?),
+        }
+        .normalize())
+    }
+}
+
 /// Either of the below variants
 #[derive(PartialEq, Debug, Clone)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
@@ -204,25 +286,25 @@ Accumulated,
 /// Retrieves an item from an array.
 At(Box<Number>, ExprOrLiteral),
 /// Selects the first output whose corresponding test condition evaluates to true, or the fallback value otherwise.
-///
+/// 
 ///  - [Create a hover effect](https://maplibre.org/maplibre-gl-js/docs/examples/create-a-hover-effect/)
-///
+/// 
 ///  - [Display HTML clusters with custom properties](https://maplibre.org/maplibre-gl-js/docs/examples/display-html-clusters-with-custom-properties/)
 Case((Vec<(Box<Boolean>,ExprOrLiteral)>,ExprOrLiteral)),
 /// Evaluates each expression in turn until the first non-null value is obtained, and returns that value.
-///
+/// 
 ///  - [Use a fallback image](https://maplibre.org/maplibre-gl-js/docs/examples/use-a-fallback-image/)
 Coalesce(Vec<ExprOrLiteral>),
 /// Retrieves a property value from the current feature's state. Returns null if the requested property is not present on the feature's state. A feature's state is not part of the GeoJSON or vector tile data, and must be set programmatically on each feature. When `source.promoteId` is not provided, features are identified by their `id` attribute, which must be an integer or a string that can be cast to an integer. When `source.promoteId` is provided, features are identified by their `promoteId` property, which may be a number, string, or any primitive data type. Note that ["feature-state"] can only be used with paint properties that support data-driven styling.
-///
+/// 
 ///  - [Create a hover effect](https://maplibre.org/maplibre-gl-js/docs/examples/create-a-hover-effect/)
 FeatureState(Box<String>),
 /// Retrieves a property value from the current feature's properties, or from another object if a second argument is provided. Returns null if the requested property is missing.
-///
+/// 
 ///  - [Change the case of labels](https://maplibre.org/maplibre-gl-js/docs/examples/change-case-of-labels/)
-///
+/// 
 ///  - [Display HTML clusters with custom properties](https://maplibre.org/maplibre-gl-js/docs/examples/display-html-clusters-with-custom-properties/)
-///
+/// 
 ///  - [Extrude polygons for 3D indoor mapping](https://maplibre.org/maplibre-gl-js/docs/examples/extrude-polygons-for-3d-indoor-mapping/)
 Get(Box<String>, Option<Box<Object>>),
 /// Retrieves a property value from global state that can be set with platform-specific APIs. Defaults can be provided using the [`state`](https://maplibre.org/maplibre-style-spec/root/#state) root property. Returns `null` if no value nor default value is set for the retrieved property.
@@ -230,25 +312,25 @@ GlobalState(StringLiteral),
 /// Gets the feature's id, if it has one.
 Id,
 /// Binds expressions to named variables, which can then be referenced in the result expression using `["var", "variable_name"]`.
-///
+/// 
 ///  - [Visualize population density](https://maplibre.org/maplibre-gl-js/docs/examples/visualize-population-density/)
 Let((Vec<(StringLiteral,ExprOrLiteral)>,ExprOrLiteral)),
 /// Selects the output whose label value matches the input value, or the fallback value if no match is found. The input can be any expression (e.g. `["get", "building_type"]`). Each label must be either:
-///
+/// 
 ///  - a single literal value; or
-///
+/// 
 ///  - an array of literal values, whose values must be all strings or all numbers (e.g. `[100, 101]` or `["c", "b"]`). The input matches if any of the values in the array matches, similar to the `"in"` operator.
-///
+/// 
 /// Each label must be unique. If the input type does not match the type of the labels, the result will be the fallback value.
 Match((ExprOrLiteral, Vec<(StringLiteralOrNumberLiteralOrArrayOfStringLiteralOrArrayOfNumberLiteralOrAnyAsUnion,ExprOrLiteral)>, ExprOrLiteral)),
 /// Produces discrete, stepped results by evaluating a piecewise-constant function defined by pairs of input and output values ("stops"). The `input` may be any numeric expression (e.g., `["get", "population"]`). Stop inputs must be numeric literals in strictly ascending order.
-///
+/// 
 /// Returns the output value of the stop just less than the input, or the first output if the input is less than the first stop.
-///
+/// 
 ///  - [Create and style clusters](https://maplibre.org/maplibre-gl-js/docs/examples/create-and-style-clusters/)
 Step((Box<Number>,ExprOrLiteral,Vec<(NumberLiteral,ExprOrLiteral)>)),
 /// References variable bound using `let`.
-///
+/// 
 ///  - [Visualize population density](https://maplibre.org/maplibre-gl-js/docs/examples/visualize-population-density/)
 Var(StringLiteral),
 }
@@ -1183,9 +1265,9 @@ pub enum Boolean {
     /// Returns `true` if the first input is strictly less than the second, `false` otherwise. The arguments are required to be either both strings or both numbers; if during evaluation they are not, expression evaluation produces an error. Cases where this constraint is known not to hold at parse time are considered in valid and will produce a parse error. Accepts an optional `collator` argument to control locale-dependent string comparisons.
     ///
     ///  - [Display HTML clusters with custom properties](https://maplibre.org/maplibre-gl-js/docs/examples/display-html-clusters-with-custom-properties/)
-    Less(LessOptions),
+    Less(ExprOrLiteral, ExprOrLiteral, Option<Collator>),
     /// Returns `true` if the first input is less than or equal to the second, `false` otherwise. The arguments are required to be either both strings or both numbers; if during evaluation they are not, expression evaluation produces an error. Cases where this constraint is known not to hold at parse time are considered in valid and will produce a parse error. Accepts an optional `collator` argument to control locale-dependent string comparisons.
-    LessEqual(LessEqualOptions),
+    LessEqual(ExprOrLiteral, ExprOrLiteral, Option<Collator>),
     /// Returns `true` if the input values are equal, `false` otherwise. The comparison is strictly typed: values of different runtime types are always considered unequal. Cases where the types are known to be different at parse time are considered invalid and will produce a parse error. Accepts an optional `collator` argument to control locale-dependent string comparisons.
     ///
     ///  - [Add multiple geometries from one GeoJSON source](https://maplibre.org/maplibre-gl-js/docs/examples/multiple-geometries/)
@@ -1197,11 +1279,11 @@ pub enum Boolean {
     ///  - [Filter symbols by toggling a list](https://maplibre.org/maplibre-gl-js/docs/examples/filter-symbols-by-toggling-a-list/)
     EqualEqual(ExprOrLiteral, ExprOrLiteral, Option<Collator>),
     /// Returns `true` if the first input is strictly greater than the second, `false` otherwise. The arguments are required to be either both strings or both numbers; if during evaluation they are not, expression evaluation produces an error. Cases where this constraint is known not to hold at parse time are considered in valid and will produce a parse error. Accepts an optional `collator` argument to control locale-dependent string comparisons.
-    Greater(GreaterOptions),
+    Greater(ExprOrLiteral, ExprOrLiteral, Option<Collator>),
     /// Returns `true` if the first input is greater than or equal to the second, `false` otherwise. The arguments are required to be either both strings or both numbers; if during evaluation they are not, expression evaluation produces an error. Cases where this constraint is known not to hold at parse time are considered in valid and will produce a parse error. Accepts an optional `collator` argument to control locale-dependent string comparisons.
     ///
     ///  - [Display HTML clusters with custom properties](https://maplibre.org/maplibre-gl-js/docs/examples/display-html-clusters-with-custom-properties/)
-    GreaterEqual(GreaterEqualOptions),
+    GreaterEqual(ExprOrLiteral, ExprOrLiteral, Option<Collator>),
     /// Returns `true` if all the inputs are `true`, `false` otherwise. The inputs are evaluated in order, and evaluation is short-circuiting: once an input expression evaluates to `false`, the result is `false` and no further input expressions are evaluated.
     ///
     ///  - [Display HTML clusters with custom properties](https://maplibre.org/maplibre-gl-js/docs/examples/display-html-clusters-with-custom-properties/)
@@ -1234,62 +1316,6 @@ pub enum Boolean {
     Literal(bool),
     /// A polymorphic expression (`case`, `match`, `get`, …) in a boolean position.
     AnyExpr(Box<Any>),
-}
-
-/// Options for deserializing the syntax enum variant [`Boolean::Less`]
-#[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-#[serde(untagged)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum LessOptions {
-    Args(
-        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
-        serde_json::Value,
-        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
-        serde_json::Value,
-        #[serde(default)] Option<Collator>,
-    ),
-}
-
-/// Options for deserializing the syntax enum variant [`Boolean::LessEqual`]
-#[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-#[serde(untagged)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum LessEqualOptions {
-    Args(
-        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
-        serde_json::Value,
-        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
-        serde_json::Value,
-        #[serde(default)] Option<Collator>,
-    ),
-}
-
-/// Options for deserializing the syntax enum variant [`Boolean::Greater`]
-#[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-#[serde(untagged)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum GreaterOptions {
-    Args(
-        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
-        serde_json::Value,
-        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
-        serde_json::Value,
-        #[serde(default)] Option<Collator>,
-    ),
-}
-
-/// Options for deserializing the syntax enum variant [`Boolean::GreaterEqual`]
-#[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
-#[serde(untagged)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum GreaterEqualOptions {
-    Args(
-        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
-        serde_json::Value,
-        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
-        serde_json::Value,
-        #[serde(default)] Option<Collator>,
-    ),
 }
 
 impl<'de> serde::Deserialize<'de> for Boolean {
@@ -1332,6 +1358,23 @@ impl<'de> serde::de::Visitor<'de> for BooleanVisitor {
             .next_element()?
             .ok_or_else(|| serde::de::Error::custom("missing operator"))?;
         match op.as_str() {
+            "literal" => {
+                let v: serde_json::Value = seq
+                    .next_element()?
+                    .ok_or_else(|| serde::de::Error::missing_field("value"))?;
+                if let Some(b) = v.as_bool() {
+                    return Ok(Boolean::Literal(b));
+                }
+                // Not a boolean — reconstruct as ["literal", v] and parse as AnyExpr.
+                let mut elems = vec![serde_json::Value::String("literal".into()), v];
+                while let Some(e) = seq.next_element::<serde_json::Value>()? {
+                    elems.push(e);
+                }
+                let arr = serde_json::Value::Array(elems);
+                let any_expr =
+                    serde_json::from_value::<Any>(arr).map_err(serde::de::Error::custom)?;
+                Ok(Boolean::AnyExpr(Box::new(any_expr)))
+            }
             "!" => {
                 let input = visit_seq_field(&mut seq, "input")?;
                 Ok(Boolean::Not(input))
@@ -1343,18 +1386,16 @@ impl<'de> serde::de::Visitor<'de> for BooleanVisitor {
                 Ok(Boolean::NotEqual(input_1, input_2, collator))
             }
             "<" => {
-                // Delegate the remainder of the sequence to LessOptions deserialization
-                let remainder_of_sequence = serde::de::value::SeqAccessDeserializer::new(seq);
-                let options =
-                    <LessOptions as serde::Deserialize>::deserialize(remainder_of_sequence)?;
-                Ok(Boolean::Less(options))
+                let input_1 = visit_seq_field(&mut seq, "input_1")?;
+                let input_2 = visit_seq_field(&mut seq, "input_2")?;
+                let collator = seq.next_element()?;
+                Ok(Boolean::Less(input_1, input_2, collator))
             }
             "<=" => {
-                // Delegate the remainder of the sequence to LessEqualOptions deserialization
-                let remainder_of_sequence = serde::de::value::SeqAccessDeserializer::new(seq);
-                let options =
-                    <LessEqualOptions as serde::Deserialize>::deserialize(remainder_of_sequence)?;
-                Ok(Boolean::LessEqual(options))
+                let input_1 = visit_seq_field(&mut seq, "input_1")?;
+                let input_2 = visit_seq_field(&mut seq, "input_2")?;
+                let collator = seq.next_element()?;
+                Ok(Boolean::LessEqual(input_1, input_2, collator))
             }
             "==" => {
                 let input_1 = visit_seq_field(&mut seq, "input_1")?;
@@ -1363,19 +1404,16 @@ impl<'de> serde::de::Visitor<'de> for BooleanVisitor {
                 Ok(Boolean::EqualEqual(input_1, input_2, collator))
             }
             ">" => {
-                // Delegate the remainder of the sequence to GreaterOptions deserialization
-                let remainder_of_sequence = serde::de::value::SeqAccessDeserializer::new(seq);
-                let options =
-                    <GreaterOptions as serde::Deserialize>::deserialize(remainder_of_sequence)?;
-                Ok(Boolean::Greater(options))
+                let input_1 = visit_seq_field(&mut seq, "input_1")?;
+                let input_2 = visit_seq_field(&mut seq, "input_2")?;
+                let collator = seq.next_element()?;
+                Ok(Boolean::Greater(input_1, input_2, collator))
             }
             ">=" => {
-                // Delegate the remainder of the sequence to GreaterEqualOptions deserialization
-                let remainder_of_sequence = serde::de::value::SeqAccessDeserializer::new(seq);
-                let options = <GreaterEqualOptions as serde::Deserialize>::deserialize(
-                    remainder_of_sequence,
-                )?;
-                Ok(Boolean::GreaterEqual(options))
+                let input_1 = visit_seq_field(&mut seq, "input_1")?;
+                let input_2 = visit_seq_field(&mut seq, "input_2")?;
+                let collator = seq.next_element()?;
+                Ok(Boolean::GreaterEqual(input_1, input_2, collator))
             }
             "all" => {
                 let mut inputs = Vec::new();
@@ -1469,35 +1507,35 @@ impl serde::Serialize for Boolean {
                 }
                 seq.end()
             }
-            Boolean::Less(opts) => {
-                let opts_val = serde_json::to_value(opts).map_err(serde::ser::Error::custom)?;
+            Boolean::Less(f0, f1, f2) => {
+                let mut elems = vec![
+                    serde_json::to_value(f0).map_err(serde::ser::Error::custom)?,
+                    serde_json::to_value(f1).map_err(serde::ser::Error::custom)?,
+                    serde_json::to_value(f2).map_err(serde::ser::Error::custom)?,
+                ];
+                while elems.len() > 2 && elems.last().is_some_and(serde_json::Value::is_null) {
+                    elems.pop();
+                }
                 let mut seq = serializer.serialize_seq(None)?;
                 seq.serialize_element("<")?;
-                if let serde_json::Value::Array(mut arr) = opts_val {
-                    while arr.last().is_some_and(serde_json::Value::is_null) {
-                        arr.pop();
-                    }
-                    for elem in &arr {
-                        seq.serialize_element(elem)?;
-                    }
-                } else {
-                    seq.serialize_element(&opts_val)?;
+                for elem in &elems {
+                    seq.serialize_element(elem)?;
                 }
                 seq.end()
             }
-            Boolean::LessEqual(opts) => {
-                let opts_val = serde_json::to_value(opts).map_err(serde::ser::Error::custom)?;
+            Boolean::LessEqual(f0, f1, f2) => {
+                let mut elems = vec![
+                    serde_json::to_value(f0).map_err(serde::ser::Error::custom)?,
+                    serde_json::to_value(f1).map_err(serde::ser::Error::custom)?,
+                    serde_json::to_value(f2).map_err(serde::ser::Error::custom)?,
+                ];
+                while elems.len() > 2 && elems.last().is_some_and(serde_json::Value::is_null) {
+                    elems.pop();
+                }
                 let mut seq = serializer.serialize_seq(None)?;
                 seq.serialize_element("<=")?;
-                if let serde_json::Value::Array(mut arr) = opts_val {
-                    while arr.last().is_some_and(serde_json::Value::is_null) {
-                        arr.pop();
-                    }
-                    for elem in &arr {
-                        seq.serialize_element(elem)?;
-                    }
-                } else {
-                    seq.serialize_element(&opts_val)?;
+                for elem in &elems {
+                    seq.serialize_element(elem)?;
                 }
                 seq.end()
             }
@@ -1517,35 +1555,35 @@ impl serde::Serialize for Boolean {
                 }
                 seq.end()
             }
-            Boolean::Greater(opts) => {
-                let opts_val = serde_json::to_value(opts).map_err(serde::ser::Error::custom)?;
+            Boolean::Greater(f0, f1, f2) => {
+                let mut elems = vec![
+                    serde_json::to_value(f0).map_err(serde::ser::Error::custom)?,
+                    serde_json::to_value(f1).map_err(serde::ser::Error::custom)?,
+                    serde_json::to_value(f2).map_err(serde::ser::Error::custom)?,
+                ];
+                while elems.len() > 2 && elems.last().is_some_and(serde_json::Value::is_null) {
+                    elems.pop();
+                }
                 let mut seq = serializer.serialize_seq(None)?;
                 seq.serialize_element(">")?;
-                if let serde_json::Value::Array(mut arr) = opts_val {
-                    while arr.last().is_some_and(serde_json::Value::is_null) {
-                        arr.pop();
-                    }
-                    for elem in &arr {
-                        seq.serialize_element(elem)?;
-                    }
-                } else {
-                    seq.serialize_element(&opts_val)?;
+                for elem in &elems {
+                    seq.serialize_element(elem)?;
                 }
                 seq.end()
             }
-            Boolean::GreaterEqual(opts) => {
-                let opts_val = serde_json::to_value(opts).map_err(serde::ser::Error::custom)?;
+            Boolean::GreaterEqual(f0, f1, f2) => {
+                let mut elems = vec![
+                    serde_json::to_value(f0).map_err(serde::ser::Error::custom)?,
+                    serde_json::to_value(f1).map_err(serde::ser::Error::custom)?,
+                    serde_json::to_value(f2).map_err(serde::ser::Error::custom)?,
+                ];
+                while elems.len() > 2 && elems.last().is_some_and(serde_json::Value::is_null) {
+                    elems.pop();
+                }
                 let mut seq = serializer.serialize_seq(None)?;
                 seq.serialize_element(">=")?;
-                if let serde_json::Value::Array(mut arr) = opts_val {
-                    while arr.last().is_some_and(serde_json::Value::is_null) {
-                        arr.pop();
-                    }
-                    for elem in &arr {
-                        seq.serialize_element(elem)?;
-                    }
-                } else {
-                    seq.serialize_element(&opts_val)?;
+                for elem in &elems {
+                    seq.serialize_element(elem)?;
                 }
                 seq.end()
             }

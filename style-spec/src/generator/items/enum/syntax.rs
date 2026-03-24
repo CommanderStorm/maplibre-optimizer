@@ -39,8 +39,7 @@ pub(crate) fn ensure_expr_or_literal_type(scope: &mut Scope) {
         .new_enum("ExprOrLiteral")
         .doc("An expression node or a literal JSON value in expression positions.")
         .vis("pub")
-        .derive("PartialEq, Debug, Clone")
-        .attr(fuzz::CFG_DERIVE_ARBITRARY);
+        .derive("PartialEq, Debug, Clone");
 
     // Literals first: we want geojson to win when valid (then object-literal fallback works).
     enu.new_variant("Null");
@@ -192,6 +191,91 @@ pub(crate) fn ensure_expr_or_literal_type(scope: &mut Scope) {
                 skip_when: None,
             },
         ],
+    );
+
+    // Normalization: collapse expression-wrapping-literal into the canonical literal variant.
+    // This prevents structurally-different but semantically-equivalent representations
+    // (e.g. `BooleanExpr(Box::new(Boolean::Literal(false)))` vs `Bool(false)`).
+    scope.raw(
+        r#"
+impl ExprOrLiteral {
+    /// Collapse expression-wrapping-literal into the canonical literal variant.
+    ///
+    /// Expression enums (`Boolean`, `Number`, `String`, `Color`) have `Literal` and
+    /// `AnyExpr` variants for top-level use (e.g. filter position). When boxed inside
+    /// `ExprOrLiteral`, those overlap with `Bool`, `NumberLiteral`, `StringLiteral`,
+    /// and `AnyExpr`. This method normalises to the canonical form.
+    #[must_use]
+    pub fn normalize(self) -> Self {
+        match self {
+            ExprOrLiteral::BooleanExpr(b) => match *b {
+                Boolean::Literal(v) => ExprOrLiteral::Bool(v),
+                Boolean::AnyExpr(a) => ExprOrLiteral::AnyExpr(a),
+                other => ExprOrLiteral::BooleanExpr(Box::new(other)),
+            },
+            ExprOrLiteral::NumberExpr(n) => match *n {
+                Number::Literal(v) => ExprOrLiteral::NumberLiteral(v),
+                Number::AnyExpr(a) => ExprOrLiteral::AnyExpr(a),
+                other => ExprOrLiteral::NumberExpr(Box::new(other)),
+            },
+            ExprOrLiteral::StringExpr(s) => match *s {
+                String::Literal(v) => ExprOrLiteral::StringLiteral(v),
+                String::AnyExpr(a) => ExprOrLiteral::AnyExpr(a),
+                other => ExprOrLiteral::StringExpr(Box::new(other)),
+            },
+            ExprOrLiteral::ColorExpr(c) => match *c {
+                Color::Literal(v) => ExprOrLiteral::StringLiteral(v),
+                Color::AnyExpr(a) => ExprOrLiteral::AnyExpr(a),
+                other => ExprOrLiteral::ColorExpr(Box::new(other)),
+            },
+            ExprOrLiteral::ArrayExpr(a) => match *a {
+                Array::Literal(v) => ExprOrLiteral::JSONArrayLiteral(v),
+                other => ExprOrLiteral::ArrayExpr(Box::new(other)),
+            },
+            ExprOrLiteral::ObjectExpr(o) => match *o {
+                Object::Literal(v) => ExprOrLiteral::JSONObjectLiteral(v),
+                other => ExprOrLiteral::ObjectExpr(Box::new(other)),
+            },
+            // JSONObjectLiteral/JSONArrayLiteral can wrap any serde_json::Value;
+            // normalise primitive contents to the matching literal variant.
+            ExprOrLiteral::JSONObjectLiteral(JSONObjectLiteral(v)) => match v {
+                serde_json::Value::Null => ExprOrLiteral::Null,
+                serde_json::Value::Bool(b) => ExprOrLiteral::Bool(b),
+                serde_json::Value::Number(n) => ExprOrLiteral::NumberLiteral(NumberLiteral::from(n)),
+                serde_json::Value::String(s) => ExprOrLiteral::StringLiteral(StringLiteral::from(s)),
+                other => ExprOrLiteral::JSONObjectLiteral(JSONObjectLiteral(other)),
+            },
+            other => other,
+        }
+    }
+}
+
+#[cfg(feature = "fuzz")]
+impl<'a> arbitrary::Arbitrary<'a> for ExprOrLiteral {
+    fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
+        let tag: u8 = u.arbitrary()?;
+        Ok(match tag % 17 {
+            0 => ExprOrLiteral::Null,
+            1 => ExprOrLiteral::Bool(u.arbitrary()?),
+            2 => ExprOrLiteral::NumberLiteral(u.arbitrary()?),
+            3 => ExprOrLiteral::StringLiteral(u.arbitrary()?),
+            4 => ExprOrLiteral::GeoJSONObjectLiteral(u.arbitrary()?),
+            5 => ExprOrLiteral::JSONObjectLiteral(u.arbitrary()?),
+            6 => ExprOrLiteral::JSONArrayLiteral(u.arbitrary()?),
+            7 => ExprOrLiteral::AnyExpr(u.arbitrary()?),
+            8 => ExprOrLiteral::ArrayExpr(u.arbitrary()?),
+            9 => ExprOrLiteral::BooleanExpr(u.arbitrary()?),
+            10 => ExprOrLiteral::CollatorExpr(u.arbitrary()?),
+            11 => ExprOrLiteral::ColorExpr(u.arbitrary()?),
+            12 => ExprOrLiteral::FormattedExpr(u.arbitrary()?),
+            13 => ExprOrLiteral::ImageExpr(u.arbitrary()?),
+            14 => ExprOrLiteral::NumberExpr(u.arbitrary()?),
+            15 => ExprOrLiteral::ObjectExpr(u.arbitrary()?),
+            _ => ExprOrLiteral::StringExpr(u.arbitrary()?),
+        }.normalize())
+    }
+}
+"#,
     );
 }
 
@@ -786,9 +870,11 @@ fn generate_syntax_enum_body(
                 } else if name == "String" && key == "resolved-locale" && param == "collator" {
                     // `resolved-locale` takes a `collator` expression.
                     "Collator".to_string()
-                } else if name == "Boolean" && (key == "==" || key == "!=") && param == "collator?"
+                } else if name == "Boolean"
+                    && matches!(key.as_str(), "==" | "!=" | "<" | "<=" | ">" | ">=")
+                    && param == "collator?"
                 {
-                    // Equality operators inline `collator?` as an optional third argument.
+                    // Comparison operators inline `collator?` as an optional third argument.
                     "Option<Collator>".to_string()
                 } else {
                     let rust_ty = generate_parameter_type(
@@ -1549,6 +1635,25 @@ fn generate_syntax_enum_deserializer(
     visit_seq.line("// First element: operator string");
     visit_seq.line("let op: std::string::String = seq.next_element()?.ok_or_else(|| serde::de::Error::custom(\"missing operator\"))?;");
     visit_seq.line("match op.as_str() {");
+    // Boolean: normalise ["literal", true/false] to Literal(bool) for filter compatibility.
+    // Only intercept when the next element is a bool; other ["literal", ...] forms
+    // (e.g. ["literal", [1,2,3]]) must fall through to the AnyExpr catch-all.
+    if name == "Boolean" {
+        visit_seq.line(r#""literal" => {"#);
+        visit_seq.line("let v: serde_json::Value = seq.next_element()?.ok_or_else(|| serde::de::Error::missing_field(\"value\"))?;");
+        visit_seq.line("if let Some(b) = v.as_bool() { return Ok(Boolean::Literal(b)); }");
+        visit_seq.line("// Not a boolean — reconstruct as [\"literal\", v] and parse as AnyExpr.");
+        visit_seq.line("let mut elems = vec![serde_json::Value::String(\"literal\".into()), v];");
+        visit_seq.line(
+            "while let Some(e) = seq.next_element::<serde_json::Value>()? { elems.push(e); }",
+        );
+        visit_seq.line("let arr = serde_json::Value::Array(elems);");
+        visit_seq.line(
+            "let any_expr = serde_json::from_value::<Any>(arr).map_err(serde::de::Error::custom)?;",
+        );
+        visit_seq.line("Ok(Boolean::AnyExpr(Box::new(any_expr)))");
+        visit_seq.line("},");
+    }
     for (key, syntax_docs) in values {
         let syntax = &syntax_docs.syntax;
         let variant_name = normalized_syntax_variant_ident(name, key);

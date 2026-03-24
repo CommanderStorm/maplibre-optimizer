@@ -3,7 +3,7 @@
 use std::collections::HashSet;
 
 use maplibre_style_spec::spec::{
-    AnyLayer, LayerFilter, MaplibreStyleSpecification, RootBearing, RootPitch, RootRoll, RootState,
+    AnyLayer, Boolean, MaplibreStyleSpecification, RootBearing, RootPitch, RootRoll, RootState,
     RootTransition, Transition, TransitionDelay, TransitionDuration, TypedLayer, Visibility,
 };
 
@@ -69,7 +69,7 @@ fn strip_true_filters(style: &mut MaplibreStyleSpecification) {
             AnyLayer::Typed(t) => &mut t.common_mut().filter,
             AnyLayer::Ref(r) => &mut r.filter,
         };
-        if filter.as_ref().is_some_and(LayerFilter::is_always_true) {
+        if filter.as_ref().is_some_and(Boolean::is_always_true) {
             *filter = None;
         }
     }

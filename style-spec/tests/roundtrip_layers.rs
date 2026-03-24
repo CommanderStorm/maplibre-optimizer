@@ -119,7 +119,7 @@ fn filter_value_access() {
     if let AnyLayer::Typed(ref t) = layer {
         let filter = t.common().filter.as_ref().unwrap();
         // ["==", 1, 1] is an expression, not a literal bool.
-        assert!(filter.as_boolean().is_some());
+        assert!(matches!(filter, Boolean::EqualEqual(..)));
     }
 }
 
@@ -166,5 +166,108 @@ fn filter_literal_bool() {
     if let AnyLayer::Typed(ref t) = layer {
         let filter = t.common().filter.as_ref().unwrap();
         assert!(filter.is_always_true());
+    }
+}
+
+#[test]
+fn expr_or_literal_normalize() {
+    // BooleanExpr(Literal(x)) → Bool(x)
+    let eol = ExprOrLiteral::BooleanExpr(Box::new(Boolean::Literal(false)));
+    let json = serde_json::to_value(&eol).unwrap();
+    assert!(matches!(eol.normalize(), ExprOrLiteral::Bool(false)));
+
+    // JSON round-trip normalizes too
+    assert_eq!(json, serde_json::json!(false));
+    let back: ExprOrLiteral = serde_json::from_value(json).unwrap();
+    assert!(matches!(back, ExprOrLiteral::Bool(false)));
+}
+
+#[test]
+fn filter_roundtrip_normalizes_expr_or_literal() {
+    // Construct a filter with an unnormalized ExprOrLiteral deep inside
+    let filter = Boolean::EqualEqual(
+        ExprOrLiteral::BooleanExpr(Box::new(Boolean::Literal(true))),
+        ExprOrLiteral::StringLiteral(StringLiteral::from("x".to_string())),
+        None,
+    );
+    let json = serde_json::to_value(&filter).unwrap();
+    let back: Boolean = serde_json::from_value(json).unwrap();
+    // After round-trip, BooleanExpr(Literal(true)) should become Bool(true)
+    if let Boolean::EqualEqual(ref lhs, _, _) = back {
+        assert!(
+            matches!(lhs, ExprOrLiteral::Bool(true)),
+            "Expected Bool(true), got {lhs:?}"
+        );
+    } else {
+        panic!("Expected EqualEqual");
+    }
+}
+
+#[test]
+fn deep_expr_or_literal_roundtrip_normalizes() {
+    // BooleanExpr(Literal(true)) deep inside a filter should normalize on JSON round-trip.
+    let filter = Boolean::In(
+        ExprOrLiteral::Bool(false),
+        ExprOrLiteral::BooleanExpr(Box::new(Boolean::Not(Box::new(Boolean::EqualEqual(
+            ExprOrLiteral::BooleanExpr(Box::new(Boolean::Literal(true))),
+            ExprOrLiteral::StringLiteral(StringLiteral::from("x".to_string())),
+            None,
+        ))))),
+    );
+    let json = serde_json::to_value(&filter).unwrap();
+    let back: Boolean = serde_json::from_value(json).unwrap();
+    // Dig into the result: In → BooleanExpr → Not → EqualEqual → first arg
+    if let Boolean::In(_, ref rhs) = back
+        && let ExprOrLiteral::BooleanExpr(b) = rhs
+        && let Boolean::Not(inner) = &**b
+        && let Boolean::EqualEqual(lhs, _, _) = &**inner
+    {
+        assert!(
+            matches!(lhs, ExprOrLiteral::Bool(true)),
+            "Deep ExprOrLiteral should normalize, got {lhs:?}"
+        );
+        return;
+    }
+    panic!("unexpected filter structure: {back:?}");
+}
+
+#[test]
+fn filter_after_fold_deserializes_normalized() {
+    // After expression passes fold ["all"] → true, the JSON becomes ["!=", ["collator", {}], true].
+    // This should deserialize with Bool(true), not BooleanExpr(Literal(true)).
+    let json = serde_json::json!(["!=", ["collator", {}], true]);
+    let filter: Boolean = serde_json::from_value(json).unwrap();
+    if let Boolean::NotEqual(_, ref rhs, _) = filter {
+        assert!(
+            matches!(rhs, ExprOrLiteral::Bool(true)),
+            "Expected Bool(true) from bare JSON true, got {rhs:?}"
+        );
+    } else {
+        panic!("Expected NotEqual, got {filter:?}");
+    }
+}
+
+#[test]
+fn filter_with_boolean_all_empty_roundtrips() {
+    // BooleanExpr(All([])) should roundtrip through JSON and Boolean deserialization
+    let filter = Boolean::NotEqual(
+        ExprOrLiteral::Null,
+        ExprOrLiteral::BooleanExpr(Box::new(Boolean::All(vec![]))),
+        None,
+    );
+    let json = serde_json::to_value(&filter).unwrap();
+    eprintln!("JSON: {json}");
+    let back: Boolean = serde_json::from_value(json).unwrap();
+    eprintln!("Back: {back:?}");
+    // The All([]) should survive the roundtrip as BooleanExpr(All([]))
+    if let Boolean::NotEqual(_, ref rhs, _) = back {
+        eprintln!("RHS: {rhs:?}");
+        // BooleanExpr(All([])) serializes as ["all"], which is an array
+        // On deserialization, ExprOrLiteral tries Bool first (fails for array),
+        // then eventually tries BooleanExpr which succeeds.
+        assert!(
+            matches!(rhs, ExprOrLiteral::BooleanExpr(_)),
+            "Expected BooleanExpr, got {rhs:?}"
+        );
     }
 }

@@ -42,7 +42,7 @@ pub struct GeoJSONObjectLiteral(
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct JSONObjectLiteral(
     #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
-    serde_json::Value,
+    pub  serde_json::Value,
 );
 
 /// JSON array literal
@@ -50,7 +50,7 @@ pub struct JSONObjectLiteral(
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct JSONArrayLiteral(
     #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_vec_json_value))]
-    Vec<serde_json::Value>,
+    pub Vec<serde_json::Value>,
 );
 
 /// Array whose elements are string literals (e.g. match labels)

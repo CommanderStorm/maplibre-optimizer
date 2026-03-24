@@ -45,21 +45,26 @@ pub fn generate_literals(scope: &mut Scope) {
         .attr(fuzz::CFG_DERIVE_ARBITRARY)
         .tuple_field_with_attrs([fuzz::ARB_GEOJSON], "geojson::GeoJson");
 
-    scope
-        .new_struct("JSONObjectLiteral")
-        .vis("pub")
-        .doc("JSON object literal")
-        .derive("serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone")
-        .attr(fuzz::CFG_DERIVE_ARBITRARY)
-        .tuple_field_with_attrs([fuzz::ARB_JSON_VALUE], "serde_json::Value");
+    // JSONObjectLiteral and JSONArrayLiteral have pub fields so that
+    // ExprOrLiteral::normalize() can destructure and reconstruct them.
+    scope.raw(
+        r#"/// JSON object literal
+#[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+pub struct JSONObjectLiteral(
+    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
+    pub serde_json::Value,
+);
 
-    scope
-        .new_struct("JSONArrayLiteral")
-        .vis("pub")
-        .doc("JSON array literal")
-        .derive("serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone")
-        .attr(fuzz::CFG_DERIVE_ARBITRARY)
-        .tuple_field_with_attrs([fuzz::ARB_VEC_JSON_VALUE], "Vec<serde_json::Value>");
+/// JSON array literal
+#[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+pub struct JSONArrayLiteral(
+    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_vec_json_value))]
+    pub Vec<serde_json::Value>,
+);
+"#,
+    );
 
     scope
         .new_struct("ArrayOfStringLiteral")

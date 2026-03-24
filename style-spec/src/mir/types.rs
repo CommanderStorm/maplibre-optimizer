@@ -314,6 +314,7 @@ impl MirSyntax {
         let mut mir = MirSyntax::from(syntax);
         Self::patch_expression_parameters(operator, &mut mir.parameters);
         Self::patch_overloads(operator, &mut mir.overloads);
+        Self::merge_comparison_overloads(operator, &mut mir);
         mir
     }
 
@@ -327,6 +328,35 @@ impl MirSyntax {
             // second overload and let `Item(ExprOrLiteral, ExprOrLiteral)` cover all uses.
             overloads.retain(|o| o.parameters.first().is_none_or(|p| p != "substring"));
         }
+    }
+
+    /// Merge `<` / `<=` / `>` / `>=` from two overloads (string, number) into one
+    /// with `any`-typed parameters, matching `==` / `!=`. This makes the codegen
+    /// emit inline `ExprOrLiteral` arguments instead of `*Options` wrapper enums.
+    pub fn merge_comparison_overloads(operator: &str, syntax: &mut Self) {
+        if !matches!(operator, "<" | "<=" | ">" | ">=") {
+            return;
+        }
+        // Keep only the first overload; rename its params to input_1, input_2.
+        syntax.overloads.truncate(1);
+        for param in &mut syntax.overloads[0].parameters {
+            if param.starts_with("string_") || param.starts_with("number_") {
+                let suffix = param.rsplit('_').next().unwrap().to_string();
+                *param = format!("input_{suffix}");
+            }
+        }
+        // Add parameter definitions for input_1, input_2 with type `any`
+        // (which generates as `ExprOrLiteral`).
+        syntax.parameters.push(MirParameter {
+            name: "input_1".to_string(),
+            r#type: MirParameterType::Expression(Box::new(MirExpression::Any)),
+            doc: None,
+        });
+        syntax.parameters.push(MirParameter {
+            name: "input_2".to_string(),
+            r#type: MirParameterType::Expression(Box::new(MirExpression::Any)),
+            doc: None,
+        });
     }
 }
 

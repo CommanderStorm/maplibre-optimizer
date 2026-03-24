@@ -365,7 +365,7 @@ mod tests {
         #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
         pub struct JSONObjectLiteral(
             #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
-            serde_json::Value,
+            pub  serde_json::Value,
         );
 
         /// JSON array literal
@@ -373,7 +373,7 @@ mod tests {
         #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
         pub struct JSONArrayLiteral(
             #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_vec_json_value))]
-            Vec<serde_json::Value>,
+            pub Vec<serde_json::Value>,
         );
 
         /// Array whose elements are string literals (e.g. match labels)
@@ -410,7 +410,6 @@ mod tests {
 
         /// An expression node or a literal JSON value in expression positions.
         #[derive(PartialEq, Debug, Clone)]
-        #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
         pub enum ExprOrLiteral {
             Null,
             Bool(bool),
@@ -535,6 +534,89 @@ mod tests {
                     "ExprOrLiteral: no variant matched. Expected Null | Bool(bool) | NumberLiteral(NumberLiteral) | StringLiteral(StringLiteral) | GeoJSONObjectLiteral(GeoJSONObjectLiteral) | JSONObjectLiteral(JSONObjectLiteral) | AnyExpr(Any) | ArrayExpr(Array) | BooleanExpr(Boolean) | CollatorExpr(Collator) | ColorExpr(Color) | FormattedExpr(Formatted) | ImageExpr(Image) | NumberExpr(Number) | ObjectExpr(Object) | StringExpr(String) | JSONArrayLiteral(JSONArrayLiteral). Errors: [{}]",
                     details.join("; ")
                 )))
+            }
+        }
+
+        impl ExprOrLiteral {
+            /// Collapse expression-wrapping-literal into the canonical literal variant.
+            ///
+            /// Expression enums (`Boolean`, `Number`, `String`, `Color`) have `Literal` and
+            /// `AnyExpr` variants for top-level use (e.g. filter position). When boxed inside
+            /// `ExprOrLiteral`, those overlap with `Bool`, `NumberLiteral`, `StringLiteral`,
+            /// and `AnyExpr`. This method normalises to the canonical form.
+            #[must_use]
+            pub fn normalize(self) -> Self {
+                match self {
+                    ExprOrLiteral::BooleanExpr(b) => match *b {
+                        Boolean::Literal(v) => ExprOrLiteral::Bool(v),
+                        Boolean::AnyExpr(a) => ExprOrLiteral::AnyExpr(a),
+                        other => ExprOrLiteral::BooleanExpr(Box::new(other)),
+                    },
+                    ExprOrLiteral::NumberExpr(n) => match *n {
+                        Number::Literal(v) => ExprOrLiteral::NumberLiteral(v),
+                        Number::AnyExpr(a) => ExprOrLiteral::AnyExpr(a),
+                        other => ExprOrLiteral::NumberExpr(Box::new(other)),
+                    },
+                    ExprOrLiteral::StringExpr(s) => match *s {
+                        String::Literal(v) => ExprOrLiteral::StringLiteral(v),
+                        String::AnyExpr(a) => ExprOrLiteral::AnyExpr(a),
+                        other => ExprOrLiteral::StringExpr(Box::new(other)),
+                    },
+                    ExprOrLiteral::ColorExpr(c) => match *c {
+                        Color::Literal(v) => ExprOrLiteral::StringLiteral(v),
+                        Color::AnyExpr(a) => ExprOrLiteral::AnyExpr(a),
+                        other => ExprOrLiteral::ColorExpr(Box::new(other)),
+                    },
+                    ExprOrLiteral::ArrayExpr(a) => match *a {
+                        Array::Literal(v) => ExprOrLiteral::JSONArrayLiteral(v),
+                        other => ExprOrLiteral::ArrayExpr(Box::new(other)),
+                    },
+                    ExprOrLiteral::ObjectExpr(o) => match *o {
+                        Object::Literal(v) => ExprOrLiteral::JSONObjectLiteral(v),
+                        other => ExprOrLiteral::ObjectExpr(Box::new(other)),
+                    },
+                    // JSONObjectLiteral/JSONArrayLiteral can wrap any serde_json::Value;
+                    // normalise primitive contents to the matching literal variant.
+                    ExprOrLiteral::JSONObjectLiteral(JSONObjectLiteral(v)) => match v {
+                        serde_json::Value::Null => ExprOrLiteral::Null,
+                        serde_json::Value::Bool(b) => ExprOrLiteral::Bool(b),
+                        serde_json::Value::Number(n) => {
+                            ExprOrLiteral::NumberLiteral(NumberLiteral::from(n))
+                        }
+                        serde_json::Value::String(s) => {
+                            ExprOrLiteral::StringLiteral(StringLiteral::from(s))
+                        }
+                        other => ExprOrLiteral::JSONObjectLiteral(JSONObjectLiteral(other)),
+                    },
+                    other => other,
+                }
+            }
+        }
+
+        #[cfg(feature = "fuzz")]
+        impl<'a> arbitrary::Arbitrary<'a> for ExprOrLiteral {
+            fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
+                let tag: u8 = u.arbitrary()?;
+                Ok(match tag % 17 {
+                    0 => ExprOrLiteral::Null,
+                    1 => ExprOrLiteral::Bool(u.arbitrary()?),
+                    2 => ExprOrLiteral::NumberLiteral(u.arbitrary()?),
+                    3 => ExprOrLiteral::StringLiteral(u.arbitrary()?),
+                    4 => ExprOrLiteral::GeoJSONObjectLiteral(u.arbitrary()?),
+                    5 => ExprOrLiteral::JSONObjectLiteral(u.arbitrary()?),
+                    6 => ExprOrLiteral::JSONArrayLiteral(u.arbitrary()?),
+                    7 => ExprOrLiteral::AnyExpr(u.arbitrary()?),
+                    8 => ExprOrLiteral::ArrayExpr(u.arbitrary()?),
+                    9 => ExprOrLiteral::BooleanExpr(u.arbitrary()?),
+                    10 => ExprOrLiteral::CollatorExpr(u.arbitrary()?),
+                    11 => ExprOrLiteral::ColorExpr(u.arbitrary()?),
+                    12 => ExprOrLiteral::FormattedExpr(u.arbitrary()?),
+                    13 => ExprOrLiteral::ImageExpr(u.arbitrary()?),
+                    14 => ExprOrLiteral::NumberExpr(u.arbitrary()?),
+                    15 => ExprOrLiteral::ObjectExpr(u.arbitrary()?),
+                    _ => ExprOrLiteral::StringExpr(u.arbitrary()?),
+                }
+                .normalize())
             }
         }
         "#);
@@ -604,7 +686,7 @@ mod tests {
         #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
         pub struct JSONObjectLiteral(
             #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
-            serde_json::Value,
+            pub  serde_json::Value,
         );
 
         /// JSON array literal
@@ -612,7 +694,7 @@ mod tests {
         #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
         pub struct JSONArrayLiteral(
             #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_vec_json_value))]
-            Vec<serde_json::Value>,
+            pub Vec<serde_json::Value>,
         );
 
         /// Array whose elements are string literals (e.g. match labels)
@@ -648,7 +730,6 @@ mod tests {
 
         /// An expression node or a literal JSON value in expression positions.
         #[derive(PartialEq, Debug, Clone)]
-        #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
         pub enum ExprOrLiteral {
             Null,
             Bool(bool),
@@ -773,6 +854,89 @@ mod tests {
                     "ExprOrLiteral: no variant matched. Expected Null | Bool(bool) | NumberLiteral(NumberLiteral) | StringLiteral(StringLiteral) | GeoJSONObjectLiteral(GeoJSONObjectLiteral) | JSONObjectLiteral(JSONObjectLiteral) | AnyExpr(Any) | ArrayExpr(Array) | BooleanExpr(Boolean) | CollatorExpr(Collator) | ColorExpr(Color) | FormattedExpr(Formatted) | ImageExpr(Image) | NumberExpr(Number) | ObjectExpr(Object) | StringExpr(String) | JSONArrayLiteral(JSONArrayLiteral). Errors: [{}]",
                     details.join("; ")
                 )))
+            }
+        }
+
+        impl ExprOrLiteral {
+            /// Collapse expression-wrapping-literal into the canonical literal variant.
+            ///
+            /// Expression enums (`Boolean`, `Number`, `String`, `Color`) have `Literal` and
+            /// `AnyExpr` variants for top-level use (e.g. filter position). When boxed inside
+            /// `ExprOrLiteral`, those overlap with `Bool`, `NumberLiteral`, `StringLiteral`,
+            /// and `AnyExpr`. This method normalises to the canonical form.
+            #[must_use]
+            pub fn normalize(self) -> Self {
+                match self {
+                    ExprOrLiteral::BooleanExpr(b) => match *b {
+                        Boolean::Literal(v) => ExprOrLiteral::Bool(v),
+                        Boolean::AnyExpr(a) => ExprOrLiteral::AnyExpr(a),
+                        other => ExprOrLiteral::BooleanExpr(Box::new(other)),
+                    },
+                    ExprOrLiteral::NumberExpr(n) => match *n {
+                        Number::Literal(v) => ExprOrLiteral::NumberLiteral(v),
+                        Number::AnyExpr(a) => ExprOrLiteral::AnyExpr(a),
+                        other => ExprOrLiteral::NumberExpr(Box::new(other)),
+                    },
+                    ExprOrLiteral::StringExpr(s) => match *s {
+                        String::Literal(v) => ExprOrLiteral::StringLiteral(v),
+                        String::AnyExpr(a) => ExprOrLiteral::AnyExpr(a),
+                        other => ExprOrLiteral::StringExpr(Box::new(other)),
+                    },
+                    ExprOrLiteral::ColorExpr(c) => match *c {
+                        Color::Literal(v) => ExprOrLiteral::StringLiteral(v),
+                        Color::AnyExpr(a) => ExprOrLiteral::AnyExpr(a),
+                        other => ExprOrLiteral::ColorExpr(Box::new(other)),
+                    },
+                    ExprOrLiteral::ArrayExpr(a) => match *a {
+                        Array::Literal(v) => ExprOrLiteral::JSONArrayLiteral(v),
+                        other => ExprOrLiteral::ArrayExpr(Box::new(other)),
+                    },
+                    ExprOrLiteral::ObjectExpr(o) => match *o {
+                        Object::Literal(v) => ExprOrLiteral::JSONObjectLiteral(v),
+                        other => ExprOrLiteral::ObjectExpr(Box::new(other)),
+                    },
+                    // JSONObjectLiteral/JSONArrayLiteral can wrap any serde_json::Value;
+                    // normalise primitive contents to the matching literal variant.
+                    ExprOrLiteral::JSONObjectLiteral(JSONObjectLiteral(v)) => match v {
+                        serde_json::Value::Null => ExprOrLiteral::Null,
+                        serde_json::Value::Bool(b) => ExprOrLiteral::Bool(b),
+                        serde_json::Value::Number(n) => {
+                            ExprOrLiteral::NumberLiteral(NumberLiteral::from(n))
+                        }
+                        serde_json::Value::String(s) => {
+                            ExprOrLiteral::StringLiteral(StringLiteral::from(s))
+                        }
+                        other => ExprOrLiteral::JSONObjectLiteral(JSONObjectLiteral(other)),
+                    },
+                    other => other,
+                }
+            }
+        }
+
+        #[cfg(feature = "fuzz")]
+        impl<'a> arbitrary::Arbitrary<'a> for ExprOrLiteral {
+            fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
+                let tag: u8 = u.arbitrary()?;
+                Ok(match tag % 17 {
+                    0 => ExprOrLiteral::Null,
+                    1 => ExprOrLiteral::Bool(u.arbitrary()?),
+                    2 => ExprOrLiteral::NumberLiteral(u.arbitrary()?),
+                    3 => ExprOrLiteral::StringLiteral(u.arbitrary()?),
+                    4 => ExprOrLiteral::GeoJSONObjectLiteral(u.arbitrary()?),
+                    5 => ExprOrLiteral::JSONObjectLiteral(u.arbitrary()?),
+                    6 => ExprOrLiteral::JSONArrayLiteral(u.arbitrary()?),
+                    7 => ExprOrLiteral::AnyExpr(u.arbitrary()?),
+                    8 => ExprOrLiteral::ArrayExpr(u.arbitrary()?),
+                    9 => ExprOrLiteral::BooleanExpr(u.arbitrary()?),
+                    10 => ExprOrLiteral::CollatorExpr(u.arbitrary()?),
+                    11 => ExprOrLiteral::ColorExpr(u.arbitrary()?),
+                    12 => ExprOrLiteral::FormattedExpr(u.arbitrary()?),
+                    13 => ExprOrLiteral::ImageExpr(u.arbitrary()?),
+                    14 => ExprOrLiteral::NumberExpr(u.arbitrary()?),
+                    15 => ExprOrLiteral::ObjectExpr(u.arbitrary()?),
+                    _ => ExprOrLiteral::StringExpr(u.arbitrary()?),
+                }
+                .normalize())
             }
         }
         "##);
@@ -831,7 +995,7 @@ mod tests {
         #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
         pub struct JSONObjectLiteral(
             #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
-            serde_json::Value,
+            pub  serde_json::Value,
         );
 
         /// JSON array literal
@@ -839,7 +1003,7 @@ mod tests {
         #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
         pub struct JSONArrayLiteral(
             #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_vec_json_value))]
-            Vec<serde_json::Value>,
+            pub Vec<serde_json::Value>,
         );
 
         /// Array whose elements are string literals (e.g. match labels)
@@ -866,7 +1030,6 @@ mod tests {
 
         /// An expression node or a literal JSON value in expression positions.
         #[derive(PartialEq, Debug, Clone)]
-        #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
         pub enum ExprOrLiteral {
             Null,
             Bool(bool),
@@ -991,6 +1154,89 @@ mod tests {
                     "ExprOrLiteral: no variant matched. Expected Null | Bool(bool) | NumberLiteral(NumberLiteral) | StringLiteral(StringLiteral) | GeoJSONObjectLiteral(GeoJSONObjectLiteral) | JSONObjectLiteral(JSONObjectLiteral) | AnyExpr(Any) | ArrayExpr(Array) | BooleanExpr(Boolean) | CollatorExpr(Collator) | ColorExpr(Color) | FormattedExpr(Formatted) | ImageExpr(Image) | NumberExpr(Number) | ObjectExpr(Object) | StringExpr(String) | JSONArrayLiteral(JSONArrayLiteral). Errors: [{}]",
                     details.join("; ")
                 )))
+            }
+        }
+
+        impl ExprOrLiteral {
+            /// Collapse expression-wrapping-literal into the canonical literal variant.
+            ///
+            /// Expression enums (`Boolean`, `Number`, `String`, `Color`) have `Literal` and
+            /// `AnyExpr` variants for top-level use (e.g. filter position). When boxed inside
+            /// `ExprOrLiteral`, those overlap with `Bool`, `NumberLiteral`, `StringLiteral`,
+            /// and `AnyExpr`. This method normalises to the canonical form.
+            #[must_use]
+            pub fn normalize(self) -> Self {
+                match self {
+                    ExprOrLiteral::BooleanExpr(b) => match *b {
+                        Boolean::Literal(v) => ExprOrLiteral::Bool(v),
+                        Boolean::AnyExpr(a) => ExprOrLiteral::AnyExpr(a),
+                        other => ExprOrLiteral::BooleanExpr(Box::new(other)),
+                    },
+                    ExprOrLiteral::NumberExpr(n) => match *n {
+                        Number::Literal(v) => ExprOrLiteral::NumberLiteral(v),
+                        Number::AnyExpr(a) => ExprOrLiteral::AnyExpr(a),
+                        other => ExprOrLiteral::NumberExpr(Box::new(other)),
+                    },
+                    ExprOrLiteral::StringExpr(s) => match *s {
+                        String::Literal(v) => ExprOrLiteral::StringLiteral(v),
+                        String::AnyExpr(a) => ExprOrLiteral::AnyExpr(a),
+                        other => ExprOrLiteral::StringExpr(Box::new(other)),
+                    },
+                    ExprOrLiteral::ColorExpr(c) => match *c {
+                        Color::Literal(v) => ExprOrLiteral::StringLiteral(v),
+                        Color::AnyExpr(a) => ExprOrLiteral::AnyExpr(a),
+                        other => ExprOrLiteral::ColorExpr(Box::new(other)),
+                    },
+                    ExprOrLiteral::ArrayExpr(a) => match *a {
+                        Array::Literal(v) => ExprOrLiteral::JSONArrayLiteral(v),
+                        other => ExprOrLiteral::ArrayExpr(Box::new(other)),
+                    },
+                    ExprOrLiteral::ObjectExpr(o) => match *o {
+                        Object::Literal(v) => ExprOrLiteral::JSONObjectLiteral(v),
+                        other => ExprOrLiteral::ObjectExpr(Box::new(other)),
+                    },
+                    // JSONObjectLiteral/JSONArrayLiteral can wrap any serde_json::Value;
+                    // normalise primitive contents to the matching literal variant.
+                    ExprOrLiteral::JSONObjectLiteral(JSONObjectLiteral(v)) => match v {
+                        serde_json::Value::Null => ExprOrLiteral::Null,
+                        serde_json::Value::Bool(b) => ExprOrLiteral::Bool(b),
+                        serde_json::Value::Number(n) => {
+                            ExprOrLiteral::NumberLiteral(NumberLiteral::from(n))
+                        }
+                        serde_json::Value::String(s) => {
+                            ExprOrLiteral::StringLiteral(StringLiteral::from(s))
+                        }
+                        other => ExprOrLiteral::JSONObjectLiteral(JSONObjectLiteral(other)),
+                    },
+                    other => other,
+                }
+            }
+        }
+
+        #[cfg(feature = "fuzz")]
+        impl<'a> arbitrary::Arbitrary<'a> for ExprOrLiteral {
+            fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
+                let tag: u8 = u.arbitrary()?;
+                Ok(match tag % 17 {
+                    0 => ExprOrLiteral::Null,
+                    1 => ExprOrLiteral::Bool(u.arbitrary()?),
+                    2 => ExprOrLiteral::NumberLiteral(u.arbitrary()?),
+                    3 => ExprOrLiteral::StringLiteral(u.arbitrary()?),
+                    4 => ExprOrLiteral::GeoJSONObjectLiteral(u.arbitrary()?),
+                    5 => ExprOrLiteral::JSONObjectLiteral(u.arbitrary()?),
+                    6 => ExprOrLiteral::JSONArrayLiteral(u.arbitrary()?),
+                    7 => ExprOrLiteral::AnyExpr(u.arbitrary()?),
+                    8 => ExprOrLiteral::ArrayExpr(u.arbitrary()?),
+                    9 => ExprOrLiteral::BooleanExpr(u.arbitrary()?),
+                    10 => ExprOrLiteral::CollatorExpr(u.arbitrary()?),
+                    11 => ExprOrLiteral::ColorExpr(u.arbitrary()?),
+                    12 => ExprOrLiteral::FormattedExpr(u.arbitrary()?),
+                    13 => ExprOrLiteral::ImageExpr(u.arbitrary()?),
+                    14 => ExprOrLiteral::NumberExpr(u.arbitrary()?),
+                    15 => ExprOrLiteral::ObjectExpr(u.arbitrary()?),
+                    _ => ExprOrLiteral::StringExpr(u.arbitrary()?),
+                }
+                .normalize())
             }
         }
 

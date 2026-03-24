@@ -1,7 +1,7 @@
 //! Metadata refinement pass operating on typed `MaplibreStyleSpecification`.
 
 use maplibre_style_spec::shared_expr::NumericPropInner;
-use maplibre_style_spec::spec::{AnyLayer, LayerFilter, MaplibreStyleSpecification, TypedLayer};
+use maplibre_style_spec::spec::{AnyLayer, Boolean, MaplibreStyleSpecification, TypedLayer};
 
 use super::source_util::VectorLayerInfo;
 use super::zoom::visibility_minzoom_from_value;
@@ -82,7 +82,7 @@ fn refine_typed_layer(
                 adopted_min,
                 adopted_max,
             );
-            if let Some(new_filter) = LayerFilter::from_value(filter_json) {
+            if let Some(new_filter) = Boolean::from_value(filter_json) {
                 *filter = new_filter;
             }
         }

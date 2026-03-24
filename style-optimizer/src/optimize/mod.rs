@@ -32,7 +32,7 @@ use dead::dead_elimination;
 use defaults::StripDefaultsVisitor;
 use expr::{NormalizeFoldVisitor, ReorderSelectivityVisitor};
 use maplibre_style_spec::mir::MirSpec;
-use maplibre_style_spec::spec::{AnyLayer, LayerFilter, MaplibreStyleSpecification};
+use maplibre_style_spec::spec::{AnyLayer, Boolean, MaplibreStyleSpecification};
 use metadata::metadata_refinement;
 use serde_json::Value;
 use source_util::{precompute_vector_layer_info, precompute_vector_layer_info_typed};
@@ -213,7 +213,7 @@ fn sync_filters_from_json(style: &mut MaplibreStyleSpecification, v: &Value) {
             .get("filter")
             .filter(|f| !f.is_null())
             .cloned()
-            .and_then(LayerFilter::from_value);
+            .and_then(Boolean::from_value);
         match typed_layer {
             AnyLayer::Typed(t) => t.common_mut().filter = new_filter,
             AnyLayer::Ref(r) => r.filter = new_filter,

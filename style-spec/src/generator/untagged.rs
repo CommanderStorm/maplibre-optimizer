@@ -24,7 +24,21 @@ pub struct Variant {
 /// Deserialization strategy: deserialize the input into `serde_json::Value`, then try
 /// each variant in order.  On total failure the error message lists every variant that
 /// was attempted together with the per-variant error.
+/// Convenience wrapper without post-normalization.
 pub fn emit_untagged_serde(scope: &mut Scope, enum_name: &str, variants: &[Variant]) {
+    emit_untagged_serde_with_normalize(scope, enum_name, variants, None);
+}
+
+/// Emit hand-written `Serialize` + `Deserialize` impls with optional post-normalization.
+///
+/// When `normalize_method` is `Some("normalize")`, every successful deserialization result
+/// is wrapped in `.normalize()` before returning.
+pub fn emit_untagged_serde_with_normalize(
+    scope: &mut Scope,
+    enum_name: &str,
+    variants: &[Variant],
+    normalize_method: Option<&str>,
+) {
     let ser_arms: String = variants
         .iter()
         .map(|v| {
@@ -54,6 +68,9 @@ pub fn emit_untagged_serde(scope: &mut Scope, enum_name: &str, variants: &[Varia
             0
         }
     });
+    let norm = normalize_method
+        .map(|m| format!(".{m}()"))
+        .unwrap_or_default();
     let deser_tries: String = deser_order
         .iter()
         .map(|&i| &variants[i])
@@ -62,15 +79,15 @@ pub fn emit_untagged_serde(scope: &mut Scope, enum_name: &str, variants: &[Varia
                 format!(
                     "\
         if value.is_null() {{
-            return Ok(Self::{name});
+            return Ok(Self::{name}{norm});
         }}\n",
                     name = v.name,
                 )
             } else {
                 let wrap = if v.is_boxed {
-                    format!("Self::{}(Box::new(v))", v.name)
+                    format!("Self::{}(Box::new(v)){norm}", v.name)
                 } else {
-                    format!("Self::{}(v)", v.name)
+                    format!("Self::{}(v){norm}", v.name)
                 };
                 let body = format!(
                     "\

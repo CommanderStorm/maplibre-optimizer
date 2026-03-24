@@ -4,87 +4,12 @@ use super::*;
 #[allow(unused_imports)]
 use crate::{array_prop, boolean_prop, color_prop, formatted_prop, numeric_prop, string_prop};
 
-/// A filter expression: a typed boolean expression, a polymorphic Any expression
-/// (`match`, `step`, `case`, …), or a literal bool.
-///
-/// On deserialize, bare `true`/`false` and `["literal", true/false]` are both
-/// normalised to `Literal(bool)`.  On serialize, `Literal(b)` emits the bare
-/// JSON boolean.
-#[derive(PartialEq, Debug, Clone)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum LayerFilter {
-    Expr(Box<Boolean>),
-    AnyExpr(Box<Any>),
-    Literal(bool),
-}
-
-impl<'de> serde::Deserialize<'de> for LayerFilter {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
-        deserializer.deserialize_any(LayerFilterVisitor)
-    }
-}
-
-struct LayerFilterVisitor;
-
-impl<'de> serde::de::Visitor<'de> for LayerFilterVisitor {
-    type Value = LayerFilter;
-
-    fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        f.write_str(
-            "a boolean literal, a Boolean expression array, or a polymorphic expression array",
-        )
-    }
-
-    fn visit_bool<E: serde::de::Error>(self, b: bool) -> Result<Self::Value, E> {
-        Ok(LayerFilter::Literal(b))
-    }
-
-    fn visit_seq<A: serde::de::SeqAccess<'de>>(self, mut seq: A) -> Result<Self::Value, A::Error> {
-        // Collect all elements; we need to inspect the first to detect ["literal", bool].
-        let mut elements: Vec<serde_json::Value> = Vec::new();
-        while let Some(elem) = seq.next_element::<serde_json::Value>()? {
-            elements.push(elem);
-        }
-        // Normalise ["literal", true/false] → Literal(bool).
-        if elements.len() == 2
-            && elements[0].as_str() == Some("literal")
-            && elements[1].is_boolean()
-        {
-            return Ok(LayerFilter::Literal(elements[1].as_bool().unwrap()));
-        }
-        let arr = serde_json::Value::Array(elements);
-        // Try Boolean first (fixed-output-type operators like `all`, `any`, `==`, …).
-        if let Ok(expr) = serde_json::from_value::<Boolean>(arr.clone()) {
-            return Ok(LayerFilter::Expr(Box::new(expr)));
-        }
-        // Fall back to Any (polymorphic operators like `match`, `step`, `case`, …).
-        let expr = serde_json::from_value::<Any>(arr).map_err(serde::de::Error::custom)?;
-        Ok(LayerFilter::AnyExpr(Box::new(expr)))
-    }
-}
-
-impl serde::Serialize for LayerFilter {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: serde::Serializer,
-    {
-        match self {
-            LayerFilter::Expr(expr) => expr.serialize(serializer),
-            LayerFilter::AnyExpr(expr) => expr.serialize(serializer),
-            LayerFilter::Literal(b) => serializer.serialize_bool(*b),
-        }
-    }
-}
-
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct Layer {
     /// A expression specifying conditions on source features. Only features that match the filter are displayed.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub filter: Option<LayerFilter>,
+    pub filter: Option<Boolean>,
     /// Unique layer name.
     pub id: LayerId,
     /// The maximum zoom level for the layer. At zoom levels equal to or greater than the maxzoom, the layer will be hidden.
@@ -1629,7 +1554,7 @@ color_prop!(
     default = serde_json::json!("rgba(0, 0, 0, 0)")
 );
 
-numeric_prop!(SymbolPaintLayerIconHaloWidth, doc = "Distance of halo to the icon outline.
+numeric_prop!(SymbolPaintLayerIconHaloWidth, doc = "Distance of halo to the icon outline. 
 
 The unit is in pixels only for SDF sprites that were created with a blur radius of 8, multiplied by the display density. I.e., the radius needs to be 16 for `@2x` sprites, etc.", min = 0_f64, default = serde_json::Number::from_i128(0).expect("the number is serialised from a number and is thus always valid"));
 
@@ -1808,7 +1733,7 @@ pub struct RefLayer {
     #[serde(rename = "ref")]
     pub r#ref: std::string::String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub filter: Option<LayerFilter>,
+    pub filter: Option<Boolean>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub minzoom: Option<LayerMinzoom>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -1968,42 +1893,33 @@ impl LayerSourceLayer {
     }
 }
 
-impl LayerFilter {
+impl Boolean {
     /// Returns `true` if this filter is the literal `false` (layer never renders).
     pub fn is_always_false(&self) -> bool {
-        matches!(self, LayerFilter::Literal(false))
+        matches!(self, Boolean::Literal(false))
     }
 
     /// Returns `true` if this filter is the literal `true` (layer always renders).
     pub fn is_always_true(&self) -> bool {
-        matches!(self, LayerFilter::Literal(true))
-    }
-
-    /// Returns the inner expression if this is an `Expr` variant.
-    pub fn as_boolean(&self) -> Option<&Boolean> {
-        match self {
-            LayerFilter::Expr(b) => Some(b),
-            LayerFilter::AnyExpr(_) | LayerFilter::Literal(_) => None,
-        }
-    }
-
-    /// Returns a mutable reference to the inner expression if this is an `Expr` variant.
-    pub fn as_boolean_mut(&mut self) -> Option<&mut Boolean> {
-        match self {
-            LayerFilter::Expr(b) => Some(b),
-            LayerFilter::AnyExpr(_) | LayerFilter::Literal(_) => None,
-        }
+        matches!(self, Boolean::Literal(true))
     }
 
     /// Serialize to `serde_json::Value` for passes that still operate on JSON.
     pub fn to_json_value(&self) -> serde_json::Value {
-        serde_json::to_value(self).expect("LayerFilter serialization is infallible")
+        serde_json::to_value(self).expect("Boolean serialization is infallible")
     }
 
     /// Deserialize from `serde_json::Value`.  Returns `None` if the value is not
     /// a valid filter (e.g. a string or object).
+    ///
+    /// A double round-trip normalises `ExprOrLiteral` values: optimizer-produced
+    /// `["literal", true]` deserialises as `BooleanExpr(Literal(true))` on the
+    /// first pass, then serialises to bare `true`, which becomes `Bool(true)` on
+    /// the second pass.
     pub fn from_value(v: serde_json::Value) -> Option<Self> {
-        serde_json::from_value(v).ok()
+        let filter: Self = serde_json::from_value(v).ok()?;
+        let normalised = serde_json::to_value(&filter).ok()?;
+        serde_json::from_value(normalised).ok()
     }
 }
 
