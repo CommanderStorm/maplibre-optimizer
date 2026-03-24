@@ -2202,7 +2202,23 @@ fn generate_syntax_enum_serializer(
             // Multi-overload: variant wraps an Options enum.
             // The Options enum uses derive(Serialize) which serializes as a tuple.
             // We need to serialize as ["op", ...options_fields].
-            arms.push_str(&generate_ser_arm_options(name, key, &var_name));
+            let min_required = syntax
+                .overloads
+                .iter()
+                .map(|o| o.parameters.iter().filter(|p| !p.ends_with('?')).count())
+                .min()
+                .unwrap_or(0);
+            // serde(untagged) single-field tuple variants serialize as just the
+            // inner value (unwrapped), not as a 1-element array. We must detect
+            // this so the serializer doesn't accidentally flatten the inner value.
+            let has_single_field_variant = syntax.overloads.iter().any(|o| o.parameters.len() == 1);
+            arms.push_str(&generate_ser_arm_options(
+                name,
+                key,
+                &var_name,
+                min_required,
+                has_single_field_variant,
+            ));
         }
     }
 
@@ -2384,17 +2400,54 @@ fn generate_ser_arm_variadic(
 /// Serialize a multi-overload variant: `Variant(Options)`.
 /// Options is an `#[serde(untagged)]` tuple enum, so it serializes as a JSON array.
 /// We emit `["op", ...options_elements]`.
-fn generate_ser_arm_options(name: &str, op: &str, var_name: &str) -> String {
+/// `min_required` is the minimum number of required fields across all overloads,
+/// which prevents null-popping from removing required arguments.
+/// `has_single_field_variant`: `serde(untagged)` serializes single-field tuple
+/// variants as the bare inner value (not wrapped in a 1-element array). If that
+/// inner value happens to be a JSON array (e.g. an expression), we must emit it
+/// as one element rather than flattening its contents.
+fn generate_ser_arm_options(
+    name: &str,
+    op: &str,
+    var_name: &str,
+    min_required: usize,
+    has_single_field_variant: bool,
+) -> String {
+    let len_check = if min_required == 0 {
+        "!arr.is_empty()".to_string()
+    } else {
+        format!("arr.len() > {min_required}")
+    };
+    let array_branch = if has_single_field_variant {
+        // A single-field variant serializes as the bare value. If that value is
+        // a JSON array (an expression like ["match", ...]), its first element is
+        // a string operator name. Multi-field tuples never start with a string.
+        format!(
+            r#"if arr.first().is_some_and(serde_json::Value::is_string) {{
+                        // Single-field variant unwrapped by serde — emit as one element.
+                        seq.serialize_element(&serde_json::Value::Array(arr))?;
+                    }} else {{
+                        while {len_check} && arr.last().is_some_and(serde_json::Value::is_null) {{ arr.pop(); }}
+                        for elem in &arr {{
+                            seq.serialize_element(elem)?;
+                        }}
+                    }}"#
+        )
+    } else {
+        format!(
+            r#"while {len_check} && arr.last().is_some_and(serde_json::Value::is_null) {{ arr.pop(); }}
+                    for elem in &arr {{
+                        seq.serialize_element(elem)?;
+                    }}"#
+        )
+    };
     format!(
         r#"            {name}::{var_name}(opts) => {{
                 let opts_val = serde_json::to_value(opts).map_err(serde::ser::Error::custom)?;
                 let mut seq = serializer.serialize_seq(None)?;
                 seq.serialize_element({op:?})?;
                 if let serde_json::Value::Array(mut arr) = opts_val {{
-                    while arr.last().is_some_and(serde_json::Value::is_null) {{ arr.pop(); }}
-                    for elem in &arr {{
-                        seq.serialize_element(elem)?;
-                    }}
+                    {array_branch}
                 }} else {{
                     seq.serialize_element(&opts_val)?;
                 }}

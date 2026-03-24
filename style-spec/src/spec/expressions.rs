@@ -2817,11 +2817,16 @@ impl serde::Serialize for Number {
                 let mut seq = serializer.serialize_seq(None)?;
                 seq.serialize_element("-")?;
                 if let serde_json::Value::Array(mut arr) = opts_val {
-                    while arr.last().is_some_and(serde_json::Value::is_null) {
-                        arr.pop();
-                    }
-                    for elem in &arr {
-                        seq.serialize_element(elem)?;
+                    if arr.first().is_some_and(serde_json::Value::is_string) {
+                        // Single-field variant unwrapped by serde — emit as one element.
+                        seq.serialize_element(&serde_json::Value::Array(arr))?;
+                    } else {
+                        while arr.len() > 1 && arr.last().is_some_and(serde_json::Value::is_null) {
+                            arr.pop();
+                        }
+                        for elem in &arr {
+                            seq.serialize_element(elem)?;
+                        }
                     }
                 } else {
                     seq.serialize_element(&opts_val)?;
@@ -2995,7 +3000,7 @@ impl serde::Serialize for Number {
                 let mut seq = serializer.serialize_seq(None)?;
                 seq.serialize_element("index-of")?;
                 if let serde_json::Value::Array(mut arr) = opts_val {
-                    while arr.last().is_some_and(serde_json::Value::is_null) {
+                    while arr.len() > 2 && arr.last().is_some_and(serde_json::Value::is_null) {
                         arr.pop();
                     }
                     for elem in &arr {
