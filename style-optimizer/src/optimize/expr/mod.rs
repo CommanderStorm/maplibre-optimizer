@@ -7,10 +7,11 @@ pub(crate) mod util;
 
 use fold::{
     try_algebraic_simplify, try_dead_branch_case, try_dead_branch_match_literal,
-    try_filter_contradiction, try_fold_boolean_algebra, try_fold_comparison,
-    try_fold_comparison_from_stats, try_fold_geometry_type_from_stats, try_fold_get_from_stats,
-    try_fold_has_from_stats, try_fold_not, try_fold_pure_operator, try_fold_redundant_coercion,
-    try_fold_redundant_properties, try_negate_comparison, try_predicate_subsumption,
+    try_filter_contradiction, try_fold_boolean_algebra, try_fold_coalesce_from_stats,
+    try_fold_comparison, try_fold_comparison_from_stats, try_fold_geometry_type_from_stats,
+    try_fold_get_from_stats, try_fold_has_from_stats, try_fold_not, try_fold_pure_operator,
+    try_fold_redundant_coercion, try_fold_redundant_properties, try_negate_comparison,
+    try_predicate_subsumption, try_prune_in_from_stats, try_prune_match_from_stats,
     try_range_tightening,
 };
 use maplibre_style_spec::mir::MirSpec;
@@ -87,6 +88,39 @@ impl StyleVisitor for NormalizeFoldVisitor<'_> {
                 &mut self.changed,
             );
         }
+        // Stats-driven: prune dead values from "in" expressions.
+        if self.passes.constant_fold {
+            fold_in_tree(
+                filter,
+                self.stats,
+                self.layer_info,
+                layer_index,
+                &mut self.changed,
+                try_prune_in_from_stats,
+            );
+        }
+        // Stats-driven: prune dead arms from "match" expressions.
+        if self.passes.constant_fold {
+            fold_in_tree(
+                filter,
+                self.stats,
+                self.layer_info,
+                layer_index,
+                &mut self.changed,
+                try_prune_match_from_stats,
+            );
+        }
+        // Stats-driven: remove dead coalesce arms.
+        if self.passes.constant_fold {
+            fold_in_tree(
+                filter,
+                self.stats,
+                self.layer_info,
+                layer_index,
+                &mut self.changed,
+                try_fold_coalesce_from_stats,
+            );
+        }
         normalize_and_fold(filter, self.mir, self.passes, &mut self.changed);
     }
 
@@ -109,6 +143,33 @@ impl StyleVisitor for NormalizeFoldVisitor<'_> {
                 self.layer_info,
                 ctx.layer_index,
                 &mut self.changed,
+            );
+        }
+        // Stats-driven: prune dead values from "in"/"match"/"coalesce" in paint/layout too.
+        if self.passes.constant_fold {
+            fold_in_tree(
+                value,
+                self.stats,
+                self.layer_info,
+                ctx.layer_index,
+                &mut self.changed,
+                try_prune_in_from_stats,
+            );
+            fold_in_tree(
+                value,
+                self.stats,
+                self.layer_info,
+                ctx.layer_index,
+                &mut self.changed,
+                try_prune_match_from_stats,
+            );
+            fold_in_tree(
+                value,
+                self.stats,
+                self.layer_info,
+                ctx.layer_index,
+                &mut self.changed,
+                try_fold_coalesce_from_stats,
             );
         }
         normalize_and_fold(value, self.mir, self.passes, &mut self.changed);
@@ -238,6 +299,30 @@ fn fold_comparison_in_tree(
     }
     for child in arr.iter_mut() {
         fold_comparison_in_tree(child, stats, layer_info, layer_index, changed);
+    }
+}
+
+type StatsFoldFn =
+    fn(&mut Vec<Value>, Option<&TileStatistics>, Option<&[Option<VectorLayerInfo>]>, usize) -> bool;
+
+/// Generic recursive walker for stats-driven folds on expression arrays.
+fn fold_in_tree(
+    v: &mut Value,
+    stats: Option<&TileStatistics>,
+    layer_info: Option<&[Option<VectorLayerInfo>]>,
+    layer_index: usize,
+    changed: &mut bool,
+    try_fold: StatsFoldFn,
+) {
+    let Value::Array(arr) = v else {
+        return;
+    };
+    if try_fold(arr, stats, layer_info, layer_index) {
+        *changed = true;
+        return;
+    }
+    for child in arr.iter_mut() {
+        fold_in_tree(child, stats, layer_info, layer_index, changed, try_fold);
     }
 }
 

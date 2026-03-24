@@ -1171,7 +1171,333 @@ fn try_fold_comparison_inner(
             let n = lit.as_f64()?;
             fold_comparison_numeric(effective_op, &n, min, max, all_present, || None)
         }
+        PropertyStats::Bool {
+            present_count,
+            true_count,
+        } => {
+            let lit_bool = lit.as_bool()?;
+            fold_comparison_bool(
+                effective_op,
+                lit_bool,
+                *true_count,
+                *present_count,
+                layer_stats.total_features,
+            )
+        }
         _ => None,
+    }
+}
+
+/// Prune dead values from `["in", ["get", prop], ["literal", [v1, v2, ...]]]` using stats.
+///
+/// Values not present in the property's `value_counts` are removed. Empty array → `false`.
+/// Single element → `["==", ["get", prop], v]`.
+/// Guard: only when `sample_rate == 1.0`.
+pub(super) fn try_prune_in_from_stats(
+    arr: &mut Vec<Value>,
+    stats: Option<&crate::stats::TileStatistics>,
+    layer_info: Option<&[Option<crate::optimize::source_util::VectorLayerInfo>]>,
+    layer_index: usize,
+) -> bool {
+    use super::util::get_prop_name;
+
+    if arr.len() != 3 || arr[0].as_str() != Some("in") {
+        return false;
+    }
+    let Some(prop) = get_prop_name(&arr[1]) else {
+        return false;
+    };
+    // The third arg must be ["literal", [...]].
+    let Value::Array(lit_wrapper) = &arr[2] else {
+        return false;
+    };
+    if lit_wrapper.len() != 2 || lit_wrapper[0].as_str() != Some("literal") {
+        return false;
+    }
+    let Value::Array(values) = &lit_wrapper[1] else {
+        return false;
+    };
+
+    let Some(stats) = stats else { return false };
+    if (stats.sample_rate - 1.0).abs() > f64::EPSILON {
+        return false;
+    }
+    let Some(infos) = layer_info else {
+        return false;
+    };
+    let Some(Some(info)) = infos.get(layer_index) else {
+        return false;
+    };
+    let Some(layer_stats) = stats.layer_stats(&info.source, &info.source_layer) else {
+        return false;
+    };
+    if layer_stats.total_features == 0 {
+        return false;
+    }
+
+    // If prop is unknown, all values are dead.
+    let prop_stats = layer_stats.properties.get(prop);
+
+    let kept: Vec<Value> = values
+        .iter()
+        .filter(|v| value_exists_in_stats(v, prop_stats))
+        .cloned()
+        .collect();
+
+    if kept.len() == values.len() {
+        return false;
+    }
+
+    if kept.is_empty() {
+        *arr = vec![Value::String("literal".to_string()), Value::Bool(false)];
+        return true;
+    }
+    if kept.len() == 1 {
+        let get_expr = arr[1].clone();
+        *arr = vec![
+            Value::String("==".to_string()),
+            get_expr,
+            kept.into_iter().next().unwrap(),
+        ];
+        return true;
+    }
+    // Rebuild with pruned values.
+    arr[2] = Value::Array(vec![
+        Value::String("literal".to_string()),
+        Value::Array(kept),
+    ]);
+    true
+}
+
+/// Check whether a JSON value exists in the property's `value_counts`.
+fn value_exists_in_stats(v: &Value, prop_stats: Option<&crate::stats::PropertyStats>) -> bool {
+    use super::util::{json_as_i64, json_as_u64};
+    use crate::stats::PropertyStats;
+
+    let Some(ps) = prop_stats else {
+        return false;
+    };
+    match ps {
+        PropertyStats::String {
+            value_counts: Some(vc),
+            ..
+        } => v.as_str().is_some_and(|s| vc.contains_key(s)),
+        PropertyStats::Integer {
+            value_counts: Some(vc),
+            ..
+        } => json_as_i64(v).is_some_and(|n| vc.contains_key(&n)),
+        PropertyStats::UnsignedInteger {
+            value_counts: Some(vc),
+            ..
+        } => json_as_u64(v).is_some_and(|n| vc.contains_key(&n)),
+        // No value_counts available — conservatively keep.
+        _ => true,
+    }
+}
+
+/// Prune dead arms from `["match", ["get", prop], label, out, ..., fallback]` using stats.
+///
+/// Arms whose labels don't exist in `value_counts` are removed. All arms pruned → fallback.
+/// Guard: only when `sample_rate == 1.0`.
+pub(super) fn try_prune_match_from_stats(
+    arr: &mut Vec<Value>,
+    stats: Option<&crate::stats::TileStatistics>,
+    layer_info: Option<&[Option<crate::optimize::source_util::VectorLayerInfo>]>,
+    layer_index: usize,
+) -> bool {
+    use super::util::get_prop_name;
+
+    if arr.first().and_then(Value::as_str) != Some("match") {
+        return false;
+    }
+    // ["match", input, label1, out1, ..., fallback] — min 5 elements, odd length.
+    if arr.len() < 5 || arr.len().is_multiple_of(2) {
+        return false;
+    }
+    let Some(prop) = get_prop_name(&arr[1]) else {
+        return false;
+    };
+
+    let Some(stats) = stats else { return false };
+    if (stats.sample_rate - 1.0).abs() > f64::EPSILON {
+        return false;
+    }
+    let Some(infos) = layer_info else {
+        return false;
+    };
+    let Some(Some(info)) = infos.get(layer_index) else {
+        return false;
+    };
+    let Some(layer_stats) = stats.layer_stats(&info.source, &info.source_layer) else {
+        return false;
+    };
+    if layer_stats.total_features == 0 {
+        return false;
+    }
+    let prop_stats = layer_stats.properties.get(prop);
+
+    let arm_count = (arr.len() - 3) / 2;
+    let mut arms_to_remove: Vec<usize> = Vec::new();
+
+    for i in 0..arm_count {
+        let label_idx = 2 + i * 2;
+        let label = &arr[label_idx];
+
+        let keep = match label {
+            Value::Array(labels) => labels.iter().any(|v| value_exists_in_stats(v, prop_stats)),
+            single => value_exists_in_stats(single, prop_stats),
+        };
+
+        if !keep {
+            arms_to_remove.push(i);
+        } else if let Value::Array(labels) = label {
+            // Filter individual values within array labels.
+            let kept: Vec<Value> = labels
+                .iter()
+                .filter(|v| value_exists_in_stats(v, prop_stats))
+                .cloned()
+                .collect();
+            if kept.len() < labels.len() {
+                // Will handle via mutation below after we know we're changing something.
+                arms_to_remove.push(usize::MAX); // sentinel — partial prune handled separately
+            }
+        }
+    }
+
+    // Check for partial label pruning (array labels with some dead values).
+    let mut changed = false;
+    for i in 0..arm_count {
+        let label_idx = 2 + i * 2;
+        if let Value::Array(labels) = &arr[label_idx] {
+            let kept: Vec<Value> = labels
+                .iter()
+                .filter(|v| value_exists_in_stats(v, prop_stats))
+                .cloned()
+                .collect();
+            if kept.len() < labels.len() && !kept.is_empty() {
+                if kept.len() == 1 {
+                    arr[label_idx] = kept.into_iter().next().unwrap();
+                } else {
+                    arr[label_idx] = Value::Array(kept);
+                }
+                changed = true;
+            }
+        }
+    }
+
+    // Remove fully dead arms (in reverse to preserve indices).
+    let dead_arms: Vec<usize> = arms_to_remove
+        .into_iter()
+        .filter(|&i| i != usize::MAX)
+        .collect();
+    if dead_arms.is_empty() && !changed {
+        return false;
+    }
+    for &i in dead_arms.iter().rev() {
+        let label_idx = 2 + i * 2;
+        // Remove output first (higher index), then label.
+        arr.remove(label_idx + 1);
+        arr.remove(label_idx);
+    }
+
+    // All arms removed → replace with fallback.
+    if arr.len() == 3 {
+        let fallback = arr[2].clone();
+        replace_arr_with_value(arr, fallback);
+        return true;
+    }
+
+    !dead_arms.is_empty() || changed
+}
+
+/// Remove dead arms from `["coalesce", arm1, arm2, ...]` when stats prove a `["get", prop]`
+/// arm is always non-null (present on all features), making subsequent arms unreachable.
+///
+/// Guard: only when `sample_rate == 1.0`.
+pub(super) fn try_fold_coalesce_from_stats(
+    arr: &mut Vec<Value>,
+    stats: Option<&crate::stats::TileStatistics>,
+    layer_info: Option<&[Option<crate::optimize::source_util::VectorLayerInfo>]>,
+    layer_index: usize,
+) -> bool {
+    use super::util::get_prop_name;
+
+    if arr.first().and_then(Value::as_str) != Some("coalesce") {
+        return false;
+    }
+    if arr.len() < 3 {
+        return false;
+    }
+
+    let Some(stats) = stats else { return false };
+    if (stats.sample_rate - 1.0).abs() > f64::EPSILON {
+        return false;
+    }
+    let Some(infos) = layer_info else {
+        return false;
+    };
+    let Some(Some(info)) = infos.get(layer_index) else {
+        return false;
+    };
+    let Some(layer_stats) = stats.layer_stats(&info.source, &info.source_layer) else {
+        return false;
+    };
+    if layer_stats.total_features == 0 {
+        return false;
+    }
+
+    // Find the first ["get", prop] arm where prop is present on all features.
+    for i in 1..arr.len() {
+        let Some(prop) = get_prop_name(&arr[i]) else {
+            continue;
+        };
+        let Some(prop_stats) = layer_stats.properties.get(prop) else {
+            continue;
+        };
+        if prop_stats.present_count() == layer_stats.total_features && i + 1 < arr.len() {
+            // Truncate everything after this arm.
+            arr.truncate(i + 1);
+            // Unwrap single-arm coalesce.
+            if arr.len() == 2 {
+                let inner = arr[1].clone();
+                replace_arr_with_value(arr, inner);
+            }
+            return true;
+        }
+    }
+    false
+}
+
+/// Fold `==`/`!=` comparisons against a boolean property.
+fn fold_comparison_bool(
+    op: &str,
+    lit_bool: bool,
+    true_count: u64,
+    present_count: u64,
+    total: u64,
+) -> Option<bool> {
+    let all_true = true_count == present_count && present_count == total;
+    let all_false = true_count == 0 && present_count == total;
+    // ("==", true) and ("!=", false) have the same logic, as do ("==", false) and ("!=", true).
+    let checking_true = (op == "==" && lit_bool) || (op == "!=" && !lit_bool);
+    if checking_true {
+        if true_count == 0 {
+            Some(false)
+        } else if all_true {
+            Some(true)
+        } else {
+            None
+        }
+    } else if op == "==" || op == "!=" {
+        if all_true {
+            Some(false)
+        } else if all_false {
+            Some(true)
+        } else {
+            None
+        }
+    } else {
+        None
     }
 }
 
@@ -1875,6 +2201,442 @@ mod tests {
         let info = make_layer_info();
         let mut arr: Vec<Value> = serde_json::from_value(json!(["<", ["get", "x"], 5])).unwrap();
         assert!(!try_fold_comparison_from_stats(
+            &mut arr,
+            Some(&stats),
+            Some(&info),
+            0
+        ));
+    }
+
+    // ── Bool comparison fold tests ────────────────────────────────────
+
+    fn bool_stats(
+        true_count: u64,
+        present: u64,
+        total: u64,
+    ) -> (TileStatistics, Vec<Option<VectorLayerInfo>>) {
+        let mut props = BTreeMap::new();
+        props.insert(
+            "bridge".to_string(),
+            PropertyStats::Bool {
+                present_count: present,
+                true_count,
+            },
+        );
+        let stats = make_stats(
+            "lyr",
+            LayerStats {
+                total_features: total,
+                properties: props,
+                ..Default::default()
+            },
+        );
+        (stats, make_layer_info())
+    }
+
+    #[test]
+    fn bool_eq_true_folds_false_when_no_trues() {
+        let (stats, info) = bool_stats(0, 100, 100);
+        let mut arr: Vec<Value> =
+            serde_json::from_value(json!(["==", ["get", "bridge"], true])).unwrap();
+        assert!(try_fold_comparison_from_stats(
+            &mut arr,
+            Some(&stats),
+            Some(&info),
+            0
+        ));
+        assert_eq!(Value::Array(arr), json!(["literal", false]));
+    }
+
+    #[test]
+    fn bool_eq_true_folds_true_when_all_true() {
+        let (stats, info) = bool_stats(100, 100, 100);
+        let mut arr: Vec<Value> =
+            serde_json::from_value(json!(["==", ["get", "bridge"], true])).unwrap();
+        assert!(try_fold_comparison_from_stats(
+            &mut arr,
+            Some(&stats),
+            Some(&info),
+            0
+        ));
+        assert_eq!(Value::Array(arr), json!(["literal", true]));
+    }
+
+    #[test]
+    fn bool_eq_false_folds_true_when_all_false() {
+        let (stats, info) = bool_stats(0, 100, 100);
+        let mut arr: Vec<Value> =
+            serde_json::from_value(json!(["==", ["get", "bridge"], false])).unwrap();
+        assert!(try_fold_comparison_from_stats(
+            &mut arr,
+            Some(&stats),
+            Some(&info),
+            0
+        ));
+        assert_eq!(Value::Array(arr), json!(["literal", true]));
+    }
+
+    #[test]
+    fn bool_eq_false_folds_false_when_all_true() {
+        let (stats, info) = bool_stats(100, 100, 100);
+        let mut arr: Vec<Value> =
+            serde_json::from_value(json!(["==", ["get", "bridge"], false])).unwrap();
+        assert!(try_fold_comparison_from_stats(
+            &mut arr,
+            Some(&stats),
+            Some(&info),
+            0
+        ));
+        assert_eq!(Value::Array(arr), json!(["literal", false]));
+    }
+
+    #[test]
+    fn bool_neq_true_folds_false_when_all_true() {
+        let (stats, info) = bool_stats(100, 100, 100);
+        let mut arr: Vec<Value> =
+            serde_json::from_value(json!(["!=", ["get", "bridge"], true])).unwrap();
+        assert!(try_fold_comparison_from_stats(
+            &mut arr,
+            Some(&stats),
+            Some(&info),
+            0
+        ));
+        assert_eq!(Value::Array(arr), json!(["literal", false]));
+    }
+
+    #[test]
+    fn bool_no_fold_when_mixed() {
+        let (stats, info) = bool_stats(50, 100, 100);
+        let mut arr: Vec<Value> =
+            serde_json::from_value(json!(["==", ["get", "bridge"], true])).unwrap();
+        assert!(!try_fold_comparison_from_stats(
+            &mut arr,
+            Some(&stats),
+            Some(&info),
+            0
+        ));
+    }
+
+    #[test]
+    fn bool_no_fold_when_not_all_present() {
+        let (stats, info) = bool_stats(0, 50, 100);
+        let mut arr: Vec<Value> =
+            serde_json::from_value(json!(["==", ["get", "bridge"], false])).unwrap();
+        assert!(!try_fold_comparison_from_stats(
+            &mut arr,
+            Some(&stats),
+            Some(&info),
+            0
+        ));
+    }
+
+    // ── in pruning tests ─────────────────────────────────────────────
+
+    use indexmap::IndexMap;
+
+    use super::{
+        try_fold_coalesce_from_stats, try_prune_in_from_stats, try_prune_match_from_stats,
+    };
+
+    fn string_stats_with_values(
+        values: &[&str],
+        total: u64,
+    ) -> (TileStatistics, Vec<Option<VectorLayerInfo>>) {
+        let mut vc = IndexMap::new();
+        for &v in values {
+            vc.insert(v.to_string(), 10);
+        }
+        let mut props = BTreeMap::new();
+        props.insert(
+            "kind".to_string(),
+            PropertyStats::String {
+                present_count: total,
+                cardinality: values.len() as u64,
+                value_counts: Some(vc),
+            },
+        );
+        let stats = make_stats(
+            "lyr",
+            LayerStats {
+                total_features: total,
+                properties: props,
+                ..Default::default()
+            },
+        );
+        (stats, make_layer_info())
+    }
+
+    fn string_stats_with_sample_rate(
+        values: &[&str],
+        total: u64,
+        sample_rate: f64,
+    ) -> (TileStatistics, Vec<Option<VectorLayerInfo>>) {
+        let (mut stats, info) = string_stats_with_values(values, total);
+        stats.sample_rate = sample_rate;
+        (stats, info)
+    }
+
+    #[test]
+    fn in_prune_removes_dead_values() {
+        let (stats, info) = string_stats_with_values(&["a", "b"], 100);
+        let mut arr: Vec<Value> = serde_json::from_value(json!([
+            "in",
+            ["get", "kind"],
+            ["literal", ["a", "b", "c", "d"]]
+        ]))
+        .unwrap();
+        assert!(try_prune_in_from_stats(
+            &mut arr,
+            Some(&stats),
+            Some(&info),
+            0
+        ));
+        assert_eq!(
+            Value::Array(arr),
+            json!(["in", ["get", "kind"], ["literal", ["a", "b"]]])
+        );
+    }
+
+    #[test]
+    fn in_prune_all_dead_folds_to_false() {
+        let (stats, info) = string_stats_with_values(&["a", "b"], 100);
+        let mut arr: Vec<Value> =
+            serde_json::from_value(json!(["in", ["get", "kind"], ["literal", ["x", "y", "z"]]]))
+                .unwrap();
+        assert!(try_prune_in_from_stats(
+            &mut arr,
+            Some(&stats),
+            Some(&info),
+            0
+        ));
+        assert_eq!(Value::Array(arr), json!(["literal", false]));
+    }
+
+    #[test]
+    fn in_prune_single_rewrites_to_eq() {
+        let (stats, info) = string_stats_with_values(&["a", "b"], 100);
+        let mut arr: Vec<Value> =
+            serde_json::from_value(json!(["in", ["get", "kind"], ["literal", ["a", "x"]]]))
+                .unwrap();
+        assert!(try_prune_in_from_stats(
+            &mut arr,
+            Some(&stats),
+            Some(&info),
+            0
+        ));
+        assert_eq!(Value::Array(arr), json!(["==", ["get", "kind"], "a"]));
+    }
+
+    #[test]
+    fn in_prune_skipped_when_sample_rate_below_1() {
+        let (stats, info) = string_stats_with_sample_rate(&["a", "b"], 100, 0.5);
+        let mut arr: Vec<Value> =
+            serde_json::from_value(json!(["in", ["get", "kind"], ["literal", ["a", "x"]]]))
+                .unwrap();
+        assert!(!try_prune_in_from_stats(
+            &mut arr,
+            Some(&stats),
+            Some(&info),
+            0
+        ));
+    }
+
+    #[test]
+    fn in_prune_no_change_when_all_present() {
+        let (stats, info) = string_stats_with_values(&["a", "b", "c"], 100);
+        let mut arr: Vec<Value> =
+            serde_json::from_value(json!(["in", ["get", "kind"], ["literal", ["a", "b"]]]))
+                .unwrap();
+        assert!(!try_prune_in_from_stats(
+            &mut arr,
+            Some(&stats),
+            Some(&info),
+            0
+        ));
+    }
+
+    // ── match pruning tests ──────────────────────────────────────────
+
+    #[test]
+    fn match_prune_removes_dead_arm() {
+        let (stats, info) = string_stats_with_values(&["a", "b"], 100);
+        let mut arr: Vec<Value> = serde_json::from_value(json!([
+            "match",
+            ["get", "kind"],
+            "a",
+            "A",
+            "c",
+            "C",
+            "fallback"
+        ]))
+        .unwrap();
+        assert!(try_prune_match_from_stats(
+            &mut arr,
+            Some(&stats),
+            Some(&info),
+            0
+        ));
+        assert_eq!(
+            Value::Array(arr),
+            json!(["match", ["get", "kind"], "a", "A", "fallback"])
+        );
+    }
+
+    #[test]
+    fn match_prune_all_dead_folds_to_fallback() {
+        let (stats, info) = string_stats_with_values(&["a", "b"], 100);
+        let mut arr: Vec<Value> = serde_json::from_value(json!([
+            "match",
+            ["get", "kind"],
+            "x",
+            "X",
+            "y",
+            "Y",
+            "fallback"
+        ]))
+        .unwrap();
+        assert!(try_prune_match_from_stats(
+            &mut arr,
+            Some(&stats),
+            Some(&info),
+            0
+        ));
+        assert_eq!(Value::Array(arr), json!(["literal", "fallback"]));
+    }
+
+    #[test]
+    fn match_prune_array_label_partial() {
+        let (stats, info) = string_stats_with_values(&["a"], 100);
+        let mut arr: Vec<Value> = serde_json::from_value(json!([
+            "match",
+            ["get", "kind"],
+            ["a", "x"],
+            "out",
+            "fallback"
+        ]))
+        .unwrap();
+        assert!(try_prune_match_from_stats(
+            &mut arr,
+            Some(&stats),
+            Some(&info),
+            0
+        ));
+        assert_eq!(
+            Value::Array(arr),
+            json!(["match", ["get", "kind"], "a", "out", "fallback"])
+        );
+    }
+
+    #[test]
+    fn match_prune_skipped_when_sample_rate_below_1() {
+        let (stats, info) = string_stats_with_sample_rate(&["a", "b"], 100, 0.5);
+        let mut arr: Vec<Value> =
+            serde_json::from_value(json!(["match", ["get", "kind"], "x", "X", "fallback"]))
+                .unwrap();
+        assert!(!try_prune_match_from_stats(
+            &mut arr,
+            Some(&stats),
+            Some(&info),
+            0
+        ));
+    }
+
+    // ── coalesce fold tests ──────────────────────────────────────────
+
+    fn coalesce_stats(
+        props: Vec<(&str, u64)>,
+        total: u64,
+    ) -> (TileStatistics, Vec<Option<VectorLayerInfo>>) {
+        let mut prop_map = BTreeMap::new();
+        for (name, present) in props {
+            prop_map.insert(
+                name.to_string(),
+                PropertyStats::String {
+                    present_count: present,
+                    cardinality: 5,
+                    value_counts: None,
+                },
+            );
+        }
+        let stats = make_stats(
+            "lyr",
+            LayerStats {
+                total_features: total,
+                properties: prop_map,
+                ..Default::default()
+            },
+        );
+        (stats, make_layer_info())
+    }
+
+    #[test]
+    fn coalesce_truncates_dead_arms() {
+        let (stats, info) = coalesce_stats(vec![("name", 100), ("alt_name", 80)], 100);
+        let mut arr: Vec<Value> = serde_json::from_value(json!([
+            "coalesce",
+            ["get", "name"],
+            ["get", "alt_name"],
+            "default"
+        ]))
+        .unwrap();
+        assert!(try_fold_coalesce_from_stats(
+            &mut arr,
+            Some(&stats),
+            Some(&info),
+            0
+        ));
+        // "name" is always present → truncate alt_name and default, unwrap single arm.
+        assert_eq!(Value::Array(arr), json!(["get", "name"]));
+    }
+
+    #[test]
+    fn coalesce_keeps_arm_when_not_always_present() {
+        let (stats, info) = coalesce_stats(vec![("name", 80), ("alt_name", 100)], 100);
+        let mut arr: Vec<Value> = serde_json::from_value(json!([
+            "coalesce",
+            ["get", "name"],
+            ["get", "alt_name"],
+            "default"
+        ]))
+        .unwrap();
+        assert!(try_fold_coalesce_from_stats(
+            &mut arr,
+            Some(&stats),
+            Some(&info),
+            0
+        ));
+        // "name" not always present, but "alt_name" is → truncate "default".
+        assert_eq!(
+            Value::Array(arr),
+            json!(["coalesce", ["get", "name"], ["get", "alt_name"]])
+        );
+    }
+
+    #[test]
+    fn coalesce_no_change_when_none_always_present() {
+        let (stats, info) = coalesce_stats(vec![("name", 80), ("alt_name", 80)], 100);
+        let mut arr: Vec<Value> = serde_json::from_value(json!([
+            "coalesce",
+            ["get", "name"],
+            ["get", "alt_name"],
+            "default"
+        ]))
+        .unwrap();
+        assert!(!try_fold_coalesce_from_stats(
+            &mut arr,
+            Some(&stats),
+            Some(&info),
+            0
+        ));
+    }
+
+    #[test]
+    fn coalesce_skipped_when_sample_rate_below_1() {
+        let (mut stats, info) = coalesce_stats(vec![("name", 100)], 100);
+        stats.sample_rate = 0.5;
+        let mut arr: Vec<Value> =
+            serde_json::from_value(json!(["coalesce", ["get", "name"], "default"])).unwrap();
+        assert!(!try_fold_coalesce_from_stats(
             &mut arr,
             Some(&stats),
             Some(&info),
