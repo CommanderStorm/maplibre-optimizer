@@ -115,16 +115,30 @@ impl<'de> serde::Deserialize<'de> for ColorExpression {
 /// Inner representation for array-like expression-backed properties.
 /// Uses `serde_json::Value` for the literal branch to accommodate diverse array shapes.
 #[derive(PartialEq, Debug, Clone)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum ArrayPropInner {
     Expr(Box<crate::spec::String>),
-    Literal(
-        #[cfg_attr(
-            feature = "fuzz",
-            arbitrary(with = crate::fuzz_helpers::arbitrary_json_value)
-        )]
-        serde_json::Value,
-    ),
+    Literal(serde_json::Value),
+}
+
+#[cfg(feature = "fuzz")]
+impl<'a> arbitrary::Arbitrary<'a> for ArrayPropInner {
+    fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
+        let tag: u8 = u.arbitrary()?;
+        if tag.is_multiple_of(2) {
+            Ok(Self::Expr(u.arbitrary()?))
+        } else {
+            let v = crate::fuzz_helpers::arbitrary_json_value(u)?;
+            // Deserialization tries `String` first; bare JSON strings always
+            // succeed as `String::Literal`, so normalise to `Expr` to match.
+            if let serde_json::Value::String(s) = v {
+                Ok(Self::Expr(Box::new(crate::spec::String::Literal(
+                    crate::spec::StringLiteral::from(s),
+                ))))
+            } else {
+                Ok(Self::Literal(v))
+            }
+        }
+    }
 }
 
 impl serde::Serialize for ArrayPropInner {
@@ -160,11 +174,29 @@ impl<'de> serde::Deserialize<'de> for ArrayPropInner {
 /// Inner representation for formatted expression-backed properties.
 /// Accepts `Formatted` expressions (e.g. `["format", ...]`), string expressions, or plain string literals.
 #[derive(PartialEq, Debug, Clone)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum FormattedPropInner {
     Formatted(Box<crate::spec::Formatted>),
     Expr(Box<crate::spec::String>),
     Literal(std::string::String),
+}
+
+#[cfg(feature = "fuzz")]
+impl<'a> arbitrary::Arbitrary<'a> for FormattedPropInner {
+    fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
+        let tag: u8 = u.arbitrary()?;
+        Ok(match tag % 3 {
+            0 => Self::Formatted(u.arbitrary()?),
+            1 => Self::Expr(u.arbitrary()?),
+            _ => {
+                // Bare strings are always parsed as Expr(String::Literal(...))
+                // since String deserialization is tried before bare String.
+                let s: std::string::String = u.arbitrary()?;
+                Self::Expr(Box::new(crate::spec::String::Literal(
+                    crate::spec::StringLiteral::from(s),
+                )))
+            }
+        })
+    }
 }
 
 impl serde::Serialize for FormattedPropInner {

@@ -5,6 +5,9 @@ use libfuzzer_sys::fuzz_target;
 use maplibre_style_spec::spec::MaplibreStyleSpecification;
 
 fuzz_target!(|data: &[u8]| {
+    if data.len() < 16 {
+        return;
+    }
     let mut u = Unstructured::new(data);
     let Ok(v) = MaplibreStyleSpecification::arbitrary(&mut u) else {
         return;
