@@ -1253,36 +1253,17 @@ pub(super) fn try_distributive_factoring(arr: &mut Vec<Value>) -> bool {
     // Each remainder with 1 element → unwrap.
     let inner_children: Vec<Value> = remainders
         .into_iter()
-        .filter_map(|mut rem| {
+        .map(|mut rem| {
             if rem.is_empty() {
-                // This child was entirely common factors → identity element.
-                // For "any" outer: identity is false; for "all" outer: identity is true.
-                // But since we factor into dual(common..., outer(remainders...)),
-                // an empty remainder means the child contributes nothing new.
-                // E.g. ["any", ["all", A], ["all", A, B]] → common={A}, remainders=[[], [B]]
-                // → ["all", A, ["any", true, B]] → ["all", A, true] → ["all", A]
-                // The identity for "any" inner is false, identity for "all" inner is true.
-                // But since outer is what wraps remainders:
-                // outer="any" means the wrapper around remainders is "any",
-                // identity for "any" is false (no-op) - but we want the vacuous
-                // truth/false: all() = true, any() = false.
-                // Actually, a child that was entirely common means ["all", A] contributed A.
-                // After factoring: the remainder is empty, so this slot in the outer
-                // wrapper is: identity of the dual = vacuous dual.
-                // dual="all" → vacuous all = true; dual="any" → vacuous any = false.
-                // The outer wrapper is the original operator:
-                // outer="any" wraps remainders → ["any", vacuous_dual, ...]
-                // vacuous_dual for dual="all" is true → ["any", true, ...] → true (absorbing)
-                // So the entire expression simplifies, but let's just emit the literal
-                // and let other passes clean up.
-                let vacuous = dual == "all";
-                Some(Value::Bool(vacuous))
+                // Empty remainder → vacuous dual: all()=true, any()=false.
+                // Other passes will simplify the resulting expression.
+                Value::Bool(dual == "all")
             } else if rem.len() == 1 {
-                Some(rem.remove(0))
+                rem.remove(0)
             } else {
                 let mut inner = vec![Value::String(dual.to_string())];
                 inner.extend(rem);
-                Some(Value::Array(inner))
+                Value::Array(inner)
             }
         })
         .collect();

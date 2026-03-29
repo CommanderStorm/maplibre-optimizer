@@ -290,14 +290,44 @@ fn sync_typed_to_json(style: &MaplibreStyleSpecification, v: &mut Value) {
     }
 }
 
-/// Replace the JSON layer with the typed serialization.
+/// Replace the JSON layer with the typed serialization, preserving keys
+/// the type system doesn't model (e.g. per-property `*-transition` overrides).
 ///
 /// The typed struct was deserialized from the JSON *after* expression passes,
 /// so it already contains those results.  Using it as the authoritative source
 /// ensures that structural-pass changes to paint/layout (empty-object
 /// removal, zoom-stop pruning, …) are reflected in the output.
-fn merge_layer_json(_original: Value, typed: &Value) -> Value {
-    typed.clone()
+fn merge_layer_json(original: Value, typed: &Value) -> Value {
+    let mut result = typed.clone();
+    for section in ["paint", "layout"] {
+        let Some(orig_obj) = original.get(section).and_then(Value::as_object) else {
+            continue;
+        };
+        if let Some(result_section) = result.get_mut(section).and_then(Value::as_object_mut) {
+            // Carry over keys the typed system doesn't model (e.g. *-transition overrides).
+            for (key, value) in orig_obj {
+                if !result_section.contains_key(key) {
+                    result_section.insert(key.clone(), value.clone());
+                }
+            }
+        } else if !orig_obj.is_empty() {
+            // Typed system dropped the section entirely but original may have
+            // keys the type system doesn't model (e.g. *-transition overrides).
+            // Only preserve those; any modeled key was intentionally removed.
+            let preserved: serde_json::Map<String, Value> = orig_obj
+                .iter()
+                .filter(|(k, _)| k.ends_with("-transition"))
+                .map(|(k, v)| (k.clone(), v.clone()))
+                .collect();
+            if !preserved.is_empty() {
+                result
+                    .as_object_mut()
+                    .expect("layer must be an object")
+                    .insert(section.to_string(), Value::Object(preserved));
+            }
+        }
+    }
+    result
 }
 
 /// Run expression-level passes on the JSON value.
