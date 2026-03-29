@@ -16,8 +16,9 @@ impl StyleVisitor for MinifyColorsVisitor {
     fn visit_property(&mut self, ctx: &PropertyContext<'_>, value: &mut Value) {
         if ctx.field.r#type.is_color() {
             minify_color_value(value);
-        } else {
-            // Expressions in non-color properties may still contain color literals.
+        } else if !ctx.field.r#type.is_resolved_image() {
+            // Expressions in non-color properties may still contain color literals,
+            // but skip resolved-image properties where strings are sprite names.
             minify_colors_in_expr(value);
         }
     }
@@ -271,11 +272,15 @@ fn named_color(s: &str) -> Option<(u8, u8, u8, f64)> {
 
 trait MirTypeExt {
     fn is_color(&self) -> bool;
+    fn is_resolved_image(&self) -> bool;
 }
 
 impl MirTypeExt for maplibre_style_spec::mir::types::MirType {
     fn is_color(&self) -> bool {
         matches!(self, Self::Color)
+    }
+    fn is_resolved_image(&self) -> bool {
+        matches!(self, Self::ResolvedImage { .. })
     }
 }
 
