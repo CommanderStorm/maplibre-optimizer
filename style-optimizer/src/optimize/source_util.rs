@@ -56,7 +56,7 @@ pub(crate) fn precompute_vector_layer_info(style: &Value) -> Vec<Option<VectorLa
                 .and_then(|s| s.get(source))
                 .and_then(Value::as_object)
                 .and_then(|s| s.get("maxzoom"))
-                .and_then(|v| v.as_f64());
+                .and_then(Value::as_f64);
             Some(VectorLayerInfo {
                 source: source.to_string(),
                 source_layer: source_layer.to_string(),
@@ -82,22 +82,21 @@ pub(crate) fn precompute_vector_layer_info_typed(
             let source_layer = common.source_layer.as_ref()?.as_str();
 
             // Check if it's a vector source.
-            if !is_vector_source_typed(style, source) {
+            let Some(Source::Vector(vector_source)) = style.sources.0.get(source) else {
                 return None;
-            }
+            };
+
+            let source_maxzoom = vector_source
+                .maxzoom
+                .as_ref()
+                .and_then(|m| serde_json::to_value(m).ok())
+                .and_then(|v| v.as_f64());
 
             Some(VectorLayerInfo {
                 source: source.to_string(),
                 source_layer: source_layer.to_string(),
+                source_maxzoom,
             })
         })
         .collect()
-}
-
-fn is_vector_source_typed(style: &MaplibreStyleSpecification, source_name: &str) -> bool {
-    style
-        .sources
-        .0
-        .get(source_name)
-        .is_some_and(|s| matches!(s, Source::Vector { .. }))
 }
