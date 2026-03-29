@@ -105,31 +105,17 @@ pub(crate) fn precompute_vector_layer_info_typed(
 
 // ── Source zoom tightening ───────────────────────────────────────────────────
 
-/// Helper: extract f64 from a newtype-wrapped `serde_json::Number`.
-fn number_to_f64<T: serde::Serialize>(n: &T) -> Option<f64> {
-    serde_json::to_value(n).ok()?.as_f64()
-}
-
-/// Effective zoom range for a source (returns `(minzoom, maxzoom)`).
+/// Effective zoom range for a tile-based source (returns `(minzoom, maxzoom)`).
+/// Only applies to vector, raster, and raster-dem sources.
 fn source_zoom_range(source: &Source) -> Option<(f64, f64)> {
     match source {
-        Source::Vector(s) => {
-            let lo = s.minzoom.as_ref().and_then(number_to_f64).unwrap_or(0.0);
-            let hi = s.maxzoom.as_ref().and_then(number_to_f64).unwrap_or(22.0);
-            Some((lo, hi))
-        }
-        Source::Raster(s) => {
-            let lo = s.minzoom.as_ref().and_then(number_to_f64).unwrap_or(0.0);
-            let hi = s.maxzoom.as_ref().and_then(number_to_f64).unwrap_or(22.0);
-            Some((lo, hi))
-        }
-        Source::RasterDem(s) => {
-            let lo = s.minzoom.as_ref().and_then(number_to_f64).unwrap_or(0.0);
-            let hi = s.maxzoom.as_ref().and_then(number_to_f64).unwrap_or(22.0);
-            Some((lo, hi))
-        }
-        _ => None,
+        Source::Vector(_) | Source::Raster(_) | Source::RasterDem(_) => {}
+        _ => return None,
     }
+    let obj = serde_json::to_value(source).ok()?;
+    let lo = obj.get("minzoom").and_then(Value::as_f64).unwrap_or(0.0);
+    let hi = obj.get("maxzoom").and_then(Value::as_f64).unwrap_or(22.0);
+    Some((lo, hi))
 }
 
 /// Tighten source minzoom/maxzoom based on the effective zoom range of all

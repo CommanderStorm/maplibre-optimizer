@@ -102,37 +102,26 @@ fn refine_typed_layer(
         }
     }
 
-    // Stats-driven zoom tightening.
+    // Stats-driven maxzoom tightening.
+    //
+    // Only maxzoom is tightened here — minzoom is intentionally left alone because
+    // stats may not cover all zoom levels (sparse samples, test fixtures, etc.),
+    // so the absence of data at low zooms does not prove it doesn't exist.
+    //
+    // Maxzoom is safe to tighten when the data's max zoom is strictly below the
+    // source's maxzoom: tiles at source maxzoom are overzoomed for higher levels,
+    // so we only cap when data definitively ends before that boundary.
     if let Some(stats) = stats
         && let Some(infos) = layer_info
         && let Some(Some(info)) = infos.get(layer_index)
         && let Some(layer_stats) = stats.layer_stats(&info.source, &info.source_layer)
         && !layer_stats.features_by_zoom.is_empty()
     {
-        let common = layer.common_mut();
-        let data_min = f64::from(*layer_stats.features_by_zoom.keys().next().unwrap());
         let data_max = f64::from(*layer_stats.features_by_zoom.keys().next_back().unwrap());
-
-        // Only tighten minzoom if the data's minimum zoom is above the source's
-        // minzoom — otherwise tiles at the source minzoom are underzoomed for
-        // lower zooms and the layer should remain visible.
-        let source_minzoom = info.source_maxzoom.map_or(0.0, |_| 0.0); // source minzoom defaults to 0
-        if data_min > source_minzoom {
-            let cur_min = common
-                .minzoom
-                .as_ref()
-                .and_then(maplibre_style_spec::spec::LayerMinzoom::as_f64);
-            if cur_min.is_none_or(|c| data_min > c) {
-                common.minzoom = maplibre_style_spec::spec::LayerMinzoom::from_f64(data_min);
-            }
-        }
-
-        // Only tighten maxzoom if the data's maximum zoom is strictly below the
-        // source's maxzoom. When data_max >= source maxzoom, tiles at that zoom
-        // are overzoomed for all higher zoom levels, so the layer remains visible
-        // beyond the data's literal max zoom.
         let source_maxzoom = info.source_maxzoom.unwrap_or(22.0);
+
         if data_max < source_maxzoom {
+            let common = layer.common_mut();
             let cur_max = common
                 .maxzoom
                 .as_ref()

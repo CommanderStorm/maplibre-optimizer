@@ -1220,7 +1220,6 @@ mod tests {
         assert_yaml_snapshot!(v["layers"][0], @r"
         id: water-fill
         maxzoom: 14
-        minzoom: 6
         source: openmaptiles
         source-layer: water
         type: fill

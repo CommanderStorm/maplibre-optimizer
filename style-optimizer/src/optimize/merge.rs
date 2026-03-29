@@ -244,38 +244,16 @@ fn layer_zoom_range(layer: &Value) -> (f64, f64) {
     (min, max)
 }
 
-/// Compute the merged zoom range across all layers in the group.
-fn merged_zoom_range(layers: &[Value]) -> (f64, f64) {
-    let mut group_min = f64::MAX;
-    let mut group_max = f64::MIN;
-    for l in layers {
-        let (lo, hi) = layer_zoom_range(l);
-        if lo < group_min {
-            group_min = lo;
-        }
-        if hi > group_max {
-            group_max = hi;
-        }
-    }
-    (group_min, group_max)
-}
-
-/// Whether a layer's zoom range differs from the merged group range.
-fn needs_zoom_guard(layer: &Value, group_min: f64, group_max: f64) -> bool {
-    let (lo, hi) = layer_zoom_range(layer);
-    lo > group_min || hi < group_max
-}
-
-/// Wrap a filter expression with zoom guards for a sub-layer whose zoom range
-/// is narrower than the merged group.  Returns the original filter if no guard
-/// is needed.
+/// Wrap a filter expression with zoom guards when this sub-layer's zoom range
+/// `(lo, hi)` is narrower than the merged group range `(group_min, group_max)`.
+/// Returns the original filter unmodified if no guard is needed.
 fn wrap_filter_with_zoom_guard(
     filter: &Value,
-    layer: &Value,
+    lo: f64,
+    hi: f64,
     group_min: f64,
     group_max: f64,
 ) -> Value {
-    let (lo, hi) = layer_zoom_range(layer);
     let needs_lo = lo > group_min;
     let needs_hi = hi < group_max;
 
@@ -283,29 +261,24 @@ fn wrap_filter_with_zoom_guard(
         return filter.clone();
     }
 
-    let zoom_expr = Value::Array(vec![Value::String("zoom".into())]);
-    let mut guards: Vec<Value> = Vec::new();
+    let mut all_args = vec![Value::String("all".into())];
+    let zoom_expr = || Value::Array(vec![Value::String("zoom".into())]);
 
     if needs_lo {
-        // [">=", ["zoom"], minzoom]
-        guards.push(Value::Array(vec![
+        all_args.push(Value::Array(vec![
             Value::String(">=".into()),
-            zoom_expr.clone(),
+            zoom_expr(),
             Value::from(lo),
         ]));
     }
     if needs_hi {
-        // ["<", ["zoom"], maxzoom]
-        guards.push(Value::Array(vec![
+        all_args.push(Value::Array(vec![
             Value::String("<".into()),
-            zoom_expr,
+            zoom_expr(),
             Value::from(hi),
         ]));
     }
 
-    // ["all", guard..., original_filter]
-    let mut all_args = vec![Value::String("all".into())];
-    all_args.append(&mut guards);
     all_args.push(filter.clone());
     Value::Array(all_args)
 }
@@ -317,10 +290,19 @@ fn build_merged_layer(layers: &[Value], mir: &MirSpec) -> Value {
     let sort_key_prop = sort_key_name(layer_type).expect("validated in grouping");
     let n = layers.len();
 
-    let (group_min, group_max) = merged_zoom_range(layers);
-    let any_zoom_differs = layers
+    // Precompute zoom ranges once to avoid repeated JSON lookups.
+    let zoom_ranges: Vec<(f64, f64)> = layers.iter().map(layer_zoom_range).collect();
+    let group_min = zoom_ranges
         .iter()
-        .any(|l| needs_zoom_guard(l, group_min, group_max));
+        .map(|&(lo, _)| lo)
+        .fold(f64::MAX, f64::min);
+    let group_max = zoom_ranges
+        .iter()
+        .map(|&(_, hi)| hi)
+        .fold(f64::MIN, f64::max);
+    let any_zoom_differs = zoom_ranges
+        .iter()
+        .any(|&(lo, hi)| lo > group_min || hi < group_max);
 
     // Match-pattern detection only works when zoom ranges are uniform
     // (zoom guards would break the simple match-on-property pattern).
@@ -348,7 +330,13 @@ fn build_merged_layer(layers: &[Value], mir: &MirSpec) -> Value {
     // ── Merged filter ────────────────────────────────────────────────────────
     obj.insert(
         "filter".into(),
-        build_merged_filter(layers, match_pat.as_ref(), group_min, group_max),
+        build_merged_filter(
+            layers,
+            match_pat.as_ref(),
+            &zoom_ranges,
+            group_min,
+            group_max,
+        ),
     );
 
     // ── Paint & layout properties ────────────────────────────────────────────
@@ -397,6 +385,7 @@ fn build_merged_layer(layers: &[Value], mir: &MirSpec) -> Value {
                     &values,
                     &default,
                     match_pat.as_ref(),
+                    &zoom_ranges,
                     group_min,
                     group_max,
                 ),
@@ -410,7 +399,14 @@ fn build_merged_layer(layers: &[Value], mir: &MirSpec) -> Value {
         .or_insert_with(|| Value::Object(serde_json::Map::new()));
     layout.as_object_mut().expect("layout is an object").insert(
         sort_key_prop.into(),
-        build_sort_key_expr(layers, n, match_pat.as_ref(), group_min, group_max),
+        build_sort_key_expr(
+            layers,
+            n,
+            match_pat.as_ref(),
+            &zoom_ranges,
+            group_min,
+            group_max,
+        ),
     );
 
     merged
@@ -419,6 +415,7 @@ fn build_merged_layer(layers: &[Value], mir: &MirSpec) -> Value {
 fn build_merged_filter(
     layers: &[Value],
     match_pat: Option<&MatchPattern>,
+    zoom_ranges: &[(f64, f64)],
     group_min: f64,
     group_max: f64,
 ) -> Value {
@@ -436,10 +433,9 @@ fn build_merged_filter(
         ])
     } else {
         let mut args = vec![Value::String("any".into())];
-        for l in layers {
+        for (l, &(lo, hi)) in layers.iter().zip(zoom_ranges) {
             if let Some(f) = l.get("filter") {
-                let guarded = wrap_filter_with_zoom_guard(f, l, group_min, group_max);
-                args.push(guarded);
+                args.push(wrap_filter_with_zoom_guard(f, lo, hi, group_min, group_max));
             }
         }
         Value::Array(args)
@@ -455,6 +451,7 @@ fn build_property_expr(
     values: &[Option<&Value>],
     default: &Value,
     match_pat: Option<&MatchPattern>,
+    zoom_ranges: &[(f64, f64)],
     group_min: f64,
     group_max: f64,
 ) -> Value {
@@ -480,8 +477,10 @@ fn build_property_expr(
         let mut args = vec![Value::String("case".into())];
         for i in (0..n).rev() {
             let filter = layers[i].get("filter").expect("validated");
-            let guarded = wrap_filter_with_zoom_guard(filter, &layers[i], group_min, group_max);
-            args.push(guarded);
+            let (lo, hi) = zoom_ranges[i];
+            args.push(wrap_filter_with_zoom_guard(
+                filter, lo, hi, group_min, group_max,
+            ));
             args.push(values[i].cloned().unwrap_or_else(|| default.clone()));
         }
         args.push(default.clone());
@@ -493,6 +492,7 @@ fn build_sort_key_expr(
     layers: &[Value],
     n: usize,
     match_pat: Option<&MatchPattern>,
+    zoom_ranges: &[(f64, f64)],
     group_min: f64,
     group_max: f64,
 ) -> Value {
@@ -516,8 +516,10 @@ fn build_sort_key_expr(
         let mut args = vec![Value::String("case".into())];
         for i in (0..n).rev() {
             let filter = layers[i].get("filter").expect("validated");
-            let guarded = wrap_filter_with_zoom_guard(filter, &layers[i], group_min, group_max);
-            args.push(guarded);
+            let (lo, hi) = zoom_ranges[i];
+            args.push(wrap_filter_with_zoom_guard(
+                filter, lo, hi, group_min, group_max,
+            ));
             args.push(Value::from(i as u64));
         }
         args.push(Value::from(-1_i64));
