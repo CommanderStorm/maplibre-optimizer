@@ -289,7 +289,7 @@ fn process_style(
     Ok(())
 }
 
-/// Rewrite filter expressions in the style to replace interned string literals with integers.
+/// Rewrite expressions in the style to replace interned string literals with integers.
 fn rewrite_style_interning(style: &mut serde_json::Value, advisory: &TilePruningAdvisory) {
     // Build lookup: source_name → source_layer → prop_name → interning table.
     let lookup: BTreeMap<&str, BTreeMap<&str, &BTreeMap<String, Vec<String>>>> = advisory
@@ -335,13 +335,27 @@ fn rewrite_style_interning(style: &mut serde_json::Value, advisory: &TilePruning
 
         // Rewrite the filter expression.
         if let Some(filter) = obj.get_mut("filter") {
-            rewrite_filter_interning(filter, interned_props);
+            rewrite_expression_interning(filter, interned_props);
+        }
+
+        // Rewrite paint expressions.
+        if let Some(paint) = obj.get_mut("paint").and_then(|v| v.as_object_mut()) {
+            for expr in paint.values_mut() {
+                rewrite_expression_interning(expr, interned_props);
+            }
+        }
+
+        // Rewrite layout expressions.
+        if let Some(layout) = obj.get_mut("layout").and_then(|v| v.as_object_mut()) {
+            for expr in layout.values_mut() {
+                rewrite_expression_interning(expr, interned_props);
+            }
         }
     }
 }
 
 /// Recursively rewrite a filter expression, replacing interned string literals with integers.
-fn rewrite_filter_interning(
+fn rewrite_expression_interning(
     expr: &mut serde_json::Value,
     interned: &BTreeMap<String, Vec<String>>,
 ) {
@@ -394,13 +408,13 @@ fn rewrite_filter_interning(
         }
         "all" | "any" | "none" | "!" => {
             for child in arr.iter_mut().skip(1) {
-                rewrite_filter_interning(child, interned);
+                rewrite_expression_interning(child, interned);
             }
         }
         _ => {
             // Recurse into unrecognized nodes.
             for child in arr.iter_mut() {
-                rewrite_filter_interning(child, interned);
+                rewrite_expression_interning(child, interned);
             }
         }
     }
@@ -458,5 +472,122 @@ fn intern_literal_array(v: &mut serde_json::Value, table: &[String]) {
         for val in vals.iter_mut() {
             intern_value(val, table);
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    fn table() -> BTreeMap<String, Vec<String>> {
+        BTreeMap::from([
+            (
+                "class".to_string(),
+                vec!["primary".to_string(), "secondary".to_string()],
+            ),
+        ])
+    }
+
+    #[test]
+    fn rewrite_match_in_paint() {
+        let t = table();
+        let mut expr = json!(["match", ["get", "class"], "primary", "#f00", "#000"]);
+        rewrite_expression_interning(&mut expr, &t);
+        assert_eq!(expr, json!(["match", ["get", "class"], 0, "#f00", "#000"]));
+    }
+
+    #[test]
+    fn rewrite_eq_in_paint() {
+        let t = table();
+        let mut expr = json!(["case", ["==", ["get", "class"], "primary"], "#f00", "#000"]);
+        rewrite_expression_interning(&mut expr, &t);
+        assert_eq!(
+            expr,
+            json!(["case", ["==", ["get", "class"], 0], "#f00", "#000"])
+        );
+    }
+
+    #[test]
+    fn rewrite_nested_interpolate_wrapping_match() {
+        let t = table();
+        let mut expr = json!([
+            "interpolate", ["linear"], ["zoom"],
+            10, ["match", ["get", "class"], "primary", 3, "secondary", 2, 1],
+            16, ["match", ["get", "class"], "primary", 6, "secondary", 4, 2]
+        ]);
+        rewrite_expression_interning(&mut expr, &t);
+        assert_eq!(
+            expr,
+            json!([
+                "interpolate", ["linear"], ["zoom"],
+                10, ["match", ["get", "class"], 0, 3, 1, 2, 1],
+                16, ["match", ["get", "class"], 0, 6, 1, 4, 2]
+            ])
+        );
+    }
+
+    #[test]
+    fn plain_string_paint_value_not_disturbed() {
+        let t = table();
+        let mut expr = json!("#ff0000");
+        rewrite_expression_interning(&mut expr, &t);
+        assert_eq!(expr, json!("#ff0000"));
+    }
+
+    #[test]
+    fn rewrite_style_interning_rewrites_paint_and_layout() {
+        let t = table();
+        let advisory = TilePruningAdvisory {
+            sources: BTreeMap::from([(
+                "s".to_string(),
+                maplibre_style_optimizer::advisory::SourceAdvisory {
+                    layers: BTreeMap::from([(
+                        "roads".to_string(),
+                        maplibre_style_optimizer::advisory::SourceLayerAdvisory {
+                            interned_properties: t,
+                            used_properties: BTreeMap::new(),
+                            used_geometry_types: BTreeMap::new(),
+                            unused_zoom_levels: vec![],
+                            unused_property_values: BTreeMap::new(),
+                            feature_ids_needed: false,
+                            combined_filter: None,
+                        },
+                    )]),
+                    unused_source_layers: vec![],
+                },
+            )]),
+        };
+
+        let mut style = json!({
+            "layers": [{
+                "id": "roads",
+                "source": "s",
+                "source-layer": "roads",
+                "filter": ["==", ["get", "class"], "primary"],
+                "paint": {
+                    "line-color": ["match", ["get", "class"], "primary", "#f00", "#000"]
+                },
+                "layout": {
+                    "line-cap": ["match", ["get", "class"], "secondary", "round", "butt"]
+                }
+            }]
+        });
+
+        rewrite_style_interning(&mut style, &advisory);
+
+        let layer = &style["layers"][0];
+        // Filter rewritten
+        assert_eq!(layer["filter"], json!(["==", ["get", "class"], 0]));
+        // Paint rewritten
+        assert_eq!(
+            layer["paint"]["line-color"],
+            json!(["match", ["get", "class"], 0, "#f00", "#000"])
+        );
+        // Layout rewritten
+        assert_eq!(
+            layer["layout"]["line-cap"],
+            json!(["match", ["get", "class"], 1, "round", "butt"])
+        );
     }
 }
