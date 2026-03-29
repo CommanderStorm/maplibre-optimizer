@@ -656,8 +656,7 @@ fn geometry_types_for_layer_type(layer_type: &str) -> Vec<GeometryType> {
 /// - The stats were collected with a full scan (`sample_rate == 1.0`)
 /// - The property is a `String` type with known `value_counts`
 /// - No targeting layer has `all_properties_used`
-/// - The property is only used in filters, not in paint/layout expressions
-/// - The property appears in at least one layer's filter
+/// - The property appears in at least one layer's filter or paint/layout expression
 fn compute_interned_properties(
     targeting: &[&StyleLayerRef],
     layer_stats: &crate::stats::LayerStats,
@@ -682,19 +681,11 @@ fn compute_interned_properties(
             continue;
         };
 
-        // Skip if this property appears in any layer's paint/layout expressions.
-        if targeting
-            .iter()
-            .any(|r| r.paint_layout_properties.contains(prop_name))
-        {
-            continue;
-        }
-
-        // Skip if this property doesn't appear in any layer's filter.
-        if !targeting
-            .iter()
-            .any(|r| r.filter_properties.contains(prop_name))
-        {
+        // Skip if this property doesn't appear in any layer's filter or paint/layout expression.
+        if !targeting.iter().any(|r| {
+            r.filter_properties.contains(prop_name)
+                || r.paint_layout_properties.contains(prop_name)
+        }) {
             continue;
         }
 
@@ -1734,7 +1725,7 @@ mod tests {
     }
 
     #[test]
-    fn interned_properties_excluded_when_paint_used() {
+    fn interned_properties_eligible_when_paint_used() {
         let style = json!({
             "version": 8,
             "sources": { "s": { "type": "vector" } },
@@ -1781,8 +1772,8 @@ mod tests {
 
         let advisory = compute_advisory(&style, &stats);
         let roads = &advisory.sources["s"].layers["roads"];
-        // "class" is used in paint → not eligible for interning.
-        assert!(!roads.interned_properties.contains_key("class"));
+        // "class" is used in both filter and paint → eligible for interning.
+        assert!(roads.interned_properties.contains_key("class"));
     }
 
     #[test]
@@ -1885,5 +1876,116 @@ mod tests {
         let roads = &advisory.sources["s"].layers["roads"];
         // ["properties"] used → all_properties_used → no interning.
         assert!(roads.interned_properties.is_empty());
+    }
+
+    #[test]
+    fn interned_properties_eligible_when_paint_only() {
+        let style = json!({
+            "version": 8,
+            "sources": { "s": { "type": "vector" } },
+            "layers": [{
+                "id": "roads",
+                "type": "line",
+                "source": "s",
+                "source-layer": "roads",
+                "paint": {
+                    "line-color": ["match", ["get", "class"], "primary", "#f00", "#000"]
+                }
+            }]
+        });
+
+        let mut vc = IndexMap::new();
+        vc.insert("primary".to_string(), 100u64);
+        vc.insert("secondary".to_string(), 50);
+        let stats = TileStatistics {
+            sources: BTreeMap::from([(
+                "s".to_string(),
+                SourceStats {
+                    layers: BTreeMap::from([(
+                        "roads".to_string(),
+                        LayerStats {
+                            total_features: 150,
+                            features_by_zoom: BTreeMap::from([(5, 150)]),
+                            geometry_types: GeometryTypeStats::default(),
+                            has_feature_ids: false,
+                            properties: BTreeMap::from([(
+                                "class".to_string(),
+                                PropertyStats::String {
+                                    present_count: 150,
+                                    cardinality: 2,
+                                    value_counts: Some(vc),
+                                },
+                            )]),
+                        },
+                    )]),
+                },
+            )]),
+            sample_rate: 1.0,
+        };
+
+        let advisory = compute_advisory(&style, &stats);
+        let roads = &advisory.sources["s"].layers["roads"];
+        // "class" used only in paint → eligible for interning.
+        assert!(roads.interned_properties.contains_key("class"));
+    }
+
+    #[test]
+    fn interned_properties_cross_layer_filter_and_paint() {
+        let style = json!({
+            "version": 8,
+            "sources": { "s": { "type": "vector" } },
+            "layers": [
+                {
+                    "id": "roads-fill",
+                    "type": "fill",
+                    "source": "s",
+                    "source-layer": "roads",
+                    "filter": ["==", ["get", "class"], "primary"]
+                },
+                {
+                    "id": "roads-line",
+                    "type": "line",
+                    "source": "s",
+                    "source-layer": "roads",
+                    "paint": {
+                        "line-color": ["match", ["get", "class"], "primary", "#f00", "#000"]
+                    }
+                }
+            ]
+        });
+
+        let mut vc = IndexMap::new();
+        vc.insert("primary".to_string(), 100u64);
+        vc.insert("secondary".to_string(), 50);
+        let stats = TileStatistics {
+            sources: BTreeMap::from([(
+                "s".to_string(),
+                SourceStats {
+                    layers: BTreeMap::from([(
+                        "roads".to_string(),
+                        LayerStats {
+                            total_features: 150,
+                            features_by_zoom: BTreeMap::from([(5, 150)]),
+                            geometry_types: GeometryTypeStats::default(),
+                            has_feature_ids: false,
+                            properties: BTreeMap::from([(
+                                "class".to_string(),
+                                PropertyStats::String {
+                                    present_count: 150,
+                                    cardinality: 2,
+                                    value_counts: Some(vc),
+                                },
+                            )]),
+                        },
+                    )]),
+                },
+            )]),
+            sample_rate: 1.0,
+        };
+
+        let advisory = compute_advisory(&style, &stats);
+        let roads = &advisory.sources["s"].layers["roads"];
+        // "class" used in filter (layer 1) and paint (layer 2) → eligible.
+        assert!(roads.interned_properties.contains_key("class"));
     }
 }

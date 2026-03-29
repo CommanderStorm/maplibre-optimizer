@@ -87,6 +87,12 @@ fn is_merge_candidate(layer: &Value) -> bool {
     let Some(lt) = layer.get("type").and_then(Value::as_str) else {
         return false;
     };
+    // Symbol layers cannot be merged: MapLibre performs collision/overlap
+    // detection per-layer, so combining symbol layers changes which labels
+    // can suppress each other.
+    if lt == "symbol" {
+        return false;
+    }
     let Some(sk) = sort_key_name(lt) else {
         return false;
     };
@@ -789,7 +795,44 @@ mod tests {
     }
 
     #[test]
-    fn merge_three_symbol_layers_with_match() {
+    fn merge_three_fill_layers_with_match() {
+        let mir = mir();
+        let mut v = json!({
+            "version": 8,
+            "sources": {"s": {"type": "vector"}},
+            "layers": [
+                {
+                    "id": "park", "type": "fill", "source": "s",
+                    "source-layer": "land",
+                    "filter": ["==", ["get", "class"], "park"],
+                    "paint": {"fill-color": "#0f0", "fill-opacity": 0.9}
+                },
+                {
+                    "id": "forest", "type": "fill", "source": "s",
+                    "source-layer": "land",
+                    "filter": ["==", ["get", "class"], "forest"],
+                    "paint": {"fill-color": "#0a0", "fill-opacity": 0.7}
+                },
+                {
+                    "id": "grass", "type": "fill", "source": "s",
+                    "source-layer": "land",
+                    "filter": ["==", ["get", "class"], "grass"],
+                    "paint": {"fill-color": "#0d0", "fill-opacity": 0.5}
+                }
+            ]
+        });
+        layer_merge(&mut v, &mir);
+        assert_eq!(v["layers"].as_array().unwrap().len(), 1);
+        let merged = &v["layers"][0];
+        // Uses match (all filters are ["==", ["get", "class"], L]).
+        assert_eq!(merged["filter"][0], "match");
+        assert_eq!(merged["layout"]["fill-sort-key"][0], "match");
+        assert_eq!(merged["paint"]["fill-color"][0], "match");
+        assert_eq!(merged["paint"]["fill-opacity"][0], "match");
+    }
+
+    #[test]
+    fn symbol_layers_are_not_merged() {
         let mir = mir();
         let mut v = json!({
             "version": 8,
@@ -808,24 +851,12 @@ mod tests {
                     "filter": ["==", ["get", "class"], "town"],
                     "layout": {"text-size": 14},
                     "paint": {"text-color": "#333"}
-                },
-                {
-                    "id": "village", "type": "symbol", "source": "s",
-                    "source-layer": "place",
-                    "filter": ["==", ["get", "class"], "village"],
-                    "layout": {"text-size": 12},
-                    "paint": {"text-color": "#555"}
                 }
             ]
         });
         layer_merge(&mut v, &mir);
-        assert_eq!(v["layers"].as_array().unwrap().len(), 1);
-        let merged = &v["layers"][0];
-        // Uses match (all filters are ["==", ["get", "class"], L]).
-        assert_eq!(merged["filter"][0], "match");
-        assert_eq!(merged["layout"]["symbol-sort-key"][0], "match");
-        assert_eq!(merged["paint"]["text-color"][0], "match");
-        assert_eq!(merged["layout"]["text-size"][0], "match");
+        // Symbol layers must not be merged — collision detection is per-layer.
+        assert_eq!(v["layers"].as_array().unwrap().len(), 2);
     }
 
     #[test]
