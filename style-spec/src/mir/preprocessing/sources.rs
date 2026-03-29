@@ -83,7 +83,7 @@ mod tests {
             serde_json::from_str(include_str!("../../../../upstream/src/reference/v8.json"))
                 .unwrap();
         let sources = preprocess_sources(&mut reference.fields);
-        insta::assert_json_snapshot!(sources);
+        insta::assert_yaml_snapshot!(sources);
     }
 
     #[test]

@@ -1574,7 +1574,7 @@ fn fold_comparison_numeric<T: PartialOrd, F: FnOnce() -> Option<bool>>(
 
 #[cfg(test)]
 mod tests {
-    use insta::assert_json_snapshot;
+    use insta::assert_yaml_snapshot;
     use serde_json::{Value, json};
 
     use super::{
@@ -1586,12 +1586,10 @@ mod tests {
         let mut arr: Vec<Value> =
             serde_json::from_value(json!(["get", "name", ["properties"]])).unwrap();
         assert!(try_fold_redundant_properties(&mut arr));
-        assert_json_snapshot!(Value::Array(arr), @r#"
-        [
-          "get",
-          "name"
-        ]
-        "#);
+        assert_yaml_snapshot!(Value::Array(arr), @r"
+        - get
+        - name
+        ");
     }
 
     #[test]
@@ -1599,12 +1597,10 @@ mod tests {
         let mut arr: Vec<Value> =
             serde_json::from_value(json!(["has", "name", ["properties"]])).unwrap();
         assert!(try_fold_redundant_properties(&mut arr));
-        assert_json_snapshot!(Value::Array(arr), @r#"
-        [
-          "has",
-          "name"
-        ]
-        "#);
+        assert_yaml_snapshot!(Value::Array(arr), @r"
+        - has
+        - name
+        ");
     }
 
     #[test]
@@ -1682,12 +1678,10 @@ mod tests {
             Some(&info),
             0
         ));
-        assert_json_snapshot!(Value::Array(arr), @r#"
-        [
-          "literal",
-          false
-        ]
-        "#);
+        assert_yaml_snapshot!(Value::Array(arr), @r"
+        - literal
+        - false
+        ");
     }
 
     #[test]
@@ -1717,12 +1711,10 @@ mod tests {
             Some(&info),
             0
         ));
-        assert_json_snapshot!(Value::Array(arr), @r#"
-        [
-          "literal",
-          false
-        ]
-        "#);
+        assert_yaml_snapshot!(Value::Array(arr), @r"
+        - literal
+        - false
+        ");
     }
 
     #[test]
@@ -1752,12 +1744,10 @@ mod tests {
             Some(&info),
             0
         ));
-        assert_json_snapshot!(Value::Array(arr), @r#"
-        [
-          "literal",
-          true
-        ]
-        "#);
+        assert_yaml_snapshot!(Value::Array(arr), @r"
+        - literal
+        - true
+        ");
     }
 
     #[test]
@@ -1834,12 +1824,10 @@ mod tests {
             Some(&info),
             0
         ));
-        assert_json_snapshot!(Value::Array(arr), @r#"
-        [
-          "literal",
-          true
-        ]
-        "#);
+        assert_yaml_snapshot!(Value::Array(arr), @r"
+        - literal
+        - true
+        ");
     }
 
     #[test]
@@ -1866,12 +1854,10 @@ mod tests {
             Some(&info),
             0
         ));
-        assert_json_snapshot!(Value::Array(arr), @r#"
-        [
-          "literal",
-          false
-        ]
-        "#);
+        assert_yaml_snapshot!(Value::Array(arr), @r"
+        - literal
+        - false
+        ");
     }
 
     #[test]
@@ -1898,12 +1884,10 @@ mod tests {
             Some(&info),
             0
         ));
-        assert_json_snapshot!(Value::Array(arr), @r#"
-        [
-          "literal",
-          true
-        ]
-        "#);
+        assert_yaml_snapshot!(Value::Array(arr), @r"
+        - literal
+        - true
+        ");
     }
 
     #[test]
@@ -1930,12 +1914,10 @@ mod tests {
             Some(&info),
             0
         ));
-        assert_json_snapshot!(Value::Array(arr), @r#"
-        [
-          "literal",
-          false
-        ]
-        "#);
+        assert_yaml_snapshot!(Value::Array(arr), @r"
+        - literal
+        - false
+        ");
     }
 
     #[test]
@@ -1989,12 +1971,10 @@ mod tests {
             Some(&info),
             0
         ));
-        assert_json_snapshot!(Value::Array(arr), @r#"
-        [
-          "literal",
-          true
-        ]
-        "#);
+        assert_yaml_snapshot!(Value::Array(arr), @r"
+        - literal
+        - true
+        ");
     }
 
     #[test]
@@ -2060,12 +2040,10 @@ mod tests {
             Some(&info),
             0
         ));
-        assert_json_snapshot!(Value::Array(arr), @r#"
-        [
-          "literal",
-          false
-        ]
-        "#);
+        assert_yaml_snapshot!(Value::Array(arr), @r"
+        - literal
+        - false
+        ");
     }
 
     #[test]
@@ -2079,12 +2057,10 @@ mod tests {
             Some(&info),
             0
         ));
-        assert_json_snapshot!(Value::Array(arr), @r#"
-        [
-          "literal",
-          true
-        ]
-        "#);
+        assert_yaml_snapshot!(Value::Array(arr), @r"
+        - literal
+        - true
+        ");
     }
 
     #[test]
@@ -2111,12 +2087,10 @@ mod tests {
             Some(&info),
             0
         ));
-        assert_json_snapshot!(Value::Array(arr), @r#"
-        [
-          "literal",
-          false
-        ]
-        "#);
+        assert_yaml_snapshot!(Value::Array(arr), @r"
+        - literal
+        - false
+        ");
     }
 
     #[test]
@@ -2130,12 +2104,10 @@ mod tests {
             Some(&info),
             0
         ));
-        assert_json_snapshot!(Value::Array(arr), @r#"
-        [
-          "literal",
-          true
-        ]
-        "#);
+        assert_yaml_snapshot!(Value::Array(arr), @r"
+        - literal
+        - true
+        ");
     }
 
     #[test]
@@ -2150,12 +2122,10 @@ mod tests {
             Some(&info),
             0
         ));
-        assert_json_snapshot!(Value::Array(arr), @r#"
-        [
-          "literal",
-          false
-        ]
-        "#);
+        assert_yaml_snapshot!(Value::Array(arr), @r"
+        - literal
+        - false
+        ");
     }
 
     #[test]
@@ -2169,12 +2139,10 @@ mod tests {
             Some(&info),
             0
         ));
-        assert_json_snapshot!(Value::Array(arr), @r#"
-        [
-          "literal",
-          false
-        ]
-        "#);
+        assert_yaml_snapshot!(Value::Array(arr), @r"
+        - literal
+        - false
+        ");
     }
 
     #[test]
@@ -2188,12 +2156,10 @@ mod tests {
             Some(&info),
             0
         ));
-        assert_json_snapshot!(Value::Array(arr), @r#"
-        [
-          "literal",
-          true
-        ]
-        "#);
+        assert_yaml_snapshot!(Value::Array(arr), @r"
+        - literal
+        - true
+        ");
     }
 
     #[test]
@@ -2225,12 +2191,10 @@ mod tests {
             Some(&info),
             0
         ));
-        assert_json_snapshot!(Value::Array(arr), @r#"
-        [
-          "literal",
-          false
-        ]
-        "#);
+        assert_yaml_snapshot!(Value::Array(arr), @r"
+        - literal
+        - false
+        ");
     }
 
     #[test]
@@ -2266,12 +2230,10 @@ mod tests {
             Some(&info),
             0
         ));
-        assert_json_snapshot!(Value::Array(arr), @r#"
-        [
-          "literal",
-          false
-        ]
-        "#);
+        assert_yaml_snapshot!(Value::Array(arr), @r"
+        - literal
+        - false
+        ");
     }
 
     #[test]
@@ -2341,12 +2303,10 @@ mod tests {
             Some(&info),
             0
         ));
-        assert_json_snapshot!(Value::Array(arr), @r#"
-        [
-          "literal",
-          false
-        ]
-        "#);
+        assert_yaml_snapshot!(Value::Array(arr), @r"
+        - literal
+        - false
+        ");
     }
 
     #[test]
@@ -2360,12 +2320,10 @@ mod tests {
             Some(&info),
             0
         ));
-        assert_json_snapshot!(Value::Array(arr), @r#"
-        [
-          "literal",
-          true
-        ]
-        "#);
+        assert_yaml_snapshot!(Value::Array(arr), @r"
+        - literal
+        - true
+        ");
     }
 
     #[test]
@@ -2379,12 +2337,10 @@ mod tests {
             Some(&info),
             0
         ));
-        assert_json_snapshot!(Value::Array(arr), @r#"
-        [
-          "literal",
-          true
-        ]
-        "#);
+        assert_yaml_snapshot!(Value::Array(arr), @r"
+        - literal
+        - true
+        ");
     }
 
     #[test]
@@ -2398,12 +2354,10 @@ mod tests {
             Some(&info),
             0
         ));
-        assert_json_snapshot!(Value::Array(arr), @r#"
-        [
-          "literal",
-          false
-        ]
-        "#);
+        assert_yaml_snapshot!(Value::Array(arr), @r"
+        - literal
+        - false
+        ");
     }
 
     #[test]
@@ -2417,12 +2371,10 @@ mod tests {
             Some(&info),
             0
         ));
-        assert_json_snapshot!(Value::Array(arr), @r#"
-        [
-          "literal",
-          false
-        ]
-        "#);
+        assert_yaml_snapshot!(Value::Array(arr), @r"
+        - literal
+        - false
+        ");
     }
 
     #[test]
@@ -2512,22 +2464,14 @@ mod tests {
             Some(&info),
             0
         ));
-        assert_json_snapshot!(Value::Array(arr), @r#"
-        [
-          "in",
-          [
-            "get",
-            "kind"
-          ],
-          [
-            "literal",
-            [
-              "a",
-              "b"
-            ]
-          ]
-        ]
-        "#);
+        assert_yaml_snapshot!(Value::Array(arr), @r"
+        - in
+        - - get
+          - kind
+        - - literal
+          - - a
+            - b
+        ");
     }
 
     #[test]
@@ -2542,12 +2486,10 @@ mod tests {
             Some(&info),
             0
         ));
-        assert_json_snapshot!(Value::Array(arr), @r#"
-        [
-          "literal",
-          false
-        ]
-        "#);
+        assert_yaml_snapshot!(Value::Array(arr), @r"
+        - literal
+        - false
+        ");
     }
 
     #[test]
@@ -2562,15 +2504,11 @@ mod tests {
             Some(&info),
             0
         ));
-        assert_json_snapshot!(Value::Array(arr), @r#"
-        [
-          "==",
-          [
-            "get",
-            "kind"
-          ],
-          "a"
-        ]
+        assert_yaml_snapshot!(Value::Array(arr), @r#"
+        - "=="
+        - - get
+          - kind
+        - a
         "#);
     }
 
@@ -2623,18 +2561,14 @@ mod tests {
             Some(&info),
             0
         ));
-        assert_json_snapshot!(Value::Array(arr), @r#"
-        [
-          "match",
-          [
-            "get",
-            "kind"
-          ],
-          "a",
-          "A",
-          "fallback"
-        ]
-        "#);
+        assert_yaml_snapshot!(Value::Array(arr), @r"
+        - match
+        - - get
+          - kind
+        - a
+        - A
+        - fallback
+        ");
     }
 
     #[test]
@@ -2656,12 +2590,10 @@ mod tests {
             Some(&info),
             0
         ));
-        assert_json_snapshot!(Value::Array(arr), @r#"
-        [
-          "literal",
-          "fallback"
-        ]
-        "#);
+        assert_yaml_snapshot!(Value::Array(arr), @r"
+        - literal
+        - fallback
+        ");
     }
 
     #[test]
@@ -2681,18 +2613,14 @@ mod tests {
             Some(&info),
             0
         ));
-        assert_json_snapshot!(Value::Array(arr), @r#"
-        [
-          "match",
-          [
-            "get",
-            "kind"
-          ],
-          "a",
-          "out",
-          "fallback"
-        ]
-        "#);
+        assert_yaml_snapshot!(Value::Array(arr), @r"
+        - match
+        - - get
+          - kind
+        - a
+        - out
+        - fallback
+        ");
     }
 
     #[test]
@@ -2754,12 +2682,10 @@ mod tests {
             0
         ));
         // "name" is always present → truncate alt_name and default, unwrap single arm.
-        assert_json_snapshot!(Value::Array(arr), @r#"
-        [
-          "get",
-          "name"
-        ]
-        "#);
+        assert_yaml_snapshot!(Value::Array(arr), @r"
+        - get
+        - name
+        ");
     }
 
     #[test]
@@ -2779,19 +2705,13 @@ mod tests {
             0
         ));
         // "name" not always present, but "alt_name" is → truncate "default".
-        assert_json_snapshot!(Value::Array(arr), @r#"
-        [
-          "coalesce",
-          [
-            "get",
-            "name"
-          ],
-          [
-            "get",
-            "alt_name"
-          ]
-        ]
-        "#);
+        assert_yaml_snapshot!(Value::Array(arr), @r"
+        - coalesce
+        - - get
+          - name
+        - - get
+          - alt_name
+        ");
     }
 
     #[test]

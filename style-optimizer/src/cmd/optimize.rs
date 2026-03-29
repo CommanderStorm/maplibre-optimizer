@@ -82,6 +82,11 @@ pub struct OptimizeArgs {
     #[arg(long)]
     cleanup: bool,
 
+    /// Merge adjacent layers with the same type/source/source-layer into fewer
+    /// layers using data-driven `case`/`match` expressions and synthesised sort-keys.
+    #[arg(long)]
+    layer_merge: bool,
+
     /// Run JSON-tree validation after optimization (`maplibre_style_spec::validate`).
     #[arg(long)]
     validate: bool,
@@ -138,6 +143,7 @@ pub fn run(args: OptimizeArgs) -> anyhow::Result<()> {
             simplify_expressions: args.simplify_expressions,
             minify_colors: args.minify_colors,
             cleanup: args.cleanup,
+            layer_merge: args.layer_merge,
         }
     };
     optimize_style_json_value_with_stats(&mut value, &mir, &passes, tile_stats.as_ref());

@@ -340,6 +340,6 @@ mod tests {
             !layers.common_fields.is_empty(),
             "layers must have common fields"
         );
-        insta::assert_json_snapshot!("decode_top_level", layers);
+        insta::assert_yaml_snapshot!("decode_top_level", layers);
     }
 }

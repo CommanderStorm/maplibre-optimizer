@@ -101,7 +101,7 @@ fn strip_layer_defaults(layer: &mut Value, layer_type: &str, mir: &MirSpec) {
 
 #[cfg(test)]
 mod tests {
-    use insta::assert_json_snapshot;
+    use insta::assert_yaml_snapshot;
     use serde_json::json;
 
     use super::*;
@@ -125,14 +125,11 @@ mod tests {
             }]
         });
         walk_style_mut(&mut v, &mir, &mut StripDefaultsVisitor { mir: &mir });
-        assert_json_snapshot!(v["layers"][0], @r##"
-        {
-          "id": "x",
-          "paint": {
-            "fill-color": "#ff0000"
-          },
-          "type": "fill"
-        }
+        assert_yaml_snapshot!(v["layers"][0], @r##"
+        id: x
+        paint:
+          fill-color: "#ff0000"
+        type: fill
         "##);
     }
 
@@ -147,12 +144,10 @@ mod tests {
             }]
         });
         walk_style_mut(&mut v, &mir, &mut StripDefaultsVisitor { mir: &mir });
-        assert_json_snapshot!(v["layers"][0], @r#"
-        {
-          "id": "x",
-          "type": "fill"
-        }
-        "#);
+        assert_yaml_snapshot!(v["layers"][0], @r"
+        id: x
+        type: fill
+        ");
     }
 
     #[test]
@@ -166,15 +161,12 @@ mod tests {
             }]
         });
         walk_style_mut(&mut v, &mir, &mut StripDefaultsVisitor { mir: &mir });
-        assert_json_snapshot!(v["layers"][0], @r#"
-        {
-          "id": "x",
-          "paint": {
-            "fill-opacity": 0.5
-          },
-          "type": "fill"
-        }
-        "#);
+        assert_yaml_snapshot!(v["layers"][0], @r"
+        id: x
+        paint:
+          fill-opacity: 0.5
+        type: fill
+        ");
     }
 
     #[test]
@@ -189,18 +181,14 @@ mod tests {
             }]
         });
         walk_style_mut(&mut v, &mir, &mut StripDefaultsVisitor { mir: &mir });
-        assert_json_snapshot!(v["layers"][0], @r#"
-        {
-          "id": "x",
-          "paint": {
-            "fill-opacity": [
-              "literal",
-              1
-            ]
-          },
-          "type": "fill"
-        }
-        "#);
+        assert_yaml_snapshot!(v["layers"][0], @r"
+        id: x
+        paint:
+          fill-opacity:
+            - literal
+            - 1
+        type: fill
+        ");
     }
 
     #[test]
@@ -219,24 +207,19 @@ mod tests {
             }]
         });
         walk_style_mut(&mut v, &mir, &mut StripDefaultsVisitor { mir: &mir });
-        assert_json_snapshot!(v["layers"][0], @r#"
-        {
-          "id": "x",
-          "layout": {
-            "text-field": "x",
-            "text-offset": [
-              2,
-              2
-            ],
-            "text-radial-offset": 0,
-            "text-variable-anchor": [
-              "top",
-              "bottom"
-            ]
-          },
-          "type": "symbol"
-        }
-        "#);
+        assert_yaml_snapshot!(v["layers"][0], @r"
+        id: x
+        layout:
+          text-field: x
+          text-offset:
+            - 2
+            - 2
+          text-radial-offset: 0
+          text-variable-anchor:
+            - top
+            - bottom
+        type: symbol
+        ");
     }
 
     #[test]
@@ -254,19 +237,15 @@ mod tests {
             }]
         });
         walk_style_mut(&mut v, &mir, &mut StripDefaultsVisitor { mir: &mir });
-        assert_json_snapshot!(v["layers"][0], @r#"
-        {
-          "id": "x",
-          "layout": {
-            "text-field": "x",
-            "text-variable-anchor": [
-              "top",
-              "bottom"
-            ]
-          },
-          "type": "symbol"
-        }
-        "#);
+        assert_yaml_snapshot!(v["layers"][0], @r"
+        id: x
+        layout:
+          text-field: x
+          text-variable-anchor:
+            - top
+            - bottom
+        type: symbol
+        ");
     }
 
     #[test]
@@ -280,11 +259,9 @@ mod tests {
             }]
         });
         walk_style_mut(&mut v, &mir, &mut StripDefaultsVisitor { mir: &mir });
-        assert_json_snapshot!(v["layers"][0], @r#"
-        {
-          "id": "x",
-          "type": "line"
-        }
-        "#);
+        assert_yaml_snapshot!(v["layers"][0], @r"
+        id: x
+        type: line
+        ");
     }
 }

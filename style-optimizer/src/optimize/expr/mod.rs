@@ -317,9 +317,7 @@ impl StyleVisitor for NormalizeFoldVisitor<'_> {
     fn visit_filter(&mut self, layer_index: usize, _: &str, filter: &mut Value) {
         if self.passes.constant_fold {
             // Special case: fold ["id"] → ["literal", null] when no feature IDs.
-            if should_fold_id(self.stats, self.layer_info, layer_index)
-                && fold_id_to_null(filter)
-            {
+            if should_fold_id(self.stats, self.layer_info, layer_index) && fold_id_to_null(filter) {
                 self.changed = true;
             }
             for rule in RULES {

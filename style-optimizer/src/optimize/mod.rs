@@ -19,6 +19,7 @@ mod color;
 mod dead;
 mod defaults;
 pub(crate) mod expr;
+mod merge;
 mod metadata;
 pub(crate) mod selectivity;
 pub(crate) mod source_util;
@@ -58,6 +59,7 @@ pub struct OptPasses {
     pub simplify_expressions: bool,
     pub minify_colors: bool,
     pub cleanup: bool,
+    pub layer_merge: bool,
 }
 
 impl OptPasses {
@@ -75,6 +77,7 @@ impl OptPasses {
             simplify_expressions: true,
             minify_colors: true,
             cleanup: true,
+            layer_merge: true,
         }
     }
 }
@@ -94,7 +97,11 @@ fn wants_expression_passes(passes: &OptPasses) -> bool {
 }
 
 fn wants_structural_passes(passes: &OptPasses) -> bool {
-    passes.strip_metadata || passes.dead_elimination || passes.metadata_refinement || passes.cleanup
+    passes.strip_metadata
+        || passes.dead_elimination
+        || passes.metadata_refinement
+        || passes.cleanup
+        || passes.layer_merge
 }
 
 // ── Public entry points ─────────────────────────────────────────────────────
@@ -127,6 +134,12 @@ pub fn optimize_style_json_value_with_stats(
     {
         run_structural_passes(&mut style, passes, stats);
         sync_typed_to_json(&style, v);
+    }
+
+    // 3. Layer merging — runs on JSON after all other passes so that dead
+    //    layers are gone and expressions are simplified before grouping.
+    if passes.layer_merge {
+        merge::layer_merge(v, mir);
     }
 }
 
@@ -309,7 +322,7 @@ fn run_json_expression_passes(
 mod tests {
     use std::path::Path;
 
-    use insta::assert_json_snapshot;
+    use insta::assert_yaml_snapshot;
 
     use super::*;
     use crate::load_intermediate_spec_from_v8_path;
@@ -331,16 +344,13 @@ mod tests {
         let mir = sample_mir();
         let mut v = serde_json::json!({"version":8,"sources":{},"layers":[{"id":"x","type":"fill","filter":["any",["==",1,1]]}]});
         optimize_style_json_value(&mut v, &mir, &passes_unary_only());
-        assert_json_snapshot!(v["layers"][0], @r#"
-        {
-          "filter": [
-            "==",
-            1,
-            1
-          ],
-          "id": "x",
-          "type": "fill"
-        }
+        assert_yaml_snapshot!(v["layers"][0], @r#"
+        filter:
+          - "=="
+          - 1
+          - 1
+        id: x
+        type: fill
         "#);
     }
 
@@ -358,16 +368,13 @@ mod tests {
         let mir = sample_mir();
         let mut v = serde_json::json!({"version":8,"sources":{},"layers":[{"id":"x","type":"fill","filter":["any",["any",["==",1,1]]]}]});
         optimize_style_json_value(&mut v, &mir, &passes_unary_only());
-        assert_json_snapshot!(v["layers"][0], @r#"
-        {
-          "filter": [
-            "==",
-            1,
-            1
-          ],
-          "id": "x",
-          "type": "fill"
-        }
+        assert_yaml_snapshot!(v["layers"][0], @r#"
+        filter:
+          - "=="
+          - 1
+          - 1
+        id: x
+        type: fill
         "#);
     }
 
@@ -376,16 +383,13 @@ mod tests {
         let mir = sample_mir();
         let mut v = serde_json::json!({"version":8,"sources":{},"layers":[{"id":"x","type":"fill","filter":["all",["==",1,1]]}]});
         optimize_style_json_value(&mut v, &mir, &passes_unary_only());
-        assert_json_snapshot!(v["layers"][0], @r#"
-        {
-          "filter": [
-            "==",
-            1,
-            1
-          ],
-          "id": "x",
-          "type": "fill"
-        }
+        assert_yaml_snapshot!(v["layers"][0], @r#"
+        filter:
+          - "=="
+          - 1
+          - 1
+        id: x
+        type: fill
         "#);
     }
 
@@ -403,16 +407,13 @@ mod tests {
         let mir = sample_mir();
         let mut v = serde_json::json!({"version":8,"sources":{},"layers":[{"id":"x","type":"fill","filter":["!",["!",["has","x"]]]}]});
         optimize_style_json_value(&mut v, &mir, &passes_unary_only());
-        assert_json_snapshot!(v["layers"][0], @r#"
-        {
-          "filter": [
-            "has",
-            "x"
-          ],
-          "id": "x",
-          "type": "fill"
-        }
-        "#);
+        assert_yaml_snapshot!(v["layers"][0], @r"
+        filter:
+          - has
+          - x
+        id: x
+        type: fill
+        ");
     }
 
     #[test]
@@ -420,18 +421,13 @@ mod tests {
         let mir = sample_mir();
         let mut v = serde_json::json!({"version":8,"sources":{},"layers":[{"id":"x","type":"fill","filter":["!",["!",["!",["has","x"]]]]}]});
         optimize_style_json_value(&mut v, &mir, &passes_unary_only());
-        assert_json_snapshot!(v["layers"][0], @r#"
-        {
-          "filter": [
-            "!",
-            [
-              "has",
-              "x"
-            ]
-          ],
-          "id": "x",
-          "type": "fill"
-        }
+        assert_yaml_snapshot!(v["layers"][0], @r#"
+        filter:
+          - "!"
+          - - has
+            - x
+        id: x
+        type: fill
         "#);
     }
 
@@ -447,19 +443,14 @@ mod tests {
                 ..Default::default()
             },
         );
-        assert_json_snapshot!(v["layers"][0], @r#"
-        {
-          "filter": [
-            "!=",
-            [
-              "get",
-              "a"
-            ],
-            1
-          ],
-          "id": "x",
-          "type": "fill"
-        }
+        assert_yaml_snapshot!(v["layers"][0], @r#"
+        filter:
+          - "!="
+          - - get
+            - a
+          - 1
+        id: x
+        type: fill
         "#);
     }
 
@@ -475,13 +466,11 @@ mod tests {
                 ..Default::default()
             },
         );
-        assert_json_snapshot!(v["layers"][0], @r#"
-        {
-          "filter": false,
-          "id": "x",
-          "type": "fill"
-        }
-        "#);
+        assert_yaml_snapshot!(v["layers"][0], @r"
+        filter: false
+        id: x
+        type: fill
+        ");
     }
 
     #[test]
@@ -496,29 +485,21 @@ mod tests {
                 ..Default::default()
             },
         );
-        assert_json_snapshot!(v, @r#"
-        {
-          "layers": [
-            {
-              "filter": [
-                "==",
-                1,
-                1
-              ],
-              "id": "y",
-              "source": "b",
-              "source-layer": "r",
-              "type": "line"
-            }
-          ],
-          "sources": {
-            "b": {
-              "type": "vector",
-              "url": "https://example/b.json"
-            }
-          },
-          "version": 8
-        }
+        assert_yaml_snapshot!(v, @r#"
+        layers:
+          - filter:
+              - "=="
+              - 1
+              - 1
+            id: y
+            source: b
+            source-layer: r
+            type: line
+        sources:
+          b:
+            type: vector
+            url: "https://example/b.json"
+        version: 8
         "#);
     }
 
@@ -534,14 +515,12 @@ mod tests {
                 ..Default::default()
             },
         );
-        assert_json_snapshot!(v["layers"][0], @r#"
-        {
-          "filter": true,
-          "id": "x",
-          "minzoom": 7.0,
-          "type": "fill"
-        }
-        "#);
+        assert_yaml_snapshot!(v["layers"][0], @r"
+        filter: true
+        id: x
+        minzoom: 7
+        type: fill
+        ");
     }
 
     #[test]
@@ -556,23 +535,16 @@ mod tests {
                 ..Default::default()
             },
         );
-        assert_json_snapshot!(v["layers"][0], @r#"
-        {
-          "filter": [
-            "any",
-            [
-              "literal",
-              true
-            ],
-            [
-              "==",
-              1,
-              2
-            ]
-          ],
-          "id": "x",
-          "type": "fill"
-        }
+        assert_yaml_snapshot!(v["layers"][0], @r#"
+        filter:
+          - any
+          - - literal
+            - true
+          - - "=="
+            - 1
+            - 2
+        id: x
+        type: fill
         "#);
     }
 
@@ -588,13 +560,11 @@ mod tests {
                 ..Default::default()
             },
         );
-        assert_json_snapshot!(v["layers"][0], @r#"
-        {
-          "filter": 3.0,
-          "id": "x",
-          "type": "fill"
-        }
-        "#);
+        assert_yaml_snapshot!(v["layers"][0], @r"
+        filter: 3
+        id: x
+        type: fill
+        ");
     }
 
     #[test]
@@ -609,13 +579,11 @@ mod tests {
                 ..Default::default()
             },
         );
-        assert_json_snapshot!(v["layers"][0], @r#"
-        {
-          "filter": "hello world",
-          "id": "x",
-          "type": "fill"
-        }
-        "#);
+        assert_yaml_snapshot!(v["layers"][0], @r"
+        filter: hello world
+        id: x
+        type: fill
+        ");
     }
 
     #[test]
@@ -630,15 +598,12 @@ mod tests {
                 ..Default::default()
             },
         );
-        assert_json_snapshot!(v["layers"][0], @r#"
-        {
-          "id": "x",
-          "paint": {
-            "fill-opacity": 0.5
-          },
-          "type": "fill"
-        }
-        "#);
+        assert_yaml_snapshot!(v["layers"][0], @r"
+        id: x
+        paint:
+          fill-opacity: 0.5
+        type: fill
+        ");
     }
 
     #[test]
@@ -653,15 +618,12 @@ mod tests {
                 ..Default::default()
             },
         );
-        assert_json_snapshot!(v["layers"][0], @r#"
-        {
-          "id": "x",
-          "paint": {
-            "line-width": 2
-          },
-          "type": "line"
-        }
-        "#);
+        assert_yaml_snapshot!(v["layers"][0], @r"
+        id: x
+        paint:
+          line-width: 2
+        type: line
+        ");
     }
 
     #[test]
@@ -676,28 +638,20 @@ mod tests {
                 ..Default::default()
             },
         );
-        assert_json_snapshot!(v["layers"][0], @r##"
-        {
-          "id": "x",
-          "paint": {
-            "line-color": [
-              "match",
-              [
-                "get",
-                "class"
-              ],
-              [
-                "motorway",
-                "trunk"
-              ],
-              "#ff0000",
-              "primary",
-              "#ff6600",
-              "#cccccc"
-            ]
-          },
-          "type": "line"
-        }
+        assert_yaml_snapshot!(v["layers"][0], @r##"
+        id: x
+        paint:
+          line-color:
+            - match
+            - - get
+              - class
+            - - motorway
+              - trunk
+            - "#ff0000"
+            - primary
+            - "#ff6600"
+            - "#cccccc"
+        type: line
         "##);
     }
 
@@ -713,18 +667,13 @@ mod tests {
                 ..Default::default()
             },
         );
-        assert_json_snapshot!(v, @r#"
-        {
-          "layers": [
-            {
-              "id": "x",
-              "type": "fill"
-            }
-          ],
-          "sources": {},
-          "version": 8
-        }
-        "#);
+        assert_yaml_snapshot!(v, @r"
+        layers:
+          - id: x
+            type: fill
+        sources: {}
+        version: 8
+        ");
     }
 
     #[test]
@@ -739,14 +688,11 @@ mod tests {
                 ..Default::default()
             },
         );
-        assert_json_snapshot!(v["layers"][0], @r##"
-        {
-          "id": "x",
-          "paint": {
-            "fill-color": "#f00"
-          },
-          "type": "fill"
-        }
+        assert_yaml_snapshot!(v["layers"][0], @r##"
+        id: x
+        paint:
+          fill-color: "#f00"
+        type: fill
         "##);
     }
 
@@ -762,7 +708,7 @@ mod tests {
                 ..Default::default()
             },
         );
-        assert_json_snapshot!(v["layers"], @"[]");
+        assert_yaml_snapshot!(v["layers"], @"[]");
     }
 
     #[test]
@@ -779,7 +725,7 @@ mod tests {
                 ..Default::default()
             },
         );
-        assert_json_snapshot!(v["layers"], @"[]");
+        assert_yaml_snapshot!(v["layers"], @"[]");
     }
 
     #[test]
@@ -796,7 +742,7 @@ mod tests {
                 ..Default::default()
             },
         );
-        assert_json_snapshot!(v["layers"], @"[]");
+        assert_yaml_snapshot!(v["layers"], @"[]");
     }
 
     #[test]
@@ -813,7 +759,7 @@ mod tests {
                 ..Default::default()
             },
         );
-        assert_json_snapshot!(v["layers"], @"[]");
+        assert_yaml_snapshot!(v["layers"], @"[]");
     }
 
     #[test]
@@ -830,20 +776,15 @@ mod tests {
                 ..Default::default()
             },
         );
-        assert_json_snapshot!(v["layers"], @r#"
-        [
-          {
-            "id": "sym",
-            "paint": {
-              "icon-opacity": 0,
-              "text-opacity": 1
-            },
-            "source": "s",
-            "source-layer": "l",
-            "type": "symbol"
-          }
-        ]
-        "#);
+        assert_yaml_snapshot!(v["layers"], @r"
+        - id: sym
+          paint:
+            icon-opacity: 0
+            text-opacity: 1
+          source: s
+          source-layer: l
+          type: symbol
+        ");
     }
 
     #[test]
@@ -869,20 +810,15 @@ mod tests {
                 ..Default::default()
             },
         );
-        assert_json_snapshot!(v["layers"][0], @r#"
-        {
-          "filter": [
-            "==",
-            [
-              "get",
-              "class"
-            ],
-            "river"
-          ],
-          "id": "x",
-          "minzoom": 7.0,
-          "type": "fill"
-        }
+        assert_yaml_snapshot!(v["layers"][0], @r#"
+        filter:
+          - "=="
+          - - get
+            - class
+          - river
+        id: x
+        minzoom: 7
+        type: fill
         "#);
     }
 
@@ -902,28 +838,20 @@ mod tests {
                 ..Default::default()
             },
         );
-        assert_json_snapshot!(v["layers"][0], @r#"
-        {
-          "id": "x",
-          "minzoom": 13.5,
-          "paint": {
-            "line-width": [
-              "interpolate",
-              [
-                "linear"
-              ],
-              [
-                "zoom"
-              ],
-              13.5,
-              0,
-              14,
-              2.5
-            ]
-          },
-          "type": "line"
-        }
-        "#);
+        assert_yaml_snapshot!(v["layers"][0], @r"
+        id: x
+        minzoom: 13.5
+        paint:
+          line-width:
+            - interpolate
+            - - linear
+            - - zoom
+            - 13.5
+            - 0
+            - 14
+            - 2.5
+        type: line
+        ");
     }
 
     #[test]
@@ -940,24 +868,18 @@ mod tests {
                 ..Default::default()
             },
         );
-        assert_json_snapshot!(v["layers"][0], @r#"
-        {
-          "id": "x",
-          "minzoom": 15.0,
-          "paint": {
-            "line-width": [
-              "step",
-              [
-                "zoom"
-              ],
-              0,
-              15,
-              2
-            ]
-          },
-          "type": "line"
-        }
-        "#);
+        assert_yaml_snapshot!(v["layers"][0], @r"
+        id: x
+        minzoom: 15
+        paint:
+          line-width:
+            - step
+            - - zoom
+            - 0
+            - 15
+            - 2
+        type: line
+        ");
     }
 
     #[test]
@@ -974,30 +896,22 @@ mod tests {
                 ..Default::default()
             },
         );
-        assert_json_snapshot!(v["layers"][0], @r#"
-        {
-          "id": "x",
-          "minzoom": 10.0,
-          "paint": {
-            "line-width": [
-              "interpolate",
-              [
-                "linear"
-              ],
-              [
-                "zoom"
-              ],
-              5,
-              0,
-              10,
-              0,
-              14,
-              2.5
-            ]
-          },
-          "type": "line"
-        }
-        "#);
+        assert_yaml_snapshot!(v["layers"][0], @r"
+        id: x
+        minzoom: 10
+        paint:
+          line-width:
+            - interpolate
+            - - linear
+            - - zoom
+            - 5
+            - 0
+            - 10
+            - 0
+            - 14
+            - 2.5
+        type: line
+        ");
     }
 
     #[test]
@@ -1020,37 +934,26 @@ mod tests {
                 ..Default::default()
             },
         );
-        assert_json_snapshot!(v["layers"][0], @r#"
-        {
-          "id": "x",
-          "minzoom": 12.0,
-          "paint": {
-            "line-opacity": [
-              "step",
-              [
-                "zoom"
-              ],
-              0,
-              12,
-              1
-            ],
-            "line-width": [
-              "interpolate",
-              [
-                "linear"
-              ],
-              [
-                "zoom"
-              ],
-              10,
-              0,
-              14,
-              2
-            ]
-          },
-          "type": "line"
-        }
-        "#);
+        assert_yaml_snapshot!(v["layers"][0], @r"
+        id: x
+        minzoom: 12
+        paint:
+          line-opacity:
+            - step
+            - - zoom
+            - 0
+            - 12
+            - 1
+          line-width:
+            - interpolate
+            - - linear
+            - - zoom
+            - 10
+            - 0
+            - 14
+            - 2
+        type: line
+        ");
     }
 
     #[test]
@@ -1068,28 +971,20 @@ mod tests {
                 ..Default::default()
             },
         );
-        assert_json_snapshot!(v["layers"][0], @r#"
-        {
-          "id": "x",
-          "minzoom": 16,
-          "paint": {
-            "line-width": [
-              "interpolate",
-              [
-                "linear"
-              ],
-              [
-                "zoom"
-              ],
-              10,
-              0,
-              14,
-              2
-            ]
-          },
-          "type": "line"
-        }
-        "#);
+        assert_yaml_snapshot!(v["layers"][0], @r"
+        id: x
+        minzoom: 16
+        paint:
+          line-width:
+            - interpolate
+            - - linear
+            - - zoom
+            - 10
+            - 0
+            - 14
+            - 2
+        type: line
+        ");
     }
 
     #[test]
@@ -1106,21 +1001,15 @@ mod tests {
                 ..Default::default()
             },
         );
-        assert_json_snapshot!(v["layers"][0], @r#"
-        {
-          "id": "x",
-          "paint": {
-            "line-width": [
-              "*",
-              [
-                "get",
-                "w"
-              ],
-              2
-            ]
-          },
-          "type": "line"
-        }
+        assert_yaml_snapshot!(v["layers"][0], @r#"
+        id: x
+        paint:
+          line-width:
+            - "*"
+            - - get
+              - w
+            - 2
+        type: line
         "#);
     }
 
@@ -1139,27 +1028,19 @@ mod tests {
                 ..Default::default()
             },
         );
-        assert_json_snapshot!(v["layers"][0], @r#"
-        {
-          "id": "x",
-          "paint": {
-            "line-width": [
-              "interpolate",
-              [
-                "linear"
-              ],
-              [
-                "zoom"
-              ],
-              5,
-              0,
-              10,
-              0
-            ]
-          },
-          "type": "line"
-        }
-        "#);
+        assert_yaml_snapshot!(v["layers"][0], @r"
+        id: x
+        paint:
+          line-width:
+            - interpolate
+            - - linear
+            - - zoom
+            - 5
+            - 0
+            - 10
+            - 0
+        type: line
+        ");
     }
 
     #[test]
@@ -1172,39 +1053,28 @@ mod tests {
         ]});
         let passes = OptPasses::all();
         optimize_style_json_value(&mut v, &mir, &passes);
-        assert_json_snapshot!(v["layers"][0], @r#"
-        {
-          "filter": [
-            "==",
-            [
-              "get",
-              "class"
-            ],
-            "motorway"
-          ],
-          "id": "road",
-          "minzoom": 10.0,
-          "paint": {
-            "line-width": [
-              "interpolate",
-              [
-                "linear"
-              ],
-              [
-                "zoom"
-              ],
-              5,
-              0,
-              10,
-              0,
-              14,
-              2.5
-            ]
-          },
-          "source": "s",
-          "source-layer": "transportation",
-          "type": "line"
-        }
+        assert_yaml_snapshot!(v["layers"][0], @r#"
+        filter:
+          - "=="
+          - - get
+            - class
+          - motorway
+        id: road
+        minzoom: 10
+        paint:
+          line-width:
+            - interpolate
+            - - linear
+            - - zoom
+            - 5
+            - 0
+            - 10
+            - 0
+            - 14
+            - 2.5
+        source: s
+        source-layer: transportation
+        type: line
         "#);
     }
 
@@ -1251,7 +1121,7 @@ mod tests {
             },
             Some(&stats),
         );
-        assert_json_snapshot!(v["layers"], @"[]");
+        assert_yaml_snapshot!(v["layers"], @"[]");
     }
 
     #[test]
@@ -1308,16 +1178,14 @@ mod tests {
             },
             Some(&stats),
         );
-        assert_json_snapshot!(v["layers"][0], @r#"
-        {
-          "id": "water-fill",
-          "maxzoom": 14.0,
-          "minzoom": 6.0,
-          "source": "openmaptiles",
-          "source-layer": "water",
-          "type": "fill"
-        }
-        "#);
+        assert_yaml_snapshot!(v["layers"][0], @r"
+        id: water-fill
+        maxzoom: 14
+        minzoom: 6
+        source: openmaptiles
+        source-layer: water
+        type: fill
+        ");
     }
 
     #[test]
@@ -1341,15 +1209,13 @@ mod tests {
             },
             Some(&stats),
         );
-        assert_json_snapshot!(v["layers"][0], @r#"
-        {
-          "filter": false,
-          "id": "water-fill",
-          "source": "openmaptiles",
-          "source-layer": "water",
-          "type": "fill"
-        }
-        "#);
+        assert_yaml_snapshot!(v["layers"][0], @r"
+        filter: false
+        id: water-fill
+        source: openmaptiles
+        source-layer: water
+        type: fill
+        ");
     }
 
     // ── Single-value property folding ──────────────────────────────────────
@@ -1382,15 +1248,13 @@ mod tests {
             },
             Some(&stats),
         );
-        assert_json_snapshot!(v["layers"][0], @r#"
-        {
-          "filter": true,
-          "id": "w",
-          "source": "openmaptiles",
-          "source-layer": "water",
-          "type": "fill"
-        }
-        "#);
+        assert_yaml_snapshot!(v["layers"][0], @r"
+        filter: true
+        id: w
+        source: openmaptiles
+        source-layer: water
+        type: fill
+        ");
     }
 
     #[test]
@@ -1423,15 +1287,13 @@ mod tests {
             },
             Some(&stats),
         );
-        assert_json_snapshot!(v["layers"][0], @r#"
-        {
-          "filter": true,
-          "id": "w",
-          "source": "openmaptiles",
-          "source-layer": "water",
-          "type": "fill"
-        }
-        "#);
+        assert_yaml_snapshot!(v["layers"][0], @r"
+        filter: true
+        id: w
+        source: openmaptiles
+        source-layer: water
+        type: fill
+        ");
     }
 
     #[test]
@@ -1534,17 +1396,14 @@ mod tests {
             },
             Some(&stats),
         );
-        assert_json_snapshot!(v["layers"][0], @r#"
-        {
-          "id": "w",
-          "paint": {
-            "fill-opacity": 1
-          },
-          "source": "openmaptiles",
-          "source-layer": "water",
-          "type": "fill"
-        }
-        "#);
+        assert_yaml_snapshot!(v["layers"][0], @r"
+        id: w
+        paint:
+          fill-opacity: 1
+        source: openmaptiles
+        source-layer: water
+        type: fill
+        ");
     }
 
     #[test]
@@ -1620,12 +1479,10 @@ mod tests {
                 ..Default::default()
             },
         );
-        assert_json_snapshot!(v["layers"][0], @r#"
-        {
-          "id": "x",
-          "type": "fill"
-        }
-        "#);
+        assert_yaml_snapshot!(v["layers"][0], @r"
+        id: x
+        type: fill
+        ");
     }
 
     #[test]
@@ -1642,13 +1499,11 @@ mod tests {
                 ..Default::default()
             },
         );
-        assert_json_snapshot!(v["layers"][0], @r#"
-        {
-          "filter": false,
-          "id": "x",
-          "type": "fill"
-        }
-        "#);
+        assert_yaml_snapshot!(v["layers"][0], @r"
+        filter: false
+        id: x
+        type: fill
+        ");
     }
 
     // ── Color minification ──────────────────────────────────────────────
@@ -1667,14 +1522,11 @@ mod tests {
                 ..Default::default()
             },
         );
-        assert_json_snapshot!(v["layers"][0], @r##"
-        {
-          "id": "x",
-          "paint": {
-            "fill-color": "#fff"
-          },
-          "type": "fill"
-        }
+        assert_yaml_snapshot!(v["layers"][0], @r##"
+        id: x
+        paint:
+          fill-color: "#fff"
+        type: fill
         "##);
     }
 
@@ -1692,14 +1544,11 @@ mod tests {
                 ..Default::default()
             },
         );
-        assert_json_snapshot!(v["layers"][0], @r##"
-        {
-          "id": "x",
-          "paint": {
-            "fill-color": "#000"
-          },
-          "type": "fill"
-        }
+        assert_yaml_snapshot!(v["layers"][0], @r##"
+        id: x
+        paint:
+          fill-color: "#000"
+        type: fill
         "##);
     }
 
@@ -1717,14 +1566,11 @@ mod tests {
                 ..Default::default()
             },
         );
-        assert_json_snapshot!(v["layers"][0], @r##"
-        {
-          "id": "x",
-          "paint": {
-            "fill-color": "#fff"
-          },
-          "type": "fill"
-        }
+        assert_yaml_snapshot!(v["layers"][0], @r##"
+        id: x
+        paint:
+          fill-color: "#fff"
+        type: fill
         "##);
     }
 
@@ -1742,13 +1588,11 @@ mod tests {
                 ..Default::default()
             },
         );
-        assert_json_snapshot!(v, @r#"
-        {
-          "layers": [],
-          "sources": {},
-          "version": 8
-        }
-        "#);
+        assert_yaml_snapshot!(v, @r"
+        layers: []
+        sources: {}
+        version: 8
+        ");
     }
 
     #[test]
@@ -1763,13 +1607,11 @@ mod tests {
                 ..Default::default()
             },
         );
-        assert_json_snapshot!(v, @r#"
-        {
-          "bearing": 45,
-          "layers": [],
-          "sources": {},
-          "version": 8
-        }
-        "#);
+        assert_yaml_snapshot!(v, @r"
+        bearing: 45
+        layers: []
+        sources: {}
+        version: 8
+        ");
     }
 }

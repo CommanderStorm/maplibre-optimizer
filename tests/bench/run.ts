@@ -7,7 +7,7 @@
  * all previous ones, showing the marginal contribution of each pass.
  *
  * Usage:
- *   just bench                                      # all scenarios, 15 runs, 11 ablation steps
+ *   just bench                                      # all scenarios, 15 runs, 12 ablation steps
  *   just bench --runs 1 munich-zigzag               # single quick scenario
  *   just bench --mbtiles /path/to/tiles.mbtiles     # enable step 12 (selectivity_reorder)
  *   just bench-debug tokyo                          # with browser console output
@@ -109,7 +109,8 @@ const ABLATION_STEPS: { pass: string; flag: string }[] = [
   { pass: "dead_elimination",    flag: "--dead-elimination" },
   { pass: "metadata_refinement", flag: "--metadata-refinement" },
   { pass: "cleanup",             flag: "--cleanup" },
-  // Step 12: only when --mbtiles is provided
+  { pass: "layer_merge",         flag: "--layer-merge" },
+  // Only when --mbtiles is provided
   { pass: "selectivity_reorder", flag: "--selectivity-reorder" },
 ];
 

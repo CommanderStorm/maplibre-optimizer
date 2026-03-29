@@ -1,0 +1,888 @@
+//! Layer merging: collapse adjacent same-type/source/source-layer layers into
+//! fewer layers with data-driven `case`/`match` expressions and synthesised sort-keys.
+//!
+//! **Phase 1** — literal-only properties, identical zoom, no existing sort-key.
+//! **Phase 2** — `match` optimisation when all filters are `["==", ["get", P], L]`.
+
+use maplibre_style_spec::mir::{MirPropertySection, MirSpec};
+use serde_json::Value;
+
+/// Layer types that support a sort-key layout property.
+fn sort_key_name(layer_type: &str) -> Option<&'static str> {
+    match layer_type {
+        "fill" => Some("fill-sort-key"),
+        "line" => Some("line-sort-key"),
+        "circle" => Some("circle-sort-key"),
+        "symbol" => Some("symbol-sort-key"),
+        _ => None,
+    }
+}
+
+/// Merge adjacent layers that share type, source, source-layer, and zoom range.
+///
+/// Synthesises `case`/`match` expressions for differing paint/layout properties
+/// and a sort-key to preserve inter-layer draw order.
+pub fn layer_merge(v: &mut Value, mir: &MirSpec) {
+    let Some(layers) = v.get_mut("layers").and_then(Value::as_array_mut) else {
+        return;
+    };
+
+    let groups = find_merge_groups(layers);
+    if groups.is_empty() {
+        return;
+    }
+
+    let old_layers = std::mem::take(layers);
+    let mut i = 0;
+
+    for &(start, end) in &groups {
+        while i < start {
+            layers.push(old_layers[i].clone());
+            i += 1;
+        }
+        layers.push(build_merged_layer(&old_layers[start..end], mir));
+        i = end;
+    }
+    while i < old_layers.len() {
+        layers.push(old_layers[i].clone());
+        i += 1;
+    }
+}
+
+// ── Grouping ─────────────────────────────────────────────────────────────────
+
+/// Returns `(start, end)` pairs of mergeable adjacent layer runs.
+fn find_merge_groups(layers: &[Value]) -> Vec<(usize, usize)> {
+    let mut groups = Vec::new();
+    let mut i = 0;
+
+    while i < layers.len() {
+        if !is_merge_candidate(&layers[i]) {
+            i += 1;
+            continue;
+        }
+
+        let start = i;
+        i += 1;
+
+        while i < layers.len()
+            && is_merge_candidate(&layers[i])
+            && same_group_key(&layers[start], &layers[i])
+        {
+            i += 1;
+        }
+
+        if i - start >= 2 && differing_props_are_scalar(&layers[start..i]) {
+            groups.push((start, i));
+        }
+    }
+
+    groups
+}
+
+/// A layer is a merge candidate if it is a typed layer whose type supports
+/// sort-key, has a filter, and has no existing sort-key property.
+fn is_merge_candidate(layer: &Value) -> bool {
+    let Some(lt) = layer.get("type").and_then(Value::as_str) else {
+        return false;
+    };
+    let Some(sk) = sort_key_name(lt) else {
+        return false;
+    };
+    // Must have a non-trivial filter (skip absent, null, and dead `false` filters).
+    let dominated = |f: &Value| f.is_null() || *f == Value::Bool(false);
+    if layer.get("filter").is_none_or(dominated) {
+        return false;
+    }
+    // Must not already have a sort-key.
+    !has_layout_key(layer, sk)
+}
+
+fn same_group_key(a: &Value, b: &Value) -> bool {
+    a.get("type") == b.get("type")
+        && a.get("source") == b.get("source")
+        && a.get("source-layer") == b.get("source-layer")
+        && a.get("minzoom") == b.get("minzoom")
+        && a.get("maxzoom") == b.get("maxzoom")
+}
+
+fn has_layout_key(layer: &Value, key: &str) -> bool {
+    layer
+        .get("layout")
+        .and_then(Value::as_object)
+        .is_some_and(|o| o.contains_key(key))
+}
+
+/// Every differing paint/layout property across the group must be a scalar
+/// (not an array/expression).  Uniform properties (same value everywhere,
+/// including uniform arrays) are fine.
+fn differing_props_are_scalar(layers: &[Value]) -> bool {
+    for section in ["paint", "layout"] {
+        let props = collect_property_names(layers, section);
+        for prop in &props {
+            if prop == "visibility" {
+                continue;
+            }
+            let values: Vec<Option<&Value>> = layers
+                .iter()
+                .map(|l| l.get(section).and_then(|s| s.get(prop.as_str())))
+                .collect();
+            let first = values.iter().flatten().next();
+            let uniform = first.is_some_and(|f| values.iter().all(|v| v.is_some_and(|x| x == *f)));
+            if !uniform {
+                // Every present value must be a plain scalar.
+                for v in values.into_iter().flatten() {
+                    if v.is_array() || v.is_object() {
+                        return false;
+                    }
+                }
+            }
+        }
+    }
+    true
+}
+
+fn collect_property_names(layers: &[Value], section: &str) -> Vec<String> {
+    let mut names = Vec::new();
+    for l in layers {
+        if let Some(obj) = l.get(section).and_then(Value::as_object) {
+            for k in obj.keys() {
+                if !names.contains(k) {
+                    names.push(k.clone());
+                }
+            }
+        }
+    }
+    names
+}
+
+// ── Match-pattern detection (Phase 2) ────────────────────────────────────────
+
+struct MatchPattern {
+    property: String,
+    labels: Vec<Value>,
+}
+
+/// Detect whether every filter is `["==", ["get", P], L]` (or reversed) on the
+/// same property with unique literal labels.
+fn detect_match_pattern(layers: &[Value]) -> Option<MatchPattern> {
+    let mut prop: Option<String> = None;
+    let mut labels = Vec::with_capacity(layers.len());
+
+    for l in layers {
+        let filter = l.get("filter")?.as_array()?;
+        if filter.len() != 3 || filter[0].as_str()? != "==" {
+            return None;
+        }
+
+        let (get_expr, literal) = if is_get_expr(&filter[1]) {
+            (&filter[1], &filter[2])
+        } else if is_get_expr(&filter[2]) {
+            (&filter[2], &filter[1])
+        } else {
+            return None;
+        };
+
+        if !(literal.is_string() || literal.is_number()) {
+            return None;
+        }
+
+        let p = get_expr.as_array()?[1].as_str()?;
+        match &prop {
+            None => prop = Some(p.to_owned()),
+            Some(existing) if existing == p => {}
+            _ => return None,
+        }
+
+        labels.push(literal.clone());
+    }
+
+    // Labels must be unique (duplicate labels → fall back to `case`).
+    for (i, a) in labels.iter().enumerate() {
+        if labels[i + 1..].contains(a) {
+            return None;
+        }
+    }
+
+    Some(MatchPattern {
+        property: prop?,
+        labels,
+    })
+}
+
+fn is_get_expr(v: &Value) -> bool {
+    v.as_array()
+        .is_some_and(|a| a.len() == 2 && a[0].as_str() == Some("get") && a[1].is_string())
+}
+
+// ── Merged-layer construction ────────────────────────────────────────────────
+
+fn build_merged_layer(layers: &[Value], mir: &MirSpec) -> Value {
+    let layer_type = layers[0]["type"].as_str().expect("validated in grouping");
+    let sort_key_prop = sort_key_name(layer_type).expect("validated in grouping");
+    let n = layers.len();
+    let match_pat = detect_match_pattern(layers);
+
+    let mut merged = layers[0].clone();
+    let obj = merged.as_object_mut().expect("layer is an object");
+
+    // ── Merged filter ────────────────────────────────────────────────────────
+    obj.insert(
+        "filter".into(),
+        build_merged_filter(layers, match_pat.as_ref()),
+    );
+
+    // ── Paint & layout properties ────────────────────────────────────────────
+    for section in ["paint", "layout"] {
+        let mir_section = if section == "paint" {
+            MirPropertySection::Paint
+        } else {
+            MirPropertySection::Layout
+        };
+        let props = collect_property_names(layers, section);
+
+        let section_obj = obj
+            .entry(section)
+            .or_insert_with(|| Value::Object(serde_json::Map::new()));
+        let section_map = section_obj.as_object_mut().expect("section is an object");
+
+        for prop in &props {
+            if prop == "visibility" {
+                continue;
+            }
+
+            let values: Vec<Option<&Value>> = layers
+                .iter()
+                .map(|l| l.get(section).and_then(|s| s.get(prop.as_str())))
+                .collect();
+            let first = values.iter().flatten().next();
+            let uniform = first.is_some_and(|f| values.iter().all(|v| v.is_some_and(|x| x == *f)));
+
+            if uniform {
+                if let Some(&val) = first {
+                    section_map.insert(prop.clone(), val.clone());
+                }
+                continue;
+            }
+
+            let default = mir
+                .layers
+                .field_default(layer_type, mir_section, prop)
+                .cloned()
+                .unwrap_or(Value::Null);
+
+            section_map.insert(
+                prop.clone(),
+                build_property_expr(layers, &values, &default, match_pat.as_ref()),
+            );
+        }
+    }
+
+    // ── Sort-key synthesis ───────────────────────────────────────────────────
+    let layout = obj
+        .entry("layout")
+        .or_insert_with(|| Value::Object(serde_json::Map::new()));
+    layout.as_object_mut().expect("layout is an object").insert(
+        sort_key_prop.into(),
+        build_sort_key_expr(layers, n, match_pat.as_ref()),
+    );
+
+    merged
+}
+
+fn build_merged_filter(layers: &[Value], match_pat: Option<&MatchPattern>) -> Value {
+    if let Some(pat) = match_pat {
+        // ["match", ["get", P], [L0, L1, …], true, false]
+        Value::Array(vec![
+            Value::String("match".into()),
+            Value::Array(vec![
+                Value::String("get".into()),
+                Value::String(pat.property.clone()),
+            ]),
+            Value::Array(pat.labels.clone()),
+            Value::Bool(true),
+            Value::Bool(false),
+        ])
+    } else {
+        let mut args = vec![Value::String("any".into())];
+        for l in layers {
+            if let Some(f) = l.get("filter") {
+                args.push(f.clone());
+            }
+        }
+        Value::Array(args)
+    }
+}
+
+/// Build a `case` or `match` expression for a property that differs across layers.
+///
+/// Uses reverse priority (top-most layer first) for `case` so that overlapping
+/// filters get "last painter wins" semantics.
+fn build_property_expr(
+    layers: &[Value],
+    values: &[Option<&Value>],
+    default: &Value,
+    match_pat: Option<&MatchPattern>,
+) -> Value {
+    let n = layers.len();
+
+    if let Some(pat) = match_pat {
+        // ["match", ["get", P], L0, V0, L1, V1, …, default]
+        let mut args = vec![
+            Value::String("match".into()),
+            Value::Array(vec![
+                Value::String("get".into()),
+                Value::String(pat.property.clone()),
+            ]),
+        ];
+        for (label, value) in pat.labels.iter().zip(values) {
+            args.push(label.clone());
+            args.push(value.cloned().unwrap_or_else(|| default.clone()));
+        }
+        args.push(default.clone());
+        Value::Array(args)
+    } else {
+        // ["case", filter_top, val_top, …, filter_bot, val_bot, default]
+        let mut args = vec![Value::String("case".into())];
+        for i in (0..n).rev() {
+            args.push(layers[i].get("filter").expect("validated").clone());
+            args.push(values[i].cloned().unwrap_or_else(|| default.clone()));
+        }
+        args.push(default.clone());
+        Value::Array(args)
+    }
+}
+
+fn build_sort_key_expr(layers: &[Value], n: usize, match_pat: Option<&MatchPattern>) -> Value {
+    if let Some(pat) = match_pat {
+        // ["match", ["get", P], L0, 0, L1, 1, …, -1]
+        let mut args = vec![
+            Value::String("match".into()),
+            Value::Array(vec![
+                Value::String("get".into()),
+                Value::String(pat.property.clone()),
+            ]),
+        ];
+        for (i, label) in pat.labels.iter().enumerate() {
+            args.push(label.clone());
+            args.push(Value::from(i as u64));
+        }
+        args.push(Value::from(-1_i64));
+        Value::Array(args)
+    } else {
+        // ["case", filter_top, n-1, …, filter_bot, 0, -1]
+        let mut args = vec![Value::String("case".into())];
+        for i in (0..n).rev() {
+            args.push(layers[i].get("filter").expect("validated").clone());
+            args.push(Value::from(i as u64));
+        }
+        args.push(Value::from(-1_i64));
+        Value::Array(args)
+    }
+}
+
+// ── Tests ────────────────────────────────────────────────────────────────────
+
+#[cfg(test)]
+mod tests {
+    use std::path::Path;
+
+    use serde_json::json;
+
+    use super::*;
+    use crate::load_intermediate_spec_from_v8_path;
+
+    fn mir() -> MirSpec {
+        let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("../upstream/src/reference/v8.json");
+        load_intermediate_spec_from_v8_path(&path).expect("v8.json")
+    }
+
+    #[test]
+    fn merge_two_fill_layers_with_match() {
+        let mir = mir();
+        let mut v = json!({
+            "version": 8,
+            "sources": {"s": {"type": "vector"}},
+            "layers": [
+                {
+                    "id": "park",
+                    "type": "fill",
+                    "source": "s",
+                    "source-layer": "landuse",
+                    "filter": ["==", ["get", "class"], "park"],
+                    "paint": {"fill-color": "green", "fill-opacity": 0.5}
+                },
+                {
+                    "id": "wood",
+                    "type": "fill",
+                    "source": "s",
+                    "source-layer": "landuse",
+                    "filter": ["==", ["get", "class"], "wood"],
+                    "paint": {"fill-color": "darkgreen", "fill-opacity": 0.5}
+                }
+            ]
+        });
+        layer_merge(&mut v, &mir);
+        insta::assert_yaml_snapshot!(v, @r##"
+        layers:
+          - filter:
+              - match
+              - - get
+                - class
+              - - park
+                - wood
+              - true
+              - false
+            id: park
+            layout:
+              fill-sort-key:
+                - match
+                - - get
+                  - class
+                - park
+                - 0
+                - wood
+                - 1
+                - -1
+            paint:
+              fill-color:
+                - match
+                - - get
+                  - class
+                - park
+                - green
+                - wood
+                - darkgreen
+                - "#000000"
+              fill-opacity: 0.5
+            source: s
+            source-layer: landuse
+            type: fill
+        sources:
+          s:
+            type: vector
+        version: 8
+        "##);
+    }
+
+    #[test]
+    fn merge_with_case_for_complex_filters() {
+        let mir = mir();
+        let mut v = json!({
+            "version": 8,
+            "sources": {"s": {"type": "vector"}},
+            "layers": [
+                {
+                    "id": "a",
+                    "type": "line",
+                    "source": "s",
+                    "source-layer": "road",
+                    "filter": ["all", ["==", ["get", "class"], "motorway"], ["has", "name"]],
+                    "paint": {"line-color": "red"}
+                },
+                {
+                    "id": "b",
+                    "type": "line",
+                    "source": "s",
+                    "source-layer": "road",
+                    "filter": ["==", ["get", "class"], "trunk"],
+                    "paint": {"line-color": "orange"}
+                }
+            ]
+        });
+        layer_merge(&mut v, &mir);
+        insta::assert_yaml_snapshot!(v, @r##"
+        layers:
+          - filter:
+              - any
+              - - all
+                - - "=="
+                  - - get
+                    - class
+                  - motorway
+                - - has
+                  - name
+              - - "=="
+                - - get
+                  - class
+                - trunk
+            id: a
+            layout:
+              line-sort-key:
+                - case
+                - - "=="
+                  - - get
+                    - class
+                  - trunk
+                - 1
+                - - all
+                  - - "=="
+                    - - get
+                      - class
+                    - motorway
+                  - - has
+                    - name
+                - 0
+                - -1
+            paint:
+              line-color:
+                - case
+                - - "=="
+                  - - get
+                    - class
+                  - trunk
+                - orange
+                - - all
+                  - - "=="
+                    - - get
+                      - class
+                    - motorway
+                  - - has
+                    - name
+                - red
+                - "#000000"
+            source: s
+            source-layer: road
+            type: line
+        sources:
+          s:
+            type: vector
+        version: 8
+        "##);
+    }
+
+    #[test]
+    fn no_merge_for_unsupported_type() {
+        let mir = mir();
+        let mut v = json!({
+            "version": 8,
+            "sources": {"s": {"type": "vector"}},
+            "layers": [
+                {
+                    "id": "a", "type": "fill-extrusion", "source": "s",
+                    "source-layer": "building",
+                    "filter": ["==", ["get", "type"], "A"],
+                    "paint": {"fill-extrusion-color": "#aaa"}
+                },
+                {
+                    "id": "b", "type": "fill-extrusion", "source": "s",
+                    "source-layer": "building",
+                    "filter": ["==", ["get", "type"], "B"],
+                    "paint": {"fill-extrusion-color": "#bbb"}
+                }
+            ]
+        });
+        let original = v.clone();
+        layer_merge(&mut v, &mir);
+        assert_eq!(v, original);
+    }
+
+    #[test]
+    fn no_merge_when_sort_key_exists() {
+        let mir = mir();
+        let mut v = json!({
+            "version": 8,
+            "sources": {"s": {"type": "vector"}},
+            "layers": [
+                {
+                    "id": "a", "type": "line", "source": "s",
+                    "source-layer": "road",
+                    "filter": ["==", ["get", "class"], "x"],
+                    "paint": {"line-color": "#f00"},
+                    "layout": {"line-sort-key": 1}
+                },
+                {
+                    "id": "b", "type": "line", "source": "s",
+                    "source-layer": "road",
+                    "filter": ["==", ["get", "class"], "y"],
+                    "paint": {"line-color": "#0f0"}
+                }
+            ]
+        });
+        let original = v.clone();
+        layer_merge(&mut v, &mir);
+        assert_eq!(v, original);
+    }
+
+    #[test]
+    fn no_merge_with_differing_zoom() {
+        let mir = mir();
+        let mut v = json!({
+            "version": 8,
+            "sources": {"s": {"type": "vector"}},
+            "layers": [
+                {
+                    "id": "a", "type": "fill", "source": "s",
+                    "source-layer": "land", "minzoom": 5,
+                    "filter": ["==", ["get", "t"], "a"],
+                    "paint": {"fill-color": "#aaa"}
+                },
+                {
+                    "id": "b", "type": "fill", "source": "s",
+                    "source-layer": "land", "minzoom": 10,
+                    "filter": ["==", ["get", "t"], "b"],
+                    "paint": {"fill-color": "#bbb"}
+                }
+            ]
+        });
+        let original = v.clone();
+        layer_merge(&mut v, &mir);
+        assert_eq!(v, original);
+    }
+
+    #[test]
+    fn no_merge_without_filter() {
+        let mir = mir();
+        let mut v = json!({
+            "version": 8,
+            "sources": {"s": {"type": "vector"}},
+            "layers": [
+                {
+                    "id": "a", "type": "fill", "source": "s",
+                    "source-layer": "land",
+                    "filter": ["==", ["get", "t"], "a"],
+                    "paint": {"fill-color": "#aaa"}
+                },
+                {
+                    "id": "b", "type": "fill", "source": "s",
+                    "source-layer": "land",
+                    "paint": {"fill-color": "#bbb"}
+                }
+            ]
+        });
+        let original = v.clone();
+        layer_merge(&mut v, &mir);
+        assert_eq!(v, original);
+    }
+
+    #[test]
+    fn skip_group_with_expression_property() {
+        let mir = mir();
+        let mut v = json!({
+            "version": 8,
+            "sources": {"s": {"type": "vector"}},
+            "layers": [
+                {
+                    "id": "a", "type": "line", "source": "s",
+                    "source-layer": "road",
+                    "filter": ["==", ["get", "class"], "x"],
+                    "paint": {"line-color": ["interpolate", ["linear"], ["zoom"], 5, "#aaa", 10, "#bbb"]}
+                },
+                {
+                    "id": "b", "type": "line", "source": "s",
+                    "source-layer": "road",
+                    "filter": ["==", ["get", "class"], "y"],
+                    "paint": {"line-color": "#ccc"}
+                }
+            ]
+        });
+        let original = v.clone();
+        layer_merge(&mut v, &mir);
+        assert_eq!(v, original);
+    }
+
+    #[test]
+    fn property_absent_on_some_layers_uses_default() {
+        let mir = mir();
+        let mut v = json!({
+            "version": 8,
+            "sources": {"s": {"type": "vector"}},
+            "layers": [
+                {
+                    "id": "a", "type": "fill", "source": "s",
+                    "source-layer": "land",
+                    "filter": ["==", ["get", "t"], "a"],
+                    "paint": {"fill-color": "#ff0000", "fill-opacity": 0.5}
+                },
+                {
+                    "id": "b", "type": "fill", "source": "s",
+                    "source-layer": "land",
+                    "filter": ["==", ["get", "t"], "b"],
+                    "paint": {"fill-color": "#0000ff"}
+                }
+            ]
+        });
+        layer_merge(&mut v, &mir);
+        // fill-opacity absent from layer b → spec default (1)
+        let merged = &v["layers"][0];
+        let opacity = &merged["paint"]["fill-opacity"];
+        assert_eq!(
+            opacity,
+            &json!(["match", ["get", "t"], "a", 0.5, "b", 1, 1]),
+        );
+    }
+
+    #[test]
+    fn non_adjacent_layers_not_merged() {
+        let mir = mir();
+        let mut v = json!({
+            "version": 8,
+            "sources": {"s": {"type": "vector"}},
+            "layers": [
+                {
+                    "id": "fill-a", "type": "fill", "source": "s",
+                    "source-layer": "land",
+                    "filter": ["==", ["get", "t"], "a"],
+                    "paint": {"fill-color": "#aaa"}
+                },
+                {
+                    "id": "line-x", "type": "line", "source": "s",
+                    "source-layer": "road",
+                    "filter": ["==", ["get", "class"], "x"],
+                    "paint": {"line-color": "#000"}
+                },
+                {
+                    "id": "fill-b", "type": "fill", "source": "s",
+                    "source-layer": "land",
+                    "filter": ["==", ["get", "t"], "b"],
+                    "paint": {"fill-color": "#bbb"}
+                }
+            ]
+        });
+        let original = v.clone();
+        layer_merge(&mut v, &mir);
+        assert_eq!(v, original);
+    }
+
+    #[test]
+    fn merge_three_symbol_layers_with_match() {
+        let mir = mir();
+        let mut v = json!({
+            "version": 8,
+            "sources": {"s": {"type": "vector"}},
+            "layers": [
+                {
+                    "id": "city", "type": "symbol", "source": "s",
+                    "source-layer": "place",
+                    "filter": ["==", ["get", "class"], "city"],
+                    "layout": {"text-size": 16},
+                    "paint": {"text-color": "#111"}
+                },
+                {
+                    "id": "town", "type": "symbol", "source": "s",
+                    "source-layer": "place",
+                    "filter": ["==", ["get", "class"], "town"],
+                    "layout": {"text-size": 14},
+                    "paint": {"text-color": "#333"}
+                },
+                {
+                    "id": "village", "type": "symbol", "source": "s",
+                    "source-layer": "place",
+                    "filter": ["==", ["get", "class"], "village"],
+                    "layout": {"text-size": 12},
+                    "paint": {"text-color": "#555"}
+                }
+            ]
+        });
+        layer_merge(&mut v, &mir);
+        assert_eq!(v["layers"].as_array().unwrap().len(), 1);
+        let merged = &v["layers"][0];
+        // Uses match (all filters are ["==", ["get", "class"], L]).
+        assert_eq!(merged["filter"][0], "match");
+        assert_eq!(merged["layout"]["symbol-sort-key"][0], "match");
+        assert_eq!(merged["paint"]["text-color"][0], "match");
+        assert_eq!(merged["layout"]["text-size"][0], "match");
+    }
+
+    #[test]
+    fn duplicate_match_labels_fall_back_to_case() {
+        let mir = mir();
+        let mut v = json!({
+            "version": 8,
+            "sources": {"s": {"type": "vector"}},
+            "layers": [
+                {
+                    "id": "a", "type": "fill", "source": "s",
+                    "source-layer": "land",
+                    "filter": ["==", ["get", "t"], "park"],
+                    "paint": {"fill-color": "#0f0"}
+                },
+                {
+                    "id": "b", "type": "fill", "source": "s",
+                    "source-layer": "land",
+                    "filter": ["==", ["get", "t"], "park"],
+                    "paint": {"fill-color": "#0a0"}
+                }
+            ]
+        });
+        layer_merge(&mut v, &mir);
+        let merged = &v["layers"][0];
+        // Duplicate labels → case, not match.
+        assert_eq!(merged["filter"][0], "any");
+        assert_eq!(merged["paint"]["fill-color"][0], "case");
+    }
+
+    #[test]
+    fn layers_pass_through_outside_groups() {
+        let mir = mir();
+        let mut v = json!({
+            "version": 8,
+            "sources": {"s": {"type": "vector"}},
+            "layers": [
+                {"id": "bg", "type": "background", "paint": {"background-color": "#fff"}},
+                {
+                    "id": "a", "type": "fill", "source": "s",
+                    "source-layer": "land",
+                    "filter": ["==", ["get", "t"], "a"],
+                    "paint": {"fill-color": "#aaa"}
+                },
+                {
+                    "id": "b", "type": "fill", "source": "s",
+                    "source-layer": "land",
+                    "filter": ["==", ["get", "t"], "b"],
+                    "paint": {"fill-color": "#bbb"}
+                },
+                {"id": "top", "type": "background", "paint": {"background-color": "#000"}}
+            ]
+        });
+        layer_merge(&mut v, &mir);
+
+        insta::assert_yaml_snapshot!(v, @r##"
+        layers:
+          - id: bg
+            paint:
+              background-color: "#fff"
+            type: background
+          - filter:
+              - match
+              - - get
+                - t
+              - - a
+                - b
+              - true
+              - false
+            id: a
+            layout:
+              fill-sort-key:
+                - match
+                - - get
+                  - t
+                - a
+                - 0
+                - b
+                - 1
+                - -1
+            paint:
+              fill-color:
+                - match
+                - - get
+                  - t
+                - a
+                - "#aaa"
+                - b
+                - "#bbb"
+                - "#000000"
+            source: s
+            source-layer: land
+            type: fill
+          - id: top
+            paint:
+              background-color: "#000"
+            type: background
+        sources:
+          s:
+            type: vector
+        version: 8
+        "##);
+    }
+}

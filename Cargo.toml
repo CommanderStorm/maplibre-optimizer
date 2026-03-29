@@ -37,7 +37,7 @@ codegen2 = { version = "0.3.0", path = "codegen2" }
 color = "0.3.2"
 criterion = { version = "0.8", features = ["async_futures", "async_tokio", "html_reports"] }
 image = "0.25.9"
-insta = { version = "1.46", features = ["json"] }
+insta = { version = "1.46", features = ["yaml"] }
 maplibre_native = "0.4.1"
 pretty_assertions = "1.4"
 rstest = "0.26.1"
