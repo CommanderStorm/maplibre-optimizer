@@ -128,7 +128,7 @@ fuzz *args:
 # Run render tests comparing original vs optimised styles (builds optimizer first)
 [working-directory: 'tests/render']
 render-test *ARGS:
-    npm install
+    npm install --no-fund --no-audit
     npx tsx run.ts {{ARGS}}
 
 # Run render tests with browser console debug output
@@ -209,7 +209,7 @@ bench_cores := env('BENCH_CORES', '0-4')
 # Requires tile proxy running (start with: just bench-proxy)
 [working-directory: 'tests/bench']
 bench *ARGS:
-    npm install
+    npm install --no-fund --no-audit
     taskset -c {{bench_cores}} npx tsx run.ts {{ARGS}}
 
 # Run benchmarks with browser console debug output
