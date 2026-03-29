@@ -310,6 +310,20 @@ layer_types:
           zoom: true
           feature: false
           global_state: false
+      resampling:
+        type:
+          Enum:
+            values:
+              - linear
+              - nearest
+        default: linear
+        doc: "The resampling/interpolation method to use for overscaling, also known as texture magnification filter.\n![Visual comparison of linear resampling versus nearest resampling](assets/resampling.png)"
+        required: false
+        expression:
+          interpolated: false
+          zoom: true
+          feature: false
+          global_state: false
   fill:
     layout:
       fill-sort-key:
@@ -735,7 +749,7 @@ layer_types:
               - multidirectional
               - standard
         default: standard
-        doc: "The hillshade algorithm to use, one of `standard`, `basic`, `combined`, `igor`, or `multidirectional`. ![image](assets/hillshade_methods.png)"
+        doc: "The hillshade algorithm to use, one of `standard`, `basic`, `combined`, `igor`, or `multidirectional`.\n![Visual comparison of standard, basic, igor, combined, and multidirectional hillshade-method](assets/hillshade_methods.png)"
         required: false
         expression:
           interpolated: false
@@ -749,6 +763,20 @@ layer_types:
         required: false
         expression:
           interpolated: true
+          zoom: true
+          feature: false
+          global_state: false
+      resampling:
+        type:
+          Enum:
+            values:
+              - linear
+              - nearest
+        default: linear
+        doc: "The resampling/interpolation method to use for overscaling, also known as texture magnification filter.\n![Visual comparison of linear resampling versus nearest resampling](assets/resampling.png)"
+        required: false
+        expression:
+          interpolated: false
           zoom: true
           feature: false
           global_state: false
@@ -767,7 +795,7 @@ layer_types:
         expression:
           interpolated: false
           zoom: true
-          feature: false
+          feature: true
           global_state: false
       line-join:
         type:
@@ -795,7 +823,7 @@ layer_types:
         expression:
           interpolated: true
           zoom: true
-          feature: false
+          feature: true
           global_state: false
       line-round-limit:
         type:
@@ -808,7 +836,7 @@ layer_types:
         expression:
           interpolated: true
           zoom: true
-          feature: false
+          feature: true
           global_state: false
       line-sort-key:
         type:
@@ -1079,7 +1107,7 @@ layer_types:
               - linear
               - nearest
         default: linear
-        doc: "The resampling/interpolation method to use for overscaling, also known as texture magnification filter"
+        doc: "The resampling/interpolation method to use for overscaling, also known as texture magnification filter. It is advised to use the generic `resampling` paint property instead."
         required: false
         expression:
           interpolated: false
@@ -1096,6 +1124,20 @@ layer_types:
         required: false
         expression:
           interpolated: true
+          zoom: true
+          feature: false
+          global_state: false
+      resampling:
+        type:
+          Enum:
+            values:
+              - linear
+              - nearest
+        default: linear
+        doc: "The resampling/interpolation method to use for overscaling, also known as texture magnification filter.\n![Visual comparison of linear resampling versus nearest resampling](assets/resampling.png)"
+        required: false
+        expression:
+          interpolated: false
           zoom: true
           feature: false
           global_state: false

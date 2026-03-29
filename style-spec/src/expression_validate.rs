@@ -1348,6 +1348,7 @@ mod tests {
             "Any",
             "Array",
             "ArrayLessTypeLengthGreater",
+            "ArrayOfString",
             "ArrayOfType",
             "Boolean",
             "Collator",

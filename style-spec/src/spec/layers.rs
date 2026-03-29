@@ -282,6 +282,10 @@ pub struct ColorReliefPaintLayer {
     #[serde(rename = "color-relief-opacity")]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub color_relief_opacity: Option<ColorReliefPaintLayerColorReliefOpacity>,
+    /// The resampling/interpolation method to use for overscaling, also known as texture magnification filter.
+    /// ![Visual comparison of linear resampling versus nearest resampling](assets/resampling.png)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub resampling: Option<ColorReliefPaintLayerResampling>,
 }
 
 color_prop!(
@@ -297,6 +301,9 @@ numeric_prop!(
     default = serde_json::Number::from_i128(1)
         .expect("the number is serialised from a number and is thus always valid")
 );
+
+string_prop!(ColorReliefPaintLayerResampling, doc = "The resampling/interpolation method to use for overscaling, also known as texture magnification filter.
+![Visual comparison of linear resampling versus nearest resampling](assets/resampling.png)", default = "linear".to_string());
 
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
@@ -623,7 +630,8 @@ pub struct HillshadePaintLayer {
     #[serde(rename = "hillshade-illumination-direction")]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub hillshade_illumination_direction: Option<HillshadePaintLayerHillshadeIlluminationDirection>,
-    /// The hillshade algorithm to use, one of `standard`, `basic`, `combined`, `igor`, or `multidirectional`. ![image](assets/hillshade_methods.png)
+    /// The hillshade algorithm to use, one of `standard`, `basic`, `combined`, `igor`, or `multidirectional`.
+    /// ![Visual comparison of standard, basic, igor, combined, and multidirectional hillshade-method](assets/hillshade_methods.png)
     #[serde(rename = "hillshade-method")]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub hillshade_method: Option<HillshadePaintLayerHillshadeMethod>,
@@ -631,6 +639,10 @@ pub struct HillshadePaintLayer {
     #[serde(rename = "hillshade-shadow-color")]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub hillshade_shadow_color: Option<HillshadePaintLayerHillshadeShadowColor>,
+    /// The resampling/interpolation method to use for overscaling, also known as texture magnification filter.
+    /// ![Visual comparison of linear resampling versus nearest resampling](assets/resampling.png)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub resampling: Option<HillshadePaintLayerResampling>,
 }
 
 color_prop!(
@@ -672,17 +684,17 @@ array_prop!(
     default = serde_json::json!(335)
 );
 
-string_prop!(
-    HillshadePaintLayerHillshadeMethod,
-    doc = "The hillshade algorithm to use, one of `standard`, `basic`, `combined`, `igor`, or `multidirectional`. ![image](assets/hillshade_methods.png)",
-    default = "standard".to_string()
-);
+string_prop!(HillshadePaintLayerHillshadeMethod, doc = "The hillshade algorithm to use, one of `standard`, `basic`, `combined`, `igor`, or `multidirectional`.
+![Visual comparison of standard, basic, igor, combined, and multidirectional hillshade-method](assets/hillshade_methods.png)", default = "standard".to_string());
 
 color_prop!(
     HillshadePaintLayerHillshadeShadowColor,
     doc = "The shading color of areas that face away from the light source(s). Only when `hillshade-method` is set to `multidirectional` can you specify multiple light sources.",
     default = serde_json::json!("#000000")
 );
+
+string_prop!(HillshadePaintLayerResampling, doc = "The resampling/interpolation method to use for overscaling, also known as texture magnification filter.
+![Visual comparison of linear resampling versus nearest resampling](assets/resampling.png)", default = "linear".to_string());
 
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
@@ -904,7 +916,7 @@ pub struct RasterPaintLayer {
     #[serde(rename = "raster-opacity")]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub raster_opacity: Option<RasterPaintLayerRasterOpacity>,
-    /// The resampling/interpolation method to use for overscaling, also known as texture magnification filter
+    /// The resampling/interpolation method to use for overscaling, also known as texture magnification filter. It is advised to use the generic `resampling` paint property instead.
     #[serde(rename = "raster-resampling")]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub raster_resampling: Option<RasterPaintLayerRasterResampling>,
@@ -912,6 +924,10 @@ pub struct RasterPaintLayer {
     #[serde(rename = "raster-saturation")]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub raster_saturation: Option<RasterPaintLayerRasterSaturation>,
+    /// The resampling/interpolation method to use for overscaling, also known as texture magnification filter.
+    /// ![Visual comparison of linear resampling versus nearest resampling](assets/resampling.png)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub resampling: Option<RasterPaintLayerResampling>,
 }
 
 numeric_prop!(
@@ -967,7 +983,7 @@ numeric_prop!(
 
 string_prop!(
     RasterPaintLayerRasterResampling,
-    doc = "The resampling/interpolation method to use for overscaling, also known as texture magnification filter",
+    doc = "The resampling/interpolation method to use for overscaling, also known as texture magnification filter. It is advised to use the generic `resampling` paint property instead.",
     default = "linear".to_string()
 );
 
@@ -979,6 +995,9 @@ numeric_prop!(
     default = serde_json::Number::from_i128(0)
         .expect("the number is serialised from a number and is thus always valid")
 );
+
+string_prop!(RasterPaintLayerResampling, doc = "The resampling/interpolation method to use for overscaling, also known as texture magnification filter.
+![Visual comparison of linear resampling versus nearest resampling](assets/resampling.png)", default = "linear".to_string());
 
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
@@ -2162,6 +2181,17 @@ pub fn walk_typed_style_mut(
                             &mut v.0,
                         );
                     }
+                    if let Some(v) = &mut paint.resampling {
+                        visitor.visit_string(
+                            &crate::typed_visitor::TypedPropertyContext {
+                                layer_index: i,
+                                layer_type: "color-relief",
+                                section: crate::mir::MirPropertySection::Paint,
+                                property_name: "resampling",
+                            },
+                            &mut v.0,
+                        );
+                    }
                 }
             }
             TypedLayer::Fill { paint, layout, .. } => {
@@ -2499,6 +2529,17 @@ pub fn walk_typed_style_mut(
                             &mut v.0,
                         );
                     }
+                    if let Some(v) = &mut paint.resampling {
+                        visitor.visit_string(
+                            &crate::typed_visitor::TypedPropertyContext {
+                                layer_index: i,
+                                layer_type: "hillshade",
+                                section: crate::mir::MirPropertySection::Paint,
+                                property_name: "resampling",
+                            },
+                            &mut v.0,
+                        );
+                    }
                 }
             }
             TypedLayer::Line { paint, layout, .. } => {
@@ -2769,6 +2810,17 @@ pub fn walk_typed_style_mut(
                                 layer_type: "raster",
                                 section: crate::mir::MirPropertySection::Paint,
                                 property_name: "raster-saturation",
+                            },
+                            &mut v.0,
+                        );
+                    }
+                    if let Some(v) = &mut paint.resampling {
+                        visitor.visit_string(
+                            &crate::typed_visitor::TypedPropertyContext {
+                                layer_index: i,
+                                layer_type: "raster",
+                                section: crate::mir::MirPropertySection::Paint,
+                                property_name: "resampling",
                             },
                             &mut v.0,
                         );

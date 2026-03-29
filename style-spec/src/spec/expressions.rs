@@ -804,6 +804,12 @@ mod test {
     }
 
     #[rstest::rstest]
+    #[case::t_split(serde_json::json!(["split",["get","name"],";"]))]
+    fn test_example_array_of_string_decodes(#[case] example: serde_json::Value) {
+        let _ = serde_json::from_value::<ArrayOfString>(example).expect("example should decode");
+    }
+
+    #[rstest::rstest]
     #[case::t_not(serde_json::json!(["!",["has","point_count"]]))]
     #[case::t_not_equal(serde_json::json!(["!=","cluster",true]))]
     #[case::t_less(serde_json::json!(["<",["get","mag"],2]))]
@@ -917,6 +923,7 @@ mod test {
     #[rstest::rstest]
     #[case::t_concat(serde_json::json!(["concat","square-rgb-",["get","color"]]))]
     #[case::t_downcase(serde_json::json!(["downcase",["get","name"]]))]
+    #[case::t_join(serde_json::json!(["join",["split",["get","name"],";"],"\n"]))]
     #[case::t_number_format(serde_json::json!(["number-format",["get","mag"],{"max-fraction-digits":1,"min-fraction-digits":1}]))]
     #[case::t_resolved_locale(serde_json::json!(["resolved-locale",["collator",{"case-sensitive":true,"diacritic-sensitive":false,"locale":"de"}]]))]
     #[case::t_slice(serde_json::json!(["slice",["get","name"],0,3]))]
@@ -1161,6 +1168,88 @@ impl serde::Serialize for ArrayLessTypeLengthGreater {
                 }
                 let mut seq = serializer.serialize_seq(None)?;
                 seq.serialize_element("array")?;
+                for elem in &elems {
+                    seq.serialize_element(elem)?;
+                }
+                seq.end()
+            }
+        }
+    }
+}
+
+/// "ArrayOfString"
+#[derive(PartialEq, Debug, Clone)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+pub enum ArrayOfString {
+    /// Returns an array of substrings formed by splitting an input string by a separator string.
+    Split(String, String),
+}
+
+impl<'de> serde::Deserialize<'de> for ArrayOfString {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        deserializer.deserialize_seq(ArrayOfStringVisitor)
+    }
+}
+
+/// Visitor for deserializing the syntax enum [`ArrayOfString`]
+struct ArrayOfStringVisitor;
+
+impl<'de> serde::de::Visitor<'de> for ArrayOfStringVisitor {
+    type Value = ArrayOfString;
+
+    fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+        formatter.write_str(
+            "an ArrayOfString expression (example: [\"split\",[\"get\",\"name\"],\";\"])",
+        )
+    }
+
+    fn visit_seq<A: serde::de::SeqAccess<'de>>(self, mut seq: A) -> Result<Self::Value, A::Error> {
+        /// Reads the next element from the sequence or reports a missing field error.
+        #[allow(dead_code)]
+        fn visit_seq_field<'de, A, T>(seq: &mut A, name: &'static str) -> Result<T, A::Error>
+        where
+            A: serde::de::SeqAccess<'de>,
+            T: serde::Deserialize<'de>,
+        {
+            seq.next_element()?
+                .ok_or_else(|| serde::de::Error::missing_field(name))
+        }
+
+        // First element: operator string
+        let op: std::string::String = seq
+            .next_element()?
+            .ok_or_else(|| serde::de::Error::custom("missing operator"))?;
+        match op.as_str() {
+            "split" => {
+                let input = visit_seq_field(&mut seq, "input")?;
+                let separator = visit_seq_field(&mut seq, "separator")?;
+                Ok(ArrayOfString::Split(input, separator))
+            }
+            _ => Err(serde::de::Error::unknown_variant(&op, &["split"])),
+        }
+    }
+}
+
+impl serde::Serialize for ArrayOfString {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        use serde::ser::SerializeSeq;
+        match self {
+            ArrayOfString::Split(f0, f1) => {
+                let mut elems = vec![
+                    serde_json::to_value(f0).map_err(serde::ser::Error::custom)?,
+                    serde_json::to_value(f1).map_err(serde::ser::Error::custom)?,
+                ];
+                while elems.len() > 2 && elems.last().is_some_and(serde_json::Value::is_null) {
+                    elems.pop();
+                }
+                let mut seq = serializer.serialize_seq(None)?;
+                seq.serialize_element("split")?;
                 for elem in &elems {
                     seq.serialize_element(elem)?;
                 }
@@ -3669,6 +3758,8 @@ pub enum String {
     Downcase(Box<String>),
     /// Returns the feature's simple geometry type: `Point`, `LineString`, or `Polygon`. `MultiPoint`, `MultiLineString`, and `MultiPolygon` are returned as `Point`, `LineString`, and `Polygon`, respectively.
     GeometryType,
+    /// Returns a string formed by concatenating the elements of the input array, inserting a separator between each element.
+    Join(Box<Array>, Box<String>),
     /// Converts the input number into a string representation using the provided format_options.
     ///
     ///  - [Display HTML clusters with custom properties](https://maplibre.org/maplibre-gl-js/docs/examples/display-html-clusters-with-custom-properties/)
@@ -3757,6 +3848,11 @@ impl<'de> serde::de::Visitor<'de> for StringVisitor {
                 Ok(String::Downcase(input))
             }
             "geometry-type" => Ok(String::GeometryType),
+            "join" => {
+                let input = visit_seq_field(&mut seq, "input")?;
+                let separator = visit_seq_field(&mut seq, "separator")?;
+                Ok(String::Join(input, separator))
+            }
             "number-format" => {
                 let input = visit_seq_field(&mut seq, "input")?;
                 let format_options = visit_seq_field(&mut seq, "format_options")?;
@@ -3844,6 +3940,21 @@ impl serde::Serialize for String {
                 }
                 let mut seq = serializer.serialize_seq(None)?;
                 seq.serialize_element("geometry-type")?;
+                for elem in &elems {
+                    seq.serialize_element(elem)?;
+                }
+                seq.end()
+            }
+            String::Join(f0, f1) => {
+                let mut elems = vec![
+                    serde_json::to_value(f0).map_err(serde::ser::Error::custom)?,
+                    serde_json::to_value(f1).map_err(serde::ser::Error::custom)?,
+                ];
+                while elems.len() > 2 && elems.last().is_some_and(serde_json::Value::is_null) {
+                    elems.pop();
+                }
+                let mut seq = serializer.serialize_seq(None)?;
+                seq.serialize_element("join")?;
                 for elem in &elems {
                     seq.serialize_element(elem)?;
                 }
