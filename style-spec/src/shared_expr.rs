@@ -11,7 +11,6 @@
 
 /// Nested expression: ramp (`interpolate` / …) or regular [`Number`](crate::spec::Number) operators.
 #[derive(PartialEq, Debug, Clone)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum NumericExpression {
     Number(crate::spec::Number),
     Ramp(crate::spec::NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection),
@@ -68,7 +67,6 @@ impl<'de> serde::Deserialize<'de> for NumericExpression {
 /// Nested expression: `interpolate` / `interpolate-hcl` / `interpolate-lab` ramps,
 /// or [`Color`](crate::spec::Color) operators.
 #[derive(PartialEq, Debug, Clone)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum ColorExpression {
     Color(crate::spec::Color),
     Ramp(crate::spec::ColorOrArrayOfColor),
@@ -107,6 +105,38 @@ impl<'de> serde::Deserialize<'de> for ColorExpression {
             "ColorExpression: no variant matched. Expected Color(Color) | Ramp(ColorOrArrayOfColor) | Interpolate(NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection). Errors: [{}]",
             details.join("; ")
         )))
+    }
+}
+
+// Both `NumericExpression` and `ColorExpression` have overlapping deserialization
+// paths: the first variant's `AnyExpr` fallback catches operators (like "step")
+// that later variants also handle.  A derived `Arbitrary` can generate the later
+// variant, but a serialize → deserialize roundtrip produces the first variant.
+// Canonicalise here so the fuzz roundtrip assertion holds.
+
+#[cfg(feature = "fuzz")]
+impl<'a> arbitrary::Arbitrary<'a> for NumericExpression {
+    fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
+        let raw = if u.arbitrary::<bool>()? {
+            Self::Number(u.arbitrary()?)
+        } else {
+            Self::Ramp(u.arbitrary()?)
+        };
+        let json = serde_json::to_value(&raw).map_err(|_| arbitrary::Error::IncorrectFormat)?;
+        serde_json::from_value(json).map_err(|_| arbitrary::Error::IncorrectFormat)
+    }
+}
+
+#[cfg(feature = "fuzz")]
+impl<'a> arbitrary::Arbitrary<'a> for ColorExpression {
+    fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
+        let raw = match u.int_in_range(0u8..=2)? {
+            0 => Self::Color(u.arbitrary()?),
+            1 => Self::Ramp(u.arbitrary()?),
+            _ => Self::Interpolate(u.arbitrary()?),
+        };
+        let json = serde_json::to_value(&raw).map_err(|_| arbitrary::Error::IncorrectFormat)?;
+        serde_json::from_value(json).map_err(|_| arbitrary::Error::IncorrectFormat)
     }
 }
 
