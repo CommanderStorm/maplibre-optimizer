@@ -280,6 +280,146 @@ fn prune_interpolate_stops<T: PartialEq + Clone>(
     changed
 }
 
+// ── Zoom comparison folding ──────────────────────────────────────────────────
+
+/// Walk all layers and fold zoom comparisons to boolean literals when the
+/// layer's minzoom makes them deterministic.
+///
+/// Only minzoom is safe — tiles overzoom beyond maxzoom, so maxzoom cannot
+/// prove a comparison unreachable.
+pub(super) fn fold_zoom_comparisons(style: &mut Value) {
+    let Some(layers) = style
+        .as_object_mut()
+        .and_then(|o| o.get_mut("layers"))
+        .and_then(Value::as_array_mut)
+    else {
+        return;
+    };
+
+    for layer in layers.iter_mut() {
+        let Some(obj) = layer.as_object_mut() else {
+            continue;
+        };
+        let Some(minzoom) = obj.get("minzoom").and_then(Value::as_f64) else {
+            continue;
+        };
+
+        // Walk filter.
+        if let Some(filter) = obj.get_mut("filter") {
+            fold_zoom_in_expr(filter, minzoom);
+        }
+
+        // Walk paint and layout property values.
+        for section in ["paint", "layout"] {
+            let Some(props) = obj.get_mut(section).and_then(Value::as_object_mut) else {
+                continue;
+            };
+            for value in props.values_mut() {
+                fold_zoom_in_expr(value, minzoom);
+            }
+        }
+    }
+}
+
+/// Recursively fold zoom comparisons within an expression.
+fn fold_zoom_in_expr(v: &mut Value, minzoom: f64) {
+    let Value::Array(arr) = v else { return };
+
+    // Recurse into children first (bottom-up).
+    for child in arr.iter_mut() {
+        fold_zoom_in_expr(child, minzoom);
+    }
+
+    // Check if this node is a zoom comparison we can fold.
+    if arr.len() != 3 {
+        return;
+    }
+    let Some(op) = arr[0].as_str() else { return };
+    if !matches!(op, ">=" | ">" | "<=" | "<" | "==" | "!=") {
+        return;
+    }
+
+    let (zoom_first, other) = if super::zoom::is_zoom_expr(&arr[1]) {
+        (true, &arr[2])
+    } else if super::zoom::is_zoom_expr(&arr[2]) {
+        (false, &arr[1])
+    } else {
+        return;
+    };
+
+    let Some(lit) = super::expr::extract_json_literal(other) else {
+        return;
+    };
+    let Some(n) = lit.as_f64() else { return };
+
+    // Normalize to zoom-first form: op' such that `zoom op' n`.
+    let effective_op = if zoom_first {
+        op
+    } else {
+        match op {
+            ">=" => "<=",
+            ">" => "<",
+            "<=" => ">=",
+            "<" => ">",
+            _ => op, // == and != are symmetric
+        }
+    };
+
+    // Apply truth table: given zoom >= minzoom always holds.
+    let folded = match effective_op {
+        ">=" => {
+            if minzoom >= n {
+                Some(true)
+            } else {
+                None
+            }
+        }
+        ">" => {
+            if minzoom > n {
+                Some(true)
+            } else {
+                None
+            }
+        }
+        "<=" => {
+            if minzoom > n {
+                Some(false)
+            } else {
+                None
+            }
+        }
+        "<" => {
+            if minzoom >= n {
+                Some(false)
+            } else {
+                None
+            }
+        }
+        "==" => {
+            if n < minzoom {
+                Some(false)
+            } else {
+                None
+            }
+        }
+        "!=" => {
+            if n < minzoom {
+                Some(true)
+            } else {
+                None
+            }
+        }
+        _ => None,
+    };
+
+    if let Some(result) = folded {
+        *v = Value::Array(vec![
+            Value::String("literal".to_string()),
+            Value::Bool(result),
+        ]);
+    }
+}
+
 // ── Tests ───────────────────────────────────────────────────────────────────
 
 #[cfg(test)]

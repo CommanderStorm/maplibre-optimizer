@@ -918,3 +918,180 @@ fn distributive_factor_single_child_unchanged() {
       - road
     "#);
 }
+
+// ── Zoom comparison folding ──────────────────────────────────────────────
+
+/// Style with minzoom set on the layer.
+fn style_with_filter_and_minzoom(filter: serde_json::Value, minzoom: f64) -> serde_json::Value {
+    serde_json::json!({
+        "version": 8,
+        "sources": {"src": {"type": "vector", "url": "x"}},
+        "layers": [{
+            "id": "l", "type": "fill", "source": "src", "source-layer": "lyr",
+            "minzoom": minzoom,
+            "filter": filter
+        }]
+    })
+}
+
+fn style_with_paint_and_minzoom(
+    prop: &str,
+    value: serde_json::Value,
+    minzoom: f64,
+) -> serde_json::Value {
+    serde_json::json!({
+        "version": 8,
+        "sources": {"src": {"type": "vector", "url": "x"}},
+        "layers": [{
+            "id": "l", "type": "fill", "source": "src", "source-layer": "lyr",
+            "minzoom": minzoom,
+            "paint": {prop: value}
+        }]
+    })
+}
+
+/// Passes that trigger zoom folding + re-fold cleanup.
+fn zoom_fold_passes() -> OptPasses {
+    OptPasses {
+        constant_fold: true,
+        simplify_unary: true,
+        simplify_expressions: true,
+        // Need a structural pass to trigger the re-fold (step 3b).
+        cleanup: true,
+        ..Default::default()
+    }
+}
+
+#[test]
+fn zoom_fold_gte_true() {
+    // [">=", ["zoom"], 5] with minzoom 10 → true
+    let mir = sample_mir();
+    let mut v = style_with_paint_and_minzoom(
+        "fill-opacity",
+        serde_json::json!(["case", [">=", ["zoom"], 5], 0.8, 0.2]),
+        10.0,
+    );
+    optimize_style_json_value(&mut v, &mir, &zoom_fold_passes());
+    // case folds to true branch → 0.8
+    assert_yaml_snapshot!(v["layers"][0]["paint"]["fill-opacity"], @"0.8");
+}
+
+#[test]
+fn zoom_fold_lt_false() {
+    // ["<", ["zoom"], 5] with minzoom 8 → false
+    let mir = sample_mir();
+    let mut v = style_with_paint_and_minzoom(
+        "fill-opacity",
+        serde_json::json!(["case", ["<", ["zoom"], 5], 0.8, 0.2]),
+        8.0,
+    );
+    optimize_style_json_value(&mut v, &mir, &zoom_fold_passes());
+    // case folds to false (fallback) → 0.2
+    assert_yaml_snapshot!(v["layers"][0]["paint"]["fill-opacity"], @"0.2");
+}
+
+#[test]
+fn zoom_fold_inside_all() {
+    // Zoom guard inside ["all", ...] in a case condition → partial fold + simplification.
+    let mir = sample_mir();
+    let mut v = style_with_paint_and_minzoom(
+        "fill-opacity",
+        serde_json::json!([
+            "case",
+            ["all", [">=", ["zoom"], 5], ["has", "name"]],
+            0.8,
+            0.2
+        ]),
+        10.0,
+    );
+    optimize_style_json_value(&mut v, &mir, &zoom_fold_passes());
+    // [">=", ["zoom"], 5] → true, ["all", true, ["has", "name"]] → ["has", "name"]
+    assert_yaml_snapshot!(v["layers"][0]["paint"]["fill-opacity"], @r#"
+    - case
+    - - has
+      - name
+    - 0.8
+    - 0.2
+    "#);
+}
+
+#[test]
+fn zoom_fold_eq_false() {
+    // ["==", ["zoom"], 3] with minzoom 5 → false
+    let mir = sample_mir();
+    let mut v = style_with_paint_and_minzoom(
+        "fill-opacity",
+        serde_json::json!(["case", ["==", ["zoom"], 3], 0.8, 0.2]),
+        5.0,
+    );
+    optimize_style_json_value(&mut v, &mir, &zoom_fold_passes());
+    assert_yaml_snapshot!(v["layers"][0]["paint"]["fill-opacity"], @"0.2");
+}
+
+#[test]
+fn zoom_fold_commuted_lte_false() {
+    // [">=", 5, ["zoom"]] means zoom <= 5. With minzoom 8 → false.
+    let mir = sample_mir();
+    let mut v = style_with_paint_and_minzoom(
+        "fill-opacity",
+        serde_json::json!(["case", [">=", 5, ["zoom"]], 0.8, 0.2]),
+        8.0,
+    );
+    optimize_style_json_value(&mut v, &mir, &zoom_fold_passes());
+    assert_yaml_snapshot!(v["layers"][0]["paint"]["fill-opacity"], @"0.2");
+}
+
+#[test]
+fn zoom_fold_undetermined_no_change() {
+    // [">=", ["zoom"], 15] with minzoom 10 → undetermined, no folding.
+    let mir = sample_mir();
+    let mut v = style_with_paint_and_minzoom(
+        "fill-opacity",
+        serde_json::json!(["case", [">=", ["zoom"], 15], 0.8, 0.2]),
+        10.0,
+    );
+    optimize_style_json_value(&mut v, &mir, &zoom_fold_passes());
+    assert_yaml_snapshot!(v["layers"][0]["paint"]["fill-opacity"], @r#"
+    - case
+    - - ">="
+      - - zoom
+      - 15
+    - 0.8
+    - 0.2
+    "#);
+}
+
+#[test]
+fn zoom_fold_no_minzoom_no_change() {
+    // No minzoom → no folding.
+    let mir = sample_mir();
+    let mut v = style_with_paint(
+        "fill-opacity",
+        serde_json::json!(["case", [">=", ["zoom"], 5], 0.8, 0.2]),
+    );
+    optimize_style_json_value(&mut v, &mir, &zoom_fold_passes());
+    assert_yaml_snapshot!(v["layers"][0]["paint"]["fill-opacity"], @r#"
+    - case
+    - - ">="
+      - - zoom
+      - 5
+    - 0.8
+    - 0.2
+    "#);
+}
+
+#[test]
+fn zoom_fold_in_filter() {
+    // Zoom comparison in filter also gets folded.
+    let mir = sample_mir();
+    let mut v = style_with_filter_and_minzoom(
+        serde_json::json!(["all", [">=", ["zoom"], 5], ["has", "name"]]),
+        10.0,
+    );
+    optimize_style_json_value(&mut v, &mir, &zoom_fold_passes());
+    // [">=", ["zoom"], 5] → true, ["all", true, ["has", "name"]] → ["has", "name"]
+    assert_yaml_snapshot!(v["layers"][0]["filter"], @r#"
+    - has
+    - name
+    "#);
+}

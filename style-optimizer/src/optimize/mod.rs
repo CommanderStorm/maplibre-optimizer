@@ -142,9 +142,10 @@ pub fn optimize_style_json_value_with_stats(
         sync_typed_to_json(&style, v);
     }
 
-    // 3. Zoom-bounded stop pruning — runs after structural passes have
+    // 3. Zoom-bounded optimizations — runs after structural passes have
     //    tightened zoom bounds (metadata_refinement) and synced them to JSON.
     if passes.simplify_expressions {
+        ramp::fold_zoom_comparisons(v);
         ramp::prune_zoom_stops(v);
     }
 
@@ -166,8 +167,9 @@ pub fn optimize_style_json_value_with_stats(
         //     selectivity reordering.
         run_json_expression_passes(v, mir, passes, stats);
 
-        // 4c. Prune zoom stops in newly-synthesised properties.
+        // 4c. Fold zoom comparisons and prune zoom stops in newly-synthesised properties.
         if passes.simplify_expressions {
+            ramp::fold_zoom_comparisons(v);
             ramp::prune_zoom_stops(v);
         }
     }

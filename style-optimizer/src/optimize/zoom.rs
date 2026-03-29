@@ -8,7 +8,7 @@ use super::expr::extract_json_literal;
 
 // ── Zoom-bound extraction ────────────────────────────────────────────────────
 
-fn is_zoom_expr(val: &Value) -> bool {
+pub(super) fn is_zoom_expr(val: &Value) -> bool {
     matches!(
         val,
         Value::Array(arr) if arr.len() == 1 && arr[0].as_str() == Some("zoom")
