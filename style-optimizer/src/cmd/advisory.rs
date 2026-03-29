@@ -477,16 +477,15 @@ fn intern_literal_array(v: &mut serde_json::Value, table: &[String]) {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use serde_json::json;
 
+    use super::*;
+
     fn table() -> BTreeMap<String, Vec<String>> {
-        BTreeMap::from([
-            (
-                "class".to_string(),
-                vec!["primary".to_string(), "secondary".to_string()],
-            ),
-        ])
+        BTreeMap::from([(
+            "class".to_string(),
+            vec!["primary".to_string(), "secondary".to_string()],
+        )])
     }
 
     #[test]
@@ -512,17 +511,25 @@ mod tests {
     fn rewrite_nested_interpolate_wrapping_match() {
         let t = table();
         let mut expr = json!([
-            "interpolate", ["linear"], ["zoom"],
-            10, ["match", ["get", "class"], "primary", 3, "secondary", 2, 1],
-            16, ["match", ["get", "class"], "primary", 6, "secondary", 4, 2]
+            "interpolate",
+            ["linear"],
+            ["zoom"],
+            10,
+            ["match", ["get", "class"], "primary", 3, "secondary", 2, 1],
+            16,
+            ["match", ["get", "class"], "primary", 6, "secondary", 4, 2]
         ]);
         rewrite_expression_interning(&mut expr, &t);
         assert_eq!(
             expr,
             json!([
-                "interpolate", ["linear"], ["zoom"],
-                10, ["match", ["get", "class"], 0, 3, 1, 2, 1],
-                16, ["match", ["get", "class"], 0, 6, 1, 4, 2]
+                "interpolate",
+                ["linear"],
+                ["zoom"],
+                10,
+                ["match", ["get", "class"], 0, 3, 1, 2, 1],
+                16,
+                ["match", ["get", "class"], 0, 6, 1, 4, 2]
             ])
         );
     }

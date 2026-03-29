@@ -24,9 +24,10 @@ pub(crate) fn dead_elimination(
                 to_drop.push(i);
                 continue;
             }
-            // Stats-driven: geometry type mismatch.
+            // Stats-driven: empty source-layer or geometry type mismatch.
             if let Some(stats) = stats
-                && is_dead_by_geometry(i, t, stats, layer_info)
+                && (is_dead_by_empty_source_layer(i, stats, layer_info)
+                    || is_dead_by_geometry(i, t, stats, layer_info))
             {
                 to_drop.push(i);
             }
@@ -49,19 +50,33 @@ pub(super) fn prune_sources(style: &mut MaplibreStyleSpecification, used: &HashS
     style.sources.0.retain(|id, _| used.contains(id.as_str()));
 }
 
+fn resolve_layer_stats<'a>(
+    layer_index: usize,
+    stats: &'a TileStatistics,
+    layer_info: Option<&[Option<VectorLayerInfo>]>,
+) -> Option<&'a crate::stats::LayerStats> {
+    let info = layer_info?.get(layer_index)?.as_ref()?;
+    stats.layer_stats(&info.source, &info.source_layer)
+}
+
+/// A source-layer with `total_features == 0` means no features exist, so any
+/// layer targeting it is dead.
+fn is_dead_by_empty_source_layer(
+    layer_index: usize,
+    stats: &TileStatistics,
+    layer_info: Option<&[Option<VectorLayerInfo>]>,
+) -> bool {
+    resolve_layer_stats(layer_index, stats, layer_info)
+        .is_some_and(|ls| ls.total_features == 0)
+}
+
 fn is_dead_by_geometry(
     layer_index: usize,
     layer: &TypedLayer,
     stats: &TileStatistics,
     layer_info: Option<&[Option<VectorLayerInfo>]>,
 ) -> bool {
-    let Some(infos) = layer_info else {
-        return false;
-    };
-    let Some(Some(info)) = infos.get(layer_index) else {
-        return false;
-    };
-    let Some(layer_stats) = stats.layer_stats(&info.source, &info.source_layer) else {
+    let Some(layer_stats) = resolve_layer_stats(layer_index, stats, layer_info) else {
         return false;
     };
 

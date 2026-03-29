@@ -683,8 +683,7 @@ fn compute_interned_properties(
 
         // Skip if this property doesn't appear in any layer's filter or paint/layout expression.
         if !targeting.iter().any(|r| {
-            r.filter_properties.contains(prop_name)
-                || r.paint_layout_properties.contains(prop_name)
+            r.filter_properties.contains(prop_name) || r.paint_layout_properties.contains(prop_name)
         }) {
             continue;
         }

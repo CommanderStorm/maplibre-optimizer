@@ -1,7 +1,7 @@
 //! `MBTiles`/MVT reading and statistics accumulation.
 //!
-//! Reads vector tiles from an `MBTiles` (`SQLite`) file, decodes MVT protobuf data,
-//! and produces [`TileStatistics`].
+//! Reads vector tiles from an `MBTiles` (`SQLite`) file or a directory of loose `.mvt` files,
+//! decodes MVT protobuf data, and produces [`TileStatistics`].
 
 use std::collections::BTreeMap;
 use std::io::Read;
@@ -72,6 +72,82 @@ pub fn decode_tile(data: &[u8]) -> anyhow::Result<mvt::Tile> {
     mvt::Tile::decode(bytes).context("decode MVT protobuf")
 }
 
+/// Accumulate a single decoded tile into the layer accumulators.
+fn accumulate_tile(
+    layers: &mut BTreeMap<String, LayerStatsAccumulator>,
+    tile: &mvt::Tile,
+    zoom: u8,
+) {
+    for mvt_layer in &tile.layers {
+        let acc = layers.entry(mvt_layer.name.clone()).or_default();
+
+        for feature in &mvt_layer.features {
+            acc.total_features += 1;
+            *acc.features_by_zoom.entry(zoom).or_insert(0) += 1;
+
+            // Geometry type
+            match feature.r#type() {
+                mvt::tile::GeomType::Point => acc.geometry_types.point += 1,
+                mvt::tile::GeomType::Linestring => acc.geometry_types.linestring += 1,
+                mvt::tile::GeomType::Polygon => acc.geometry_types.polygon += 1,
+                mvt::tile::GeomType::Unknown => acc.geometry_types.unknown += 1,
+            }
+
+            // Feature ID
+            if feature.id.unwrap_or(0) != 0 {
+                acc.has_feature_ids = true;
+            }
+
+            // Properties from tags (alternating key_index, value_index)
+            let tags = &feature.tags;
+            let mut i = 0;
+            while i + 1 < tags.len() {
+                let key_idx = tags[i] as usize;
+                let val_idx = tags[i + 1] as usize;
+                i += 2;
+
+                let Some(key) = mvt_layer.keys.get(key_idx) else {
+                    continue;
+                };
+                let Some(value) = mvt_layer.values.get(val_idx) else {
+                    continue;
+                };
+
+                let prop_acc = acc
+                    .properties
+                    .entry(key.clone())
+                    .or_insert_with(PropertyStatsAccumulator::new);
+                prop_acc.observe(value);
+            }
+        }
+    }
+}
+
+/// Finalize layer accumulators into a [`TileStatistics`].
+fn finish_layers(
+    layers: BTreeMap<String, LayerStatsAccumulator>,
+    source_name: &str,
+    sample_rate: f64,
+) -> TileStatistics {
+    let mut source_layers = BTreeMap::new();
+    for (name, acc) in layers {
+        source_layers.insert(name, acc.finish());
+    }
+
+    let mut sources = BTreeMap::new();
+    sources.insert(
+        source_name.to_string(),
+        SourceStats {
+            layers: source_layers,
+        },
+    );
+
+    TileStatistics {
+        sources,
+        sample_rate,
+    }
+}
+
 /// Collect statistics from an `MBTiles` file for a given source name.
 ///
 /// `zoom_levels` specifies which zoom levels to scan. `sample_rate` (0.0–1.0) controls
@@ -107,69 +183,74 @@ pub fn collect_statistics(
                 }
             };
 
-            for mvt_layer in &tile.layers {
-                let acc = layers.entry(mvt_layer.name.clone()).or_default();
-
-                for feature in &mvt_layer.features {
-                    acc.total_features += 1;
-                    *acc.features_by_zoom.entry(zoom).or_insert(0) += 1;
-
-                    // Geometry type
-                    match feature.r#type() {
-                        mvt::tile::GeomType::Point => acc.geometry_types.point += 1,
-                        mvt::tile::GeomType::Linestring => acc.geometry_types.linestring += 1,
-                        mvt::tile::GeomType::Polygon => acc.geometry_types.polygon += 1,
-                        mvt::tile::GeomType::Unknown => acc.geometry_types.unknown += 1,
-                    }
-
-                    // Feature ID
-                    if feature.id.unwrap_or(0) != 0 {
-                        acc.has_feature_ids = true;
-                    }
-
-                    // Properties from tags (alternating key_index, value_index)
-                    let tags = &feature.tags;
-                    let mut i = 0;
-                    while i + 1 < tags.len() {
-                        let key_idx = tags[i] as usize;
-                        let val_idx = tags[i + 1] as usize;
-                        i += 2;
-
-                        let Some(key) = mvt_layer.keys.get(key_idx) else {
-                            continue;
-                        };
-                        let Some(value) = mvt_layer.values.get(val_idx) else {
-                            continue;
-                        };
-
-                        let prop_acc = acc
-                            .properties
-                            .entry(key.clone())
-                            .or_insert_with(PropertyStatsAccumulator::new);
-                        prop_acc.observe(value);
-                    }
-                }
-            }
+            accumulate_tile(&mut layers, &tile, zoom);
         }
     }
 
-    let mut source_layers = BTreeMap::new();
-    for (name, acc) in layers {
-        source_layers.insert(name, acc.finish());
+    Ok(finish_layers(layers, source_name, sample_rate))
+}
+
+/// Collect statistics from a directory of loose `.mvt` files.
+///
+/// Scans `dir` (non-recursively) for files matching `{z}-{x}-{y}.mvt`,
+/// skipping `.tms.mvt` files and non-matching names.
+pub fn collect_from_directory(dir: &Path, source_name: &str) -> anyhow::Result<TileStatistics> {
+    let mut layers: BTreeMap<String, LayerStatsAccumulator> = BTreeMap::new();
+
+    let entries =
+        std::fs::read_dir(dir).with_context(|| format!("read directory {}", dir.display()))?;
+
+    for entry in entries {
+        let entry = entry?;
+
+        if entry.file_type()?.is_dir() {
+            continue;
+        }
+
+        let file_name = entry.file_name();
+        let name = file_name.to_string_lossy();
+
+        // Skip non-.mvt files and .tms.mvt files (avoid double-counting)
+        if !name.ends_with(".mvt") || name.ends_with(".tms.mvt") {
+            continue;
+        }
+
+        // Parse {z}-{x}-{y}.mvt pattern
+        let Some(zoom) = parse_tile_zoom(&name) else {
+            continue;
+        };
+
+        let data = std::fs::read(entry.path())
+            .with_context(|| format!("read {}", entry.path().display()))?;
+
+        let tile = match decode_tile(&data) {
+            Ok(t) => t,
+            Err(e) => {
+                eprintln!("warning: skipping {}: {e}", entry.path().display());
+                continue;
+            }
+        };
+
+        accumulate_tile(&mut layers, &tile, zoom);
     }
 
-    let mut sources = BTreeMap::new();
-    sources.insert(
-        source_name.to_string(),
-        SourceStats {
-            layers: source_layers,
-        },
-    );
+    Ok(finish_layers(layers, source_name, 1.0))
+}
 
-    Ok(TileStatistics {
-        sources,
-        sample_rate,
-    })
+/// Try to parse a zoom level from a `{z}-{x}-{y}.mvt` filename.
+/// Returns `None` for non-matching names (e.g. `ocean.mvt`, `checkerboard.mvt`).
+fn parse_tile_zoom(name: &str) -> Option<u8> {
+    let stem = name.strip_suffix(".mvt")?;
+    let mut parts = stem.split('-');
+    let z: u8 = parts.next()?.parse().ok()?;
+    // Validate that x and y segments exist and are numeric
+    let _x: u32 = parts.next()?.parse().ok()?;
+    let _y: u32 = parts.next()?.parse().ok()?;
+    // Reject if there are extra segments
+    if parts.next().is_some() {
+        return None;
+    }
+    Some(z)
 }
 
 // ── Accumulators ─────────────────────────────────────────────────────────────

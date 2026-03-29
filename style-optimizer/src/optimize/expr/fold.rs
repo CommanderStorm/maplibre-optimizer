@@ -1218,22 +1218,10 @@ pub(super) fn try_prune_in_from_stats(
         return false;
     };
 
-    let Some(stats) = stats else { return false };
-    if (stats.sample_rate - 1.0).abs() > f64::EPSILON {
-        return false;
-    }
-    let Some(infos) = layer_info else {
+    let Some(layer_stats) = super::util::resolve_layer_stats(stats, layer_info, layer_index)
+    else {
         return false;
     };
-    let Some(Some(info)) = infos.get(layer_index) else {
-        return false;
-    };
-    let Some(layer_stats) = stats.layer_stats(&info.source, &info.source_layer) else {
-        return false;
-    };
-    if layer_stats.total_features == 0 {
-        return false;
-    }
 
     // If prop is unknown, all values are dead.
     let prop_stats = layer_stats.properties.get(prop);
@@ -1243,6 +1231,17 @@ pub(super) fn try_prune_in_from_stats(
         .filter(|v| value_exists_in_stats(v, prop_stats))
         .cloned()
         .collect();
+
+    // Check if all values are covered: every value in value_counts appears in
+    // the `in` list AND the property is present on 100% of features → fold to true.
+    // Use `kept` (post-prune) since those are exactly the values that exist in data.
+    if let Some(prop_stats) = prop_stats
+        && prop_stats.present_count() == layer_stats.total_features
+        && all_values_covered_by_in(prop_stats, &kept)
+    {
+        *arr = vec![Value::String("literal".to_string()), Value::Bool(true)];
+        return true;
+    }
 
     if kept.len() == values.len() {
         return false;
@@ -1295,6 +1294,36 @@ fn value_exists_in_stats(v: &Value, prop_stats: Option<&crate::stats::PropertySt
     }
 }
 
+/// Check whether every value in the property's `value_counts` appears in the `in` list.
+/// Returns `false` conservatively if `value_counts` is unavailable.
+fn all_values_covered_by_in(prop_stats: &crate::stats::PropertyStats, in_values: &[Value]) -> bool {
+    use super::util::{json_as_i64, json_as_u64};
+    use crate::stats::PropertyStats;
+
+    match prop_stats {
+        PropertyStats::String {
+            value_counts: Some(vc),
+            ..
+        } => vc
+            .keys()
+            .all(|k| in_values.iter().any(|v| v.as_str() == Some(k))),
+        PropertyStats::Integer {
+            value_counts: Some(vc),
+            ..
+        } => vc
+            .keys()
+            .all(|k| in_values.iter().any(|v| json_as_i64(v) == Some(*k))),
+        PropertyStats::UnsignedInteger {
+            value_counts: Some(vc),
+            ..
+        } => vc
+            .keys()
+            .all(|k| in_values.iter().any(|v| json_as_u64(v) == Some(*k))),
+        // No value_counts available — conservatively don't fold.
+        _ => false,
+    }
+}
+
 /// Prune dead arms from `["match", ["get", prop], label, out, ..., fallback]` using stats.
 ///
 /// Arms whose labels don't exist in `value_counts` are removed. All arms pruned → fallback.
@@ -1318,22 +1347,10 @@ pub(super) fn try_prune_match_from_stats(
         return false;
     };
 
-    let Some(stats) = stats else { return false };
-    if (stats.sample_rate - 1.0).abs() > f64::EPSILON {
-        return false;
-    }
-    let Some(infos) = layer_info else {
+    let Some(layer_stats) = super::util::resolve_layer_stats(stats, layer_info, layer_index)
+    else {
         return false;
     };
-    let Some(Some(info)) = infos.get(layer_index) else {
-        return false;
-    };
-    let Some(layer_stats) = stats.layer_stats(&info.source, &info.source_layer) else {
-        return false;
-    };
-    if layer_stats.total_features == 0 {
-        return false;
-    }
     let prop_stats = layer_stats.properties.get(prop);
 
     let arm_count = (arr.len() - 3) / 2;
@@ -1429,24 +1446,46 @@ pub(super) fn try_fold_coalesce_from_stats(
         return false;
     }
 
-    let Some(stats) = stats else { return false };
-    if (stats.sample_rate - 1.0).abs() > f64::EPSILON {
-        return false;
-    }
-    let Some(infos) = layer_info else {
+    let Some(layer_stats) = super::util::resolve_layer_stats(stats, layer_info, layer_index)
+    else {
         return false;
     };
-    let Some(Some(info)) = infos.get(layer_index) else {
-        return false;
-    };
-    let Some(layer_stats) = stats.layer_stats(&info.source, &info.source_layer) else {
-        return false;
-    };
-    if layer_stats.total_features == 0 {
-        return false;
+
+    // First pass: remove ["get", prop] arms where prop has present_count == 0
+    // (always null, so coalesce skips them). Skip index 0 ("coalesce" operator).
+    let before_len = arr.len();
+    let mut first = true;
+    arr.retain(|v| {
+        if first {
+            first = false;
+            return true; // keep "coalesce" operator
+        }
+        if let Some(prop) = get_prop_name(v) {
+            let never_present = layer_stats
+                .properties
+                .get(prop)
+                .is_none_or(|ps| ps.present_count() == 0);
+            return !never_present;
+        }
+        true // keep non-get arms (literals, other expressions)
+    });
+    let changed = arr.len() < before_len;
+    // After removing never-present arms, unwrap or collapse.
+    if changed {
+        if arr.len() == 1 {
+            // All arms removed — coalesce with no arms evaluates to null.
+            *arr = vec![Value::String("literal".to_string()), Value::Null];
+            return true;
+        }
+        if arr.len() == 2 {
+            let inner = arr[1].clone();
+            replace_arr_with_value(arr, inner);
+            return true;
+        }
     }
 
-    // Find the first ["get", prop] arm where prop is present on all features.
+    // Second pass: find the first ["get", prop] arm where prop is present on
+    // all features, and truncate everything after it.
     for i in 1..arr.len() {
         let Some(prop) = get_prop_name(&arr[i]) else {
             continue;
@@ -1465,7 +1504,230 @@ pub(super) fn try_fold_coalesce_from_stats(
             return true;
         }
     }
-    false
+    changed
+}
+
+/// Prune unreachable stops from property-driven `step` and `interpolate` expressions
+/// using min/max from `PropertyStats`.
+///
+/// **Step above max**: Remove stops with threshold > max(prop) — unreachable by any value.
+/// Null input returns the default, unaffected by high stops.
+///
+/// **Step below min**: Absorb stops with threshold ≤ min(prop) into default — only safe
+/// if property is 100% present (otherwise null values still need the original default).
+///
+/// **Interpolate above max**: Keep the first boundary stop ≥ max, remove later ones.
+///
+/// **Interpolate below min**: Keep the last boundary stop ≤ min, remove earlier ones.
+///
+/// Guard: `sample_rate == 1.0`.
+pub(super) fn try_prune_data_ramp_from_stats(
+    arr: &mut Vec<Value>,
+    stats: Option<&crate::stats::TileStatistics>,
+    layer_info: Option<&[Option<crate::optimize::source_util::VectorLayerInfo>]>,
+    layer_index: usize,
+) -> bool {
+    use super::util::get_prop_name;
+    use crate::stats::PropertyStats;
+
+    let Some(op) = arr.first().and_then(Value::as_str) else {
+        return false;
+    };
+    let is_step = op == "step";
+    let is_interpolate = matches!(op, "interpolate" | "interpolate-hcl" | "interpolate-lab");
+    if !is_step && !is_interpolate {
+        return false;
+    }
+
+    // Step: ["step", input, default, t1, v1, t2, v2, ...]
+    // Interpolate: ["interpolate", method, input, t1, v1, t2, v2, ...]
+    let (input_idx, first_stop_idx) = if is_step { (1, 3) } else { (2, 3) };
+
+    if arr.len() <= first_stop_idx {
+        return false;
+    }
+
+    // Input must be ["get", prop].
+    let Some(prop) = get_prop_name(&arr[input_idx]) else {
+        return false;
+    };
+
+    let Some(layer_stats) = super::util::resolve_layer_stats(stats, layer_info, layer_index)
+    else {
+        return false;
+    };
+    let Some(prop_stats) = layer_stats.properties.get(prop) else {
+        return false;
+    };
+
+    // Extract min/max as f64. Precision loss is acceptable: these are threshold
+    // comparisons, not exact equality checks. Bail on non-finite values (corrupted stats).
+    #[expect(
+        clippy::cast_precision_loss,
+        reason = "threshold comparisons tolerate rounding"
+    )]
+    let (min_val, max_val) = match prop_stats {
+        PropertyStats::Integer { min, max, .. } => (*min as f64, *max as f64),
+        PropertyStats::UnsignedInteger { min, max, .. } => (*min as f64, *max as f64),
+        PropertyStats::Double { min, max, .. } if min.is_finite() && max.is_finite() => {
+            (*min, *max)
+        }
+        _ => return false,
+    };
+
+    let all_present = prop_stats.present_count() == layer_stats.total_features;
+
+    if is_step {
+        prune_data_step(arr, first_stop_idx, min_val, max_val, all_present)
+    } else {
+        prune_data_interpolate(arr, first_stop_idx, min_val, max_val)
+    }
+}
+
+/// Prune stops from a property-driven step expression.
+fn prune_data_step(
+    arr: &mut Vec<Value>,
+    first_stop_idx: usize,
+    min_val: f64,
+    max_val: f64,
+    all_present: bool,
+) -> bool {
+    let mut changed = false;
+    let default_idx = first_stop_idx - 1; // index 2 for step
+
+    // Above max: remove stops with threshold > max.
+    // Stops are (threshold, value) pairs starting at first_stop_idx.
+    let mut i = first_stop_idx;
+    while i + 1 < arr.len() {
+        if arr[i].as_f64().is_some_and(|t| t > max_val) {
+            // Remove this stop and all after it.
+            arr.truncate(i);
+            changed = true;
+            break;
+        }
+        i += 2;
+    }
+
+    // Below min (only safe if property is 100% present): absorb stops with
+    // threshold ≤ min into default.
+    if all_present {
+        let mut last_absorbed = None;
+        let mut i = first_stop_idx;
+        while i + 1 < arr.len() {
+            if arr[i].as_f64().is_some_and(|t| t <= min_val) {
+                last_absorbed = Some(i);
+            } else {
+                break;
+            }
+            i += 2;
+        }
+        if let Some(last_idx) = last_absorbed {
+            // The value of the last absorbed stop becomes the new default.
+            arr[default_idx] = arr[last_idx + 1].clone();
+            // Remove all absorbed stops.
+            arr.drain(first_stop_idx..=last_idx + 1);
+            changed = true;
+        }
+    }
+
+    // Collapse trivial: if no stops remain, replace with default.
+    if arr.len() == first_stop_idx {
+        let val = arr[default_idx].clone();
+        replace_arr_with_value(arr, val);
+        return true;
+    }
+
+    // Collapse trivial: all stop outputs equal default.
+    if arr.len() > first_stop_idx {
+        let default = &arr[default_idx];
+        if arr[first_stop_idx + 1..]
+            .iter()
+            .step_by(2)
+            .all(|v| v == default)
+        {
+            let val = default.clone();
+            replace_arr_with_value(arr, val);
+            return true;
+        }
+    }
+
+    changed
+}
+
+/// Prune stops from a property-driven interpolate expression.
+fn prune_data_interpolate(
+    arr: &mut Vec<Value>,
+    first_stop_idx: usize,
+    min_val: f64,
+    max_val: f64,
+) -> bool {
+    // Stops are (threshold, value) pairs starting at first_stop_idx.
+    let stop_count = (arr.len() - first_stop_idx) / 2;
+    if stop_count < 2 {
+        return false;
+    }
+
+    let mut changed = false;
+
+    // Above max: keep the first stop with threshold ≥ max, remove everything after.
+    let mut boundary_above = None;
+    let mut i = first_stop_idx;
+    while i + 1 < arr.len() {
+        if arr[i].as_f64().is_some_and(|t| t >= max_val) {
+            boundary_above = Some(i);
+            break;
+        }
+        i += 2;
+    }
+    if let Some(keep_through) = boundary_above {
+        let keep_len = keep_through + 2; // include value after threshold
+        if keep_len < arr.len() {
+            arr.truncate(keep_len);
+            changed = true;
+        }
+    }
+
+    // Below min: keep the last stop with threshold ≤ min, remove earlier ones.
+    let mut keep_from = None;
+    let mut i = first_stop_idx;
+    while i + 1 < arr.len() {
+        if arr[i].as_f64().is_some_and(|t| t <= min_val) {
+            keep_from = Some(i);
+        } else {
+            break;
+        }
+        i += 2;
+    }
+    if let Some(keep_idx) = keep_from
+        && keep_idx > first_stop_idx
+    {
+        arr.drain(first_stop_idx..keep_idx);
+        changed = true;
+    }
+
+    // Collapse trivial: single stop → bare value.
+    let remaining_stops = (arr.len() - first_stop_idx) / 2;
+    if remaining_stops == 1 {
+        let val = arr[first_stop_idx + 1].clone();
+        replace_arr_with_value(arr, val);
+        return true;
+    }
+
+    // Collapse trivial: all stop outputs identical → bare value.
+    if remaining_stops >= 2 {
+        let first = &arr[first_stop_idx + 1];
+        if arr[first_stop_idx + 1..]
+            .iter()
+            .step_by(2)
+            .all(|v| v == first)
+        {
+            let val = first.clone();
+            replace_arr_with_value(arr, val);
+            return true;
+        }
+    }
+
+    changed
 }
 
 /// Fold `==`/`!=` comparisons against a boolean property.
@@ -2408,7 +2670,8 @@ mod tests {
     use indexmap::IndexMap;
 
     use super::{
-        try_fold_coalesce_from_stats, try_prune_in_from_stats, try_prune_match_from_stats,
+        try_fold_coalesce_from_stats, try_prune_data_ramp_from_stats, try_prune_in_from_stats,
+        try_prune_match_from_stats,
     };
 
     fn string_stats_with_values(
@@ -2464,13 +2727,11 @@ mod tests {
             Some(&info),
             0
         ));
+        // After pruning "c","d", remaining ["a","b"] covers all values and
+        // present_count == total → folds to true.
         assert_yaml_snapshot!(Value::Array(arr), @r"
-        - in
-        - - get
-          - kind
-        - - literal
-          - - a
-            - b
+        - literal
+        - true
         ");
     }
 
@@ -2739,6 +3000,400 @@ mod tests {
         let mut arr: Vec<Value> =
             serde_json::from_value(json!(["coalesce", ["get", "name"], "default"])).unwrap();
         assert!(!try_fold_coalesce_from_stats(
+            &mut arr,
+            Some(&stats),
+            Some(&info),
+            0
+        ));
+    }
+
+    // ── coalesce: never-present arm removal ──────────────────────────
+
+    #[test]
+    fn coalesce_removes_never_present_arms() {
+        let (stats, info) = coalesce_stats(vec![("name", 0), ("alt_name", 80)], 100);
+        let mut arr: Vec<Value> = serde_json::from_value(json!([
+            "coalesce",
+            ["get", "name"],
+            ["get", "alt_name"],
+            "default"
+        ]))
+        .unwrap();
+        assert!(try_fold_coalesce_from_stats(
+            &mut arr,
+            Some(&stats),
+            Some(&info),
+            0
+        ));
+        assert_yaml_snapshot!(Value::Array(arr), @r"
+        - coalesce
+        - - get
+          - alt_name
+        - default
+        ");
+    }
+
+    #[test]
+    fn coalesce_removes_unknown_prop_arm() {
+        // "missing" not in stats at all → never present.
+        let (stats, info) = coalesce_stats(vec![("name", 80)], 100);
+        let mut arr: Vec<Value> = serde_json::from_value(json!([
+            "coalesce",
+            ["get", "missing"],
+            ["get", "name"],
+            "default"
+        ]))
+        .unwrap();
+        assert!(try_fold_coalesce_from_stats(
+            &mut arr,
+            Some(&stats),
+            Some(&info),
+            0
+        ));
+        assert_yaml_snapshot!(Value::Array(arr), @r"
+        - coalesce
+        - - get
+          - name
+        - default
+        ");
+    }
+
+    #[test]
+    fn coalesce_collapses_when_all_get_arms_never_present() {
+        let (stats, info) = coalesce_stats(vec![("a", 0), ("b", 0)], 100);
+        let mut arr: Vec<Value> =
+            serde_json::from_value(json!(["coalesce", ["get", "a"], ["get", "b"], "fallback"]))
+                .unwrap();
+        assert!(try_fold_coalesce_from_stats(
+            &mut arr,
+            Some(&stats),
+            Some(&info),
+            0
+        ));
+        // Only "fallback" remains → unwrapped.
+        assert_yaml_snapshot!(Value::Array(arr), @r"
+        - literal
+        - fallback
+        ");
+    }
+
+    // ── in → true folding tests ──────────────────────────────────────
+
+    #[test]
+    fn in_folds_true_when_all_values_covered() {
+        let (stats, info) = string_stats_with_values(&["a", "b"], 100);
+        let mut arr: Vec<Value> =
+            serde_json::from_value(json!(["in", ["get", "kind"], ["literal", ["a", "b", "c"]]]))
+                .unwrap();
+        // "c" not in stats → pruned. Then "a","b" cover all values and present==total → true.
+        assert!(try_prune_in_from_stats(
+            &mut arr,
+            Some(&stats),
+            Some(&info),
+            0
+        ));
+        assert_yaml_snapshot!(Value::Array(arr), @r"
+        - literal
+        - true
+        ");
+    }
+
+    #[test]
+    fn in_folds_true_exact_coverage() {
+        let (stats, info) = string_stats_with_values(&["x", "y"], 100);
+        let mut arr: Vec<Value> =
+            serde_json::from_value(json!(["in", ["get", "kind"], ["literal", ["x", "y"]]]))
+                .unwrap();
+        assert!(try_prune_in_from_stats(
+            &mut arr,
+            Some(&stats),
+            Some(&info),
+            0
+        ));
+        assert_yaml_snapshot!(Value::Array(arr), @r"
+        - literal
+        - true
+        ");
+    }
+
+    #[test]
+    fn in_no_fold_true_when_not_all_present() {
+        // present_count (50) < total_features (100) — can't fold to true.
+        let mut vc = IndexMap::new();
+        vc.insert("a".to_string(), 10u64);
+        let mut props = BTreeMap::new();
+        props.insert(
+            "kind".to_string(),
+            PropertyStats::String {
+                present_count: 50,
+                cardinality: 1,
+                value_counts: Some(vc),
+            },
+        );
+        let stats = make_stats(
+            "lyr",
+            LayerStats {
+                total_features: 100,
+                properties: props,
+                ..Default::default()
+            },
+        );
+        let info = make_layer_info();
+        let mut arr: Vec<Value> =
+            serde_json::from_value(json!(["in", ["get", "kind"], ["literal", ["a"]]])).unwrap();
+        assert!(!try_prune_in_from_stats(
+            &mut arr,
+            Some(&stats),
+            Some(&info),
+            0
+        ));
+    }
+
+    // ── data-driven ramp pruning tests ───────────────────────────────
+
+    fn int_prop_stats(
+        prop: &str,
+        min: i64,
+        max: i64,
+        present: u64,
+        total: u64,
+    ) -> (TileStatistics, Vec<Option<VectorLayerInfo>>) {
+        let mut props = BTreeMap::new();
+        props.insert(
+            prop.to_string(),
+            PropertyStats::Integer {
+                present_count: present,
+                min,
+                max,
+                cardinality: 10,
+                value_counts: None,
+            },
+        );
+        let stats = make_stats(
+            "lyr",
+            LayerStats {
+                total_features: total,
+                properties: props,
+                ..Default::default()
+            },
+        );
+        (stats, make_layer_info())
+    }
+
+    #[test]
+    fn step_prune_above_max() {
+        let (stats, info) = int_prop_stats("rank", 1, 5, 100, 100);
+        let mut arr: Vec<Value> = serde_json::from_value(json!([
+            "step",
+            ["get", "rank"],
+            "small",
+            3,
+            "medium",
+            7,
+            "large"
+        ]))
+        .unwrap();
+        assert!(try_prune_data_ramp_from_stats(
+            &mut arr,
+            Some(&stats),
+            Some(&info),
+            0
+        ));
+        assert_yaml_snapshot!(Value::Array(arr), @r#"
+        - step
+        - - get
+          - rank
+        - small
+        - 3
+        - medium
+        "#);
+    }
+
+    #[test]
+    fn step_prune_below_min_when_all_present() {
+        let (stats, info) = int_prop_stats("rank", 5, 10, 100, 100);
+        let mut arr: Vec<Value> = serde_json::from_value(json!([
+            "step",
+            ["get", "rank"],
+            "tiny",
+            3,
+            "small",
+            5,
+            "medium",
+            8,
+            "large"
+        ]))
+        .unwrap();
+        assert!(try_prune_data_ramp_from_stats(
+            &mut arr,
+            Some(&stats),
+            Some(&info),
+            0
+        ));
+        // Stops at 3 and 5 are ≤ min(5), so absorbed into default.
+        assert_yaml_snapshot!(Value::Array(arr), @r#"
+        - step
+        - - get
+          - rank
+        - medium
+        - 8
+        - large
+        "#);
+    }
+
+    #[test]
+    fn step_no_prune_below_min_when_not_all_present() {
+        let (stats, info) = int_prop_stats("rank", 5, 10, 80, 100);
+        let mut arr: Vec<Value> = serde_json::from_value(json!([
+            "step",
+            ["get", "rank"],
+            "tiny",
+            3,
+            "small",
+            8,
+            "large"
+        ]))
+        .unwrap();
+        // threshold 3 < min=5, but not all present → below-min pruning unsafe.
+        // threshold 8 ≤ max=10 → no above-max pruning either.
+        assert!(!try_prune_data_ramp_from_stats(
+            &mut arr,
+            Some(&stats),
+            Some(&info),
+            0
+        ));
+    }
+
+    #[test]
+    fn step_collapses_when_all_pruned() {
+        let (stats, info) = int_prop_stats("rank", 1, 2, 100, 100);
+        let mut arr: Vec<Value> = serde_json::from_value(json!([
+            "step",
+            ["get", "rank"],
+            "small",
+            5,
+            "medium",
+            10,
+            "large"
+        ]))
+        .unwrap();
+        assert!(try_prune_data_ramp_from_stats(
+            &mut arr,
+            Some(&stats),
+            Some(&info),
+            0
+        ));
+        // All stops > max(2) → removed → only default remains → collapse.
+        assert_yaml_snapshot!(Value::Array(arr), @r#"
+        - literal
+        - small
+        "#);
+    }
+
+    #[test]
+    fn interpolate_prune_above_max() {
+        let (stats, info) = int_prop_stats("pop", 0, 500, 100, 100);
+        let mut arr: Vec<Value> = serde_json::from_value(json!([
+            "interpolate",
+            ["linear"],
+            ["get", "pop"],
+            0,
+            1,
+            200,
+            5,
+            500,
+            10,
+            1000,
+            20
+        ]))
+        .unwrap();
+        assert!(try_prune_data_ramp_from_stats(
+            &mut arr,
+            Some(&stats),
+            Some(&info),
+            0
+        ));
+        // Keep boundary at 500 (≥ max=500), remove 1000.
+        assert_yaml_snapshot!(Value::Array(arr), @r"
+        - interpolate
+        - - linear
+        - - get
+          - pop
+        - 0
+        - 1
+        - 200
+        - 5
+        - 500
+        - 10
+        ");
+    }
+
+    #[test]
+    fn interpolate_prune_below_min() {
+        let (stats, info) = int_prop_stats("pop", 500, 1000, 100, 100);
+        let mut arr: Vec<Value> = serde_json::from_value(json!([
+            "interpolate",
+            ["linear"],
+            ["get", "pop"],
+            0,
+            1,
+            100,
+            3,
+            500,
+            10,
+            1000,
+            20
+        ]))
+        .unwrap();
+        assert!(try_prune_data_ramp_from_stats(
+            &mut arr,
+            Some(&stats),
+            Some(&info),
+            0
+        ));
+        // Keep boundary at 500 (last ≤ min=500), remove 0 and 100.
+        assert_yaml_snapshot!(Value::Array(arr), @r"
+        - interpolate
+        - - linear
+        - - get
+          - pop
+        - 500
+        - 10
+        - 1000
+        - 20
+        ");
+    }
+
+    #[test]
+    fn data_ramp_no_prune_when_zoom_driven() {
+        let (stats, info) = int_prop_stats("x", 1, 5, 100, 100);
+        let mut arr: Vec<Value> =
+            serde_json::from_value(json!(["step", ["zoom"], "small", 3, "medium", 7, "large"]))
+                .unwrap();
+        // ["zoom"] is not ["get", prop] → no pruning.
+        assert!(!try_prune_data_ramp_from_stats(
+            &mut arr,
+            Some(&stats),
+            Some(&info),
+            0
+        ));
+    }
+
+    #[test]
+    fn data_ramp_no_prune_when_sample_rate_below_1() {
+        let (mut stats, info) = int_prop_stats("rank", 1, 5, 100, 100);
+        stats.sample_rate = 0.5;
+        let mut arr: Vec<Value> = serde_json::from_value(json!([
+            "step",
+            ["get", "rank"],
+            "small",
+            3,
+            "medium",
+            7,
+            "large"
+        ]))
+        .unwrap();
+        assert!(!try_prune_data_ramp_from_stats(
             &mut arr,
             Some(&stats),
             Some(&info),

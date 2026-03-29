@@ -4,13 +4,13 @@ use std::path::PathBuf;
 use anyhow::Context;
 use clap::Args;
 
-/// Collect tile statistics from an `MBTiles` file.
+/// Collect tile statistics from an `MBTiles` file or a directory of `.mvt` files.
 ///
 /// Reads vector tiles, decodes MVT data, and writes a `TileStatistics` JSON file
 /// suitable for use with `optimize --stats`.
 #[derive(Args, Debug)]
 pub struct StatsArgs {
-    /// Path to the input `.mbtiles` file.
+    /// Path to the input `.mbtiles` file or a directory of `.mvt` files.
     #[arg(long)]
     input: PathBuf,
 
@@ -38,22 +38,30 @@ pub struct StatsArgs {
 pub fn run(args: &StatsArgs) -> anyhow::Result<()> {
     use maplibre_style_optimizer::stats::collect;
 
-    let conn = collect::open_mbtiles(&args.input)?;
+    let stats = if args.input.is_dir() {
+        eprintln!(
+            "Collecting statistics from directory {} for source {:?}",
+            args.input.display(),
+            args.source_name,
+        );
+        collect::collect_from_directory(&args.input, &args.source_name)?
+    } else {
+        let conn = collect::open_mbtiles(&args.input)?;
 
-    let zoom_levels = match &args.zoom_levels {
-        Some(spec) => parse_zoom_levels(spec)?,
-        None => collect::available_zoom_levels(&conn)?,
+        let zoom_levels = match &args.zoom_levels {
+            Some(spec) => parse_zoom_levels(spec)?,
+            None => collect::available_zoom_levels(&conn)?,
+        };
+
+        eprintln!(
+            "Collecting statistics from {} for source {:?} at zoom levels {zoom_levels:?} (sample rate {:.0}%)",
+            args.input.display(),
+            args.source_name,
+            args.sample_rate * 100.0,
+        );
+
+        collect::collect_statistics(&conn, &args.source_name, &zoom_levels, args.sample_rate)?
     };
-
-    eprintln!(
-        "Collecting statistics from {} for source {:?} at zoom levels {zoom_levels:?} (sample rate {:.0}%)",
-        args.input.display(),
-        args.source_name,
-        args.sample_rate * 100.0,
-    );
-
-    let stats =
-        collect::collect_statistics(&conn, &args.source_name, &zoom_levels, args.sample_rate)?;
 
     let json = if args.pretty {
         serde_json::to_string_pretty(&stats)?

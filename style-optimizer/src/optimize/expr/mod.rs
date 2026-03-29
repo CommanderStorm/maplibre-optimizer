@@ -11,8 +11,8 @@ use fold::{
     try_fold_comparison, try_fold_comparison_from_stats, try_fold_geometry_type_from_stats,
     try_fold_get_from_stats, try_fold_has_from_stats, try_fold_not, try_fold_pure_operator,
     try_fold_redundant_coercion, try_fold_redundant_properties, try_negate_comparison,
-    try_predicate_subsumption, try_prune_in_from_stats, try_prune_match_from_stats,
-    try_range_tightening,
+    try_predicate_subsumption, try_prune_data_ramp_from_stats, try_prune_in_from_stats,
+    try_prune_match_from_stats, try_range_tightening,
 };
 use maplibre_style_spec::mir::MirSpec;
 use reorder::{LayerContext, reorder_selectivity};
@@ -249,6 +249,11 @@ static RULES: &[RewriteRule] = &[
         gate: RuleGate::ConstantFold,
         scope: RuleScope::FilterAndProperty,
         apply: try_fold_coalesce_from_stats,
+    },
+    RewriteRule::WithStats {
+        gate: RuleGate::ConstantFold,
+        scope: RuleScope::FilterAndProperty,
+        apply: try_prune_data_ramp_from_stats,
     },
     // ── simplify_expressions ──
     RewriteRule::Pure {
