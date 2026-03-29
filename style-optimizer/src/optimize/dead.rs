@@ -84,7 +84,9 @@ fn is_dead_by_geometry(
         TypedLayer::Fill { .. } | TypedLayer::FillExtrusion { .. } => gt.polygon == 0,
         TypedLayer::Circle { .. } | TypedLayer::Heatmap { .. } => gt.point == 0,
         TypedLayer::Line { .. } => gt.linestring == 0 && gt.polygon == 0,
-        TypedLayer::Symbol { .. } => gt.point == 0 && gt.linestring == 0,
+        // Symbols can be placed on any geometry type (point, line midpoint, polygon
+        // pole of inaccessibility), so only dead when there are no features at all.
+        TypedLayer::Symbol { .. } => gt.point == 0 && gt.linestring == 0 && gt.polygon == 0,
         TypedLayer::Background { .. }
         | TypedLayer::ColorRelief { .. }
         | TypedLayer::Hillshade { .. }
