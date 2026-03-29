@@ -477,3 +477,185 @@ fn interpolate_prune_above_max() {
       - 2.5
     ");
 }
+
+// ── SCCP: sparse conditional constant propagation ─────────────────────
+
+#[test]
+fn sccp_case_substitutes_get_in_output() {
+    let mir = sample_mir();
+    let mut v = style_with_paint(
+        "fill-color",
+        serde_json::json!([
+            "case",
+            ["==", ["get", "type"], "road"],
+            ["get", "type"],
+            "other"
+        ]),
+    );
+    optimize_style_json_value(&mut v, &mir, &fold_passes());
+    assert_yaml_snapshot!(v["layers"][0]["paint"], @r#"
+    fill-color:
+      - case
+      - - "=="
+        - - get
+          - type
+        - road
+      - road
+      - other
+    "#);
+}
+
+#[test]
+fn sccp_case_commuted_operands() {
+    let mir = sample_mir();
+    let mut v = style_with_paint(
+        "fill-color",
+        serde_json::json!([
+            "case",
+            ["==", "road", ["get", "type"]],
+            ["get", "type"],
+            "other"
+        ]),
+    );
+    optimize_style_json_value(&mut v, &mir, &fold_passes());
+    assert_yaml_snapshot!(v["layers"][0]["paint"], @r#"
+    fill-color:
+      - case
+      - - "=="
+        - road
+        - - get
+          - type
+      - road
+      - other
+    "#);
+}
+
+#[test]
+fn sccp_case_enables_concat_fold() {
+    let mir = sample_mir();
+    let mut v = style_with_paint(
+        "fill-color",
+        serde_json::json!([
+            "case",
+            ["==", ["get", "type"], "road"],
+            ["concat", ["get", "type"], "-area"],
+            "other"
+        ]),
+    );
+    optimize_style_json_value(&mut v, &mir, &fold_passes());
+    assert_yaml_snapshot!(v["layers"][0]["paint"], @r#"
+    fill-color:
+      - case
+      - - "=="
+        - - get
+          - type
+        - road
+      - road-area
+      - other
+    "#);
+}
+
+#[test]
+fn sccp_match_substitutes_input() {
+    let mir = sample_mir();
+    let mut v = style_with_paint(
+        "fill-color",
+        serde_json::json!([
+            "match",
+            ["get", "class"],
+            "park",
+            ["get", "class"],
+            "default"
+        ]),
+    );
+    optimize_style_json_value(&mut v, &mir, &fold_passes());
+    assert_yaml_snapshot!(v["layers"][0]["paint"], @r#"
+    fill-color:
+      - match
+      - - get
+        - class
+      - park
+      - park
+      - default
+    "#);
+}
+
+#[test]
+fn sccp_match_enables_concat_fold() {
+    let mir = sample_mir();
+    let mut v = style_with_paint(
+        "fill-color",
+        serde_json::json!([
+            "match",
+            ["get", "class"],
+            "park",
+            ["concat", ["get", "class"], "-area"],
+            "default"
+        ]),
+    );
+    optimize_style_json_value(&mut v, &mir, &fold_passes());
+    assert_yaml_snapshot!(v["layers"][0]["paint"], @r#"
+    fill-color:
+      - match
+      - - get
+        - class
+      - park
+      - park-area
+      - default
+    "#);
+}
+
+#[test]
+fn sccp_match_skips_multi_label_arms() {
+    let mir = sample_mir();
+    let mut v = style_with_paint(
+        "fill-color",
+        serde_json::json!([
+            "match",
+            ["get", "class"],
+            ["park", "garden"],
+            ["get", "class"],
+            "default"
+        ]),
+    );
+    optimize_style_json_value(&mut v, &mir, &fold_passes());
+    // Output should be unchanged — multi-label arm is not substituted
+    assert_yaml_snapshot!(v["layers"][0]["paint"], @r#"
+    fill-color:
+      - match
+      - - get
+        - class
+      - - park
+        - garden
+      - - get
+        - class
+      - default
+    "#);
+}
+
+#[test]
+fn sccp_case_skips_not_equal_condition() {
+    let mir = sample_mir();
+    let mut v = style_with_paint(
+        "fill-color",
+        serde_json::json!([
+            "case",
+            ["!=", ["get", "type"], "road"],
+            ["get", "type"],
+            "other"
+        ]),
+    );
+    optimize_style_json_value(&mut v, &mir, &fold_passes());
+    // Output should be unchanged — != doesn't constrain the value
+    assert_yaml_snapshot!(v["layers"][0]["paint"], @r#"
+    fill-color:
+      - case
+      - - "!="
+        - - get
+          - type
+        - road
+      - - get
+        - type
+      - other
+    "#);
+}

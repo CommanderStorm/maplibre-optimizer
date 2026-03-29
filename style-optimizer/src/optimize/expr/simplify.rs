@@ -501,6 +501,26 @@ fn count_var_uses(v: &Value, name: &str) -> usize {
     }
 }
 
+/// Replace all occurrences of `target` (by structural equality) with `replacement` in a value tree.
+pub(super) fn substitute_expr(v: &Value, target: &Value, replacement: &Value) -> Value {
+    if v == target {
+        return replacement.clone();
+    }
+    match v {
+        Value::Array(arr) => Value::Array(
+            arr.iter()
+                .map(|child| substitute_expr(child, target, replacement))
+                .collect(),
+        ),
+        Value::Object(map) => Value::Object(
+            map.iter()
+                .map(|(k, child)| (k.clone(), substitute_expr(child, target, replacement)))
+                .collect(),
+        ),
+        other => other.clone(),
+    }
+}
+
 /// Replace all `["var", name]` with `replacement` in a value tree.
 fn substitute_var(v: &Value, name: &str, replacement: &Value) -> Value {
     match v {

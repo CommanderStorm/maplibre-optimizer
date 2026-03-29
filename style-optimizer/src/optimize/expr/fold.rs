@@ -528,6 +528,83 @@ pub(super) fn try_dead_branch_match_literal(arr: &mut Vec<Value>) -> bool {
     true
 }
 
+/// Sparse conditional constant propagation for `case` expressions.
+///
+/// When a `case` arm condition is `["==", A, B]` with one side being a literal,
+/// substitute the non-literal expression with the literal value inside the arm body.
+pub(super) fn try_sccp_case(arr: &mut Vec<Value>) -> bool {
+    if arr.first().and_then(Value::as_str) != Some("case") {
+        return false;
+    }
+    // Need at least: ["case", cond, out, fallback] = 4 elements, even length
+    if arr.len() < 4 || !arr.len().is_multiple_of(2) {
+        return false;
+    }
+    let mut changed = false;
+    let n_arms = (arr.len() - 2) / 2;
+    for i in 0..n_arms {
+        let cond_idx = 1 + 2 * i;
+        let out_idx = 2 + 2 * i;
+        let Value::Array(cond) = &arr[cond_idx] else {
+            continue;
+        };
+        // Must be ["==", A, B] with exactly 3 elements (no collator)
+        if cond.len() != 3 || cond[0].as_str() != Some("==") {
+            continue;
+        }
+        let (target, literal) = if let Some(lit) = extract_json_literal(&cond[2]) {
+            (&cond[1], lit)
+        } else if let Some(lit) = extract_json_literal(&cond[1]) {
+            (&cond[2], lit)
+        } else {
+            continue;
+        };
+        let target = target.clone();
+        let replacement = super::simplify::substitute_expr(&arr[out_idx], &target, &literal);
+        if replacement != arr[out_idx] {
+            arr[out_idx] = replacement;
+            changed = true;
+        }
+    }
+    changed
+}
+
+/// Sparse conditional constant propagation for `match` expressions.
+///
+/// When a `match` arm has a single (non-array) label, the input expression equals
+/// that label inside the arm body — substitute it.
+pub(super) fn try_sccp_match(arr: &mut Vec<Value>) -> bool {
+    if arr.first().and_then(Value::as_str) != Some("match") {
+        return false;
+    }
+    // ["match", input, label, output, ..., fallback] — len >= 5, odd length
+    if arr.len() < 5 || arr.len().is_multiple_of(2) {
+        return false;
+    }
+    // Skip if input is already a literal — `try_dead_branch_match_literal` handles that.
+    if extract_json_literal(&arr[1]).is_some() {
+        return false;
+    }
+    let input_expr = arr[1].clone();
+    let mut changed = false;
+    let arm_count = (arr.len() - 3) / 2;
+    for i in 0..arm_count {
+        let label_idx = 2 + 2 * i;
+        let out_idx = 3 + 2 * i;
+        // Skip multi-label arms — we don't know which value matched.
+        if arr[label_idx].is_array() {
+            continue;
+        }
+        let label = arr[label_idx].clone();
+        let replacement = super::simplify::substitute_expr(&arr[out_idx], &input_expr, &label);
+        if replacement != arr[out_idx] {
+            arr[out_idx] = replacement;
+            changed = true;
+        }
+    }
+    changed
+}
+
 /// Detect contradictory `==`/`!=` predicates inside `["all", ...]` and fold to false.
 pub(super) fn try_filter_contradiction(arr: &mut Vec<Value>) -> bool {
     if arr.first().and_then(Value::as_str) != Some("all") {
@@ -757,12 +834,7 @@ pub(super) fn try_boolean_absorption(arr: &mut Vec<Value>) -> bool {
         .iter()
         .filter(|child| {
             !(child.is_array()
-                && child
-                    .as_array()
-                    .unwrap()
-                    .first()
-                    .and_then(Value::as_str)
-                    == Some(dual))
+                && child.as_array().unwrap().first().and_then(Value::as_str) == Some(dual))
         })
         .collect();
 

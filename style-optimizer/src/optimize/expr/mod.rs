@@ -11,7 +11,7 @@ use fold::{
     try_dead_branch_match_literal, try_filter_contradiction, try_fold_boolean_algebra,
     try_fold_comparison, try_fold_not, try_fold_pure_operator, try_fold_redundant_coercion,
     try_fold_redundant_properties, try_negate_comparison, try_predicate_subsumption,
-    try_range_tightening,
+    try_range_tightening, try_sccp_case, try_sccp_match,
 };
 use fold_stats::{
     try_fold_coalesce_from_stats, try_fold_comparison_from_stats,
@@ -192,6 +192,16 @@ static RULES: &[RewriteRule] = &[
         gate: RuleGate::ConstantFold,
         scope: RuleScope::Peephole,
         apply: try_dead_branch_match_literal,
+    },
+    RewriteRule::Pure {
+        gate: RuleGate::ConstantFold,
+        scope: RuleScope::Peephole,
+        apply: try_sccp_case,
+    },
+    RewriteRule::Pure {
+        gate: RuleGate::ConstantFold,
+        scope: RuleScope::Peephole,
+        apply: try_sccp_match,
     },
     RewriteRule::Pure {
         gate: RuleGate::ConstantFold,
@@ -533,9 +543,8 @@ fn apply_one_rewrite_pass(arr: &mut Vec<Value>, mir: &MirSpec, passes: &OptPasse
 // JSON round-trip for filter expressions.
 
 use fold::{
-    try_boolean_absorption_typed, try_filter_contradiction_typed,
-    try_fold_boolean_algebra_typed, try_fold_comparison_typed, try_fold_not_typed,
-    try_negate_comparison_typed,
+    try_boolean_absorption_typed, try_filter_contradiction_typed, try_fold_boolean_algebra_typed,
+    try_fold_comparison_typed, try_fold_not_typed, try_negate_comparison_typed,
 };
 use fold_stats::{try_fold_geometry_type_from_stats_typed, try_fold_has_from_stats_typed};
 use maplibre_style_spec::spec::Boolean;
