@@ -343,8 +343,25 @@ async function optimizeStyleWithPasses(
   }
 }
 
+/** Check whether a style uses templated tile URLs (`{z}`, `{x}`, `{y}`).
+ *  Stats-driven optimizations assume zoom-based tile fetching; styles with
+ *  hardcoded tile URLs serve specific tiles at all zoom levels, so stats
+ *  would produce incorrect zoom bounds for them. */
+function usesTemplatedTileUrls(style: TestStyle): boolean {
+  if (!style.sources) return false;
+  for (const src of Object.values(style.sources)) {
+    if (Array.isArray(src.tiles)) {
+      for (const t of src.tiles as string[]) {
+        if (!t.includes("{z}")) return false;
+      }
+    }
+  }
+  return true;
+}
+
 async function optimizeStyle(styleJSON: TestStyle): Promise<TestStyle> {
-  return optimizeStyleWithPasses(styleJSON, ["--all"], statsPath);
+  const stats = statsPath && usesTemplatedTileUrls(styleJSON) ? statsPath : undefined;
+  return optimizeStyleWithPasses(styleJSON, ["--all"], stats);
 }
 
 function restoreTestMetadata(optimised: TestStyle, original: TestStyle): void {
