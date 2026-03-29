@@ -13,19 +13,25 @@
  *   just render-test background-color    # filter by name
  *   just render-test --debug             # show browser console
  *   just render-test --stats stats.json  # pass tile stats to optimizer
+ *   just render-test --concurrency 8     # run N tests in parallel
  *
  * When a test fails, individual passes are automatically bisected to identify culprits.
  */
 
 import path from "node:path";
 import fs from "node:fs";
+import fsp from "node:fs/promises";
+import os from "node:os";
 import http from "node:http";
-import { execFileSync, execSync } from "node:child_process";
+import { execFile, execSync } from "node:child_process";
+import { promisify } from "node:util";
 import { globSync } from "glob";
 import st from "st";
 import { PNG } from "pngjs";
 import pixelmatch from "pixelmatch";
 import puppeteer, { type Page } from "puppeteer";
+
+const execFileAsync = promisify(execFile);
 
 // ── paths ────────────────────────────────────────────────────────────────────
 
@@ -96,8 +102,23 @@ if (statsIdx !== -1 && statsIdx + 1 < argv.length) {
   }
 }
 
+let concurrency: number;
+const concurrencyIdx = argv.indexOf("--concurrency");
+if (concurrencyIdx !== -1 && concurrencyIdx + 1 < argv.length) {
+  concurrency = parseInt(argv[concurrencyIdx + 1], 10);
+  if (Number.isNaN(concurrency) || concurrency < 1) {
+    console.error(`Invalid concurrency value: ${argv[concurrencyIdx + 1]}`);
+    process.exit(1);
+  }
+} else {
+  concurrency = Math.min(os.cpus().length, 8);
+}
+
 const filters = argv.filter(
-  (a, i) => !a.startsWith("--") && argv[i - 1] !== "--stats",
+  (a, i) =>
+    !a.startsWith("--") &&
+    argv[i - 1] !== "--stats" &&
+    argv[i - 1] !== "--concurrency",
 );
 
 // ── asset server ─────────────────────────────────────────────────────────────
@@ -298,30 +319,31 @@ function discoverTests(port: number): { styles: TestStyle[]; skipped: number } {
 
 // ── optimise a style JSON via our Rust binary ────────────────────────────────
 
-function optimizeStyleWithPasses(
+let tmpCounter = 0;
+
+async function optimizeStyleWithPasses(
   styleJSON: TestStyle,
   passFlags: string[],
   stats?: string,
-): TestStyle {
-  const tmpIn = path.join(RESULTS_DIR, "_opt_input.json");
-  const tmpOut = path.join(RESULTS_DIR, "_opt_output.json");
-  fs.writeFileSync(tmpIn, JSON.stringify(styleJSON));
+): Promise<TestStyle> {
+  const id = tmpCounter++;
+  const tmpIn = path.join(RESULTS_DIR, `_opt_input_${id}.json`);
+  const tmpOut = path.join(RESULTS_DIR, `_opt_output_${id}.json`);
+  await fsp.writeFile(tmpIn, JSON.stringify(styleJSON));
   try {
     const args = ["optimize", "--input", tmpIn, "--output", tmpOut, ...passFlags];
     if (stats) args.push("--stats", stats);
-    execFileSync(OPTIMIZER, args, { timeout: 30_000 });
-    return JSON.parse(fs.readFileSync(tmpOut, "utf8"));
+    await execFileAsync(OPTIMIZER, args, { timeout: 30_000 });
+    return JSON.parse(await fsp.readFile(tmpOut, "utf8"));
   } finally {
-    try {
-      fs.unlinkSync(tmpIn);
-    } catch {}
-    try {
-      fs.unlinkSync(tmpOut);
-    } catch {}
+    await Promise.all([
+      fsp.unlink(tmpIn).catch(() => {}),
+      fsp.unlink(tmpOut).catch(() => {}),
+    ]);
   }
 }
 
-function optimizeStyle(styleJSON: TestStyle): TestStyle {
+async function optimizeStyle(styleJSON: TestStyle): Promise<TestStyle> {
   return optimizeStyleWithPasses(styleJSON, ["--all"], statsPath);
 }
 
@@ -359,7 +381,7 @@ async function bisectPasses(
   const layersSnapshot = JSON.stringify(style.layers);
   for (const flag of PASS_FLAGS) {
     try {
-      const opt = optimizeStyleWithPasses(JSON.parse(styleSnapshot) as TestStyle, [flag], statsPath);
+      const opt = await optimizeStyleWithPasses(JSON.parse(styleSnapshot) as TestStyle, [flag], statsPath);
       restoreTestMetadata(opt, style);
 
       // Skip render if this pass didn't change the style
@@ -474,6 +496,18 @@ window.__renderStyle = function(style) {
 };
 `;
 
+// ── page pool ────────────────────────────────────────────────────────────────
+
+/** Initialise a page with maplibre-gl and the render helper pre-loaded. */
+async function initPage(page: Page): Promise<void> {
+  await page.setContent(`<!DOCTYPE html>
+<html><head><meta charset="utf-8">
+<style>body{margin:0}#map{box-sizing:content-box}</style>
+</head><body><div id="map"></div></body></html>`);
+  await page.addScriptTag({ path: MAPLIBRE_JS });
+  await page.addScriptTag({ content: RENDER_FN });
+}
+
 // ── render a style in headless chrome and return raw RGBA pixels ─────────────
 
 async function renderStyle(page: Page, style: TestStyle): Promise<Uint8Array> {
@@ -485,14 +519,18 @@ async function renderStyle(page: Page, style: TestStyle): Promise<Uint8Array> {
     height,
     deviceScaleFactor: style.metadata.test.pixelRatio || 1,
   });
-  await page.setContent(`<!DOCTYPE html>
-<html><head><meta charset="utf-8">
-<style>body{margin:0}#map{width:${width}px;height:${height}px;box-sizing:content-box}</style>
-</head><body><div id="map"></div></body></html>`);
 
-  // re-inject maplibre-gl and render helper after setContent clears the page
-  await page.addScriptTag({ path: MAPLIBRE_JS });
-  await page.addScriptTag({ content: RENDER_FN });
+  // Reset the map container for a fresh render without reloading maplibre-gl
+  await page.evaluate(
+    (w: number, h: number) => {
+      const el = document.getElementById("map")!;
+      el.style.width = `${w}px`;
+      el.style.height = `${h}px`;
+      el.innerHTML = "";
+    },
+    width,
+    height,
+  );
 
   // call the browser-side render function (no tsx transforms applied)
   const data = await page.evaluate(
@@ -551,8 +589,11 @@ async function main(): Promise<void> {
     "--enable-unsafe-swiftshader",
   ];
 
+  // Clamp concurrency to test count
+  const poolSize = Math.min(concurrency, styles.length || 1);
+  console.log(`Using ${poolSize} concurrent browser page(s)`);
+
   let browser = await puppeteer.launch({ headless: true, args: PUPPETEER_ARGS });
-  let page = await browser.newPage();
 
   function applyDebugListeners(p: Page): void {
     if (!debug) return;
@@ -561,16 +602,43 @@ async function main(): Promise<void> {
       console.error(`  [browser error] ${err.message}`),
     );
   }
-  applyDebugListeners(page);
 
-  const passed: string[] = [];
+  async function createPage(): Promise<Page> {
+    const p = await browser.newPage();
+    applyDebugListeners(p);
+    await initPage(p);
+    return p;
+  }
+
+  // Create page pool — each page has maplibre-gl pre-loaded
+  const pages = await Promise.all(
+    Array.from({ length: poolSize }, () => createPage()),
+  );
+
   const failed: FailedTest[] = [];
   const errored: ErroredTest[] = [];
-  let index = 0;
+  let passedCount = 0;
+  let completed = 0;
+  let nextIdx = 0;
 
-  for (const style of styles) {
+  /** Mutable page reference so crash recovery can swap the underlying page. */
+  interface PageRef { page: Page }
+
+  async function recoverPage(ref: PageRef): Promise<void> {
+    try { await ref.page.close(); } catch {}
+    try {
+      ref.page = await createPage();
+    } catch {
+      // Browser itself is dead — relaunch everything
+      console.log("  Browser crashed, relaunching…");
+      try { await browser.close(); } catch (e) { console.error("  Failed to close browser:", e); }
+      browser = await puppeteer.launch({ headless: true, args: PUPPETEER_ARGS });
+      ref.page = await createPage();
+    }
+  }
+
+  async function processTest(ref: PageRef, style: TestStyle): Promise<void> {
     const id = style.metadata.test.id;
-    index++;
     const w = Math.floor(
       style.metadata.test.width * (style.metadata.test.pixelRatio || 1),
     );
@@ -581,20 +649,30 @@ async function main(): Promise<void> {
     const threshold = style.metadata.test.threshold;
 
     try {
-      // 1. render original
-      const origPixels = await renderStyle(page, style);
-
-      // 2. optimise (deep-clone so localised URLs are preserved)
-      const optimised = optimizeStyle(
+      // 1. optimise first so we can detect no-ops before rendering
+      const optimised = await optimizeStyle(
         JSON.parse(JSON.stringify(style)) as TestStyle,
       );
-
       restoreTestMetadata(optimised, style);
 
-      // 3. render optimised
-      const optPixels = await renderStyle(page, optimised);
+      // 2. skip both renders if optimizer didn't change the style
+      if (
+        JSON.stringify(optimised.layers) === JSON.stringify(style.layers) &&
+        JSON.stringify(optimised.sources) === JSON.stringify(style.sources)
+      ) {
+        completed++;
+        passedCount++;
+        console.log(`${completed}/${styles.length}: passed ${id} (no-op)`);
+        return;
+      }
 
-      // 4. compare original vs optimised
+      // 3. render original
+      const origPixels = await renderStyle(ref.page, style);
+
+      // 4. render optimised
+      const optPixels = await renderStyle(ref.page, optimised);
+
+      // 5. compare original vs optimised
       const { ratio, diffPng } = comparePixels(
         origPixels,
         optPixels,
@@ -603,15 +681,17 @@ async function main(): Promise<void> {
         threshold,
       );
 
+      completed++;
+
       if (ratio <= allowed) {
-        passed.push(id);
-        console.log(`${index}/${styles.length}: passed ${id}`);
+        passedCount++;
+        console.log(`${completed}/${styles.length}: passed ${id}`);
       } else {
         const entry: FailedTest = { id, ratio };
 
         console.log(`  Bisecting passes for ${id}…`);
         const culprits = await bisectPasses(
-          page, style, origPixels, w, h, allowed, threshold,
+          ref.page, style, origPixels, w, h, allowed, threshold,
         );
         entry.culpritPasses = culprits;
         if (culprits.length > 0) {
@@ -622,7 +702,7 @@ async function main(): Promise<void> {
 
         failed.push(entry);
         console.log(
-          `\x1b[31m${index}/${styles.length}: FAILED ${id}  diff=${ratio.toFixed(6)}\x1b[0m`,
+          `\x1b[31m${completed}/${styles.length}: FAILED ${id}  diff=${ratio.toFixed(6)}\x1b[0m`,
         );
 
         // write diff artefacts for inspection
@@ -645,33 +725,42 @@ async function main(): Promise<void> {
         );
       }
     } catch (err: unknown) {
+      completed++;
       const msg = err instanceof Error ? err.message : String(err);
       errored.push({ id, error: msg });
       console.log(
-        `\x1b[91m${index}/${styles.length}: ERROR ${id}: ${msg}\x1b[0m`,
+        `\x1b[91m${completed}/${styles.length}: ERROR ${id}: ${msg}\x1b[0m`,
       );
 
-      // If the browser/page crashed, recover by re-launching
+      // If the page crashed, try to recover it
       if (
         msg.includes("Session closed") ||
         msg.includes("Target closed") ||
         msg.includes("Protocol error")
       ) {
-        console.log("  Recovering browser…");
-        try { await browser.close(); } catch {}
-        browser = await puppeteer.launch({ headless: true, args: PUPPETEER_ARGS });
-        page = await browser.newPage();
-        applyDebugListeners(page);
+        console.log("  Recovering page…");
+        await recoverPage(ref);
       }
     }
   }
+
+  // Worker-pool pattern: each page picks up the next test when it finishes
+  async function worker(ref: PageRef): Promise<void> {
+    while (true) {
+      const idx = nextIdx++;
+      if (idx >= styles.length) break;
+      await processTest(ref, styles[idx]);
+    }
+  }
+
+  await Promise.all(pages.map((p) => worker({ page: p })));
 
   await browser.close();
   server.close();
 
   // ── summary ────────────────────────────────────────────────────────────────
   console.log("\n── Summary ──");
-  console.log(`  ${passed.length} passed`);
+  console.log(`  ${passedCount} passed`);
   if (failed.length) console.log(`  \x1b[31m${failed.length} failed\x1b[0m`);
   if (errored.length)
     console.log(`  \x1b[91m${errored.length} errored\x1b[0m`);
