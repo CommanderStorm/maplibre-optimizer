@@ -488,7 +488,11 @@ window.__renderStyle = function(style) {
       }
 
       map.remove();
-      resolve(Array.from(buf));
+      var binary = '';
+      for (var k = 0; k < buf.length; k += 32768) {
+        binary += String.fromCharCode.apply(null, buf.subarray(k, k + 32768));
+      }
+      resolve(btoa(binary));
     } catch (e) {
       reject(e);
     }
@@ -538,7 +542,7 @@ async function renderStyle(page: Page, style: TestStyle): Promise<Uint8Array> {
     style as any,
   );
 
-  return new Uint8Array(data as number[]);
+  return new Uint8Array(Buffer.from(data as string, "base64"));
 }
 
 // ── compare two pixel buffers ────────────────────────────────────────────────
@@ -568,11 +572,57 @@ function buildOptimizer(): void {
   }
 }
 
+// ── auto-generate tile stats ─────────────────────────────────────────────────
+
+/** Generate stats from tile directories and merge them into a single file. */
+function autoGenerateStats(): string {
+  const tileDirs = [
+    path.join(ASSETS, "tiles"),
+    path.join(ASSETS, "tiles/mapbox.mapbox-streets-v7"),
+  ];
+
+  const tmpStats: string[] = [];
+  for (const dir of tileDirs) {
+    if (!fs.existsSync(dir)) continue;
+    const tmp = path.join(RESULTS_DIR, `_stats_${tmpStats.length}.json`);
+    execSync(
+      `"${OPTIMIZER}" stats --input "${dir}" --source-name maplibre --output "${tmp}"`,
+      { stdio: "pipe" },
+    );
+    tmpStats.push(tmp);
+  }
+
+  // Merge: combine source-layer maps from all stats files
+  const merged = { sources: { maplibre: { layers: {} as Record<string, unknown> } }, sample_rate: 1.0 };
+  for (const tmp of tmpStats) {
+    const stats = JSON.parse(fs.readFileSync(tmp, "utf8"));
+    const srcLayers = stats.sources?.maplibre?.layers;
+    if (srcLayers) {
+      Object.assign(merged.sources.maplibre.layers, srcLayers);
+    }
+    fs.unlinkSync(tmp);
+  }
+
+  const out = path.join(RESULTS_DIR, "_auto_stats.json");
+  fs.writeFileSync(out, JSON.stringify(merged));
+  return out;
+}
+
 // ── main ─────────────────────────────────────────────────────────────────────
 
 async function main(): Promise<void> {
   buildOptimizer();
   fs.mkdirSync(RESULTS_DIR, { recursive: true });
+
+  // Auto-generate stats from tile directories when not explicitly provided
+  if (!statsPath) {
+    try {
+      statsPath = autoGenerateStats();
+      console.log(`Auto-generated tile stats: ${statsPath}`);
+    } catch (err) {
+      console.warn(`Warning: failed to auto-generate tile stats: ${err}`);
+    }
+  }
 
   const PORT = 2900;
   const server = await startAssetServer(PORT);
@@ -583,14 +633,84 @@ async function main(): Promise<void> {
     `Discovered ${styles.length} render tests (${skipped} skipped)`,
   );
 
+  // ── Phase 1: pre-optimize all styles with high concurrency ──────────────
+  const optConcurrency = Math.min(os.cpus().length * 2, 32);
+  console.log(`Pre-optimizing ${styles.length} styles (concurrency: ${optConcurrency})…`);
+
+  interface PreOptResult {
+    style: TestStyle;
+    optimised: TestStyle | null; // null = optimization error
+    isNoop: boolean;
+    error?: string;
+  }
+
+  const preOptResults: PreOptResult[] = new Array(styles.length);
+  let optSemaphore = 0;
+  const optWaiters: (() => void)[] = [];
+
+  async function acquireOptSlot(): Promise<void> {
+    if (optSemaphore < optConcurrency) {
+      optSemaphore++;
+      return;
+    }
+    await new Promise<void>((resolve) => optWaiters.push(resolve));
+  }
+
+  function releaseOptSlot(): void {
+    const next = optWaiters.shift();
+    if (next) {
+      next();
+    } else {
+      optSemaphore--;
+    }
+  }
+
+  await Promise.all(
+    styles.map(async (style, i) => {
+      await acquireOptSlot();
+      try {
+        const optimised = await optimizeStyle(
+          JSON.parse(JSON.stringify(style)) as TestStyle,
+        );
+        restoreTestMetadata(optimised, style);
+
+        const isNoop =
+          JSON.stringify(optimised.layers) === JSON.stringify(style.layers) &&
+          JSON.stringify(optimised.sources) === JSON.stringify(style.sources);
+
+        preOptResults[i] = { style, optimised: isNoop ? null : optimised, isNoop };
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err);
+        preOptResults[i] = { style, optimised: null, isNoop: false, error: msg };
+      } finally {
+        releaseOptSlot();
+      }
+    }),
+  );
+
+  let noopCount = 0;
+  const renderQueue: PreOptResult[] = [];
+  const optErrors: PreOptResult[] = [];
+  for (const r of preOptResults) {
+    if (r.isNoop) noopCount++;
+    else if (r.error) optErrors.push(r);
+    else renderQueue.push(r);
+  }
+
+  console.log(
+    `${noopCount} tests are no-ops (skipping rendering), ${renderQueue.length} need rendering, ${optErrors.length} optimization errors`,
+  );
+
+  // ── Phase 2: render tests that changed ──────────────────────────────────
+
   const PUPPETEER_ARGS = [
     "--disable-gpu",
     "--enable-features=AllowSwiftShaderFallback,AllowSoftwareGLFallbackDueToCrashes",
     "--enable-unsafe-swiftshader",
   ];
 
-  // Clamp concurrency to test count
-  const poolSize = Math.min(concurrency, styles.length || 1);
+  // Clamp concurrency to render queue count
+  const poolSize = Math.min(concurrency, renderQueue.length || 1);
   console.log(`Using ${poolSize} concurrent browser page(s)`);
 
   let browser = await puppeteer.launch({ headless: true, args: PUPPETEER_ARGS });
@@ -617,9 +737,17 @@ async function main(): Promise<void> {
 
   const failed: FailedTest[] = [];
   const errored: ErroredTest[] = [];
-  let passedCount = 0;
-  let completed = 0;
+  let passedCount = noopCount; // no-ops already passed
+  let completed = noopCount + optErrors.length;
   let nextIdx = 0;
+
+  // Record optimization errors
+  for (const r of optErrors) {
+    errored.push({ id: r.style.metadata.test.id, error: r.error! });
+    console.log(
+      `\x1b[91m${completed}/${styles.length}: ERROR ${r.style.metadata.test.id}: ${r.error}\x1b[0m`,
+    );
+  }
 
   /** Mutable page reference so crash recovery can swap the underlying page. */
   interface PageRef { page: Page }
@@ -637,7 +765,8 @@ async function main(): Promise<void> {
     }
   }
 
-  async function processTest(ref: PageRef, style: TestStyle): Promise<void> {
+  async function processTest(ref: PageRef, result: PreOptResult): Promise<void> {
+    const { style, optimised } = result;
     const id = style.metadata.test.id;
     const w = Math.floor(
       style.metadata.test.width * (style.metadata.test.pixelRatio || 1),
@@ -649,30 +778,13 @@ async function main(): Promise<void> {
     const threshold = style.metadata.test.threshold;
 
     try {
-      // 1. optimise first so we can detect no-ops before rendering
-      const optimised = await optimizeStyle(
-        JSON.parse(JSON.stringify(style)) as TestStyle,
-      );
-      restoreTestMetadata(optimised, style);
-
-      // 2. skip both renders if optimizer didn't change the style
-      if (
-        JSON.stringify(optimised.layers) === JSON.stringify(style.layers) &&
-        JSON.stringify(optimised.sources) === JSON.stringify(style.sources)
-      ) {
-        completed++;
-        passedCount++;
-        console.log(`${completed}/${styles.length}: passed ${id} (no-op)`);
-        return;
-      }
-
-      // 3. render original
+      // 1. render original
       const origPixels = await renderStyle(ref.page, style);
 
-      // 4. render optimised
-      const optPixels = await renderStyle(ref.page, optimised);
+      // 2. render optimised
+      const optPixels = await renderStyle(ref.page, optimised!);
 
-      // 5. compare original vs optimised
+      // 3. compare original vs optimised
       const { ratio, diffPng } = comparePixels(
         origPixels,
         optPixels,
@@ -748,8 +860,8 @@ async function main(): Promise<void> {
   async function worker(ref: PageRef): Promise<void> {
     while (true) {
       const idx = nextIdx++;
-      if (idx >= styles.length) break;
-      await processTest(ref, styles[idx]);
+      if (idx >= renderQueue.length) break;
+      await processTest(ref, renderQueue[idx]);
     }
   }
 
