@@ -146,7 +146,7 @@ pub(super) fn try_fold_pure_operator(arr: &mut Vec<Value>, mir: &MirSpec) -> boo
         .operators
         .get(op)
         .is_some_and(MirExpressionOperator::is_pure);
-    if !pure_in_mir && !matches!(op, "length" | "at") {
+    if !pure_in_mir && !matches!(op, "length" | "at" | "in") {
         return false;
     }
 
@@ -391,6 +391,22 @@ fn evaluate_pure_operator(op: &str, args: &[Value]) -> Option<Value> {
             args[1].as_array()?.get(idx).cloned()
         }
 
+        // ── Membership ───────────────────────────────────────────────────────
+        "in" => {
+            if args.len() != 2 {
+                return None;
+            }
+            let needle = &args[0];
+            match &args[1] {
+                Value::Array(haystack) => Some(Value::Bool(haystack.contains(needle))),
+                Value::String(haystack) => {
+                    let needle_str = needle.as_str()?;
+                    Some(Value::Bool(haystack.contains(needle_str)))
+                }
+                _ => None,
+            }
+        }
+
         _ => None,
     }
 }
@@ -532,6 +548,10 @@ pub(super) fn try_dead_branch_match_literal(arr: &mut Vec<Value>) -> bool {
 ///
 /// When a `case` arm condition is `["==", A, B]` with one side being a literal,
 /// substitute the non-literal expression with the literal value inside the arm body.
+#[expect(
+    clippy::ptr_arg,
+    reason = "fn pointer signature requires &mut Vec<Value>"
+)]
 pub(super) fn try_sccp_case(arr: &mut Vec<Value>) -> bool {
     if arr.first().and_then(Value::as_str) != Some("case") {
         return false;
@@ -573,6 +593,10 @@ pub(super) fn try_sccp_case(arr: &mut Vec<Value>) -> bool {
 ///
 /// When a `match` arm has a single (non-array) label, the input expression equals
 /// that label inside the arm body — substitute it.
+#[expect(
+    clippy::ptr_arg,
+    reason = "fn pointer signature requires &mut Vec<Value>"
+)]
 pub(super) fn try_sccp_match(arr: &mut Vec<Value>) -> bool {
     if arr.first().and_then(Value::as_str) != Some("match") {
         return false;
@@ -695,6 +719,57 @@ pub(super) fn extract_eq_predicate(v: &Value) -> Option<(String, Value, Value)> 
         return Some((op, arr[2].clone(), lit));
     }
     None
+}
+
+/// Substitute equality bindings into siblings within `["all", ...]`.
+///
+/// For each `["==", expr, literal]` predicate (or commuted form), replaces occurrences of
+/// `expr` with `literal` in all other sibling predicates. This enables downstream folds
+/// (e.g. `try_fold_comparison`, `try_fold_pure_operator`) to constant-fold the substituted
+/// expressions.
+///
+/// Only substitutes into direct siblings — does not recurse into nested `all`/`any`.
+#[expect(
+    clippy::ptr_arg,
+    reason = "fn pointer signature requires &mut Vec<Value>"
+)]
+pub(super) fn try_equivalence_substitution(arr: &mut Vec<Value>) -> bool {
+    if arr.first().and_then(Value::as_str) != Some("all") {
+        return false;
+    }
+    if arr.len() < 3 {
+        return false;
+    }
+
+    // Collect equality bindings: (index, target_expr, literal_value).
+    let mut bindings: Vec<(usize, Value, Value)> = Vec::new();
+    for (i, elem) in arr.iter().enumerate().skip(1) {
+        if let Some((op, target, lit)) = extract_eq_predicate(elem)
+            && op == "=="
+        {
+            bindings.push((i, target, lit));
+        }
+    }
+    if bindings.is_empty() {
+        return false;
+    }
+
+    // Substitute bindings into non-equality siblings.
+    let mut changed = false;
+    for (idx, elem) in arr.iter_mut().enumerate().skip(1) {
+        // Skip the equality predicates themselves.
+        if bindings.iter().any(|(i, _, _)| *i == idx) {
+            continue;
+        }
+        for (_, target, replacement) in &bindings {
+            let substituted = super::simplify::substitute_expr(elem, target, replacement);
+            if substituted != *elem {
+                *elem = substituted;
+                changed = true;
+            }
+        }
+    }
+    changed
 }
 
 /// Detect range tightening inside `["all", ...]`:

@@ -8,10 +8,11 @@ pub(crate) mod util;
 
 use fold::{
     try_algebraic_simplify, try_boolean_absorption, try_dead_branch_case,
-    try_dead_branch_match_literal, try_distributive_factoring, try_filter_contradiction,
-    try_fold_boolean_algebra, try_fold_comparison, try_fold_not, try_fold_pure_operator,
-    try_fold_redundant_coercion, try_fold_redundant_properties, try_negate_comparison,
-    try_predicate_subsumption, try_range_tightening, try_sccp_case, try_sccp_match,
+    try_dead_branch_match_literal, try_distributive_factoring, try_equivalence_substitution,
+    try_filter_contradiction, try_fold_boolean_algebra, try_fold_comparison, try_fold_not,
+    try_fold_pure_operator, try_fold_redundant_coercion, try_fold_redundant_properties,
+    try_negate_comparison, try_predicate_subsumption, try_range_tightening, try_sccp_case,
+    try_sccp_match,
 };
 use fold_stats::{
     try_fold_coalesce_from_stats, try_fold_comparison_from_stats,
@@ -208,6 +209,11 @@ static RULES: &[RewriteRule] = &[
         gate: RuleGate::ConstantFold,
         scope: RuleScope::Peephole,
         apply: try_filter_contradiction,
+    },
+    RewriteRule::Pure {
+        gate: RuleGate::ConstantFold,
+        scope: RuleScope::Peephole,
+        apply: try_equivalence_substitution,
     },
     RewriteRule::Pure {
         gate: RuleGate::ConstantFold,

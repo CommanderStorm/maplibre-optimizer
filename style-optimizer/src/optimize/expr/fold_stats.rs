@@ -574,11 +574,19 @@ fn value_frequency(v: &Value, prop_stats: &crate::stats::PropertyStats) -> Optio
         PropertyStats::Integer {
             value_counts: Some(vc),
             ..
-        } => Some(json_as_i64(v).and_then(|n| vc.get(&n).copied()).unwrap_or(0)),
+        } => Some(
+            json_as_i64(v)
+                .and_then(|n| vc.get(&n).copied())
+                .unwrap_or(0),
+        ),
         PropertyStats::UnsignedInteger {
             value_counts: Some(vc),
             ..
-        } => Some(json_as_u64(v).and_then(|n| vc.get(&n).copied()).unwrap_or(0)),
+        } => Some(
+            json_as_u64(v)
+                .and_then(|n| vc.get(&n).copied())
+                .unwrap_or(0),
+        ),
         // No value_counts available — cannot determine frequency.
         _ => None,
     }
@@ -650,7 +658,11 @@ pub(super) fn try_reorder_match_from_stats(
     arm_freqs.sort_by_key(|entry| std::cmp::Reverse(entry.1));
 
     // Check if the order actually changed.
-    if arm_freqs.iter().enumerate().all(|(pos, (orig, _))| pos == *orig) {
+    if arm_freqs
+        .iter()
+        .enumerate()
+        .all(|(pos, (orig, _))| pos == *orig)
+    {
         return false;
     }
 

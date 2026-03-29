@@ -1125,10 +1125,14 @@ fn match_arms_reordered_by_frequency() {
     let mut v = style_with_paint(
         "fill-color",
         serde_json::json!([
-            "match", ["get", "class"],
-            "rare", "red",
-            "common", "blue",
-            "medium", "green",
+            "match",
+            ["get", "class"],
+            "rare",
+            "red",
+            "common",
+            "blue",
+            "medium",
+            "green",
             "black"
         ]),
     );
@@ -1202,4 +1206,178 @@ fn match_arms_not_reordered_without_value_counts() {
     let original = v["layers"][0]["paint"]["fill-color"].clone();
     optimize_style_json_value_with_stats(&mut v, &mir, &simplify_passes(), Some(&stats));
     assert_eq!(v["layers"][0]["paint"]["fill-color"], original);
+}
+
+// ── Equivalence substitution ──────────────────────────────────────────
+
+#[test]
+fn equivalence_substitution_in_subsumption() {
+    let mir = sample_mir();
+    let mut v = style_with_filter(serde_json::json!([
+        "all",
+        ["==", ["get", "class"], "road"],
+        [
+            "in",
+            ["get", "class"],
+            ["literal", ["road", "rail", "path"]]
+        ]
+    ]));
+    optimize_style_json_value(&mut v, &mir, &fold_passes());
+    assert_yaml_snapshot!(v["layers"], @r#"
+    - filter:
+        - all
+        - - "=="
+          - - get
+            - class
+          - road
+      id: l
+      source: src
+      source-layer: lyr
+      type: fill
+    "#);
+}
+
+#[test]
+fn equivalence_substitution_comparison() {
+    let mir = sample_mir();
+    let mut v = style_with_filter(serde_json::json!([
+        "all",
+        ["==", ["get", "x"], 5],
+        [">=", ["get", "x"], 3]
+    ]));
+    optimize_style_json_value(&mut v, &mir, &fold_passes());
+    assert_yaml_snapshot!(v["layers"], @r#"
+    - filter:
+        - all
+        - - "=="
+          - - get
+            - x
+          - 5
+      id: l
+      source: src
+      source-layer: lyr
+      type: fill
+    "#);
+}
+
+#[test]
+fn equivalence_substitution_no_binding_without_equality() {
+    let mir = sample_mir();
+    let mut v = style_with_filter(serde_json::json!([
+        "all",
+        [">=", ["get", "x"], 5],
+        ["in", ["get", "x"], ["literal", [5, 6, 7]]]
+    ]));
+    let original_filter = v["layers"][0]["filter"].clone();
+    optimize_style_json_value(&mut v, &mir, &fold_passes());
+    assert_eq!(v["layers"][0]["filter"], original_filter);
+}
+
+#[test]
+fn equivalence_substitution_multiple_equalities() {
+    let mir = sample_mir();
+    let mut v = style_with_filter(serde_json::json!([
+        "all",
+        ["==", ["get", "class"], "road"],
+        ["==", ["get", "subclass"], "main"],
+        [
+            "in",
+            ["get", "class"],
+            ["literal", ["road", "rail", "path"]]
+        ]
+    ]));
+    optimize_style_json_value(&mut v, &mir, &fold_passes());
+    assert_yaml_snapshot!(v["layers"], @r#"
+    - filter:
+        - all
+        - - "=="
+          - - get
+            - class
+          - road
+        - - "=="
+          - - get
+            - subclass
+          - main
+      id: l
+      source: src
+      source-layer: lyr
+      type: fill
+    "#);
+}
+
+#[test]
+fn equivalence_substitution_commuted_equality() {
+    let mir = sample_mir();
+    let mut v = style_with_filter(serde_json::json!([
+        "all",
+        ["==", "road", ["get", "class"]],
+        [
+            "in",
+            ["get", "class"],
+            ["literal", ["road", "rail", "path"]]
+        ]
+    ]));
+    optimize_style_json_value(&mut v, &mir, &fold_passes());
+    assert_yaml_snapshot!(v["layers"], @r#"
+    - filter:
+        - all
+        - - "=="
+          - road
+          - - get
+            - class
+      id: l
+      source: src
+      source-layer: lyr
+      type: fill
+    "#);
+}
+
+#[test]
+fn equivalence_substitution_flat_walk_only() {
+    let mir = sample_mir();
+    let mut v = style_with_filter(serde_json::json!([
+        "all",
+        ["==", ["get", "class"], "road"],
+        [
+            "any",
+            ["in", ["get", "class"], ["literal", ["road", "rail"]]],
+            ["==", ["get", "class"], "path"]
+        ]
+    ]));
+    optimize_style_json_value(&mut v, &mir, &fold_passes());
+    assert_yaml_snapshot!(v["layers"], @r#"
+    - filter:
+        - all
+        - - "=="
+          - - get
+            - class
+          - road
+      id: l
+      source: src
+      source-layer: lyr
+      type: fill
+    "#);
+}
+
+#[test]
+fn equivalence_substitution_no_self_modification() {
+    let mir = sample_mir();
+    let mut v = style_with_filter(serde_json::json!([
+        "all",
+        ["==", ["get", "class"], "road"],
+        ["!=", ["get", "class"], "rail"]
+    ]));
+    optimize_style_json_value(&mut v, &mir, &fold_passes());
+    assert_yaml_snapshot!(v["layers"], @r#"
+    - filter:
+        - all
+        - - "=="
+          - - get
+            - class
+          - road
+      id: l
+      source: src
+      source-layer: lyr
+      type: fill
+    "#);
 }
