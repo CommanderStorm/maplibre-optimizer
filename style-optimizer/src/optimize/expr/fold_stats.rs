@@ -18,21 +18,9 @@ pub(super) fn try_fold_has_from_stats(
     let Some(prop_name) = arr[1].as_str() else {
         return false;
     };
-    let Some(stats) = stats else {
+    let Some(layer_stats) = super::util::resolve_layer_stats(stats, layer_info, layer_index) else {
         return false;
     };
-    let Some(infos) = layer_info else {
-        return false;
-    };
-    let Some(Some(info)) = infos.get(layer_index) else {
-        return false;
-    };
-    let Some(layer_stats) = stats.layer_stats(&info.source, &info.source_layer) else {
-        return false;
-    };
-    if layer_stats.total_features == 0 {
-        return false;
-    }
     let Some(prop_stats) = layer_stats.properties.get(prop_name) else {
         // Property not in stats at all — never observed on any feature.
         *arr = vec![Value::String("literal".to_string()), Value::Bool(false)];
@@ -86,21 +74,9 @@ pub(super) fn try_fold_geometry_type_from_stats(
         return false;
     }
 
-    let Some(stats) = stats else {
+    let Some(layer_stats) = super::util::resolve_layer_stats(stats, layer_info, layer_index) else {
         return false;
     };
-    let Some(infos) = layer_info else {
-        return false;
-    };
-    let Some(Some(info)) = infos.get(layer_index) else {
-        return false;
-    };
-    let Some(layer_stats) = stats.layer_stats(&info.source, &info.source_layer) else {
-        return false;
-    };
-    if layer_stats.total_features == 0 {
-        return false;
-    }
 
     let gt = &layer_stats.geometry_types;
     let queried_count = match geom_type_str {
@@ -154,21 +130,9 @@ pub(super) fn try_fold_get_from_stats(
     let Some(prop_name) = arr[1].as_str() else {
         return false;
     };
-    let Some(stats) = stats else {
+    let Some(layer_stats) = super::util::resolve_layer_stats(stats, layer_info, layer_index) else {
         return false;
     };
-    let Some(infos) = layer_info else {
-        return false;
-    };
-    let Some(Some(info)) = infos.get(layer_index) else {
-        return false;
-    };
-    let Some(layer_stats) = stats.layer_stats(&info.source, &info.source_layer) else {
-        return false;
-    };
-    if layer_stats.total_features == 0 {
-        return false;
-    }
     let Some(prop_stats) = layer_stats.properties.get(prop_name) else {
         return false;
     };
@@ -308,12 +272,7 @@ fn try_fold_comparison_inner(
         return None;
     };
 
-    let infos = layer_info?;
-    let info = infos.get(layer_index)?.as_ref()?;
-    let layer_stats = stats?.layer_stats(&info.source, &info.source_layer)?;
-    if layer_stats.total_features == 0 {
-        return None;
-    }
+    let layer_stats = super::util::resolve_layer_stats(stats, layer_info, layer_index)?;
     let prop_stats = layer_stats.properties.get(prop)?;
     let all_present = prop_stats.present_count() == layer_stats.total_features;
 
@@ -1000,5 +959,122 @@ fn fold_comparison_numeric<T: PartialOrd, F: FnOnce() -> Option<bool>>(
             }
         }
         _ => None,
+    }
+}
+
+// ── Typed Boolean stats rules ────────────────────────────────────────────────
+
+use maplibre_style_spec::spec::{Boolean, ExprOrLiteral};
+
+/// Typed version: fold `Has(prop, None)` → `Literal(true/false)` using stats.
+pub(super) fn try_fold_has_from_stats_typed(
+    filter: &mut Boolean,
+    stats: Option<&crate::stats::TileStatistics>,
+    layer_info: Option<&[Option<crate::optimize::source_util::VectorLayerInfo>]>,
+    layer_index: usize,
+) -> bool {
+    let Boolean::Has(prop, obj) = filter else {
+        return false;
+    };
+    // Only handle simple `has(prop)`, not `has(prop, object)`.
+    if obj.is_some() {
+        return false;
+    }
+    let Some(prop_name) = string_expr_as_str(prop) else {
+        return false;
+    };
+
+    let Some(layer_stats) = super::util::resolve_layer_stats(stats, layer_info, layer_index) else {
+        return false;
+    };
+
+    let Some(prop_stats) = layer_stats.properties.get(prop_name) else {
+        *filter = Boolean::Literal(false);
+        return true;
+    };
+    if prop_stats.present_count() == 0 {
+        *filter = Boolean::Literal(false);
+        return true;
+    }
+    if prop_stats.present_count() == layer_stats.total_features {
+        *filter = Boolean::Literal(true);
+        return true;
+    }
+    false
+}
+
+/// Typed version: fold `EqualEqual(GeometryType, "Point")` → `Literal(true/false)`.
+pub(super) fn try_fold_geometry_type_from_stats_typed(
+    filter: &mut Boolean,
+    stats: Option<&crate::stats::TileStatistics>,
+    layer_info: Option<&[Option<crate::optimize::source_util::VectorLayerInfo>]>,
+    layer_index: usize,
+) -> bool {
+    let (is_eq, a, b) = match filter {
+        Boolean::EqualEqual(a, b, None) => (true, a as &ExprOrLiteral, b as &ExprOrLiteral),
+        Boolean::NotEqual(a, b, None) => (false, a as &ExprOrLiteral, b as &ExprOrLiteral),
+        _ => return false,
+    };
+    let Some(geom_type_str) =
+        extract_geom_type_literal(a, b).or_else(|| extract_geom_type_literal(b, a))
+    else {
+        return false;
+    };
+
+    if !matches!(geom_type_str, "Point" | "LineString" | "Polygon") {
+        return false;
+    }
+
+    let Some(layer_stats) = super::util::resolve_layer_stats(stats, layer_info, layer_index) else {
+        return false;
+    };
+
+    let gt = &layer_stats.geometry_types;
+    let queried_count = match geom_type_str {
+        "Point" => gt.point,
+        "LineString" => gt.linestring,
+        "Polygon" => gt.polygon,
+        _ => unreachable!(),
+    };
+
+    let non_zero_types =
+        u8::from(gt.point > 0) + u8::from(gt.linestring > 0) + u8::from(gt.polygon > 0);
+
+    let fold_value = if queried_count == 0 {
+        Some(!is_eq)
+    } else if non_zero_types == 1 && queried_count > 0 {
+        Some(is_eq)
+    } else {
+        None
+    };
+
+    if let Some(val) = fold_value {
+        *filter = Boolean::Literal(val);
+        return true;
+    }
+    false
+}
+
+/// Extract geometry-type string when one operand is `StringExpr(GeometryType)`.
+fn extract_geom_type_literal<'a>(
+    maybe_geom: &ExprOrLiteral,
+    maybe_lit: &'a ExprOrLiteral,
+) -> Option<&'a str> {
+    if let ExprOrLiteral::StringExpr(s) = maybe_geom
+        && matches!(s.as_ref(), maplibre_style_spec::spec::String::GeometryType)
+        && let ExprOrLiteral::StringLiteral(lit) = maybe_lit
+    {
+        Some(lit.as_str())
+    } else {
+        None
+    }
+}
+
+/// Extract a plain string from a `String` expression (only handles `Literal` variant).
+fn string_expr_as_str(s: &maplibre_style_spec::spec::String) -> Option<&str> {
+    if let maplibre_style_spec::spec::String::Literal(lit) = s {
+        Some(lit.as_str())
+    } else {
+        None
     }
 }

@@ -14,6 +14,9 @@ pub(crate) fn dead_elimination(
     stats: Option<&TileStatistics>,
     layer_info: Option<&[Option<VectorLayerInfo>]>,
 ) {
+    // Reject sampled stats for irreversible dead-layer elimination.
+    let stats = stats.filter(|s| (s.sample_rate - 1.0).abs() <= f64::EPSILON);
+
     let mut to_drop: Vec<usize> = Vec::new();
     for (i, layer) in style.layers.iter().enumerate() {
         if let AnyLayer::Typed(t) = layer {
@@ -50,15 +53,6 @@ pub(super) fn prune_sources(style: &mut MaplibreStyleSpecification, used: &HashS
     style.sources.0.retain(|id, _| used.contains(id.as_str()));
 }
 
-fn resolve_layer_stats<'a>(
-    layer_index: usize,
-    stats: &'a TileStatistics,
-    layer_info: Option<&[Option<VectorLayerInfo>]>,
-) -> Option<&'a crate::stats::LayerStats> {
-    let info = layer_info?.get(layer_index)?.as_ref()?;
-    stats.layer_stats(&info.source, &info.source_layer)
-}
-
 /// A source-layer with `total_features == 0` means no features exist, so any
 /// layer targeting it is dead.
 fn is_dead_by_empty_source_layer(
@@ -66,7 +60,15 @@ fn is_dead_by_empty_source_layer(
     stats: &TileStatistics,
     layer_info: Option<&[Option<VectorLayerInfo>]>,
 ) -> bool {
-    resolve_layer_stats(layer_index, stats, layer_info).is_some_and(|ls| ls.total_features == 0)
+    // Inline resolution: we specifically need to detect total_features == 0
+    // (the shared `resolve_layer_stats` filters that case out).
+    let info = layer_info
+        .and_then(|infos| infos.get(layer_index))
+        .and_then(Option::as_ref);
+    let Some(info) = info else { return false };
+    stats
+        .layer_stats(&info.source, &info.source_layer)
+        .is_some_and(|ls| ls.total_features == 0)
 }
 
 fn is_dead_by_geometry(
@@ -75,7 +77,10 @@ fn is_dead_by_geometry(
     stats: &TileStatistics,
     layer_info: Option<&[Option<VectorLayerInfo>]>,
 ) -> bool {
-    let Some(layer_stats) = resolve_layer_stats(layer_index, stats, layer_info) else {
+    // Use shared resolution (sample_rate already checked in dead_elimination).
+    let Some(layer_stats) =
+        super::source_util::resolve_layer_stats(Some(stats), layer_info, layer_index)
+    else {
         return false;
     };
 

@@ -340,6 +340,25 @@ mod tests {
         #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
         pub struct StringLiteral(std::string::String);
 
+        impl NumberLiteral {
+            /// Access the underlying `serde_json::Number`.
+            pub fn as_number(&self) -> &serde_json::Number {
+                &self.0
+            }
+
+            /// Try to represent as `f64`.
+            pub fn as_f64(&self) -> Option<f64> {
+                self.0.as_f64()
+            }
+        }
+
+        impl StringLiteral {
+            /// Borrow as `&str`.
+            pub fn as_str(&self) -> &str {
+                &self.0
+            }
+        }
+
         impl From<serde_json::Number> for NumberLiteral {
             fn from(n: serde_json::Number) -> Self {
                 Self(n)
@@ -661,6 +680,25 @@ mod tests {
         #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
         pub struct StringLiteral(std::string::String);
 
+        impl NumberLiteral {
+            /// Access the underlying `serde_json::Number`.
+            pub fn as_number(&self) -> &serde_json::Number {
+                &self.0
+            }
+
+            /// Try to represent as `f64`.
+            pub fn as_f64(&self) -> Option<f64> {
+                self.0.as_f64()
+            }
+        }
+
+        impl StringLiteral {
+            /// Borrow as `&str`.
+            pub fn as_str(&self) -> &str {
+                &self.0
+            }
+        }
+
         impl From<serde_json::Number> for NumberLiteral {
             fn from(n: serde_json::Number) -> Self {
                 Self(n)
@@ -969,6 +1007,25 @@ mod tests {
         #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
         #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
         pub struct StringLiteral(std::string::String);
+
+        impl NumberLiteral {
+            /// Access the underlying `serde_json::Number`.
+            pub fn as_number(&self) -> &serde_json::Number {
+                &self.0
+            }
+
+            /// Try to represent as `f64`.
+            pub fn as_f64(&self) -> Option<f64> {
+                self.0.as_f64()
+            }
+        }
+
+        impl StringLiteral {
+            /// Borrow as `&str`.
+            pub fn as_str(&self) -> &str {
+                &self.0
+            }
+        }
 
         impl From<serde_json::Number> for NumberLiteral {
             fn from(n: serde_json::Number) -> Self {

@@ -521,6 +521,155 @@ fn apply_one_rewrite_pass(arr: &mut Vec<Value>, mir: &MirSpec, passes: &OptPasse
         .any(|r| r.apply_peephole(arr, mir))
 }
 
+// ── Typed filter passes ──────────────────────────────────────────────────────
+//
+// These operate directly on `Boolean` via the typed filter walker, avoiding the
+// JSON round-trip for filter expressions.
+
+use fold::{
+    try_filter_contradiction_typed, try_fold_boolean_algebra_typed, try_fold_comparison_typed,
+    try_fold_not_typed, try_negate_comparison_typed,
+};
+use fold_stats::{try_fold_geometry_type_from_stats_typed, try_fold_has_from_stats_typed};
+use maplibre_style_spec::spec::Boolean;
+use simplify::{
+    try_boolean_flattening_typed, try_demorgan_typed, try_rewrite_any_to_in_typed,
+    try_simplify_unary_typed,
+};
+
+use super::walk::TypedFilterVisitor;
+
+/// Invariant context threaded through the recursive Boolean walker.
+struct TypedFoldCtx<'a> {
+    passes: &'a OptPasses,
+    stats: Option<&'a TileStatistics>,
+    layer_info: Option<&'a [Option<VectorLayerInfo>]>,
+    layer_index: usize,
+    changed: bool,
+}
+
+impl TypedFoldCtx<'_> {
+    /// Apply all enabled typed rewrite rules to a single `Boolean` node until fixpoint.
+    fn apply_rewrites(&mut self, filter: &mut Boolean) {
+        loop {
+            let mut any_fired = false;
+
+            if self.passes.expression_kind {
+                any_fired |= try_negate_comparison_typed(filter);
+            }
+            if self.passes.constant_fold {
+                any_fired |= try_fold_not_typed(filter);
+                any_fired |= try_fold_comparison_typed(filter);
+                any_fired |= try_fold_boolean_algebra_typed(filter);
+                any_fired |= try_filter_contradiction_typed(filter);
+            }
+            if self.passes.simplify_expressions {
+                any_fired |= try_boolean_flattening_typed(filter);
+                any_fired |= try_demorgan_typed(filter);
+                any_fired |= try_rewrite_any_to_in_typed(filter);
+            }
+            if self.passes.simplify_unary {
+                any_fired |= try_simplify_unary_typed(filter);
+            }
+
+            if self.passes.constant_fold {
+                any_fired |= try_fold_has_from_stats_typed(
+                    filter,
+                    self.stats,
+                    self.layer_info,
+                    self.layer_index,
+                );
+                any_fired |= try_fold_geometry_type_from_stats_typed(
+                    filter,
+                    self.stats,
+                    self.layer_info,
+                    self.layer_index,
+                );
+            }
+
+            if any_fired {
+                self.changed = true;
+            } else {
+                break;
+            }
+        }
+    }
+
+    /// Recursively walk a `Boolean` tree (bottom-up) and apply typed rewrite rules.
+    fn normalize_and_fold(&mut self, filter: &mut Boolean) {
+        walk_boolean_children_mut(filter, |child| {
+            self.normalize_and_fold(child);
+        });
+        self.apply_rewrites(filter);
+    }
+}
+
+/// Visit all direct `Boolean` children of a `Boolean` node.
+fn walk_boolean_children_mut(filter: &mut Boolean, mut f: impl FnMut(&mut Boolean)) {
+    match filter {
+        Boolean::Not(inner) => f(inner),
+        Boolean::All(children) | Boolean::Any(children) => {
+            for child in children.iter_mut() {
+                f(child);
+            }
+        }
+        // AnyExpr wraps polymorphic expressions (case, match) that may contain
+        // Boolean sub-expressions — walk into their conditions.
+        Boolean::AnyExpr(any) => {
+            walk_any_boolean_children(any, &mut f);
+        }
+        // Comparison operators, Has, In, Literal, etc. have no Boolean children.
+        Boolean::EqualEqual(..)
+        | Boolean::NotEqual(..)
+        | Boolean::Less(..)
+        | Boolean::LessEqual(..)
+        | Boolean::Greater(..)
+        | Boolean::GreaterEqual(..)
+        | Boolean::Has(..)
+        | Boolean::In(..)
+        | Boolean::IsSupportedScript(..)
+        | Boolean::To(..)
+        | Boolean::Within(..)
+        | Boolean::Op(..)
+        | Boolean::Literal(..) => {}
+    }
+}
+
+/// Walk Boolean children inside an `Any` expression (case conditions, etc.).
+fn walk_any_boolean_children(
+    any: &mut maplibre_style_spec::spec::Any,
+    f: &mut impl FnMut(&mut Boolean),
+) {
+    use maplibre_style_spec::spec::Any;
+    if let Any::Case((branches, _fallback)) = any {
+        for (condition, _output) in branches.iter_mut() {
+            f(condition);
+        }
+    }
+}
+
+/// Typed filter visitor that applies normalize+fold passes directly on `Boolean`.
+pub(crate) struct TypedNormalizeFoldVisitor<'a> {
+    pub passes: &'a OptPasses,
+    pub stats: Option<&'a TileStatistics>,
+    pub layer_info: Option<&'a [Option<VectorLayerInfo>]>,
+    pub changed: bool,
+}
+
+impl TypedFilterVisitor for TypedNormalizeFoldVisitor<'_> {
+    fn visit_filter(&mut self, layer_index: usize, _layer_type: &str, filter: &mut Boolean) {
+        let mut ctx = TypedFoldCtx {
+            passes: self.passes,
+            stats: self.stats,
+            layer_info: self.layer_info,
+            layer_index,
+            changed: false,
+        };
+        ctx.normalize_and_fold(filter);
+        self.changed |= ctx.changed;
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::path::Path;

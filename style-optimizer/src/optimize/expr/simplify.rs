@@ -594,3 +594,155 @@ fn try_step_stop_dedup(arr: &mut Vec<Value>) -> bool {
     }
     true
 }
+
+// ── Typed Boolean rules ──────────────────────────────────────────────────────
+
+use maplibre_style_spec::spec::{Boolean, ExprOrLiteral};
+
+/// De Morgan's law on typed `Boolean`:
+/// `Not(All([A, B, ...]))` → `Any([Not(A), Not(B), ...])`
+/// `Not(Any([A, B, ...]))` → `All([Not(A), Not(B), ...])`
+///
+/// Only applied when there are ≥2 children (otherwise unary unwrap handles it).
+pub(super) fn try_demorgan_typed(filter: &mut Boolean) -> bool {
+    let Boolean::Not(_) = filter else {
+        return false;
+    };
+    // Take ownership to avoid cloning children.
+    let Boolean::Not(inner) = std::mem::replace(filter, Boolean::Literal(false)) else {
+        unreachable!();
+    };
+    match *inner {
+        Boolean::All(children) if children.len() >= 2 => {
+            let negated = children
+                .into_iter()
+                .map(|c| Boolean::Not(Box::new(c)))
+                .collect();
+            *filter = Boolean::Any(negated);
+            true
+        }
+        Boolean::Any(children) if children.len() >= 2 => {
+            let negated = children
+                .into_iter()
+                .map(|c| Boolean::Not(Box::new(c)))
+                .collect();
+            *filter = Boolean::All(negated);
+            true
+        }
+        other => {
+            // Not applicable — put it back.
+            *filter = Boolean::Not(Box::new(other));
+            false
+        }
+    }
+}
+
+/// Flatten nested boolean operators:
+/// `All([All([A, B]), C])` → `All([A, B, C])`, same for `Any`.
+pub(super) fn try_boolean_flattening_typed(filter: &mut Boolean) -> bool {
+    match filter {
+        Boolean::All(children) => flatten_typed(children, true),
+        Boolean::Any(children) => flatten_typed(children, false),
+        _ => false,
+    }
+}
+
+fn flatten_typed(children: &mut Vec<Boolean>, is_all: bool) -> bool {
+    let needs_flatten = children.iter().any(|c| match c {
+        Boolean::All(_) if is_all => true,
+        Boolean::Any(_) if !is_all => true,
+        _ => false,
+    });
+    if !needs_flatten {
+        return false;
+    }
+    let old = std::mem::take(children);
+    for child in old {
+        match child {
+            Boolean::All(grandchildren) if is_all => children.extend(grandchildren),
+            Boolean::Any(grandchildren) if !is_all => children.extend(grandchildren),
+            other => children.push(other),
+        }
+    }
+    true
+}
+
+/// Rewrite `Any([EqualEqual(get, a), EqualEqual(get, b), ...])` → `In(get, literal([a, b, ...]))`.
+///
+/// Only when all children are `EqualEqual` with the same non-literal first operand.
+pub(super) fn try_rewrite_any_to_in_typed(filter: &mut Boolean) -> bool {
+    let Boolean::Any(children) = filter else {
+        return false;
+    };
+    if children.len() < 2 {
+        return false;
+    }
+
+    let mut common_expr: Option<&ExprOrLiteral> = None;
+    let mut values: Vec<ExprOrLiteral> = Vec::with_capacity(children.len());
+
+    for child in children.iter() {
+        let Boolean::EqualEqual(lhs, rhs, None) = child else {
+            return false;
+        };
+        // One side must be a literal, the other the common expression.
+        let (expr, val) = if super::fold::is_literal(rhs) && !super::fold::is_literal(lhs) {
+            (lhs, rhs)
+        } else if super::fold::is_literal(lhs) && !super::fold::is_literal(rhs) {
+            (rhs, lhs)
+        } else {
+            return false;
+        };
+        match common_expr {
+            None => common_expr = Some(expr),
+            Some(prev) if prev == expr => {}
+            _ => return false,
+        }
+        values.push(val.clone());
+    }
+
+    let Some(expr) = common_expr else {
+        return false;
+    };
+    let literal_array =
+        ExprOrLiteral::JSONArrayLiteral(maplibre_style_spec::spec::JSONArrayLiteral(
+            values.into_iter().map(expr_or_literal_to_json).collect(),
+        ));
+    *filter = Boolean::In(expr.clone(), literal_array);
+    true
+}
+
+/// Convert a known-literal `ExprOrLiteral` to a `serde_json::Value` without serde.
+fn expr_or_literal_to_json(v: ExprOrLiteral) -> Value {
+    match v {
+        ExprOrLiteral::Null => Value::Null,
+        ExprOrLiteral::Bool(b) => Value::Bool(b),
+        ExprOrLiteral::NumberLiteral(n) => Value::Number(n.as_number().clone()),
+        ExprOrLiteral::StringLiteral(s) => Value::String(s.as_str().to_owned()),
+        // Fallback to serde for complex types (shouldn't happen for literals).
+        other => serde_json::to_value(&other).unwrap_or(Value::Null),
+    }
+}
+
+/// Unwrap unary `All`/`Any` and eliminate double negation:
+/// `All([x])` → `x`, `Any([x])` → `x`, `Not(Not(x))` → `x`.
+pub(super) fn try_simplify_unary_typed(filter: &mut Boolean) -> bool {
+    match filter {
+        Boolean::All(children) | Boolean::Any(children) if children.len() == 1 => {
+            *filter = children.pop().unwrap();
+            true
+        }
+        Boolean::Not(inner) if matches!(inner.as_ref(), Boolean::Not(_)) => {
+            // Take ownership to avoid cloning: Not(Not(x)) → x.
+            let Boolean::Not(inner) = std::mem::replace(filter, Boolean::Literal(false)) else {
+                unreachable!();
+            };
+            let Boolean::Not(grand) = *inner else {
+                unreachable!();
+            };
+            *filter = *grand;
+            true
+        }
+        _ => false,
+    }
+}

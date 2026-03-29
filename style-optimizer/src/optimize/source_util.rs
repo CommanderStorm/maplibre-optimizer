@@ -103,6 +103,33 @@ pub(crate) fn precompute_vector_layer_info_typed(
         .collect()
 }
 
+// ── Shared stats resolution ──────────────────────────────────────────────────
+
+/// Resolve stats + `layer_info` into the [`LayerStats`] for a given layer index.
+///
+/// Returns `None` (= bail out, no fold) when any of:
+/// - `stats` is absent
+/// - `sample_rate < 1.0`
+/// - `layer_info` is absent or doesn't contain the index
+/// - source/source-layer has no stats
+/// - `total_features == 0`
+pub(crate) fn resolve_layer_stats<'a>(
+    stats: Option<&'a crate::stats::TileStatistics>,
+    layer_info: Option<&[Option<VectorLayerInfo>]>,
+    layer_index: usize,
+) -> Option<&'a crate::stats::LayerStats> {
+    let stats = stats?;
+    if (stats.sample_rate - 1.0).abs() > f64::EPSILON {
+        return None;
+    }
+    let info = layer_info?.get(layer_index)?.as_ref()?;
+    let layer_stats = stats.layer_stats(&info.source, &info.source_layer)?;
+    if layer_stats.total_features == 0 {
+        return None;
+    }
+    Some(layer_stats)
+}
+
 // ── Source zoom tightening ───────────────────────────────────────────────────
 
 /// Effective zoom range for a tile-based source (returns `(minzoom, maxzoom)`).

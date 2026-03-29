@@ -32,7 +32,7 @@ use cleanup::cleanup;
 use color::MinifyColorsVisitor;
 use dead::dead_elimination;
 use defaults::StripDefaultsVisitor;
-use expr::{NormalizeFoldVisitor, ReorderSelectivityVisitor};
+use expr::{NormalizeFoldVisitor, ReorderSelectivityVisitor, TypedNormalizeFoldVisitor};
 use maplibre_style_spec::mir::MirSpec;
 use maplibre_style_spec::spec::MaplibreStyleSpecification;
 use metadata::metadata_refinement;
@@ -41,7 +41,7 @@ use source_util::{
     precompute_vector_layer_info, precompute_vector_layer_info_typed, tighten_source_zoom_bounds,
 };
 use strip::strip_metadata;
-use walk::walk_style_mut;
+use walk::{walk_style_mut, walk_typed_filters};
 
 use crate::stats::TileStatistics;
 
@@ -213,6 +213,25 @@ fn run_structural_passes(
 
     if passes.cleanup {
         cleanup(style);
+    }
+
+    // Typed filter expression passes — applied after structural passes so that
+    // residual filter simplification (e.g. after metadata_refinement removes
+    // zoom predicates) is caught without a JSON round-trip.
+    if wants_expression_passes(passes) {
+        let layer_info = stats.map(|_| precompute_vector_layer_info_typed(style));
+        for _ in 0..NORMALIZE_FOLD_FIXPOINT_CAP {
+            let mut visitor = TypedNormalizeFoldVisitor {
+                passes,
+                stats,
+                layer_info: layer_info.as_deref(),
+                changed: false,
+            };
+            walk_typed_filters(style, &mut visitor);
+            if !visitor.changed {
+                break;
+            }
+        }
     }
 
     if passes.source_zoom_tightening {
@@ -1220,6 +1239,7 @@ mod tests {
         assert_yaml_snapshot!(v["layers"][0], @r"
         id: water-fill
         maxzoom: 14
+        minzoom: 6
         source: openmaptiles
         source-layer: water
         type: fill

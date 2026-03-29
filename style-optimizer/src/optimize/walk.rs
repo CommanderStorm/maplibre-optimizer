@@ -1,8 +1,14 @@
-//! Schema-guided visitor for `MapLibre` style JSON trees.
+//! Schema-guided visitors for `MapLibre` style trees.
+//!
+//! Two visitor systems:
+//! - [`StyleVisitor`] + [`walk_style_mut`]: JSON-based, used for property expression passes.
+//! - [`TypedFilterVisitor`] + [`walk_typed_filters`]: typed, used for filter expression passes
+//!   operating directly on [`Boolean`].
 
 use std::collections::{HashMap, HashSet};
 
 use maplibre_style_spec::mir::{MirLayerField, MirPropertySection, MirSpec};
+use maplibre_style_spec::spec::{AnyLayer, Boolean, MaplibreStyleSpecification};
 use serde_json::Value;
 
 // ── Public types ──────────────────────────────────────────────────────────────
@@ -167,5 +173,31 @@ fn resolve_layer_type(
         }
         let r = obj.get("ref").and_then(Value::as_str)?;
         current = *by_id.get(r)?;
+    }
+}
+
+// ── Typed filter visitor ─────────────────────────────────────────────────────
+
+/// Visitor for typed filter passes operating directly on [`Boolean`].
+pub(crate) trait TypedFilterVisitor {
+    /// Called for each layer's filter. Return `true` if the filter was modified.
+    fn visit_filter(&mut self, layer_index: usize, layer_type: &str, filter: &mut Boolean);
+}
+
+/// Walk all typed layers and visit their filters.
+pub(crate) fn walk_typed_filters(
+    style: &mut MaplibreStyleSpecification,
+    visitor: &mut impl TypedFilterVisitor,
+) {
+    for (i, layer) in style.layers.iter_mut().enumerate() {
+        let AnyLayer::Typed(t) = layer else {
+            continue;
+        };
+        if t.common().filter.is_some() {
+            let layer_type = t.layer_type().to_string();
+            if let Some(ref mut filter) = t.common_mut().filter {
+                visitor.visit_filter(i, &layer_type, filter);
+            }
+        }
     }
 }

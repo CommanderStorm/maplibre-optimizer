@@ -830,3 +830,167 @@ pub(super) fn try_fold_redundant_properties(arr: &mut Vec<Value>) -> bool {
     }
     false
 }
+
+// ── Typed Boolean rules ──────────────────────────────────────────────────────
+//
+// Typed equivalents of the JSON peephole rules above, operating directly on
+// `Boolean` enum variants.  Used by the typed filter walker.
+
+use maplibre_style_spec::spec::{Boolean, ExprOrLiteral};
+
+/// `Not(Literal(b))` → `Literal(!b)`
+pub(super) fn try_fold_not_typed(filter: &mut Boolean) -> bool {
+    if let Boolean::Not(inner) = filter
+        && let Boolean::Literal(b) = **inner
+    {
+        *filter = Boolean::Literal(!b);
+        return true;
+    }
+    false
+}
+
+/// `Not(EqualEqual(a, b, c))` → `NotEqual(a, b, c)` and vice versa for all
+/// comparison operator pairs.
+pub(super) fn try_negate_comparison_typed(filter: &mut Boolean) -> bool {
+    let Boolean::Not(_) = filter else {
+        return false;
+    };
+    // Take ownership of the inner expression to avoid cloning.
+    let Boolean::Not(inner) = std::mem::replace(filter, Boolean::Literal(false)) else {
+        unreachable!();
+    };
+    let negated = match *inner {
+        Boolean::EqualEqual(a, b, c) => Boolean::NotEqual(a, b, c),
+        Boolean::NotEqual(a, b, c) => Boolean::EqualEqual(a, b, c),
+        Boolean::Less(a, b, c) => Boolean::GreaterEqual(a, b, c),
+        Boolean::GreaterEqual(a, b, c) => Boolean::Less(a, b, c),
+        Boolean::Greater(a, b, c) => Boolean::LessEqual(a, b, c),
+        Boolean::LessEqual(a, b, c) => Boolean::Greater(a, b, c),
+        other => {
+            // Not a comparison — put it back.
+            *filter = Boolean::Not(Box::new(other));
+            return false;
+        }
+    };
+    *filter = negated;
+    true
+}
+
+/// Fold comparisons of two identical literals:
+/// `EqualEqual(x, x)` → `Literal(true)`, `NotEqual(x, x)` → `Literal(false)`, etc.
+pub(super) fn try_fold_comparison_typed(filter: &mut Boolean) -> bool {
+    let result = match filter {
+        Boolean::EqualEqual(a, b, None) if a == b && is_literal(a) => true,
+        Boolean::NotEqual(a, b, None) if a == b && is_literal(a) => false,
+        // For ordering comparisons with equal operands: < and > are false, <= and >= are true.
+        Boolean::Less(a, b, None) if a == b && is_literal(a) => false,
+        Boolean::Greater(a, b, None) if a == b && is_literal(a) => false,
+        Boolean::LessEqual(a, b, None) if a == b && is_literal(a) => true,
+        Boolean::GreaterEqual(a, b, None) if a == b && is_literal(a) => true,
+        _ => return false,
+    };
+    *filter = Boolean::Literal(result);
+    true
+}
+
+/// Boolean algebra simplification for `All` and `Any`:
+/// - `All([])` → `Literal(true)`, `Any([])` → `Literal(false)` (vacuous)
+/// - `All` short-circuits on `Literal(false)`, `Any` short-circuits on `Literal(true)`
+/// - Removes absorbed literals (`true` from `All`, `false` from `Any`)
+pub(super) fn try_fold_boolean_algebra_typed(filter: &mut Boolean) -> bool {
+    match filter {
+        Boolean::All(_) => fold_all_any_typed(filter, true),
+        Boolean::Any(_) => fold_all_any_typed(filter, false),
+        _ => false,
+    }
+}
+
+fn fold_all_any_typed(filter: &mut Boolean, is_all: bool) -> bool {
+    let (Boolean::All(children) | Boolean::Any(children)) = filter else {
+        return false;
+    };
+
+    // Vacuous: All([]) → true, Any([]) → false.
+    if children.is_empty() {
+        *filter = Boolean::Literal(is_all);
+        return true;
+    }
+
+    let absorbing = !is_all; // true absorbs Any, false absorbs All
+    let identity = is_all; // true is identity for All, false is identity for Any
+
+    // Short-circuit on absorbing element.
+    if children
+        .iter()
+        .any(|c| matches!(c, Boolean::Literal(b) if *b == absorbing))
+    {
+        *filter = Boolean::Literal(absorbing);
+        return true;
+    }
+
+    // Filter out identity elements.
+    let before = children.len();
+    children.retain(|c| !matches!(c, Boolean::Literal(b) if *b == identity));
+
+    if children.is_empty() {
+        // All elements were identity → result is identity.
+        *filter = Boolean::Literal(identity);
+        return true;
+    }
+
+    children.len() != before
+}
+
+/// Detect contradictory `==`/`!=` predicates inside `All(children)` → `Literal(false)`.
+pub(super) fn try_filter_contradiction_typed(filter: &mut Boolean) -> bool {
+    let Boolean::All(children) = filter else {
+        return false;
+    };
+    for i in 0..children.len() {
+        for j in (i + 1)..children.len() {
+            if typed_predicates_contradict(&children[i], &children[j]) {
+                *filter = Boolean::Literal(false);
+                return true;
+            }
+        }
+    }
+    false
+}
+
+/// Check if two typed boolean predicates contradict each other.
+fn typed_predicates_contradict(a: &Boolean, b: &Boolean) -> bool {
+    // Extract (lhs, rhs) from equality/inequality comparisons.
+    let (a_eq, a_lhs, a_rhs) = match a {
+        Boolean::EqualEqual(l, r, None) => (true, l, r),
+        Boolean::NotEqual(l, r, None) => (false, l, r),
+        _ => return false,
+    };
+    let (b_eq, b_lhs, b_rhs) = match b {
+        Boolean::EqualEqual(l, r, None) => (true, l, r),
+        Boolean::NotEqual(l, r, None) => (false, l, r),
+        _ => return false,
+    };
+    if a_lhs != b_lhs {
+        return false;
+    }
+    // Two ==s with different RHS: x == a ∧ x == b where a ≠ b → contradiction.
+    if a_eq && b_eq && a_rhs != b_rhs {
+        return true;
+    }
+    // == and != with same value: x == a ∧ x != a → contradiction.
+    if a_eq != b_eq && a_rhs == b_rhs {
+        return true;
+    }
+    false
+}
+
+/// Check if an `ExprOrLiteral` is a literal (not a computed expression).
+pub(super) fn is_literal(v: &ExprOrLiteral) -> bool {
+    matches!(
+        v,
+        ExprOrLiteral::Null
+            | ExprOrLiteral::Bool(_)
+            | ExprOrLiteral::NumberLiteral(_)
+            | ExprOrLiteral::StringLiteral(_)
+    )
+}

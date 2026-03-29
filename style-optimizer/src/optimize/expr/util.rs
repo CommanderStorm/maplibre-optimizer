@@ -94,27 +94,5 @@ pub(crate) fn json_as_u64(v: &Value) -> Option<u64> {
     v.as_u64().or_else(|| v.as_f64().map(|f| f as u64))
 }
 
-/// Resolve stats + `layer_info` into the [`LayerStats`] for a given layer index.
-///
-/// Returns `None` (= bail out, no fold) when any of:
-/// - `stats` is absent
-/// - `sample_rate < 1.0`
-/// - `layer_info` is absent or doesn't contain the index
-/// - source/source-layer has no stats
-/// - `total_features == 0`
-pub(super) fn resolve_layer_stats<'a>(
-    stats: Option<&'a crate::stats::TileStatistics>,
-    layer_info: Option<&[Option<crate::optimize::source_util::VectorLayerInfo>]>,
-    layer_index: usize,
-) -> Option<&'a crate::stats::LayerStats> {
-    let stats = stats?;
-    if (stats.sample_rate - 1.0).abs() > f64::EPSILON {
-        return None;
-    }
-    let info = layer_info?.get(layer_index)?.as_ref()?;
-    let layer_stats = stats.layer_stats(&info.source, &info.source_layer)?;
-    if layer_stats.total_features == 0 {
-        return None;
-    }
-    Some(layer_stats)
-}
+// `resolve_layer_stats` lives in `source_util.rs` — re-export for fold_stats callers.
+pub(super) use crate::optimize::source_util::resolve_layer_stats;
