@@ -285,6 +285,7 @@ fn wrap_filter_with_zoom_guard(
 
 // ── Merged-layer construction ────────────────────────────────────────────────
 
+#[expect(clippy::too_many_lines)]
 fn build_merged_layer(layers: &[Value], mir: &MirSpec) -> Value {
     let layer_type = layers[0]["type"].as_str().expect("validated in grouping");
     let sort_key_prop = sort_key_name(layer_type).expect("validated in grouping");

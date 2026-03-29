@@ -278,7 +278,7 @@ fn sync_typed_to_json(style: &MaplibreStyleSpecification, v: &mut Value) {
         ) {
             if json_layers.len() == typed_layers.len() {
                 let merged: Vec<Value> = json_layers
-                    .into_iter()
+                    .iter()
                     .zip(typed_layers)
                     .map(|(jl, tl)| merge_layer_json(jl, tl))
                     .collect();
@@ -299,7 +299,7 @@ fn sync_typed_to_json(style: &MaplibreStyleSpecification, v: &mut Value) {
 /// so it already contains those results.  Using it as the authoritative source
 /// ensures that structural-pass changes to paint/layout (empty-object
 /// removal, zoom-stop pruning, …) are reflected in the output.
-fn merge_layer_json(original: Value, typed: &Value) -> Value {
+fn merge_layer_json(original: &Value, typed: &Value) -> Value {
     let mut result = typed.clone();
     for section in ["paint", "layout"] {
         let Some(orig_obj) = original.get(section).and_then(Value::as_object) else {
