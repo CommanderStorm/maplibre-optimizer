@@ -1,7 +1,8 @@
-//! Property: applying all optimizer passes twice produces the same result as applying them once.
+//! Property: applying all optimizer passes twice produces the same JSON output as once.
 //!
-//! This catches convergence bugs in the fixpoint loop and any pass that fails to reach a
-//! stable output on its first application.
+//! Compares JSON-serialized output (the format that is actually written to disk)
+//! rather than typed structs, because some complex expression forms have multiple
+//! valid typed representations that are semantically equivalent.
 
 use std::path::Path;
 use std::sync::OnceLock;
@@ -47,8 +48,9 @@ proptest! {
     fn optimizer_is_idempotent(mut style in arbitrary_style()) {
         let passes = OptPasses::all();
         optimize_style(&mut style, mir(), &passes, None);
-        let after_first = style.clone();
+        let after_first = serde_json::to_value(&style).unwrap();
         optimize_style(&mut style, mir(), &passes, None);
-        prop_assert_eq!(after_first, style);
+        let after_second = serde_json::to_value(&style).unwrap();
+        prop_assert_eq!(after_first, after_second);
     }
 }

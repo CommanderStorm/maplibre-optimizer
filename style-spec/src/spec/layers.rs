@@ -1943,6 +1943,1477 @@ impl LayerMaxzoom {
     }
 }
 
+/// Walk all expression-backed paint/layout properties on typed layer structs.
+///
+/// For each layer, visits the filter (if present), then each expression-backed
+/// paint and layout property, then the layer itself via `visit_layer`.
+#[expect(clippy::collapsible_if)]
+pub fn walk_typed_style_mut(
+    style: &mut MaplibreStyleSpecification,
+    visitor: &mut impl crate::typed_visitor::TypedStyleVisitor,
+) {
+    for (i, layer) in style.layers.iter_mut().enumerate() {
+        let AnyLayer::Typed(typed) = layer else {
+            continue;
+        };
+        let layer_type = typed.layer_type();
+
+        if let Some(filter) = &mut typed.common_mut().filter {
+            visitor.visit_filter(i, layer_type, filter);
+        }
+
+        match typed {
+            TypedLayer::Background { paint, .. } => {
+                if let Some(paint) = paint {
+                    if let Some(v) = &mut paint.background_color {
+                        visitor.visit_color(
+                            &crate::typed_visitor::TypedPropertyContext {
+                                layer_index: i,
+                                layer_type: "background",
+                                section: crate::mir::MirPropertySection::Paint,
+                                property_name: "background-color",
+                            },
+                            &mut v.0,
+                        );
+                    }
+                    if let Some(v) = &mut paint.background_opacity {
+                        visitor.visit_numeric(
+                            &crate::typed_visitor::TypedPropertyContext {
+                                layer_index: i,
+                                layer_type: "background",
+                                section: crate::mir::MirPropertySection::Paint,
+                                property_name: "background-opacity",
+                            },
+                            &mut v.0,
+                        );
+                    }
+                    if let Some(v) = &mut paint.background_pattern {
+                        visitor.visit_string(
+                            &crate::typed_visitor::TypedPropertyContext {
+                                layer_index: i,
+                                layer_type: "background",
+                                section: crate::mir::MirPropertySection::Paint,
+                                property_name: "background-pattern",
+                            },
+                            &mut v.0,
+                        );
+                    }
+                }
+            }
+            TypedLayer::Circle { paint, layout, .. } => {
+                if let Some(paint) = paint {
+                    if let Some(v) = &mut paint.circle_blur {
+                        visitor.visit_numeric(
+                            &crate::typed_visitor::TypedPropertyContext {
+                                layer_index: i,
+                                layer_type: "circle",
+                                section: crate::mir::MirPropertySection::Paint,
+                                property_name: "circle-blur",
+                            },
+                            &mut v.0,
+                        );
+                    }
+                    if let Some(v) = &mut paint.circle_color {
+                        visitor.visit_color(
+                            &crate::typed_visitor::TypedPropertyContext {
+                                layer_index: i,
+                                layer_type: "circle",
+                                section: crate::mir::MirPropertySection::Paint,
+                                property_name: "circle-color",
+                            },
+                            &mut v.0,
+                        );
+                    }
+                    if let Some(v) = &mut paint.circle_opacity {
+                        visitor.visit_numeric(
+                            &crate::typed_visitor::TypedPropertyContext {
+                                layer_index: i,
+                                layer_type: "circle",
+                                section: crate::mir::MirPropertySection::Paint,
+                                property_name: "circle-opacity",
+                            },
+                            &mut v.0,
+                        );
+                    }
+                    if let Some(v) = &mut paint.circle_pitch_alignment {
+                        visitor.visit_string(
+                            &crate::typed_visitor::TypedPropertyContext {
+                                layer_index: i,
+                                layer_type: "circle",
+                                section: crate::mir::MirPropertySection::Paint,
+                                property_name: "circle-pitch-alignment",
+                            },
+                            &mut v.0,
+                        );
+                    }
+                    if let Some(v) = &mut paint.circle_pitch_scale {
+                        visitor.visit_string(
+                            &crate::typed_visitor::TypedPropertyContext {
+                                layer_index: i,
+                                layer_type: "circle",
+                                section: crate::mir::MirPropertySection::Paint,
+                                property_name: "circle-pitch-scale",
+                            },
+                            &mut v.0,
+                        );
+                    }
+                    if let Some(v) = &mut paint.circle_radius {
+                        visitor.visit_numeric(
+                            &crate::typed_visitor::TypedPropertyContext {
+                                layer_index: i,
+                                layer_type: "circle",
+                                section: crate::mir::MirPropertySection::Paint,
+                                property_name: "circle-radius",
+                            },
+                            &mut v.0,
+                        );
+                    }
+                    if let Some(v) = &mut paint.circle_stroke_color {
+                        visitor.visit_color(
+                            &crate::typed_visitor::TypedPropertyContext {
+                                layer_index: i,
+                                layer_type: "circle",
+                                section: crate::mir::MirPropertySection::Paint,
+                                property_name: "circle-stroke-color",
+                            },
+                            &mut v.0,
+                        );
+                    }
+                    if let Some(v) = &mut paint.circle_stroke_opacity {
+                        visitor.visit_numeric(
+                            &crate::typed_visitor::TypedPropertyContext {
+                                layer_index: i,
+                                layer_type: "circle",
+                                section: crate::mir::MirPropertySection::Paint,
+                                property_name: "circle-stroke-opacity",
+                            },
+                            &mut v.0,
+                        );
+                    }
+                    if let Some(v) = &mut paint.circle_stroke_width {
+                        visitor.visit_numeric(
+                            &crate::typed_visitor::TypedPropertyContext {
+                                layer_index: i,
+                                layer_type: "circle",
+                                section: crate::mir::MirPropertySection::Paint,
+                                property_name: "circle-stroke-width",
+                            },
+                            &mut v.0,
+                        );
+                    }
+                    if let Some(v) = &mut paint.circle_translate {
+                        visitor.visit_array(
+                            &crate::typed_visitor::TypedPropertyContext {
+                                layer_index: i,
+                                layer_type: "circle",
+                                section: crate::mir::MirPropertySection::Paint,
+                                property_name: "circle-translate",
+                            },
+                            &mut v.0,
+                        );
+                    }
+                    if let Some(v) = &mut paint.circle_translate_anchor {
+                        visitor.visit_string(
+                            &crate::typed_visitor::TypedPropertyContext {
+                                layer_index: i,
+                                layer_type: "circle",
+                                section: crate::mir::MirPropertySection::Paint,
+                                property_name: "circle-translate-anchor",
+                            },
+                            &mut v.0,
+                        );
+                    }
+                }
+                if let Some(layout) = layout {
+                    if let Some(v) = &mut layout.circle_sort_key {
+                        visitor.visit_numeric(
+                            &crate::typed_visitor::TypedPropertyContext {
+                                layer_index: i,
+                                layer_type: "circle",
+                                section: crate::mir::MirPropertySection::Layout,
+                                property_name: "circle-sort-key",
+                            },
+                            &mut v.0,
+                        );
+                    }
+                }
+            }
+            TypedLayer::ColorRelief { paint, .. } => {
+                if let Some(paint) = paint {
+                    if let Some(v) = &mut paint.color_relief_color {
+                        visitor.visit_color(
+                            &crate::typed_visitor::TypedPropertyContext {
+                                layer_index: i,
+                                layer_type: "color-relief",
+                                section: crate::mir::MirPropertySection::Paint,
+                                property_name: "color-relief-color",
+                            },
+                            &mut v.0,
+                        );
+                    }
+                    if let Some(v) = &mut paint.color_relief_opacity {
+                        visitor.visit_numeric(
+                            &crate::typed_visitor::TypedPropertyContext {
+                                layer_index: i,
+                                layer_type: "color-relief",
+                                section: crate::mir::MirPropertySection::Paint,
+                                property_name: "color-relief-opacity",
+                            },
+                            &mut v.0,
+                        );
+                    }
+                }
+            }
+            TypedLayer::Fill { paint, layout, .. } => {
+                if let Some(paint) = paint {
+                    if let Some(v) = &mut paint.fill_antialias {
+                        visitor.visit_boolean_prop(
+                            &crate::typed_visitor::TypedPropertyContext {
+                                layer_index: i,
+                                layer_type: "fill",
+                                section: crate::mir::MirPropertySection::Paint,
+                                property_name: "fill-antialias",
+                            },
+                            &mut v.0,
+                        );
+                    }
+                    if let Some(v) = &mut paint.fill_color {
+                        visitor.visit_color(
+                            &crate::typed_visitor::TypedPropertyContext {
+                                layer_index: i,
+                                layer_type: "fill",
+                                section: crate::mir::MirPropertySection::Paint,
+                                property_name: "fill-color",
+                            },
+                            &mut v.0,
+                        );
+                    }
+                    if let Some(v) = &mut paint.fill_opacity {
+                        visitor.visit_numeric(
+                            &crate::typed_visitor::TypedPropertyContext {
+                                layer_index: i,
+                                layer_type: "fill",
+                                section: crate::mir::MirPropertySection::Paint,
+                                property_name: "fill-opacity",
+                            },
+                            &mut v.0,
+                        );
+                    }
+                    if let Some(v) = &mut paint.fill_outline_color {
+                        visitor.visit_color(
+                            &crate::typed_visitor::TypedPropertyContext {
+                                layer_index: i,
+                                layer_type: "fill",
+                                section: crate::mir::MirPropertySection::Paint,
+                                property_name: "fill-outline-color",
+                            },
+                            &mut v.0,
+                        );
+                    }
+                    if let Some(v) = &mut paint.fill_pattern {
+                        visitor.visit_string(
+                            &crate::typed_visitor::TypedPropertyContext {
+                                layer_index: i,
+                                layer_type: "fill",
+                                section: crate::mir::MirPropertySection::Paint,
+                                property_name: "fill-pattern",
+                            },
+                            &mut v.0,
+                        );
+                    }
+                    if let Some(v) = &mut paint.fill_translate {
+                        visitor.visit_array(
+                            &crate::typed_visitor::TypedPropertyContext {
+                                layer_index: i,
+                                layer_type: "fill",
+                                section: crate::mir::MirPropertySection::Paint,
+                                property_name: "fill-translate",
+                            },
+                            &mut v.0,
+                        );
+                    }
+                    if let Some(v) = &mut paint.fill_translate_anchor {
+                        visitor.visit_string(
+                            &crate::typed_visitor::TypedPropertyContext {
+                                layer_index: i,
+                                layer_type: "fill",
+                                section: crate::mir::MirPropertySection::Paint,
+                                property_name: "fill-translate-anchor",
+                            },
+                            &mut v.0,
+                        );
+                    }
+                }
+                if let Some(layout) = layout {
+                    if let Some(v) = &mut layout.fill_sort_key {
+                        visitor.visit_numeric(
+                            &crate::typed_visitor::TypedPropertyContext {
+                                layer_index: i,
+                                layer_type: "fill",
+                                section: crate::mir::MirPropertySection::Layout,
+                                property_name: "fill-sort-key",
+                            },
+                            &mut v.0,
+                        );
+                    }
+                }
+            }
+            TypedLayer::FillExtrusion { paint, .. } => {
+                if let Some(paint) = paint {
+                    if let Some(v) = &mut paint.fill_extrusion_base {
+                        visitor.visit_numeric(
+                            &crate::typed_visitor::TypedPropertyContext {
+                                layer_index: i,
+                                layer_type: "fill-extrusion",
+                                section: crate::mir::MirPropertySection::Paint,
+                                property_name: "fill-extrusion-base",
+                            },
+                            &mut v.0,
+                        );
+                    }
+                    if let Some(v) = &mut paint.fill_extrusion_color {
+                        visitor.visit_color(
+                            &crate::typed_visitor::TypedPropertyContext {
+                                layer_index: i,
+                                layer_type: "fill-extrusion",
+                                section: crate::mir::MirPropertySection::Paint,
+                                property_name: "fill-extrusion-color",
+                            },
+                            &mut v.0,
+                        );
+                    }
+                    if let Some(v) = &mut paint.fill_extrusion_height {
+                        visitor.visit_numeric(
+                            &crate::typed_visitor::TypedPropertyContext {
+                                layer_index: i,
+                                layer_type: "fill-extrusion",
+                                section: crate::mir::MirPropertySection::Paint,
+                                property_name: "fill-extrusion-height",
+                            },
+                            &mut v.0,
+                        );
+                    }
+                    if let Some(v) = &mut paint.fill_extrusion_opacity {
+                        visitor.visit_numeric(
+                            &crate::typed_visitor::TypedPropertyContext {
+                                layer_index: i,
+                                layer_type: "fill-extrusion",
+                                section: crate::mir::MirPropertySection::Paint,
+                                property_name: "fill-extrusion-opacity",
+                            },
+                            &mut v.0,
+                        );
+                    }
+                    if let Some(v) = &mut paint.fill_extrusion_pattern {
+                        visitor.visit_string(
+                            &crate::typed_visitor::TypedPropertyContext {
+                                layer_index: i,
+                                layer_type: "fill-extrusion",
+                                section: crate::mir::MirPropertySection::Paint,
+                                property_name: "fill-extrusion-pattern",
+                            },
+                            &mut v.0,
+                        );
+                    }
+                    if let Some(v) = &mut paint.fill_extrusion_translate {
+                        visitor.visit_array(
+                            &crate::typed_visitor::TypedPropertyContext {
+                                layer_index: i,
+                                layer_type: "fill-extrusion",
+                                section: crate::mir::MirPropertySection::Paint,
+                                property_name: "fill-extrusion-translate",
+                            },
+                            &mut v.0,
+                        );
+                    }
+                    if let Some(v) = &mut paint.fill_extrusion_translate_anchor {
+                        visitor.visit_string(
+                            &crate::typed_visitor::TypedPropertyContext {
+                                layer_index: i,
+                                layer_type: "fill-extrusion",
+                                section: crate::mir::MirPropertySection::Paint,
+                                property_name: "fill-extrusion-translate-anchor",
+                            },
+                            &mut v.0,
+                        );
+                    }
+                    if let Some(v) = &mut paint.fill_extrusion_vertical_gradient {
+                        visitor.visit_boolean_prop(
+                            &crate::typed_visitor::TypedPropertyContext {
+                                layer_index: i,
+                                layer_type: "fill-extrusion",
+                                section: crate::mir::MirPropertySection::Paint,
+                                property_name: "fill-extrusion-vertical-gradient",
+                            },
+                            &mut v.0,
+                        );
+                    }
+                }
+            }
+            TypedLayer::Heatmap { paint, .. } => {
+                if let Some(paint) = paint {
+                    if let Some(v) = &mut paint.heatmap_color {
+                        visitor.visit_color(
+                            &crate::typed_visitor::TypedPropertyContext {
+                                layer_index: i,
+                                layer_type: "heatmap",
+                                section: crate::mir::MirPropertySection::Paint,
+                                property_name: "heatmap-color",
+                            },
+                            &mut v.0,
+                        );
+                    }
+                    if let Some(v) = &mut paint.heatmap_intensity {
+                        visitor.visit_numeric(
+                            &crate::typed_visitor::TypedPropertyContext {
+                                layer_index: i,
+                                layer_type: "heatmap",
+                                section: crate::mir::MirPropertySection::Paint,
+                                property_name: "heatmap-intensity",
+                            },
+                            &mut v.0,
+                        );
+                    }
+                    if let Some(v) = &mut paint.heatmap_opacity {
+                        visitor.visit_numeric(
+                            &crate::typed_visitor::TypedPropertyContext {
+                                layer_index: i,
+                                layer_type: "heatmap",
+                                section: crate::mir::MirPropertySection::Paint,
+                                property_name: "heatmap-opacity",
+                            },
+                            &mut v.0,
+                        );
+                    }
+                    if let Some(v) = &mut paint.heatmap_radius {
+                        visitor.visit_numeric(
+                            &crate::typed_visitor::TypedPropertyContext {
+                                layer_index: i,
+                                layer_type: "heatmap",
+                                section: crate::mir::MirPropertySection::Paint,
+                                property_name: "heatmap-radius",
+                            },
+                            &mut v.0,
+                        );
+                    }
+                    if let Some(v) = &mut paint.heatmap_weight {
+                        visitor.visit_numeric(
+                            &crate::typed_visitor::TypedPropertyContext {
+                                layer_index: i,
+                                layer_type: "heatmap",
+                                section: crate::mir::MirPropertySection::Paint,
+                                property_name: "heatmap-weight",
+                            },
+                            &mut v.0,
+                        );
+                    }
+                }
+            }
+            TypedLayer::Hillshade { paint, .. } => {
+                if let Some(paint) = paint {
+                    if let Some(v) = &mut paint.hillshade_accent_color {
+                        visitor.visit_color(
+                            &crate::typed_visitor::TypedPropertyContext {
+                                layer_index: i,
+                                layer_type: "hillshade",
+                                section: crate::mir::MirPropertySection::Paint,
+                                property_name: "hillshade-accent-color",
+                            },
+                            &mut v.0,
+                        );
+                    }
+                    if let Some(v) = &mut paint.hillshade_exaggeration {
+                        visitor.visit_numeric(
+                            &crate::typed_visitor::TypedPropertyContext {
+                                layer_index: i,
+                                layer_type: "hillshade",
+                                section: crate::mir::MirPropertySection::Paint,
+                                property_name: "hillshade-exaggeration",
+                            },
+                            &mut v.0,
+                        );
+                    }
+                    if let Some(v) = &mut paint.hillshade_highlight_color {
+                        visitor.visit_color(
+                            &crate::typed_visitor::TypedPropertyContext {
+                                layer_index: i,
+                                layer_type: "hillshade",
+                                section: crate::mir::MirPropertySection::Paint,
+                                property_name: "hillshade-highlight-color",
+                            },
+                            &mut v.0,
+                        );
+                    }
+                    if let Some(v) = &mut paint.hillshade_illumination_altitude {
+                        visitor.visit_array(
+                            &crate::typed_visitor::TypedPropertyContext {
+                                layer_index: i,
+                                layer_type: "hillshade",
+                                section: crate::mir::MirPropertySection::Paint,
+                                property_name: "hillshade-illumination-altitude",
+                            },
+                            &mut v.0,
+                        );
+                    }
+                    if let Some(v) = &mut paint.hillshade_illumination_anchor {
+                        visitor.visit_string(
+                            &crate::typed_visitor::TypedPropertyContext {
+                                layer_index: i,
+                                layer_type: "hillshade",
+                                section: crate::mir::MirPropertySection::Paint,
+                                property_name: "hillshade-illumination-anchor",
+                            },
+                            &mut v.0,
+                        );
+                    }
+                    if let Some(v) = &mut paint.hillshade_illumination_direction {
+                        visitor.visit_array(
+                            &crate::typed_visitor::TypedPropertyContext {
+                                layer_index: i,
+                                layer_type: "hillshade",
+                                section: crate::mir::MirPropertySection::Paint,
+                                property_name: "hillshade-illumination-direction",
+                            },
+                            &mut v.0,
+                        );
+                    }
+                    if let Some(v) = &mut paint.hillshade_method {
+                        visitor.visit_string(
+                            &crate::typed_visitor::TypedPropertyContext {
+                                layer_index: i,
+                                layer_type: "hillshade",
+                                section: crate::mir::MirPropertySection::Paint,
+                                property_name: "hillshade-method",
+                            },
+                            &mut v.0,
+                        );
+                    }
+                    if let Some(v) = &mut paint.hillshade_shadow_color {
+                        visitor.visit_color(
+                            &crate::typed_visitor::TypedPropertyContext {
+                                layer_index: i,
+                                layer_type: "hillshade",
+                                section: crate::mir::MirPropertySection::Paint,
+                                property_name: "hillshade-shadow-color",
+                            },
+                            &mut v.0,
+                        );
+                    }
+                }
+            }
+            TypedLayer::Line { paint, layout, .. } => {
+                if let Some(paint) = paint {
+                    if let Some(v) = &mut paint.line_blur {
+                        visitor.visit_numeric(
+                            &crate::typed_visitor::TypedPropertyContext {
+                                layer_index: i,
+                                layer_type: "line",
+                                section: crate::mir::MirPropertySection::Paint,
+                                property_name: "line-blur",
+                            },
+                            &mut v.0,
+                        );
+                    }
+                    if let Some(v) = &mut paint.line_color {
+                        visitor.visit_color(
+                            &crate::typed_visitor::TypedPropertyContext {
+                                layer_index: i,
+                                layer_type: "line",
+                                section: crate::mir::MirPropertySection::Paint,
+                                property_name: "line-color",
+                            },
+                            &mut v.0,
+                        );
+                    }
+                    if let Some(v) = &mut paint.line_dasharray {
+                        visitor.visit_array(
+                            &crate::typed_visitor::TypedPropertyContext {
+                                layer_index: i,
+                                layer_type: "line",
+                                section: crate::mir::MirPropertySection::Paint,
+                                property_name: "line-dasharray",
+                            },
+                            &mut v.0,
+                        );
+                    }
+                    if let Some(v) = &mut paint.line_gap_width {
+                        visitor.visit_numeric(
+                            &crate::typed_visitor::TypedPropertyContext {
+                                layer_index: i,
+                                layer_type: "line",
+                                section: crate::mir::MirPropertySection::Paint,
+                                property_name: "line-gap-width",
+                            },
+                            &mut v.0,
+                        );
+                    }
+                    if let Some(v) = &mut paint.line_gradient {
+                        visitor.visit_color(
+                            &crate::typed_visitor::TypedPropertyContext {
+                                layer_index: i,
+                                layer_type: "line",
+                                section: crate::mir::MirPropertySection::Paint,
+                                property_name: "line-gradient",
+                            },
+                            &mut v.0,
+                        );
+                    }
+                    if let Some(v) = &mut paint.line_offset {
+                        visitor.visit_numeric(
+                            &crate::typed_visitor::TypedPropertyContext {
+                                layer_index: i,
+                                layer_type: "line",
+                                section: crate::mir::MirPropertySection::Paint,
+                                property_name: "line-offset",
+                            },
+                            &mut v.0,
+                        );
+                    }
+                    if let Some(v) = &mut paint.line_opacity {
+                        visitor.visit_numeric(
+                            &crate::typed_visitor::TypedPropertyContext {
+                                layer_index: i,
+                                layer_type: "line",
+                                section: crate::mir::MirPropertySection::Paint,
+                                property_name: "line-opacity",
+                            },
+                            &mut v.0,
+                        );
+                    }
+                    if let Some(v) = &mut paint.line_pattern {
+                        visitor.visit_string(
+                            &crate::typed_visitor::TypedPropertyContext {
+                                layer_index: i,
+                                layer_type: "line",
+                                section: crate::mir::MirPropertySection::Paint,
+                                property_name: "line-pattern",
+                            },
+                            &mut v.0,
+                        );
+                    }
+                    if let Some(v) = &mut paint.line_translate {
+                        visitor.visit_array(
+                            &crate::typed_visitor::TypedPropertyContext {
+                                layer_index: i,
+                                layer_type: "line",
+                                section: crate::mir::MirPropertySection::Paint,
+                                property_name: "line-translate",
+                            },
+                            &mut v.0,
+                        );
+                    }
+                    if let Some(v) = &mut paint.line_translate_anchor {
+                        visitor.visit_string(
+                            &crate::typed_visitor::TypedPropertyContext {
+                                layer_index: i,
+                                layer_type: "line",
+                                section: crate::mir::MirPropertySection::Paint,
+                                property_name: "line-translate-anchor",
+                            },
+                            &mut v.0,
+                        );
+                    }
+                    if let Some(v) = &mut paint.line_width {
+                        visitor.visit_numeric(
+                            &crate::typed_visitor::TypedPropertyContext {
+                                layer_index: i,
+                                layer_type: "line",
+                                section: crate::mir::MirPropertySection::Paint,
+                                property_name: "line-width",
+                            },
+                            &mut v.0,
+                        );
+                    }
+                }
+                if let Some(layout) = layout {
+                    if let Some(v) = &mut layout.line_cap {
+                        visitor.visit_string(
+                            &crate::typed_visitor::TypedPropertyContext {
+                                layer_index: i,
+                                layer_type: "line",
+                                section: crate::mir::MirPropertySection::Layout,
+                                property_name: "line-cap",
+                            },
+                            &mut v.0,
+                        );
+                    }
+                    if let Some(v) = &mut layout.line_join {
+                        visitor.visit_string(
+                            &crate::typed_visitor::TypedPropertyContext {
+                                layer_index: i,
+                                layer_type: "line",
+                                section: crate::mir::MirPropertySection::Layout,
+                                property_name: "line-join",
+                            },
+                            &mut v.0,
+                        );
+                    }
+                    if let Some(v) = &mut layout.line_miter_limit {
+                        visitor.visit_numeric(
+                            &crate::typed_visitor::TypedPropertyContext {
+                                layer_index: i,
+                                layer_type: "line",
+                                section: crate::mir::MirPropertySection::Layout,
+                                property_name: "line-miter-limit",
+                            },
+                            &mut v.0,
+                        );
+                    }
+                    if let Some(v) = &mut layout.line_round_limit {
+                        visitor.visit_numeric(
+                            &crate::typed_visitor::TypedPropertyContext {
+                                layer_index: i,
+                                layer_type: "line",
+                                section: crate::mir::MirPropertySection::Layout,
+                                property_name: "line-round-limit",
+                            },
+                            &mut v.0,
+                        );
+                    }
+                    if let Some(v) = &mut layout.line_sort_key {
+                        visitor.visit_numeric(
+                            &crate::typed_visitor::TypedPropertyContext {
+                                layer_index: i,
+                                layer_type: "line",
+                                section: crate::mir::MirPropertySection::Layout,
+                                property_name: "line-sort-key",
+                            },
+                            &mut v.0,
+                        );
+                    }
+                }
+            }
+            TypedLayer::Raster { paint, .. } => {
+                if let Some(paint) = paint {
+                    if let Some(v) = &mut paint.raster_brightness_max {
+                        visitor.visit_numeric(
+                            &crate::typed_visitor::TypedPropertyContext {
+                                layer_index: i,
+                                layer_type: "raster",
+                                section: crate::mir::MirPropertySection::Paint,
+                                property_name: "raster-brightness-max",
+                            },
+                            &mut v.0,
+                        );
+                    }
+                    if let Some(v) = &mut paint.raster_brightness_min {
+                        visitor.visit_numeric(
+                            &crate::typed_visitor::TypedPropertyContext {
+                                layer_index: i,
+                                layer_type: "raster",
+                                section: crate::mir::MirPropertySection::Paint,
+                                property_name: "raster-brightness-min",
+                            },
+                            &mut v.0,
+                        );
+                    }
+                    if let Some(v) = &mut paint.raster_contrast {
+                        visitor.visit_numeric(
+                            &crate::typed_visitor::TypedPropertyContext {
+                                layer_index: i,
+                                layer_type: "raster",
+                                section: crate::mir::MirPropertySection::Paint,
+                                property_name: "raster-contrast",
+                            },
+                            &mut v.0,
+                        );
+                    }
+                    if let Some(v) = &mut paint.raster_fade_duration {
+                        visitor.visit_numeric(
+                            &crate::typed_visitor::TypedPropertyContext {
+                                layer_index: i,
+                                layer_type: "raster",
+                                section: crate::mir::MirPropertySection::Paint,
+                                property_name: "raster-fade-duration",
+                            },
+                            &mut v.0,
+                        );
+                    }
+                    if let Some(v) = &mut paint.raster_hue_rotate {
+                        visitor.visit_numeric(
+                            &crate::typed_visitor::TypedPropertyContext {
+                                layer_index: i,
+                                layer_type: "raster",
+                                section: crate::mir::MirPropertySection::Paint,
+                                property_name: "raster-hue-rotate",
+                            },
+                            &mut v.0,
+                        );
+                    }
+                    if let Some(v) = &mut paint.raster_opacity {
+                        visitor.visit_numeric(
+                            &crate::typed_visitor::TypedPropertyContext {
+                                layer_index: i,
+                                layer_type: "raster",
+                                section: crate::mir::MirPropertySection::Paint,
+                                property_name: "raster-opacity",
+                            },
+                            &mut v.0,
+                        );
+                    }
+                    if let Some(v) = &mut paint.raster_resampling {
+                        visitor.visit_string(
+                            &crate::typed_visitor::TypedPropertyContext {
+                                layer_index: i,
+                                layer_type: "raster",
+                                section: crate::mir::MirPropertySection::Paint,
+                                property_name: "raster-resampling",
+                            },
+                            &mut v.0,
+                        );
+                    }
+                    if let Some(v) = &mut paint.raster_saturation {
+                        visitor.visit_numeric(
+                            &crate::typed_visitor::TypedPropertyContext {
+                                layer_index: i,
+                                layer_type: "raster",
+                                section: crate::mir::MirPropertySection::Paint,
+                                property_name: "raster-saturation",
+                            },
+                            &mut v.0,
+                        );
+                    }
+                }
+            }
+            TypedLayer::Symbol { paint, layout, .. } => {
+                if let Some(paint) = paint {
+                    if let Some(v) = &mut paint.icon_color {
+                        visitor.visit_color(
+                            &crate::typed_visitor::TypedPropertyContext {
+                                layer_index: i,
+                                layer_type: "symbol",
+                                section: crate::mir::MirPropertySection::Paint,
+                                property_name: "icon-color",
+                            },
+                            &mut v.0,
+                        );
+                    }
+                    if let Some(v) = &mut paint.icon_halo_blur {
+                        visitor.visit_numeric(
+                            &crate::typed_visitor::TypedPropertyContext {
+                                layer_index: i,
+                                layer_type: "symbol",
+                                section: crate::mir::MirPropertySection::Paint,
+                                property_name: "icon-halo-blur",
+                            },
+                            &mut v.0,
+                        );
+                    }
+                    if let Some(v) = &mut paint.icon_halo_color {
+                        visitor.visit_color(
+                            &crate::typed_visitor::TypedPropertyContext {
+                                layer_index: i,
+                                layer_type: "symbol",
+                                section: crate::mir::MirPropertySection::Paint,
+                                property_name: "icon-halo-color",
+                            },
+                            &mut v.0,
+                        );
+                    }
+                    if let Some(v) = &mut paint.icon_halo_width {
+                        visitor.visit_numeric(
+                            &crate::typed_visitor::TypedPropertyContext {
+                                layer_index: i,
+                                layer_type: "symbol",
+                                section: crate::mir::MirPropertySection::Paint,
+                                property_name: "icon-halo-width",
+                            },
+                            &mut v.0,
+                        );
+                    }
+                    if let Some(v) = &mut paint.icon_opacity {
+                        visitor.visit_numeric(
+                            &crate::typed_visitor::TypedPropertyContext {
+                                layer_index: i,
+                                layer_type: "symbol",
+                                section: crate::mir::MirPropertySection::Paint,
+                                property_name: "icon-opacity",
+                            },
+                            &mut v.0,
+                        );
+                    }
+                    if let Some(v) = &mut paint.icon_translate {
+                        visitor.visit_array(
+                            &crate::typed_visitor::TypedPropertyContext {
+                                layer_index: i,
+                                layer_type: "symbol",
+                                section: crate::mir::MirPropertySection::Paint,
+                                property_name: "icon-translate",
+                            },
+                            &mut v.0,
+                        );
+                    }
+                    if let Some(v) = &mut paint.icon_translate_anchor {
+                        visitor.visit_string(
+                            &crate::typed_visitor::TypedPropertyContext {
+                                layer_index: i,
+                                layer_type: "symbol",
+                                section: crate::mir::MirPropertySection::Paint,
+                                property_name: "icon-translate-anchor",
+                            },
+                            &mut v.0,
+                        );
+                    }
+                    if let Some(v) = &mut paint.text_color {
+                        visitor.visit_color(
+                            &crate::typed_visitor::TypedPropertyContext {
+                                layer_index: i,
+                                layer_type: "symbol",
+                                section: crate::mir::MirPropertySection::Paint,
+                                property_name: "text-color",
+                            },
+                            &mut v.0,
+                        );
+                    }
+                    if let Some(v) = &mut paint.text_halo_blur {
+                        visitor.visit_numeric(
+                            &crate::typed_visitor::TypedPropertyContext {
+                                layer_index: i,
+                                layer_type: "symbol",
+                                section: crate::mir::MirPropertySection::Paint,
+                                property_name: "text-halo-blur",
+                            },
+                            &mut v.0,
+                        );
+                    }
+                    if let Some(v) = &mut paint.text_halo_color {
+                        visitor.visit_color(
+                            &crate::typed_visitor::TypedPropertyContext {
+                                layer_index: i,
+                                layer_type: "symbol",
+                                section: crate::mir::MirPropertySection::Paint,
+                                property_name: "text-halo-color",
+                            },
+                            &mut v.0,
+                        );
+                    }
+                    if let Some(v) = &mut paint.text_halo_width {
+                        visitor.visit_numeric(
+                            &crate::typed_visitor::TypedPropertyContext {
+                                layer_index: i,
+                                layer_type: "symbol",
+                                section: crate::mir::MirPropertySection::Paint,
+                                property_name: "text-halo-width",
+                            },
+                            &mut v.0,
+                        );
+                    }
+                    if let Some(v) = &mut paint.text_opacity {
+                        visitor.visit_numeric(
+                            &crate::typed_visitor::TypedPropertyContext {
+                                layer_index: i,
+                                layer_type: "symbol",
+                                section: crate::mir::MirPropertySection::Paint,
+                                property_name: "text-opacity",
+                            },
+                            &mut v.0,
+                        );
+                    }
+                    if let Some(v) = &mut paint.text_translate {
+                        visitor.visit_array(
+                            &crate::typed_visitor::TypedPropertyContext {
+                                layer_index: i,
+                                layer_type: "symbol",
+                                section: crate::mir::MirPropertySection::Paint,
+                                property_name: "text-translate",
+                            },
+                            &mut v.0,
+                        );
+                    }
+                    if let Some(v) = &mut paint.text_translate_anchor {
+                        visitor.visit_string(
+                            &crate::typed_visitor::TypedPropertyContext {
+                                layer_index: i,
+                                layer_type: "symbol",
+                                section: crate::mir::MirPropertySection::Paint,
+                                property_name: "text-translate-anchor",
+                            },
+                            &mut v.0,
+                        );
+                    }
+                }
+                if let Some(layout) = layout {
+                    if let Some(v) = &mut layout.icon_allow_overlap {
+                        visitor.visit_boolean_prop(
+                            &crate::typed_visitor::TypedPropertyContext {
+                                layer_index: i,
+                                layer_type: "symbol",
+                                section: crate::mir::MirPropertySection::Layout,
+                                property_name: "icon-allow-overlap",
+                            },
+                            &mut v.0,
+                        );
+                    }
+                    if let Some(v) = &mut layout.icon_anchor {
+                        visitor.visit_string(
+                            &crate::typed_visitor::TypedPropertyContext {
+                                layer_index: i,
+                                layer_type: "symbol",
+                                section: crate::mir::MirPropertySection::Layout,
+                                property_name: "icon-anchor",
+                            },
+                            &mut v.0,
+                        );
+                    }
+                    if let Some(v) = &mut layout.icon_ignore_placement {
+                        visitor.visit_boolean_prop(
+                            &crate::typed_visitor::TypedPropertyContext {
+                                layer_index: i,
+                                layer_type: "symbol",
+                                section: crate::mir::MirPropertySection::Layout,
+                                property_name: "icon-ignore-placement",
+                            },
+                            &mut v.0,
+                        );
+                    }
+                    if let Some(v) = &mut layout.icon_image {
+                        visitor.visit_string(
+                            &crate::typed_visitor::TypedPropertyContext {
+                                layer_index: i,
+                                layer_type: "symbol",
+                                section: crate::mir::MirPropertySection::Layout,
+                                property_name: "icon-image",
+                            },
+                            &mut v.0,
+                        );
+                    }
+                    if let Some(v) = &mut layout.icon_keep_upright {
+                        visitor.visit_boolean_prop(
+                            &crate::typed_visitor::TypedPropertyContext {
+                                layer_index: i,
+                                layer_type: "symbol",
+                                section: crate::mir::MirPropertySection::Layout,
+                                property_name: "icon-keep-upright",
+                            },
+                            &mut v.0,
+                        );
+                    }
+                    if let Some(v) = &mut layout.icon_offset {
+                        visitor.visit_array(
+                            &crate::typed_visitor::TypedPropertyContext {
+                                layer_index: i,
+                                layer_type: "symbol",
+                                section: crate::mir::MirPropertySection::Layout,
+                                property_name: "icon-offset",
+                            },
+                            &mut v.0,
+                        );
+                    }
+                    if let Some(v) = &mut layout.icon_optional {
+                        visitor.visit_boolean_prop(
+                            &crate::typed_visitor::TypedPropertyContext {
+                                layer_index: i,
+                                layer_type: "symbol",
+                                section: crate::mir::MirPropertySection::Layout,
+                                property_name: "icon-optional",
+                            },
+                            &mut v.0,
+                        );
+                    }
+                    if let Some(v) = &mut layout.icon_overlap {
+                        visitor.visit_string(
+                            &crate::typed_visitor::TypedPropertyContext {
+                                layer_index: i,
+                                layer_type: "symbol",
+                                section: crate::mir::MirPropertySection::Layout,
+                                property_name: "icon-overlap",
+                            },
+                            &mut v.0,
+                        );
+                    }
+                    if let Some(v) = &mut layout.icon_padding {
+                        visitor.visit_array(
+                            &crate::typed_visitor::TypedPropertyContext {
+                                layer_index: i,
+                                layer_type: "symbol",
+                                section: crate::mir::MirPropertySection::Layout,
+                                property_name: "icon-padding",
+                            },
+                            &mut v.0,
+                        );
+                    }
+                    if let Some(v) = &mut layout.icon_pitch_alignment {
+                        visitor.visit_string(
+                            &crate::typed_visitor::TypedPropertyContext {
+                                layer_index: i,
+                                layer_type: "symbol",
+                                section: crate::mir::MirPropertySection::Layout,
+                                property_name: "icon-pitch-alignment",
+                            },
+                            &mut v.0,
+                        );
+                    }
+                    if let Some(v) = &mut layout.icon_rotate {
+                        visitor.visit_numeric(
+                            &crate::typed_visitor::TypedPropertyContext {
+                                layer_index: i,
+                                layer_type: "symbol",
+                                section: crate::mir::MirPropertySection::Layout,
+                                property_name: "icon-rotate",
+                            },
+                            &mut v.0,
+                        );
+                    }
+                    if let Some(v) = &mut layout.icon_rotation_alignment {
+                        visitor.visit_string(
+                            &crate::typed_visitor::TypedPropertyContext {
+                                layer_index: i,
+                                layer_type: "symbol",
+                                section: crate::mir::MirPropertySection::Layout,
+                                property_name: "icon-rotation-alignment",
+                            },
+                            &mut v.0,
+                        );
+                    }
+                    if let Some(v) = &mut layout.icon_size {
+                        visitor.visit_numeric(
+                            &crate::typed_visitor::TypedPropertyContext {
+                                layer_index: i,
+                                layer_type: "symbol",
+                                section: crate::mir::MirPropertySection::Layout,
+                                property_name: "icon-size",
+                            },
+                            &mut v.0,
+                        );
+                    }
+                    if let Some(v) = &mut layout.icon_text_fit {
+                        visitor.visit_string(
+                            &crate::typed_visitor::TypedPropertyContext {
+                                layer_index: i,
+                                layer_type: "symbol",
+                                section: crate::mir::MirPropertySection::Layout,
+                                property_name: "icon-text-fit",
+                            },
+                            &mut v.0,
+                        );
+                    }
+                    if let Some(v) = &mut layout.icon_text_fit_padding {
+                        visitor.visit_array(
+                            &crate::typed_visitor::TypedPropertyContext {
+                                layer_index: i,
+                                layer_type: "symbol",
+                                section: crate::mir::MirPropertySection::Layout,
+                                property_name: "icon-text-fit-padding",
+                            },
+                            &mut v.0,
+                        );
+                    }
+                    if let Some(v) = &mut layout.symbol_avoid_edges {
+                        visitor.visit_boolean_prop(
+                            &crate::typed_visitor::TypedPropertyContext {
+                                layer_index: i,
+                                layer_type: "symbol",
+                                section: crate::mir::MirPropertySection::Layout,
+                                property_name: "symbol-avoid-edges",
+                            },
+                            &mut v.0,
+                        );
+                    }
+                    if let Some(v) = &mut layout.symbol_placement {
+                        visitor.visit_string(
+                            &crate::typed_visitor::TypedPropertyContext {
+                                layer_index: i,
+                                layer_type: "symbol",
+                                section: crate::mir::MirPropertySection::Layout,
+                                property_name: "symbol-placement",
+                            },
+                            &mut v.0,
+                        );
+                    }
+                    if let Some(v) = &mut layout.symbol_sort_key {
+                        visitor.visit_numeric(
+                            &crate::typed_visitor::TypedPropertyContext {
+                                layer_index: i,
+                                layer_type: "symbol",
+                                section: crate::mir::MirPropertySection::Layout,
+                                property_name: "symbol-sort-key",
+                            },
+                            &mut v.0,
+                        );
+                    }
+                    if let Some(v) = &mut layout.symbol_spacing {
+                        visitor.visit_numeric(
+                            &crate::typed_visitor::TypedPropertyContext {
+                                layer_index: i,
+                                layer_type: "symbol",
+                                section: crate::mir::MirPropertySection::Layout,
+                                property_name: "symbol-spacing",
+                            },
+                            &mut v.0,
+                        );
+                    }
+                    if let Some(v) = &mut layout.symbol_z_order {
+                        visitor.visit_string(
+                            &crate::typed_visitor::TypedPropertyContext {
+                                layer_index: i,
+                                layer_type: "symbol",
+                                section: crate::mir::MirPropertySection::Layout,
+                                property_name: "symbol-z-order",
+                            },
+                            &mut v.0,
+                        );
+                    }
+                    if let Some(v) = &mut layout.text_allow_overlap {
+                        visitor.visit_boolean_prop(
+                            &crate::typed_visitor::TypedPropertyContext {
+                                layer_index: i,
+                                layer_type: "symbol",
+                                section: crate::mir::MirPropertySection::Layout,
+                                property_name: "text-allow-overlap",
+                            },
+                            &mut v.0,
+                        );
+                    }
+                    if let Some(v) = &mut layout.text_anchor {
+                        visitor.visit_string(
+                            &crate::typed_visitor::TypedPropertyContext {
+                                layer_index: i,
+                                layer_type: "symbol",
+                                section: crate::mir::MirPropertySection::Layout,
+                                property_name: "text-anchor",
+                            },
+                            &mut v.0,
+                        );
+                    }
+                    if let Some(v) = &mut layout.text_field {
+                        visitor.visit_formatted(
+                            &crate::typed_visitor::TypedPropertyContext {
+                                layer_index: i,
+                                layer_type: "symbol",
+                                section: crate::mir::MirPropertySection::Layout,
+                                property_name: "text-field",
+                            },
+                            &mut v.0,
+                        );
+                    }
+                    if let Some(v) = &mut layout.text_font {
+                        visitor.visit_array(
+                            &crate::typed_visitor::TypedPropertyContext {
+                                layer_index: i,
+                                layer_type: "symbol",
+                                section: crate::mir::MirPropertySection::Layout,
+                                property_name: "text-font",
+                            },
+                            &mut v.0,
+                        );
+                    }
+                    if let Some(v) = &mut layout.text_ignore_placement {
+                        visitor.visit_boolean_prop(
+                            &crate::typed_visitor::TypedPropertyContext {
+                                layer_index: i,
+                                layer_type: "symbol",
+                                section: crate::mir::MirPropertySection::Layout,
+                                property_name: "text-ignore-placement",
+                            },
+                            &mut v.0,
+                        );
+                    }
+                    if let Some(v) = &mut layout.text_justify {
+                        visitor.visit_string(
+                            &crate::typed_visitor::TypedPropertyContext {
+                                layer_index: i,
+                                layer_type: "symbol",
+                                section: crate::mir::MirPropertySection::Layout,
+                                property_name: "text-justify",
+                            },
+                            &mut v.0,
+                        );
+                    }
+                    if let Some(v) = &mut layout.text_keep_upright {
+                        visitor.visit_boolean_prop(
+                            &crate::typed_visitor::TypedPropertyContext {
+                                layer_index: i,
+                                layer_type: "symbol",
+                                section: crate::mir::MirPropertySection::Layout,
+                                property_name: "text-keep-upright",
+                            },
+                            &mut v.0,
+                        );
+                    }
+                    if let Some(v) = &mut layout.text_letter_spacing {
+                        visitor.visit_numeric(
+                            &crate::typed_visitor::TypedPropertyContext {
+                                layer_index: i,
+                                layer_type: "symbol",
+                                section: crate::mir::MirPropertySection::Layout,
+                                property_name: "text-letter-spacing",
+                            },
+                            &mut v.0,
+                        );
+                    }
+                    if let Some(v) = &mut layout.text_line_height {
+                        visitor.visit_numeric(
+                            &crate::typed_visitor::TypedPropertyContext {
+                                layer_index: i,
+                                layer_type: "symbol",
+                                section: crate::mir::MirPropertySection::Layout,
+                                property_name: "text-line-height",
+                            },
+                            &mut v.0,
+                        );
+                    }
+                    if let Some(v) = &mut layout.text_max_angle {
+                        visitor.visit_numeric(
+                            &crate::typed_visitor::TypedPropertyContext {
+                                layer_index: i,
+                                layer_type: "symbol",
+                                section: crate::mir::MirPropertySection::Layout,
+                                property_name: "text-max-angle",
+                            },
+                            &mut v.0,
+                        );
+                    }
+                    if let Some(v) = &mut layout.text_max_width {
+                        visitor.visit_numeric(
+                            &crate::typed_visitor::TypedPropertyContext {
+                                layer_index: i,
+                                layer_type: "symbol",
+                                section: crate::mir::MirPropertySection::Layout,
+                                property_name: "text-max-width",
+                            },
+                            &mut v.0,
+                        );
+                    }
+                    if let Some(v) = &mut layout.text_offset {
+                        visitor.visit_array(
+                            &crate::typed_visitor::TypedPropertyContext {
+                                layer_index: i,
+                                layer_type: "symbol",
+                                section: crate::mir::MirPropertySection::Layout,
+                                property_name: "text-offset",
+                            },
+                            &mut v.0,
+                        );
+                    }
+                    if let Some(v) = &mut layout.text_optional {
+                        visitor.visit_boolean_prop(
+                            &crate::typed_visitor::TypedPropertyContext {
+                                layer_index: i,
+                                layer_type: "symbol",
+                                section: crate::mir::MirPropertySection::Layout,
+                                property_name: "text-optional",
+                            },
+                            &mut v.0,
+                        );
+                    }
+                    if let Some(v) = &mut layout.text_overlap {
+                        visitor.visit_string(
+                            &crate::typed_visitor::TypedPropertyContext {
+                                layer_index: i,
+                                layer_type: "symbol",
+                                section: crate::mir::MirPropertySection::Layout,
+                                property_name: "text-overlap",
+                            },
+                            &mut v.0,
+                        );
+                    }
+                    if let Some(v) = &mut layout.text_padding {
+                        visitor.visit_numeric(
+                            &crate::typed_visitor::TypedPropertyContext {
+                                layer_index: i,
+                                layer_type: "symbol",
+                                section: crate::mir::MirPropertySection::Layout,
+                                property_name: "text-padding",
+                            },
+                            &mut v.0,
+                        );
+                    }
+                    if let Some(v) = &mut layout.text_pitch_alignment {
+                        visitor.visit_string(
+                            &crate::typed_visitor::TypedPropertyContext {
+                                layer_index: i,
+                                layer_type: "symbol",
+                                section: crate::mir::MirPropertySection::Layout,
+                                property_name: "text-pitch-alignment",
+                            },
+                            &mut v.0,
+                        );
+                    }
+                    if let Some(v) = &mut layout.text_radial_offset {
+                        visitor.visit_numeric(
+                            &crate::typed_visitor::TypedPropertyContext {
+                                layer_index: i,
+                                layer_type: "symbol",
+                                section: crate::mir::MirPropertySection::Layout,
+                                property_name: "text-radial-offset",
+                            },
+                            &mut v.0,
+                        );
+                    }
+                    if let Some(v) = &mut layout.text_rotate {
+                        visitor.visit_numeric(
+                            &crate::typed_visitor::TypedPropertyContext {
+                                layer_index: i,
+                                layer_type: "symbol",
+                                section: crate::mir::MirPropertySection::Layout,
+                                property_name: "text-rotate",
+                            },
+                            &mut v.0,
+                        );
+                    }
+                    if let Some(v) = &mut layout.text_rotation_alignment {
+                        visitor.visit_string(
+                            &crate::typed_visitor::TypedPropertyContext {
+                                layer_index: i,
+                                layer_type: "symbol",
+                                section: crate::mir::MirPropertySection::Layout,
+                                property_name: "text-rotation-alignment",
+                            },
+                            &mut v.0,
+                        );
+                    }
+                    if let Some(v) = &mut layout.text_size {
+                        visitor.visit_numeric(
+                            &crate::typed_visitor::TypedPropertyContext {
+                                layer_index: i,
+                                layer_type: "symbol",
+                                section: crate::mir::MirPropertySection::Layout,
+                                property_name: "text-size",
+                            },
+                            &mut v.0,
+                        );
+                    }
+                    if let Some(v) = &mut layout.text_transform {
+                        visitor.visit_string(
+                            &crate::typed_visitor::TypedPropertyContext {
+                                layer_index: i,
+                                layer_type: "symbol",
+                                section: crate::mir::MirPropertySection::Layout,
+                                property_name: "text-transform",
+                            },
+                            &mut v.0,
+                        );
+                    }
+                    if let Some(v) = &mut layout.text_variable_anchor {
+                        visitor.visit_array(
+                            &crate::typed_visitor::TypedPropertyContext {
+                                layer_index: i,
+                                layer_type: "symbol",
+                                section: crate::mir::MirPropertySection::Layout,
+                                property_name: "text-variable-anchor",
+                            },
+                            &mut v.0,
+                        );
+                    }
+                    if let Some(v) = &mut layout.text_writing_mode {
+                        visitor.visit_array(
+                            &crate::typed_visitor::TypedPropertyContext {
+                                layer_index: i,
+                                layer_type: "symbol",
+                                section: crate::mir::MirPropertySection::Layout,
+                                property_name: "text-writing-mode",
+                            },
+                            &mut v.0,
+                        );
+                    }
+                }
+            }
+        }
+
+        visitor.visit_layer(i, layer_type, typed);
+    }
+}
+
 #[cfg(test)]
 #[allow(unused_imports)]
 mod test {

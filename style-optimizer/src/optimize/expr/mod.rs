@@ -173,19 +173,6 @@ impl StyleVisitor for NormalizeFoldVisitor<'_> {
             );
         }
         normalize_and_fold(value, self.mir, self.passes, &mut self.changed);
-        // Unwrap ["literal", scalar] → scalar for paint/layout properties.
-        // Only safe for non-array, non-object types (numbers, strings, bools, null).
-        // Arrays/objects inside ["literal", ...] encode literal array/object values
-        // that would be misinterpreted as expressions if unwrapped.
-        if let Value::Array(arr) = value
-            && arr.len() == 2
-            && arr[0].as_str() == Some("literal")
-            && !arr[1].is_array()
-            && !arr[1].is_object()
-        {
-            *value = arr[1].take();
-            self.changed = true;
-        }
     }
 }
 
@@ -372,15 +359,15 @@ fn normalize_and_fold(v: &mut Value, mir: &MirSpec, passes: &OptPasses, changed:
             {
                 rewrite_expression_array(arr, mir, passes, changed);
             }
-            if passes.simplify_unary && arr.len() == 2 {
+            if arr.len() == 2 {
                 match arr.first().and_then(Value::as_str) {
-                    Some("any" | "all") => {
+                    Some("any" | "all") if passes.simplify_unary => {
                         let inner = arr[1].take();
                         *v = inner;
                         *changed = true;
                         normalize_and_fold(v, mir, passes, changed);
                     }
-                    Some("!") => {
+                    Some("!") if passes.simplify_unary => {
                         if let Value::Array(inner) = &arr[1]
                             && inner.len() == 2
                             && inner[0].as_str() == Some("!")
@@ -390,6 +377,14 @@ fn normalize_and_fold(v: &mut Value, mir: &MirSpec, passes: &OptPasses, changed:
                             *changed = true;
                             normalize_and_fold(v, mir, passes, changed);
                         }
+                    }
+                    // Unwrap ["literal", scalar] → scalar.  Scalars (numbers,
+                    // strings, booleans, null) are unambiguous in expression
+                    // context, so the wrapper is redundant.  This ensures the
+                    // JSON form is canonical for typed round-trip stability.
+                    Some("literal") if !arr[1].is_array() && !arr[1].is_object() => {
+                        *v = arr[1].take();
+                        *changed = true;
                     }
                     _ => {}
                 }

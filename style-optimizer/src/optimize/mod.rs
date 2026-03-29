@@ -4,10 +4,10 @@
 //!
 //! - [`optimize_style`] is the typed entry point.  Structural passes work
 //!   directly on `&mut MaplibreStyleSpecification`; expression passes
-//!   temporarily serialize to JSON for the schema-guided walker and sync
-//!   only filter changes back (paint/layout in the typed struct is left as-is
-//!   because `["literal", x]` produced by constant-folding is not accepted by
-//!   the generated numeric paint property types).
+//!   temporarily serialize to JSON for the schema-guided walker, then
+//!   deserialize the result back to replace the full typed struct (the
+//!   JSON walker's `NormalizeFoldVisitor` unwraps `["literal", scalar]`
+//!   back to bare scalars, so the post-pass JSON round-trips cleanly).
 //!
 //! - [`optimize_style_json_value`] / [`optimize_style_json_value_with_stats`]
 //!   run expression passes directly on the JSON (no typed round-trip, so all
@@ -32,7 +32,7 @@ use dead::dead_elimination;
 use defaults::StripDefaultsVisitor;
 use expr::{NormalizeFoldVisitor, ReorderSelectivityVisitor};
 use maplibre_style_spec::mir::MirSpec;
-use maplibre_style_spec::spec::{AnyLayer, Boolean, MaplibreStyleSpecification};
+use maplibre_style_spec::spec::MaplibreStyleSpecification;
 use metadata::metadata_refinement;
 use serde_json::Value;
 use source_util::{precompute_vector_layer_info, precompute_vector_layer_info_typed};
@@ -130,53 +130,25 @@ pub fn optimize_style_json_value_with_stats(
     }
 }
 
-/// Typed entry point.  Structural passes work directly on the typed struct.
-/// Expression passes serialize to JSON, run the walker, then sync only filter
-/// changes back; paint/layout simplification results in the typed output are
-/// dropped because `["literal", x]` is not a valid form for generated numeric
-/// paint types.  This limitation will be resolved in Phase 3.
+/// Typed entry point.  Delegates to the JSON pipeline so that expression-pass
+/// results for all properties (paint, layout, and filter) are preserved.  The
+/// final JSON is deserialized back into a typed struct.
 pub fn optimize_style(
     style: &mut MaplibreStyleSpecification,
     mir: &MirSpec,
     passes: &OptPasses,
     stats: Option<&TileStatistics>,
 ) {
-    run_pipeline(style, mir, passes, stats);
-}
-
-// ── Pipeline implementation ─────────────────────────────────────────────────
-
-/// Typed-primary pipeline used by [`optimize_style`].
-fn run_pipeline(
-    style: &mut MaplibreStyleSpecification,
-    mir: &MirSpec,
-    passes: &OptPasses,
-    stats: Option<&TileStatistics>,
-) {
-    if !wants_expression_passes(passes) && !wants_structural_passes(passes) {
+    let Ok(mut v) = serde_json::to_value(&*style) else {
         return;
+    };
+    optimize_style_json_value_with_stats(&mut v, mir, passes, stats);
+    if let Ok(updated) = serde_json::from_value::<MaplibreStyleSpecification>(v) {
+        *style = updated;
     }
-
-    // 1. Strip metadata (typed, direct) — before expression passes so that the
-    //    serialized JSON excludes metadata.
-    if passes.strip_metadata {
-        strip_metadata(style);
-    }
-
-    // 2. Expression passes: serialize → JSON walker → sync only filter changes back.
-    if wants_expression_passes(passes)
-        && let Ok(mut v) = serde_json::to_value(&*style)
-    {
-        run_json_expression_passes(&mut v, mir, passes, stats);
-        sync_filters_from_json(style, &v);
-    }
-
-    // 3–5. Remaining structural passes (typed, direct).
-    run_structural_passes(style, passes, stats);
 }
 
-/// Run structural passes in order.  `strip_metadata` is idempotent and
-/// harmless to call even if it already ran in [`run_pipeline`].
+/// Run structural passes in order.
 fn run_structural_passes(
     style: &mut MaplibreStyleSpecification,
     passes: &OptPasses,
@@ -198,26 +170,6 @@ fn run_structural_passes(
 
     if passes.cleanup {
         cleanup(style);
-    }
-}
-
-/// Sync only the `filter` field of each layer from a post-expression-pass JSON
-/// value back into the typed struct.  Filters that fail to deserialize (should
-/// not happen with well-formed expression-pass output) are silently dropped.
-fn sync_filters_from_json(style: &mut MaplibreStyleSpecification, v: &Value) {
-    let Some(json_layers) = v.get("layers").and_then(Value::as_array) else {
-        return;
-    };
-    for (typed_layer, json_layer) in style.layers.iter_mut().zip(json_layers.iter()) {
-        let new_filter = json_layer
-            .get("filter")
-            .filter(|f| !f.is_null())
-            .cloned()
-            .and_then(Boolean::from_value);
-        match typed_layer {
-            AnyLayer::Typed(t) => t.common_mut().filter = new_filter,
-            AnyLayer::Ref(r) => r.filter = new_filter,
-        }
     }
 }
 
@@ -525,10 +477,7 @@ mod tests {
         );
         assert_json_snapshot!(v["layers"][0], @r#"
         {
-          "filter": [
-            "literal",
-            false
-          ],
+          "filter": false,
           "id": "x",
           "type": "fill"
         }
@@ -641,10 +590,7 @@ mod tests {
         );
         assert_json_snapshot!(v["layers"][0], @r#"
         {
-          "filter": [
-            "literal",
-            3.0
-          ],
+          "filter": 3.0,
           "id": "x",
           "type": "fill"
         }
@@ -665,10 +611,7 @@ mod tests {
         );
         assert_json_snapshot!(v["layers"][0], @r#"
         {
-          "filter": [
-            "literal",
-            "hello world"
-          ],
+          "filter": "hello world",
           "id": "x",
           "type": "fill"
         }
@@ -1400,10 +1343,7 @@ mod tests {
         );
         assert_json_snapshot!(v["layers"][0], @r#"
         {
-          "filter": [
-            "literal",
-            false
-          ],
+          "filter": false,
           "id": "water-fill",
           "source": "openmaptiles",
           "source-layer": "water",
@@ -1444,10 +1384,7 @@ mod tests {
         );
         assert_json_snapshot!(v["layers"][0], @r#"
         {
-          "filter": [
-            "literal",
-            true
-          ],
+          "filter": true,
           "id": "w",
           "source": "openmaptiles",
           "source-layer": "water",
@@ -1488,10 +1425,7 @@ mod tests {
         );
         assert_json_snapshot!(v["layers"][0], @r#"
         {
-          "filter": [
-            "literal",
-            true
-          ],
+          "filter": true,
           "id": "w",
           "source": "openmaptiles",
           "source-layer": "water",
@@ -1614,15 +1548,14 @@ mod tests {
     }
 
     #[test]
-    fn literal_inside_expression_not_unwrapped() {
-        // ["literal", 1] inside a non-fully-foldable expression must NOT be unwrapped.
-        // ["+", ["literal", 1], ["get", "foo"]] must remain unchanged.
+    fn literal_scalar_inside_expression_unwrapped() {
+        // ["literal", 1] (scalar) inside an expression is unwrapped to bare 1.
+        // ["+", ["literal", 1], ["get", "foo"]] → ["+", 1, ["get", "foo"]]
         let mir = sample_mir();
         let mut v = serde_json::json!({"version":8,"sources":{},"layers":[{
             "id":"x","type":"fill",
             "paint":{"fill-opacity":["+",["literal",1],["get","foo"]]}
         }]});
-        let expected = v["layers"][0]["paint"]["fill-opacity"].clone();
         optimize_style_json_value(
             &mut v,
             &mir,
@@ -1633,7 +1566,10 @@ mod tests {
                 ..Default::default()
             },
         );
-        assert_eq!(v["layers"][0]["paint"]["fill-opacity"], expected);
+        assert_eq!(
+            v["layers"][0]["paint"]["fill-opacity"],
+            serde_json::json!(["+", 1, ["get", "foo"]])
+        );
     }
 
     // ── Typed entry point tests ─────────────────────────────────────────────
@@ -1708,10 +1644,7 @@ mod tests {
         );
         assert_json_snapshot!(v["layers"][0], @r#"
         {
-          "filter": [
-            "literal",
-            false
-          ],
+          "filter": false,
           "id": "x",
           "type": "fill"
         }

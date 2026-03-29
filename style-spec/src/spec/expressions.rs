@@ -156,11 +156,6 @@ impl ExprOrLiteral {
             ExprOrLiteral::StringExpr(s) => match *s {
                 String::Literal(v) => ExprOrLiteral::StringLiteral(v),
                 String::AnyExpr(a) => ExprOrLiteral::AnyExpr(a),
-                // String::Slice and Array::Slice share the "slice" operator;
-                // ArrayExpr is deserialized before StringExpr, so normalize.
-                String::Slice(expr, start, end) => ExprOrLiteral::ArrayExpr(Box::new(
-                    Array::Slice(ExprOrLiteral::StringExpr(expr).normalize(), start, end),
-                )),
                 other => ExprOrLiteral::StringExpr(Box::new(other)),
             },
             ExprOrLiteral::ColorExpr(c) => match *c {
@@ -173,7 +168,7 @@ impl ExprOrLiteral {
                 other => ExprOrLiteral::ArrayExpr(Box::new(other)),
             },
             ExprOrLiteral::ObjectExpr(o) => match *o {
-                Object::Literal(v) => ExprOrLiteral::JSONObjectLiteral(v).normalize(),
+                Object::Literal(v) => ExprOrLiteral::JSONObjectLiteral(v),
                 other => ExprOrLiteral::ObjectExpr(Box::new(other)),
             },
             // JSONObjectLiteral/JSONArrayLiteral can wrap any serde_json::Value;
@@ -187,9 +182,6 @@ impl ExprOrLiteral {
                 serde_json::Value::String(s) => {
                     ExprOrLiteral::StringLiteral(StringLiteral::from(s))
                 }
-                serde_json::Value::Array(a) => {
-                    ExprOrLiteral::JSONArrayLiteral(JSONArrayLiteral(a))
-                }
                 other => ExprOrLiteral::JSONObjectLiteral(JSONObjectLiteral(other)),
             },
             other => other,
@@ -201,7 +193,7 @@ impl ExprOrLiteral {
 impl<'a> arbitrary::Arbitrary<'a> for ExprOrLiteral {
     fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
         let tag: u8 = u.arbitrary()?;
-        let v = match tag % 17 {
+        Ok(match tag % 17 {
             0 => ExprOrLiteral::Null,
             1 => ExprOrLiteral::Bool(u.arbitrary()?),
             2 => ExprOrLiteral::NumberLiteral(u.arbitrary()?),
@@ -220,50 +212,19 @@ impl<'a> arbitrary::Arbitrary<'a> for ExprOrLiteral {
             15 => ExprOrLiteral::ObjectExpr(u.arbitrary()?),
             _ => ExprOrLiteral::StringExpr(u.arbitrary()?),
         }
-        .normalize();
-        Ok(v)
+        .normalize())
     }
 }
 
 /// Either of the below variants
 #[derive(PartialEq, Debug, Clone)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum StringLiteralOrNumberLiteralOrArrayOfStringLiteralOrArrayOfNumberLiteralOrAnyAsUnion {
     StringLiteral(StringLiteral),
     NumberLiteral(NumberLiteral),
     ArrayOfStringLiteral(ArrayOfStringLiteral),
     ArrayOfNumberLiteral(ArrayOfNumberLiteral),
     Any(Box<Any>),
-}
-
-#[cfg(feature = "fuzz")]
-impl<'a> arbitrary::Arbitrary<'a>
-    for StringLiteralOrNumberLiteralOrArrayOfStringLiteralOrArrayOfNumberLiteralOrAnyAsUnion
-{
-    fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
-        let tag: u8 = u.arbitrary()?;
-        // Match labels are semantically literals, not expressions.
-        // Only generate literal variants (String, Number, ArrayOfString,
-        // ArrayOfNumber) to avoid roundtrip ambiguity with Any expressions.
-        let v = match tag % 4 {
-            0 => Self::StringLiteral(u.arbitrary()?),
-            1 => Self::NumberLiteral(u.arbitrary()?),
-            2 => Self::ArrayOfStringLiteral(u.arbitrary()?),
-            _ => {
-                let inner: ArrayOfNumberLiteral = u.arbitrary()?;
-                // An empty ArrayOfNumberLiteral serializes as `[]` which
-                // deserializes as ArrayOfStringLiteral (tried first).
-                let json = serde_json::to_value(&inner).ok();
-                if json.as_ref().is_some_and(|v| v == &serde_json::json!([])) {
-                    Self::ArrayOfStringLiteral(
-                        serde_json::from_value(serde_json::json!([])).unwrap(),
-                    )
-                } else {
-                    Self::ArrayOfNumberLiteral(inner)
-                }
-            }
-        };
-        Ok(v)
-    }
 }
 
 impl serde::Serialize
@@ -593,14 +554,37 @@ impl serde::Serialize for Any {
                 }
                 seq.end()
             }
-            Any::Case((pairs, fallback)) => {
+            Any::Case(inner) => {
+                let inner_val = serde_json::to_value(inner).map_err(serde::ser::Error::custom)?;
                 let mut seq = serializer.serialize_seq(None)?;
                 seq.serialize_element("case")?;
-                for (condition, output) in pairs {
-                    seq.serialize_element(&condition)?;
-                    seq.serialize_element(&output)?;
+                if let serde_json::Value::Array(top) = &inner_val {
+                    for elem in top {
+                        if let serde_json::Value::Array(sub) = elem {
+                            if sub.is_empty() {
+                                // Empty Vec — nothing to flatten.
+                            } else if sub[0].is_array() {
+                                // An array-of-arrays is the Vec<(A,B)> — flatten it.
+                                for pair in sub {
+                                    if let serde_json::Value::Array(pair_elems) = pair {
+                                        for pe in pair_elems {
+                                            seq.serialize_element(pe)?;
+                                        }
+                                    } else {
+                                        seq.serialize_element(pair)?;
+                                    }
+                                }
+                            } else {
+                                // Plain array value (e.g. a sub-expression like ["zoom"]).
+                                seq.serialize_element(elem)?;
+                            }
+                        } else {
+                            seq.serialize_element(elem)?;
+                        }
+                    }
+                } else {
+                    seq.serialize_element(&inner_val)?;
                 }
-                seq.serialize_element(&fallback)?;
                 seq.end()
             }
             Any::Coalesce(inner) => {
@@ -667,35 +651,102 @@ impl serde::Serialize for Any {
                 }
                 seq.end()
             }
-            Any::Let((bindings, body)) => {
+            Any::Let(inner) => {
+                let inner_val = serde_json::to_value(inner).map_err(serde::ser::Error::custom)?;
                 let mut seq = serializer.serialize_seq(None)?;
                 seq.serialize_element("let")?;
-                for (name, value) in bindings {
-                    seq.serialize_element(&name)?;
-                    seq.serialize_element(&value)?;
+                if let serde_json::Value::Array(top) = &inner_val {
+                    for elem in top {
+                        if let serde_json::Value::Array(sub) = elem {
+                            if sub.is_empty() {
+                                // Empty Vec — nothing to flatten.
+                            } else if sub[0].is_array() {
+                                // An array-of-arrays is the Vec<(A,B)> — flatten it.
+                                for pair in sub {
+                                    if let serde_json::Value::Array(pair_elems) = pair {
+                                        for pe in pair_elems {
+                                            seq.serialize_element(pe)?;
+                                        }
+                                    } else {
+                                        seq.serialize_element(pair)?;
+                                    }
+                                }
+                            } else {
+                                // Plain array value (e.g. a sub-expression like ["zoom"]).
+                                seq.serialize_element(elem)?;
+                            }
+                        } else {
+                            seq.serialize_element(elem)?;
+                        }
+                    }
+                } else {
+                    seq.serialize_element(&inner_val)?;
                 }
-                seq.serialize_element(&body)?;
                 seq.end()
             }
-            Any::Match((input, pairs, fallback)) => {
+            Any::Match(inner) => {
+                let inner_val = serde_json::to_value(inner).map_err(serde::ser::Error::custom)?;
                 let mut seq = serializer.serialize_seq(None)?;
                 seq.serialize_element("match")?;
-                seq.serialize_element(&input)?;
-                for (label, output) in pairs {
-                    seq.serialize_element(&label)?;
-                    seq.serialize_element(&output)?;
+                if let serde_json::Value::Array(top) = &inner_val {
+                    for elem in top {
+                        if let serde_json::Value::Array(sub) = elem {
+                            if sub.is_empty() {
+                                // Empty Vec — nothing to flatten.
+                            } else if sub[0].is_array() {
+                                // An array-of-arrays is the Vec<(A,B)> — flatten it.
+                                for pair in sub {
+                                    if let serde_json::Value::Array(pair_elems) = pair {
+                                        for pe in pair_elems {
+                                            seq.serialize_element(pe)?;
+                                        }
+                                    } else {
+                                        seq.serialize_element(pair)?;
+                                    }
+                                }
+                            } else {
+                                // Plain array value (e.g. a sub-expression like ["zoom"]).
+                                seq.serialize_element(elem)?;
+                            }
+                        } else {
+                            seq.serialize_element(elem)?;
+                        }
+                    }
+                } else {
+                    seq.serialize_element(&inner_val)?;
                 }
-                seq.serialize_element(&fallback)?;
                 seq.end()
             }
-            Any::Step((input, default_output, stops)) => {
+            Any::Step(inner) => {
+                let inner_val = serde_json::to_value(inner).map_err(serde::ser::Error::custom)?;
                 let mut seq = serializer.serialize_seq(None)?;
                 seq.serialize_element("step")?;
-                seq.serialize_element(&input)?;
-                seq.serialize_element(&default_output)?;
-                for (stop_input, stop_output) in stops {
-                    seq.serialize_element(&stop_input)?;
-                    seq.serialize_element(&stop_output)?;
+                if let serde_json::Value::Array(top) = &inner_val {
+                    for elem in top {
+                        if let serde_json::Value::Array(sub) = elem {
+                            if sub.is_empty() {
+                                // Empty Vec — nothing to flatten.
+                            } else if sub[0].is_array() {
+                                // An array-of-arrays is the Vec<(A,B)> — flatten it.
+                                for pair in sub {
+                                    if let serde_json::Value::Array(pair_elems) = pair {
+                                        for pe in pair_elems {
+                                            seq.serialize_element(pe)?;
+                                        }
+                                    } else {
+                                        seq.serialize_element(pair)?;
+                                    }
+                                }
+                            } else {
+                                // Plain array value (e.g. a sub-expression like ["zoom"]).
+                                seq.serialize_element(elem)?;
+                            }
+                        } else {
+                            seq.serialize_element(elem)?;
+                        }
+                    }
+                } else {
+                    seq.serialize_element(&inner_val)?;
                 }
                 seq.end()
             }
@@ -2033,25 +2084,69 @@ impl serde::Serialize for ColorOrArrayOfColor {
     {
         use serde::ser::SerializeSeq;
         match self {
-            ColorOrArrayOfColor::InterpolateHcl((interpolation, input, stops)) => {
+            ColorOrArrayOfColor::InterpolateHcl(inner) => {
+                let inner_val = serde_json::to_value(inner).map_err(serde::ser::Error::custom)?;
                 let mut seq = serializer.serialize_seq(None)?;
                 seq.serialize_element("interpolate-hcl")?;
-                seq.serialize_element(&interpolation)?;
-                seq.serialize_element(&input)?;
-                for (stop_input, stop_output) in stops {
-                    seq.serialize_element(&stop_input)?;
-                    seq.serialize_element(&stop_output)?;
+                if let serde_json::Value::Array(top) = &inner_val {
+                    for elem in top {
+                        if let serde_json::Value::Array(sub) = elem {
+                            if sub.is_empty() {
+                                // Empty Vec — nothing to flatten.
+                            } else if sub[0].is_array() {
+                                // An array-of-arrays is the Vec<(A,B)> — flatten it.
+                                for pair in sub {
+                                    if let serde_json::Value::Array(pair_elems) = pair {
+                                        for pe in pair_elems {
+                                            seq.serialize_element(pe)?;
+                                        }
+                                    } else {
+                                        seq.serialize_element(pair)?;
+                                    }
+                                }
+                            } else {
+                                // Plain array value (e.g. a sub-expression like ["zoom"]).
+                                seq.serialize_element(elem)?;
+                            }
+                        } else {
+                            seq.serialize_element(elem)?;
+                        }
+                    }
+                } else {
+                    seq.serialize_element(&inner_val)?;
                 }
                 seq.end()
             }
-            ColorOrArrayOfColor::InterpolateLab((interpolation, input, stops)) => {
+            ColorOrArrayOfColor::InterpolateLab(inner) => {
+                let inner_val = serde_json::to_value(inner).map_err(serde::ser::Error::custom)?;
                 let mut seq = serializer.serialize_seq(None)?;
                 seq.serialize_element("interpolate-lab")?;
-                seq.serialize_element(&interpolation)?;
-                seq.serialize_element(&input)?;
-                for (stop_input, stop_output) in stops {
-                    seq.serialize_element(&stop_input)?;
-                    seq.serialize_element(&stop_output)?;
+                if let serde_json::Value::Array(top) = &inner_val {
+                    for elem in top {
+                        if let serde_json::Value::Array(sub) = elem {
+                            if sub.is_empty() {
+                                // Empty Vec — nothing to flatten.
+                            } else if sub[0].is_array() {
+                                // An array-of-arrays is the Vec<(A,B)> — flatten it.
+                                for pair in sub {
+                                    if let serde_json::Value::Array(pair_elems) = pair {
+                                        for pe in pair_elems {
+                                            seq.serialize_element(pe)?;
+                                        }
+                                    } else {
+                                        seq.serialize_element(pair)?;
+                                    }
+                                }
+                            } else {
+                                // Plain array value (e.g. a sub-expression like ["zoom"]).
+                                seq.serialize_element(elem)?;
+                            }
+                        } else {
+                            seq.serialize_element(elem)?;
+                        }
+                    }
+                } else {
+                    seq.serialize_element(&inner_val)?;
                 }
                 seq.end()
             }
@@ -2298,31 +2393,10 @@ impl serde::Serialize for Image {
 
 /// Either of the below variants
 #[derive(PartialEq, Debug, Clone)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum ArrayOrStringAsUnion {
     Array(Array),
     String(Box<String>),
-}
-
-#[cfg(feature = "fuzz")]
-impl<'a> arbitrary::Arbitrary<'a> for ArrayOrStringAsUnion {
-    fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
-        let tag: u8 = u.arbitrary()?;
-        if tag.is_multiple_of(2) {
-            Ok(Self::Array(u.arbitrary()?))
-        } else {
-            let s: String = u.arbitrary()?;
-            // String::Slice and Array::Slice share the "slice" operator;
-            // Array is deserialized first, so normalize Slice to Array.
-            Ok(match s {
-                String::Slice(expr, start, end) => Self::Array(Array::Slice(
-                    ExprOrLiteral::StringExpr(expr).normalize(),
-                    start,
-                    end,
-                )),
-                other => Self::String(Box::new(other)),
-            })
-        }
-    }
 }
 
 impl serde::Serialize for ArrayOrStringAsUnion {
@@ -2448,33 +2522,22 @@ pub enum MinusOptions {
 /// Options for deserializing the syntax enum variant [`Number::IndexOf`]
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone)]
 #[serde(untagged)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum IndexOfOptions {
     Item(
         ExprOrLiteral,
         ExprOrLiteral,
         #[serde(default)]
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_option_json_value))]
         Option<serde_json::Value>,
     ),
     Substring(
         Box<String>,
         Box<String>,
         #[serde(default)]
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_option_json_value))]
         Option<serde_json::Value>,
     ),
-}
-
-#[cfg(feature = "fuzz")]
-impl<'a> arbitrary::Arbitrary<'a> for IndexOfOptions {
-    fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
-        // `Item` is tried first during untagged deserialization and can represent
-        // everything `Substring` can (via `ExprOrLiteral::StringExpr`), so always
-        // generate `Item` to ensure roundtrip stability.
-        Ok(Self::Item(
-            u.arbitrary()?,
-            u.arbitrary()?,
-            crate::fuzz_helpers::arbitrary_option_json_value(u)?,
-        ))
-    }
 }
 
 impl<'de> serde::Deserialize<'de> for Number {
@@ -3152,49 +3215,16 @@ impl serde::Serialize for Number {
 
 /// Either of the below variants
 #[derive(PartialEq, Debug, Clone)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjectionAsUnion {
     Number(NumberLiteral),
-    ArrayOfNumber(serde_json::Value),
+    ArrayOfNumber(
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::fuzz_helpers::arbitrary_json_value))]
+        serde_json::Value,
+    ),
     Color(Color),
     ArrayOfColor(ColorOrArrayOfColor),
     Projection(Box<ProjectionType>),
-}
-
-#[cfg(feature = "fuzz")]
-impl<'a> arbitrary::Arbitrary<'a>
-    for NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjectionAsUnion
-{
-    fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
-        let tag: u8 = u.arbitrary()?;
-        Ok(match tag % 5 {
-            0 => Self::Number(u.arbitrary()?),
-            1 => {
-                let v = crate::fuzz_helpers::arbitrary_json_value(u)?;
-                // Normalize primitives that would be caught by earlier
-                // deserialization attempts (Number, Color, etc.).
-                match &v {
-                    serde_json::Value::Number(n) => Self::Number(NumberLiteral::from(n.clone())),
-                    serde_json::Value::String(s) => {
-                        Self::Color(Color::Literal(StringLiteral::from(s.clone())))
-                    }
-                    _ => Self::ArrayOfNumber(v),
-                }
-            }
-            2 => Self::Color(u.arbitrary()?),
-            3 => Self::ArrayOfColor(u.arbitrary()?),
-            _ => {
-                let pt: ProjectionType = u.arbitrary()?;
-                // `Projection(Literal(s))` serializes as a bare string which
-                // deserializes as `Color(Literal(StringLiteral(s)))` (tried first).
-                match pt {
-                    ProjectionType::Literal(s) => {
-                        Self::Color(Color::Literal(StringLiteral::from(s)))
-                    }
-                    other => Self::Projection(Box::new(other)),
-                }
-            }
-        })
-    }
 }
 
 impl serde::Serialize for NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjectionAsUnion {
@@ -3337,18 +3367,36 @@ impl serde::Serialize for NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection
     {
         use serde::ser::SerializeSeq;
         match self {
-            NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection::Interpolate((
-                interpolation,
-                input,
-                stops,
-            )) => {
+            NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection::Interpolate(inner) => {
+                let inner_val = serde_json::to_value(inner).map_err(serde::ser::Error::custom)?;
                 let mut seq = serializer.serialize_seq(None)?;
                 seq.serialize_element("interpolate")?;
-                seq.serialize_element(&interpolation)?;
-                seq.serialize_element(&input)?;
-                for (stop_input, stop_output) in stops {
-                    seq.serialize_element(&stop_input)?;
-                    seq.serialize_element(&stop_output)?;
+                if let serde_json::Value::Array(top) = &inner_val {
+                    for elem in top {
+                        if let serde_json::Value::Array(sub) = elem {
+                            if sub.is_empty() {
+                                // Empty Vec — nothing to flatten.
+                            } else if sub[0].is_array() {
+                                // An array-of-arrays is the Vec<(A,B)> — flatten it.
+                                for pair in sub {
+                                    if let serde_json::Value::Array(pair_elems) = pair {
+                                        for pe in pair_elems {
+                                            seq.serialize_element(pe)?;
+                                        }
+                                    } else {
+                                        seq.serialize_element(pair)?;
+                                    }
+                                }
+                            } else {
+                                // Plain array value (e.g. a sub-expression like ["zoom"]).
+                                seq.serialize_element(elem)?;
+                            }
+                        } else {
+                            seq.serialize_element(elem)?;
+                        }
+                    }
+                } else {
+                    seq.serialize_element(&inner_val)?;
                 }
                 seq.end()
             }

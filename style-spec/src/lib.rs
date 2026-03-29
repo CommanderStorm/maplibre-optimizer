@@ -7,6 +7,8 @@ pub(crate) mod fuzz_helpers;
 
 #[cfg(feature = "full")]
 pub mod shared_expr;
+#[cfg(feature = "full")]
+pub mod typed_visitor;
 
 #[cfg(feature = "full")]
 pub mod expression_validate;

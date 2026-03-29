@@ -414,6 +414,9 @@ fn generate_layer_types(scope: &mut Scope, layers: &MirLayers) {
 
     // Helper impls on TypedLayer, AnyLayer, and newtype wrappers
     generate_layer_helper_impls(scope, layers);
+
+    // Typed visitor walk function
+    generate_typed_visitor_walk(scope, layers);
 }
 
 /// Generate the common `Layer` struct with the hand-written `filter` field
@@ -701,6 +704,153 @@ impl LayerMaxzoom {{
 
     pub fn from_f64(n: f64) -> Option<Self> {{
         serde_json::Number::from_f64(n).map(Self)
+    }}
+}}
+"#
+    ));
+}
+
+/// Returns the visitor method name and inner type accessor for an expression-backed
+/// `MirLayerField`, or `None` if the field is not expression-backed or has no
+/// corresponding typed visitor method.
+fn visitor_method_for_field(field: &MirLayerField) -> Option<&'static str> {
+    field.expression.as_ref()?;
+    match &field.r#type {
+        MirType::Number { .. } => Some("visit_numeric"),
+        MirType::Color => Some("visit_color"),
+        MirType::Boolean => Some("visit_boolean_prop"),
+        MirType::String => Some("visit_string"),
+        MirType::ResolvedImage { .. } => Some("visit_string"),
+        MirType::Enum { values } => {
+            // The visibility pattern (none/visible) generates a type alias to
+            // `Visibility`, not a `string_prop!` newtype — skip it.
+            // See also: items::enum::is_visibility_pattern.
+            let is_visibility = values.len() == 2
+                && values.iter().any(|v| v == "none")
+                && values.iter().any(|v| v == "visible");
+            if is_visibility {
+                None
+            } else {
+                Some("visit_string")
+            }
+        }
+        MirType::Formatted { .. } => Some("visit_formatted"),
+        MirType::ColorArray => Some("visit_color"),
+        MirType::Array { .. } | MirType::NumberArray { .. } | MirType::Padding => {
+            Some("visit_array")
+        }
+        _ => None,
+    }
+}
+
+/// Emit visitor calls for one section (paint or layout) of a layer type.
+fn emit_section_visits(
+    out: &mut String,
+    binding: &str,
+    section: &str,
+    type_key: &str,
+    fields: &std::collections::BTreeMap<String, MirLayerField>,
+) {
+    out.push_str(&format!(
+        "                    if let Some({binding}) = {binding} {{\n"
+    ));
+    for (spec_name, field) in fields {
+        let Some(method) = visitor_method_for_field(field) else {
+            continue;
+        };
+        let rust_name = to_snake_case(spec_name);
+        out.push_str(&format!(
+            "                        if let Some(v) = &mut {binding}.{rust_name} {{\n\
+             \x20                           visitor.{method}(&crate::typed_visitor::TypedPropertyContext {{\n\
+             \x20                               layer_index: i,\n\
+             \x20                               layer_type: \"{type_key}\",\n\
+             \x20                               section: crate::mir::MirPropertySection::{section},\n\
+             \x20                               property_name: \"{spec_name}\",\n\
+             \x20                           }}, &mut v.0);\n\
+             \x20                       }}\n"
+        ));
+    }
+    out.push_str("                    }\n");
+}
+
+/// Generate `walk_typed_style_mut()` — a typed counterpart to the JSON `walk_style_mut`.
+///
+/// Emits a function that iterates over every `TypedLayer` variant's paint/layout
+/// fields and calls the appropriate `TypedStyleVisitor` method for expression-backed
+/// properties.
+fn generate_typed_visitor_walk(scope: &mut Scope, layers: &MirLayers) {
+    if layers.layer_types.is_empty() {
+        return;
+    }
+
+    let mut match_arms = String::new();
+
+    for (type_key, layer_type) in &layers.layer_types {
+        let variant = to_upper_camel_case(type_key);
+
+        let has_paint_visits = layer_type
+            .paint
+            .values()
+            .any(|f| visitor_method_for_field(f).is_some());
+        let has_layout_visits = layer_type
+            .layout
+            .values()
+            .any(|f| visitor_method_for_field(f).is_some());
+
+        // Only bind paint/layout when they have visitable fields.
+        let bindings = match (has_paint_visits, has_layout_visits) {
+            (true, true) => "paint, layout, ..".to_string(),
+            (true, false) => "paint, ..".to_string(),
+            (false, true) => "layout, ..".to_string(),
+            (false, false) => "..".to_string(),
+        };
+        match_arms.push_str(&format!(
+            "                TypedLayer::{variant} {{ {bindings} }} => {{\n"
+        ));
+        if has_paint_visits {
+            emit_section_visits(
+                &mut match_arms,
+                "paint",
+                "Paint",
+                type_key,
+                &layer_type.paint,
+            );
+        }
+        if has_layout_visits {
+            emit_section_visits(
+                &mut match_arms,
+                "layout",
+                "Layout",
+                type_key,
+                &layer_type.layout,
+            );
+        }
+        match_arms.push_str("                }\n");
+    }
+
+    scope.raw(format!(
+        r#"
+/// Walk all expression-backed paint/layout properties on typed layer structs.
+///
+/// For each layer, visits the filter (if present), then each expression-backed
+/// paint and layout property, then the layer itself via `visit_layer`.
+#[expect(clippy::collapsible_if)]
+pub fn walk_typed_style_mut(
+    style: &mut MaplibreStyleSpecification,
+    visitor: &mut impl crate::typed_visitor::TypedStyleVisitor,
+) {{
+    for (i, layer) in style.layers.iter_mut().enumerate() {{
+        let AnyLayer::Typed(typed) = layer else {{ continue }};
+        let layer_type = typed.layer_type();
+
+        if let Some(filter) = &mut typed.common_mut().filter {{
+            visitor.visit_filter(i, layer_type, filter);
+        }}
+
+        match typed {{
+{match_arms}        }}
+
+        visitor.visit_layer(i, layer_type, typed);
     }}
 }}
 "#
