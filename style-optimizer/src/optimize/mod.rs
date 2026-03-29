@@ -143,10 +143,28 @@ pub fn optimize_style_json_value_with_stats(
         ramp::prune_zoom_stops(v);
     }
 
+    // 3b. Re-fold after structural changes: metadata_refinement may remove
+    //     zoom predicates leaving residual wrappers (e.g. `["all", x]`),
+    //     and ramp pruning may collapse ramps to bare literals.
+    if wants_normalize_fold(passes) && wants_structural_passes(passes) {
+        run_normalize_fold_only(v, mir, passes, stats);
+    }
+
     // 4. Layer merging — runs on JSON after all other passes so that dead
     //    layers are gone and expressions are simplified before grouping.
     if passes.layer_merge {
         merge::layer_merge(v, mir);
+
+        // 4b. Re-run expression passes on merge-generated expressions:
+        //     layer_merge synthesises new case/match/any expressions that
+        //     benefit from fold/simplify, default stripping, and
+        //     selectivity reordering.
+        run_json_expression_passes(v, mir, passes, stats);
+
+        // 4c. Prune zoom stops in newly-synthesised properties.
+        if passes.simplify_expressions {
+            ramp::prune_zoom_stops(v);
+        }
     }
 }
 
@@ -302,6 +320,31 @@ fn run_json_expression_passes(
                 layer_info: layer_info.as_deref(),
             },
         );
+    }
+}
+
+/// Run only the normalize/fold fixpoint — a lightweight cleanup pass for
+/// residual wrappers left by structural changes (e.g. `["all", x]` after a
+/// predicate was removed, or a ramp collapsed to a literal).
+fn run_normalize_fold_only(
+    v: &mut Value,
+    mir: &MirSpec,
+    passes: &OptPasses,
+    stats: Option<&TileStatistics>,
+) {
+    let layer_info = stats.map(|_| precompute_vector_layer_info(v));
+    for _ in 0..NORMALIZE_FOLD_FIXPOINT_CAP {
+        let mut visitor = NormalizeFoldVisitor {
+            mir,
+            passes,
+            stats,
+            layer_info: layer_info.as_deref(),
+            changed: false,
+        };
+        walk_style_mut(v, mir, &mut visitor);
+        if !visitor.changed {
+            break;
+        }
     }
 }
 
