@@ -37,7 +37,9 @@ use maplibre_style_spec::mir::MirSpec;
 use maplibre_style_spec::spec::MaplibreStyleSpecification;
 use metadata::metadata_refinement;
 use serde_json::Value;
-use source_util::{precompute_vector_layer_info, precompute_vector_layer_info_typed};
+use source_util::{
+    precompute_vector_layer_info, precompute_vector_layer_info_typed, tighten_source_zoom_bounds,
+};
 use strip::strip_metadata;
 use walk::walk_style_mut;
 
@@ -61,6 +63,7 @@ pub struct OptPasses {
     pub minify_colors: bool,
     pub cleanup: bool,
     pub layer_merge: bool,
+    pub source_zoom_tightening: bool,
 }
 
 impl OptPasses {
@@ -79,6 +82,7 @@ impl OptPasses {
             minify_colors: true,
             cleanup: true,
             layer_merge: true,
+            source_zoom_tightening: true,
         }
     }
 }
@@ -103,6 +107,7 @@ fn wants_structural_passes(passes: &OptPasses) -> bool {
         || passes.metadata_refinement
         || passes.cleanup
         || passes.layer_merge
+        || passes.source_zoom_tightening
 }
 
 // ── Public entry points ─────────────────────────────────────────────────────
@@ -208,6 +213,10 @@ fn run_structural_passes(
 
     if passes.cleanup {
         cleanup(style);
+    }
+
+    if passes.source_zoom_tightening {
+        tighten_source_zoom_bounds(style);
     }
 }
 

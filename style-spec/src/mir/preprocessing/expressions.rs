@@ -173,9 +173,43 @@ fn build_by_output_type(
     // enables structural passes (e.g. zoom-bounded stop pruning) on the typed representation.
     expand_step_into_ramp_groups(&mut by_output_type);
 
+    // Merge typed array groups (e.g. `ArrayOfString`) into the generic `Array` group.
+    // `array<string>` is-a `array`, so `Array` must accept operators like `split` that
+    // return a typed array subtype.
+    merge_typed_arrays_into_array(&mut by_output_type);
+
     // Handle the case where the expression_name uses `DecodedEnumValues::Version` — not
     // present in production but guards test fixtures that lack DecodedSyntaxEnum values.
     by_output_type
+}
+
+/// Merge operators from typed array groups (e.g. `ArrayOfString`) into the
+/// generic `Array` group, since `array<T>` is a subtype of `array`.
+fn merge_typed_arrays_into_array(by_output_type: &mut BTreeMap<String, MirExpressionGroup>) {
+    let typed_array_keys: Vec<String> = by_output_type
+        .keys()
+        .filter(|k| k.starts_with("ArrayOf") && *k != "ArrayOfType")
+        .cloned()
+        .collect();
+
+    if typed_array_keys.is_empty() {
+        return;
+    }
+
+    let mut to_merge: Vec<(String, MirSyntaxVariantDef)> = Vec::new();
+    for key in &typed_array_keys {
+        if let Some(group) = by_output_type.get(key) {
+            for (op_name, variant) in &group.variants {
+                to_merge.push((op_name.clone(), variant.clone()));
+            }
+        }
+    }
+
+    if let Some(array_group) = by_output_type.get_mut("Array") {
+        for (op_name, variant) in to_merge {
+            array_group.variants.entry(op_name).or_insert(variant);
+        }
+    }
 }
 
 /// Expand `step` from the `Any` group into per-output-type ramp groups.

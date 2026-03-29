@@ -87,6 +87,11 @@ pub struct OptimizeArgs {
     #[arg(long)]
     layer_merge: bool,
 
+    /// Tighten source minzoom/maxzoom based on the effective zoom range of
+    /// referencing layers.
+    #[arg(long)]
+    source_zoom_tightening: bool,
+
     /// Run JSON-tree validation after optimization (`maplibre_style_spec::validate`).
     #[arg(long)]
     validate: bool,
@@ -144,6 +149,7 @@ pub fn run(args: OptimizeArgs) -> anyhow::Result<()> {
             minify_colors: args.minify_colors,
             cleanup: args.cleanup,
             layer_merge: args.layer_merge,
+            source_zoom_tightening: args.source_zoom_tightening,
         }
     };
     optimize_style_json_value_with_stats(&mut value, &mir, &passes, tile_stats.as_ref());

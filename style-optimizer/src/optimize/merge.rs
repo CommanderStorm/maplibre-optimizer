@@ -3,6 +3,8 @@
 //!
 //! **Phase 1** — literal-only properties, identical zoom, no existing sort-key.
 //! **Phase 2** — `match` optimisation when all filters are `["==", ["get", P], L]`.
+//! **Phase 3** — zoom-tolerant merging: layers with different minzoom/maxzoom are
+//!   merged by wrapping each sub-layer's filter contribution with zoom guards.
 
 use maplibre_style_spec::mir::{MirPropertySection, MirSpec};
 use serde_json::Value;
@@ -109,8 +111,6 @@ fn same_group_key(a: &Value, b: &Value) -> bool {
     a.get("type") == b.get("type")
         && a.get("source") == b.get("source")
         && a.get("source-layer") == b.get("source-layer")
-        && a.get("minzoom") == b.get("minzoom")
-        && a.get("maxzoom") == b.get("maxzoom")
 }
 
 fn has_layout_key(layer: &Value, key: &str) -> bool {
@@ -235,21 +235,120 @@ fn is_get_expr(v: &Value) -> bool {
         .is_some_and(|a| a.len() == 2 && a[0].as_str() == Some("get") && a[1].is_string())
 }
 
+// ── Zoom range helpers ───────────────────────────────────────────────────────
+
+/// Effective zoom range for a layer (defaults: minzoom=0, maxzoom=24).
+fn layer_zoom_range(layer: &Value) -> (f64, f64) {
+    let min = layer.get("minzoom").and_then(Value::as_f64).unwrap_or(0.0);
+    let max = layer.get("maxzoom").and_then(Value::as_f64).unwrap_or(24.0);
+    (min, max)
+}
+
+/// Compute the merged zoom range across all layers in the group.
+fn merged_zoom_range(layers: &[Value]) -> (f64, f64) {
+    let mut group_min = f64::MAX;
+    let mut group_max = f64::MIN;
+    for l in layers {
+        let (lo, hi) = layer_zoom_range(l);
+        if lo < group_min {
+            group_min = lo;
+        }
+        if hi > group_max {
+            group_max = hi;
+        }
+    }
+    (group_min, group_max)
+}
+
+/// Whether a layer's zoom range differs from the merged group range.
+fn needs_zoom_guard(layer: &Value, group_min: f64, group_max: f64) -> bool {
+    let (lo, hi) = layer_zoom_range(layer);
+    lo > group_min || hi < group_max
+}
+
+/// Wrap a filter expression with zoom guards for a sub-layer whose zoom range
+/// is narrower than the merged group.  Returns the original filter if no guard
+/// is needed.
+fn wrap_filter_with_zoom_guard(
+    filter: &Value,
+    layer: &Value,
+    group_min: f64,
+    group_max: f64,
+) -> Value {
+    let (lo, hi) = layer_zoom_range(layer);
+    let needs_lo = lo > group_min;
+    let needs_hi = hi < group_max;
+
+    if !needs_lo && !needs_hi {
+        return filter.clone();
+    }
+
+    let zoom_expr = Value::Array(vec![Value::String("zoom".into())]);
+    let mut guards: Vec<Value> = Vec::new();
+
+    if needs_lo {
+        // [">=", ["zoom"], minzoom]
+        guards.push(Value::Array(vec![
+            Value::String(">=".into()),
+            zoom_expr.clone(),
+            Value::from(lo),
+        ]));
+    }
+    if needs_hi {
+        // ["<", ["zoom"], maxzoom]
+        guards.push(Value::Array(vec![
+            Value::String("<".into()),
+            zoom_expr,
+            Value::from(hi),
+        ]));
+    }
+
+    // ["all", guard..., original_filter]
+    let mut all_args = vec![Value::String("all".into())];
+    all_args.append(&mut guards);
+    all_args.push(filter.clone());
+    Value::Array(all_args)
+}
+
 // ── Merged-layer construction ────────────────────────────────────────────────
 
 fn build_merged_layer(layers: &[Value], mir: &MirSpec) -> Value {
     let layer_type = layers[0]["type"].as_str().expect("validated in grouping");
     let sort_key_prop = sort_key_name(layer_type).expect("validated in grouping");
     let n = layers.len();
-    let match_pat = detect_match_pattern(layers);
+
+    let (group_min, group_max) = merged_zoom_range(layers);
+    let any_zoom_differs = layers
+        .iter()
+        .any(|l| needs_zoom_guard(l, group_min, group_max));
+
+    // Match-pattern detection only works when zoom ranges are uniform
+    // (zoom guards would break the simple match-on-property pattern).
+    let match_pat = if any_zoom_differs {
+        None
+    } else {
+        detect_match_pattern(layers)
+    };
 
     let mut merged = layers[0].clone();
     let obj = merged.as_object_mut().expect("layer is an object");
 
+    // ── Merged zoom range ────────────────────────────────────────────────────
+    if group_min > 0.0 {
+        obj.insert("minzoom".into(), Value::from(group_min));
+    } else {
+        obj.remove("minzoom");
+    }
+    if group_max < 24.0 {
+        obj.insert("maxzoom".into(), Value::from(group_max));
+    } else {
+        obj.remove("maxzoom");
+    }
+
     // ── Merged filter ────────────────────────────────────────────────────────
     obj.insert(
         "filter".into(),
-        build_merged_filter(layers, match_pat.as_ref()),
+        build_merged_filter(layers, match_pat.as_ref(), group_min, group_max),
     );
 
     // ── Paint & layout properties ────────────────────────────────────────────
@@ -293,7 +392,14 @@ fn build_merged_layer(layers: &[Value], mir: &MirSpec) -> Value {
 
             section_map.insert(
                 prop.clone(),
-                build_property_expr(layers, &values, &default, match_pat.as_ref()),
+                build_property_expr(
+                    layers,
+                    &values,
+                    &default,
+                    match_pat.as_ref(),
+                    group_min,
+                    group_max,
+                ),
             );
         }
     }
@@ -304,13 +410,18 @@ fn build_merged_layer(layers: &[Value], mir: &MirSpec) -> Value {
         .or_insert_with(|| Value::Object(serde_json::Map::new()));
     layout.as_object_mut().expect("layout is an object").insert(
         sort_key_prop.into(),
-        build_sort_key_expr(layers, n, match_pat.as_ref()),
+        build_sort_key_expr(layers, n, match_pat.as_ref(), group_min, group_max),
     );
 
     merged
 }
 
-fn build_merged_filter(layers: &[Value], match_pat: Option<&MatchPattern>) -> Value {
+fn build_merged_filter(
+    layers: &[Value],
+    match_pat: Option<&MatchPattern>,
+    group_min: f64,
+    group_max: f64,
+) -> Value {
     if let Some(pat) = match_pat {
         // ["match", ["get", P], [L0, L1, …], true, false]
         Value::Array(vec![
@@ -327,7 +438,8 @@ fn build_merged_filter(layers: &[Value], match_pat: Option<&MatchPattern>) -> Va
         let mut args = vec![Value::String("any".into())];
         for l in layers {
             if let Some(f) = l.get("filter") {
-                args.push(f.clone());
+                let guarded = wrap_filter_with_zoom_guard(f, l, group_min, group_max);
+                args.push(guarded);
             }
         }
         Value::Array(args)
@@ -343,6 +455,8 @@ fn build_property_expr(
     values: &[Option<&Value>],
     default: &Value,
     match_pat: Option<&MatchPattern>,
+    group_min: f64,
+    group_max: f64,
 ) -> Value {
     let n = layers.len();
 
@@ -365,7 +479,9 @@ fn build_property_expr(
         // ["case", filter_top, val_top, …, filter_bot, val_bot, default]
         let mut args = vec![Value::String("case".into())];
         for i in (0..n).rev() {
-            args.push(layers[i].get("filter").expect("validated").clone());
+            let filter = layers[i].get("filter").expect("validated");
+            let guarded = wrap_filter_with_zoom_guard(filter, &layers[i], group_min, group_max);
+            args.push(guarded);
             args.push(values[i].cloned().unwrap_or_else(|| default.clone()));
         }
         args.push(default.clone());
@@ -373,7 +489,13 @@ fn build_property_expr(
     }
 }
 
-fn build_sort_key_expr(layers: &[Value], n: usize, match_pat: Option<&MatchPattern>) -> Value {
+fn build_sort_key_expr(
+    layers: &[Value],
+    n: usize,
+    match_pat: Option<&MatchPattern>,
+    group_min: f64,
+    group_max: f64,
+) -> Value {
     if let Some(pat) = match_pat {
         // ["match", ["get", P], L0, 0, L1, 1, …, -1]
         let mut args = vec![
@@ -393,7 +515,9 @@ fn build_sort_key_expr(layers: &[Value], n: usize, match_pat: Option<&MatchPatte
         // ["case", filter_top, n-1, …, filter_bot, 0, -1]
         let mut args = vec![Value::String("case".into())];
         for i in (0..n).rev() {
-            args.push(layers[i].get("filter").expect("validated").clone());
+            let filter = layers[i].get("filter").expect("validated");
+            let guarded = wrap_filter_with_zoom_guard(filter, &layers[i], group_min, group_max);
+            args.push(guarded);
             args.push(Value::from(i as u64));
         }
         args.push(Value::from(-1_i64));
@@ -625,7 +749,7 @@ mod tests {
     }
 
     #[test]
-    fn no_merge_with_differing_zoom() {
+    fn merge_with_differing_zoom_adds_guards() {
         let mir = mir();
         let mut v = json!({
             "version": 8,
@@ -645,9 +769,19 @@ mod tests {
                 }
             ]
         });
-        let original = v.clone();
         layer_merge(&mut v, &mir);
-        assert_eq!(v, original);
+        // Layers are now merged despite differing zoom.
+        assert_eq!(v["layers"].as_array().unwrap().len(), 1);
+        let merged = &v["layers"][0];
+        // Merged minzoom is the minimum (5).
+        assert_eq!(merged["minzoom"], 5.0);
+        // Uses case (not match) because zoom guards break the match pattern.
+        assert_eq!(merged["filter"][0], "any");
+        // Layer b's filter arm is wrapped with a zoom guard.
+        // ["any", filter_a, ["all", [">=", ["zoom"], 10], filter_b]]
+        let arm_b = &merged["filter"][2];
+        assert_eq!(arm_b[0], "all");
+        assert_eq!(arm_b[1][0], ">=");
     }
 
     #[test]
@@ -959,5 +1093,212 @@ mod tests {
             type: vector
         version: 8
         "##);
+    }
+
+    #[test]
+    #[expect(clippy::too_many_lines)]
+    fn zoom_tolerant_merge_three_line_layers() {
+        let mir = mir();
+        let mut v = json!({
+            "version": 8,
+            "sources": {"s": {"type": "vector"}},
+            "layers": [
+                {
+                    "id": "motorway", "type": "line", "source": "s",
+                    "source-layer": "road", "minzoom": 4, "maxzoom": 22,
+                    "filter": ["==", ["get", "class"], "motorway"],
+                    "paint": {"line-color": "red", "line-width": 5}
+                },
+                {
+                    "id": "trunk", "type": "line", "source": "s",
+                    "source-layer": "road", "minzoom": 7, "maxzoom": 22,
+                    "filter": ["==", ["get", "class"], "trunk"],
+                    "paint": {"line-color": "orange", "line-width": 3}
+                },
+                {
+                    "id": "primary", "type": "line", "source": "s",
+                    "source-layer": "road", "minzoom": 10, "maxzoom": 22,
+                    "filter": ["==", ["get", "class"], "primary"],
+                    "paint": {"line-color": "yellow", "line-width": 2}
+                }
+            ]
+        });
+        layer_merge(&mut v, &mir);
+        insta::assert_yaml_snapshot!(v, @r##"
+        layers:
+          - filter:
+              - any
+              - - "=="
+                - - get
+                  - class
+                - motorway
+              - - all
+                - - ">="
+                  - - zoom
+                  - 7
+                - - "=="
+                  - - get
+                    - class
+                  - trunk
+              - - all
+                - - ">="
+                  - - zoom
+                  - 10
+                - - "=="
+                  - - get
+                    - class
+                  - primary
+            id: motorway
+            layout:
+              line-sort-key:
+                - case
+                - - all
+                  - - ">="
+                    - - zoom
+                    - 10
+                  - - "=="
+                    - - get
+                      - class
+                    - primary
+                - 2
+                - - all
+                  - - ">="
+                    - - zoom
+                    - 7
+                  - - "=="
+                    - - get
+                      - class
+                    - trunk
+                - 1
+                - - "=="
+                  - - get
+                    - class
+                  - motorway
+                - 0
+                - -1
+            maxzoom: 22
+            minzoom: 4
+            paint:
+              line-color:
+                - case
+                - - all
+                  - - ">="
+                    - - zoom
+                    - 10
+                  - - "=="
+                    - - get
+                      - class
+                    - primary
+                - yellow
+                - - all
+                  - - ">="
+                    - - zoom
+                    - 7
+                  - - "=="
+                    - - get
+                      - class
+                    - trunk
+                - orange
+                - - "=="
+                  - - get
+                    - class
+                  - motorway
+                - red
+                - "#000000"
+              line-width:
+                - case
+                - - all
+                  - - ">="
+                    - - zoom
+                    - 10
+                  - - "=="
+                    - - get
+                      - class
+                    - primary
+                - 2
+                - - all
+                  - - ">="
+                    - - zoom
+                    - 7
+                  - - "=="
+                    - - get
+                      - class
+                    - trunk
+                - 3
+                - - "=="
+                  - - get
+                    - class
+                  - motorway
+                - 5
+                - 1
+            source: s
+            source-layer: road
+            type: line
+        sources:
+          s:
+            type: vector
+        version: 8
+        "##);
+    }
+
+    #[test]
+    fn zoom_tolerant_merge_maxzoom_guard() {
+        let mir = mir();
+        let mut v = json!({
+            "version": 8,
+            "sources": {"s": {"type": "vector"}},
+            "layers": [
+                {
+                    "id": "a", "type": "fill", "source": "s",
+                    "source-layer": "land",
+                    "filter": ["==", ["get", "t"], "a"],
+                    "paint": {"fill-color": "#aaa"}
+                },
+                {
+                    "id": "b", "type": "fill", "source": "s",
+                    "source-layer": "land", "maxzoom": 14,
+                    "filter": ["==", ["get", "t"], "b"],
+                    "paint": {"fill-color": "#bbb"}
+                }
+            ]
+        });
+        layer_merge(&mut v, &mir);
+        assert_eq!(v["layers"].as_array().unwrap().len(), 1);
+        let merged = &v["layers"][0];
+        // No maxzoom on merged (24 is default, omitted).
+        assert!(merged.get("maxzoom").is_none());
+        // Layer b's arm has a maxzoom guard.
+        let arm_b = &merged["filter"][2];
+        assert_eq!(arm_b[0], "all");
+        assert_eq!(arm_b[1][0], "<");
+        assert_eq!(arm_b[1][2], 14.0);
+    }
+
+    #[test]
+    fn same_zoom_still_uses_match_pattern() {
+        let mir = mir();
+        let mut v = json!({
+            "version": 8,
+            "sources": {"s": {"type": "vector"}},
+            "layers": [
+                {
+                    "id": "a", "type": "fill", "source": "s",
+                    "source-layer": "land", "minzoom": 5,
+                    "filter": ["==", ["get", "t"], "a"],
+                    "paint": {"fill-color": "#aaa"}
+                },
+                {
+                    "id": "b", "type": "fill", "source": "s",
+                    "source-layer": "land", "minzoom": 5,
+                    "filter": ["==", ["get", "t"], "b"],
+                    "paint": {"fill-color": "#bbb"}
+                }
+            ]
+        });
+        layer_merge(&mut v, &mir);
+        assert_eq!(v["layers"].as_array().unwrap().len(), 1);
+        let merged = &v["layers"][0];
+        // Same zoom → match pattern still applies.
+        assert_eq!(merged["filter"][0], "match");
     }
 }

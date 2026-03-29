@@ -1,4 +1,6 @@
-//! Shared utilities for vector layer info.
+//! Shared utilities for vector layer info and source-level optimisations.
+
+use std::collections::BTreeMap;
 
 use maplibre_style_spec::spec::{AnyLayer, MaplibreStyleSpecification, Source};
 use serde_json::Value;
@@ -99,4 +101,121 @@ pub(crate) fn precompute_vector_layer_info_typed(
             })
         })
         .collect()
+}
+
+// ── Source zoom tightening ───────────────────────────────────────────────────
+
+/// Helper: extract f64 from a newtype-wrapped `serde_json::Number`.
+fn number_to_f64<T: serde::Serialize>(n: &T) -> Option<f64> {
+    serde_json::to_value(n).ok()?.as_f64()
+}
+
+/// Effective zoom range for a source (returns `(minzoom, maxzoom)`).
+fn source_zoom_range(source: &Source) -> Option<(f64, f64)> {
+    match source {
+        Source::Vector(s) => {
+            let lo = s.minzoom.as_ref().and_then(number_to_f64).unwrap_or(0.0);
+            let hi = s.maxzoom.as_ref().and_then(number_to_f64).unwrap_or(22.0);
+            Some((lo, hi))
+        }
+        Source::Raster(s) => {
+            let lo = s.minzoom.as_ref().and_then(number_to_f64).unwrap_or(0.0);
+            let hi = s.maxzoom.as_ref().and_then(number_to_f64).unwrap_or(22.0);
+            Some((lo, hi))
+        }
+        Source::RasterDem(s) => {
+            let lo = s.minzoom.as_ref().and_then(number_to_f64).unwrap_or(0.0);
+            let hi = s.maxzoom.as_ref().and_then(number_to_f64).unwrap_or(22.0);
+            Some((lo, hi))
+        }
+        _ => None,
+    }
+}
+
+/// Tighten source minzoom/maxzoom based on the effective zoom range of all
+/// layers that reference each source.
+///
+/// After dead-layer elimination and metadata refinement, some sources may have
+/// a wider zoom range than any of their referencing layers actually need.
+/// Tightening prevents unnecessary tile fetches.
+pub(crate) fn tighten_source_zoom_bounds(style: &mut MaplibreStyleSpecification) {
+    // Collect effective zoom bounds per source from layer metadata.
+    // For each source, track (min of layer minzooms, max of layer maxzooms).
+    let mut source_bounds: BTreeMap<&str, (f64, f64)> = BTreeMap::new();
+
+    for layer in &style.layers {
+        let AnyLayer::Typed(t) = layer else {
+            continue;
+        };
+        let common = t.common();
+        let Some(source_name) = common
+            .source
+            .as_ref()
+            .map(maplibre_style_spec::spec::LayerSource::as_str)
+        else {
+            continue;
+        };
+
+        let layer_min = common
+            .minzoom
+            .as_ref()
+            .and_then(maplibre_style_spec::spec::LayerMinzoom::as_f64)
+            .unwrap_or(0.0);
+        let layer_max = common
+            .maxzoom
+            .as_ref()
+            .and_then(maplibre_style_spec::spec::LayerMaxzoom::as_f64)
+            .unwrap_or(24.0);
+
+        source_bounds
+            .entry(source_name)
+            .and_modify(|(lo, hi)| {
+                if layer_min < *lo {
+                    *lo = layer_min;
+                }
+                if layer_max > *hi {
+                    *hi = layer_max;
+                }
+            })
+            .or_insert((layer_min, layer_max));
+    }
+
+    // Apply tightened bounds to each source.
+    for (name, (eff_min, eff_max)) in &source_bounds {
+        let Some(source) = style.sources.0.get_mut(*name) else {
+            continue;
+        };
+        let Some((src_min, src_max)) = source_zoom_range(source) else {
+            continue;
+        };
+
+        // Only tighten, never loosen.
+        let new_min = eff_min.max(src_min);
+        let new_max = eff_max.min(src_max);
+
+        // Skip if no change.
+        if (new_min - src_min).abs() < f64::EPSILON && (new_max - src_max).abs() < f64::EPSILON {
+            continue;
+        }
+
+        // Modify source via JSON round-trip (constructors are crate-private).
+        let Ok(mut src_json) = serde_json::to_value(&*source) else {
+            continue;
+        };
+        let Some(obj) = src_json.as_object_mut() else {
+            continue;
+        };
+        let mut changed = false;
+        if new_min > src_min {
+            obj.insert("minzoom".into(), Value::from(new_min));
+            changed = true;
+        }
+        if new_max < src_max {
+            obj.insert("maxzoom".into(), Value::from(new_max));
+            changed = true;
+        }
+        if changed && let Ok(updated) = serde_json::from_value::<Source>(src_json) {
+            *source = updated;
+        }
+    }
 }

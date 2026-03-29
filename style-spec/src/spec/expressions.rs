@@ -791,6 +791,7 @@ mod test {
     #[rstest::rstest]
     #[case::t_literal(serde_json::json!(["literal",["DIN Offc Pro Italic","Arial Unicode MS Regular"]]))]
     #[case::t_slice(serde_json::json!(["slice",["get","name"],0,3]))]
+    #[case::t_split(serde_json::json!(["split",["get","name"],";"]))]
     #[case::t_to_rgba(serde_json::json!(["to-rgba","#ff0000"]))]
     fn test_example_array_decodes(#[case] example: serde_json::Value) {
         let _ = serde_json::from_value::<Array>(example).expect("example should decode");
@@ -948,6 +949,8 @@ pub enum Array {
     Literal(JSONArrayLiteral),
     /// Returns a subarray from an array or a substring from a string from a specified start index, or between a start index and an end index if set. The return value is inclusive of the start index but not of the end index. In a string, a UTF-16 surrogate pair counts as a single position.
     Slice(ExprOrLiteral, Box<Number>, Option<Box<Number>>),
+    /// Returns an array of substrings formed by splitting an input string by a separator string.
+    Split(Box<String>, Box<String>),
     /// Returns a four-element array containing the input color's red, green, blue, and alpha components, in that order.
     ToRgba(Box<Color>),
 }
@@ -1002,13 +1005,18 @@ impl<'de> serde::de::Visitor<'de> for ArrayVisitor {
                 let end_index = seq.next_element()?;
                 Ok(Array::Slice(array, start_index, end_index))
             }
+            "split" => {
+                let input = visit_seq_field(&mut seq, "input")?;
+                let separator = visit_seq_field(&mut seq, "separator")?;
+                Ok(Array::Split(input, separator))
+            }
             "to-rgba" => {
                 let color = visit_seq_field(&mut seq, "color")?;
                 Ok(Array::ToRgba(color))
             }
             _ => Err(serde::de::Error::unknown_variant(
                 &op,
-                &["array", "literal", "slice", "to-rgba"],
+                &["array", "literal", "slice", "split", "to-rgba"],
             )),
         }
     }
@@ -1056,6 +1064,21 @@ impl serde::Serialize for Array {
                 }
                 let mut seq = serializer.serialize_seq(None)?;
                 seq.serialize_element("slice")?;
+                for elem in &elems {
+                    seq.serialize_element(elem)?;
+                }
+                seq.end()
+            }
+            Array::Split(f0, f1) => {
+                let mut elems = vec![
+                    serde_json::to_value(f0).map_err(serde::ser::Error::custom)?,
+                    serde_json::to_value(f1).map_err(serde::ser::Error::custom)?,
+                ];
+                while elems.len() > 2 && elems.last().is_some_and(serde_json::Value::is_null) {
+                    elems.pop();
+                }
+                let mut seq = serializer.serialize_seq(None)?;
+                seq.serialize_element("split")?;
                 for elem in &elems {
                     seq.serialize_element(elem)?;
                 }
