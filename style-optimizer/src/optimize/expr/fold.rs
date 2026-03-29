@@ -740,6 +740,64 @@ pub(super) fn try_predicate_subsumption(arr: &mut Vec<Value>) -> bool {
     true
 }
 
+/// Boolean absorption: `["all", A, ["any", A, B, ...]]` → remove the `any` child,
+/// and dually `["any", A, ["all", A, B, ...]]` → remove the `all` child.
+pub(super) fn try_boolean_absorption(arr: &mut Vec<Value>) -> bool {
+    let dual = match arr.first().and_then(Value::as_str) {
+        Some("all") => "any",
+        Some("any") => "all",
+        _ => return false,
+    };
+    if arr.len() < 3 {
+        return false;
+    }
+
+    // Collect indices of top-level atoms (children that are NOT the dual operator).
+    let atoms: Vec<&Value> = arr[1..]
+        .iter()
+        .filter(|child| {
+            !(child.is_array()
+                && child
+                    .as_array()
+                    .unwrap()
+                    .first()
+                    .and_then(Value::as_str)
+                    == Some(dual))
+        })
+        .collect();
+
+    if atoms.is_empty() {
+        return false;
+    }
+
+    // For each child that IS the dual operator, check if any atom appears among its children.
+    let mut to_remove: Vec<usize> = Vec::new();
+    for (i, child) in arr[1..].iter().enumerate() {
+        let Value::Array(inner) = child else {
+            continue;
+        };
+        if inner.first().and_then(Value::as_str) != Some(dual) {
+            continue;
+        }
+        // Check if any top-level atom appears inside this dual-operator child.
+        let absorbed = atoms
+            .iter()
+            .any(|atom| inner[1..].iter().any(|sub| sub == *atom));
+        if absorbed {
+            to_remove.push(i + 1); // +1 because arr[0] is the operator
+        }
+    }
+
+    if to_remove.is_empty() {
+        return false;
+    }
+
+    for idx in to_remove.into_iter().rev() {
+        arr.remove(idx);
+    }
+    true
+}
+
 /// Fold redundant coercions:
 /// - `["to-string", "hello"]` → `["literal", "hello"]` (already a string)
 /// - `["to-number", 42]` → `["literal", 42]` (already a number)
@@ -982,6 +1040,74 @@ fn typed_predicates_contradict(a: &Boolean, b: &Boolean) -> bool {
         return true;
     }
     false
+}
+
+/// Boolean absorption on typed `Boolean`: `All([A, Any([A, B, ...])])` → remove the `Any` child,
+/// and dually `Any([A, All([A, B, ...])])` → remove the `All` child.
+pub(super) fn try_boolean_absorption_typed(filter: &mut Boolean) -> bool {
+    let is_all = match filter {
+        Boolean::All(_) => true,
+        Boolean::Any(_) => false,
+        _ => return false,
+    };
+
+    let (Boolean::All(children) | Boolean::Any(children)) = filter else {
+        return false;
+    };
+
+    if children.len() < 2 {
+        return false;
+    }
+
+    // Collect top-level atoms: children that are NOT the dual variant.
+    let atom_indices: Vec<usize> = children
+        .iter()
+        .enumerate()
+        .filter(|(_, c)| {
+            if is_all {
+                !matches!(c, Boolean::Any(_))
+            } else {
+                !matches!(c, Boolean::All(_))
+            }
+        })
+        .map(|(i, _)| i)
+        .collect();
+
+    if atom_indices.is_empty() {
+        return false;
+    }
+
+    // For each dual-variant child, check if any atom appears among its sub-children.
+    let mut to_remove: Vec<usize> = Vec::new();
+    for (i, child) in children.iter().enumerate() {
+        let inner = if is_all {
+            if let Boolean::Any(inner) = child {
+                inner
+            } else {
+                continue;
+            }
+        } else if let Boolean::All(inner) = child {
+            inner
+        } else {
+            continue;
+        };
+
+        let absorbed = atom_indices
+            .iter()
+            .any(|&ai| inner.iter().any(|sub| sub == &children[ai]));
+        if absorbed {
+            to_remove.push(i);
+        }
+    }
+
+    if to_remove.is_empty() {
+        return false;
+    }
+
+    for idx in to_remove.into_iter().rev() {
+        children.remove(idx);
+    }
+    true
 }
 
 /// Check if an `ExprOrLiteral` is a literal (not a computed expression).

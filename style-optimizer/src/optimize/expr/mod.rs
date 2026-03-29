@@ -7,10 +7,11 @@ mod simplify;
 pub(crate) mod util;
 
 use fold::{
-    try_algebraic_simplify, try_dead_branch_case, try_dead_branch_match_literal,
-    try_filter_contradiction, try_fold_boolean_algebra, try_fold_comparison, try_fold_not,
-    try_fold_pure_operator, try_fold_redundant_coercion, try_fold_redundant_properties,
-    try_negate_comparison, try_predicate_subsumption, try_range_tightening,
+    try_algebraic_simplify, try_boolean_absorption, try_dead_branch_case,
+    try_dead_branch_match_literal, try_filter_contradiction, try_fold_boolean_algebra,
+    try_fold_comparison, try_fold_not, try_fold_pure_operator, try_fold_redundant_coercion,
+    try_fold_redundant_properties, try_negate_comparison, try_predicate_subsumption,
+    try_range_tightening,
 };
 use fold_stats::{
     try_fold_coalesce_from_stats, try_fold_comparison_from_stats,
@@ -206,6 +207,11 @@ static RULES: &[RewriteRule] = &[
         gate: RuleGate::ConstantFold,
         scope: RuleScope::Peephole,
         apply: try_predicate_subsumption,
+    },
+    RewriteRule::Pure {
+        gate: RuleGate::ConstantFold,
+        scope: RuleScope::Peephole,
+        apply: try_boolean_absorption,
     },
     RewriteRule::Pure {
         gate: RuleGate::ConstantFold,
@@ -527,8 +533,9 @@ fn apply_one_rewrite_pass(arr: &mut Vec<Value>, mir: &MirSpec, passes: &OptPasse
 // JSON round-trip for filter expressions.
 
 use fold::{
-    try_filter_contradiction_typed, try_fold_boolean_algebra_typed, try_fold_comparison_typed,
-    try_fold_not_typed, try_negate_comparison_typed,
+    try_boolean_absorption_typed, try_filter_contradiction_typed,
+    try_fold_boolean_algebra_typed, try_fold_comparison_typed, try_fold_not_typed,
+    try_negate_comparison_typed,
 };
 use fold_stats::{try_fold_geometry_type_from_stats_typed, try_fold_has_from_stats_typed};
 use maplibre_style_spec::spec::Boolean;
@@ -562,6 +569,7 @@ impl TypedFoldCtx<'_> {
                 any_fired |= try_fold_comparison_typed(filter);
                 any_fired |= try_fold_boolean_algebra_typed(filter);
                 any_fired |= try_filter_contradiction_typed(filter);
+                any_fired |= try_boolean_absorption_typed(filter);
             }
             if self.passes.simplify_expressions {
                 any_fired |= try_boolean_flattening_typed(filter);
