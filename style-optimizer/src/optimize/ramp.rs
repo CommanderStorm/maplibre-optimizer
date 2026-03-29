@@ -176,11 +176,7 @@ fn prune_wide_ramp(
     }
 }
 
-fn prune_color_ramp(
-    ramp: &mut ColorOrArrayOfColor,
-    min: Option<f64>,
-    max: Option<f64>,
-) -> bool {
+fn prune_color_ramp(ramp: &mut ColorOrArrayOfColor, min: Option<f64>, max: Option<f64>) -> bool {
     match ramp {
         ColorOrArrayOfColor::InterpolateHcl((_method, input, stops))
         | ColorOrArrayOfColor::InterpolateLab((_method, input, stops)) => {
@@ -385,7 +381,19 @@ mod tests {
         let mut style = make_style(
             None,
             Some(12.0),
-            json!(["interpolate", ["linear"], ["zoom"], 5, 1, 10, 2, 14, 3, 20, 4]),
+            json!([
+                "interpolate",
+                ["linear"],
+                ["zoom"],
+                5,
+                1,
+                10,
+                2,
+                14,
+                3,
+                20,
+                4
+            ]),
         );
         prune_zoom_stops(&mut style);
         assert_eq!(
@@ -399,7 +407,19 @@ mod tests {
         let mut style = make_style(
             Some(10.0),
             Some(11.0),
-            json!(["interpolate", ["linear"], ["zoom"], 2, 0, 10, 5, 11, 5, 20, 10]),
+            json!([
+                "interpolate",
+                ["linear"],
+                ["zoom"],
+                2,
+                0,
+                10,
+                5,
+                11,
+                5,
+                20,
+                10
+            ]),
         );
         prune_zoom_stops(&mut style);
         // After pruning: stops [z10→5, z11→5] → identical outputs → bare 5.

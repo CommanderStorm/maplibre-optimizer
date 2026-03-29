@@ -27,7 +27,7 @@ pub fn layer_merge(v: &mut Value, mir: &MirSpec) {
         return;
     };
 
-    let groups = find_merge_groups(layers);
+    let groups = find_merge_groups(layers, mir);
     if groups.is_empty() {
         return;
     }
@@ -52,7 +52,7 @@ pub fn layer_merge(v: &mut Value, mir: &MirSpec) {
 // ── Grouping ─────────────────────────────────────────────────────────────────
 
 /// Returns `(start, end)` pairs of mergeable adjacent layer runs.
-fn find_merge_groups(layers: &[Value]) -> Vec<(usize, usize)> {
+fn find_merge_groups(layers: &[Value], mir: &MirSpec) -> Vec<(usize, usize)> {
     let mut groups = Vec::new();
     let mut i = 0;
 
@@ -72,7 +72,8 @@ fn find_merge_groups(layers: &[Value]) -> Vec<(usize, usize)> {
             i += 1;
         }
 
-        if i - start >= 2 && differing_props_are_scalar(&layers[start..i]) {
+        let layer_type = layers[start]["type"].as_str().expect("validated");
+        if i - start >= 2 && differing_props_are_mergeable(&layers[start..i], layer_type, mir) {
             groups.push((start, i));
         }
     }
@@ -113,11 +114,20 @@ fn has_layout_key(layer: &Value, key: &str) -> bool {
         .is_some_and(|o| o.contains_key(key))
 }
 
-/// Every differing paint/layout property across the group must be a scalar
-/// (not an array/expression).  Uniform properties (same value everywhere,
-/// including uniform arrays) are fine.
-fn differing_props_are_scalar(layers: &[Value]) -> bool {
-    for section in ["paint", "layout"] {
+/// Every differing paint/layout property across the group must be mergeable.
+///
+/// A property is mergeable if either:
+/// - It is uniform across all layers (same value everywhere, including arrays)
+/// - Its MIR field has `expression.feature == true`, meaning it supports
+///   feature-dependent expressions and can be wrapped in `case`/`match`
+///
+/// Properties whose MIR field lacks feature-expression support (camera-only
+/// properties like `line-dasharray`, `*-translate`) must be uniform to merge.
+fn differing_props_are_mergeable(layers: &[Value], layer_type: &str, mir: &MirSpec) -> bool {
+    for (section, mir_section) in [
+        ("paint", MirPropertySection::Paint),
+        ("layout", MirPropertySection::Layout),
+    ] {
         let props = collect_property_names(layers, section);
         for prop in &props {
             if prop == "visibility" {
@@ -129,13 +139,17 @@ fn differing_props_are_scalar(layers: &[Value]) -> bool {
                 .collect();
             let first = values.iter().flatten().next();
             let uniform = first.is_some_and(|f| values.iter().all(|v| v.is_some_and(|x| x == *f)));
-            if !uniform {
-                // Every present value must be a plain scalar.
-                for v in values.into_iter().flatten() {
-                    if v.is_array() || v.is_object() {
-                        return false;
-                    }
-                }
+            if uniform {
+                continue;
+            }
+            // Property differs — check if the field supports feature-driven expressions.
+            let is_feature_driven = mir
+                .layers
+                .field_for(layer_type, mir_section, prop)
+                .and_then(|f| f.expression.as_ref())
+                .is_some_and(|e| e.feature);
+            if !is_feature_driven {
+                return false;
             }
         }
     }
@@ -656,7 +670,7 @@ mod tests {
     }
 
     #[test]
-    fn skip_group_with_expression_property() {
+    fn merge_group_with_feature_driven_expression_property() {
         let mir = mir();
         let mut v = json!({
             "version": 8,
@@ -673,6 +687,36 @@ mod tests {
                     "source-layer": "road",
                     "filter": ["==", ["get", "class"], "y"],
                     "paint": {"line-color": "#ccc"}
+                }
+            ]
+        });
+        layer_merge(&mut v, &mir);
+        // line-color is feature-driven, so expression values can be merged.
+        assert_eq!(v["layers"].as_array().unwrap().len(), 1);
+        let merged = &v["layers"][0];
+        assert_eq!(merged["filter"][0], "match");
+        assert_eq!(merged["paint"]["line-color"][0], "match");
+    }
+
+    #[test]
+    fn skip_group_with_camera_only_differing_property() {
+        let mir = mir();
+        // line-translate is camera-only (feature: false) — differing values must block merge.
+        let mut v = json!({
+            "version": 8,
+            "sources": {"s": {"type": "vector"}},
+            "layers": [
+                {
+                    "id": "a", "type": "line", "source": "s",
+                    "source-layer": "road",
+                    "filter": ["==", ["get", "class"], "x"],
+                    "paint": {"line-translate": [1, 0]}
+                },
+                {
+                    "id": "b", "type": "line", "source": "s",
+                    "source-layer": "road",
+                    "filter": ["==", ["get", "class"], "y"],
+                    "paint": {"line-translate": [0, 1]}
                 }
             ]
         });

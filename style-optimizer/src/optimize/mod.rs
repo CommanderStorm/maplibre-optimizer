@@ -244,32 +244,14 @@ fn sync_typed_to_json(style: &MaplibreStyleSpecification, v: &mut Value) {
     }
 }
 
-/// Merge typed scalar fields into a JSON layer, keeping original paint/layout.
-fn merge_layer_json(mut original: Value, typed: &Value) -> Value {
-    let (Some(orig_obj), Some(typed_obj)) = (original.as_object_mut(), typed.as_object()) else {
-        return original;
-    };
-    for key in &[
-        "id",
-        "type",
-        "source",
-        "source-layer",
-        "filter",
-        "minzoom",
-        "maxzoom",
-        "metadata",
-        "ref",
-    ] {
-        match typed_obj.get(*key) {
-            Some(val) if !val.is_null() => {
-                orig_obj.insert((*key).to_string(), val.clone());
-            }
-            _ => {
-                orig_obj.remove(*key);
-            }
-        }
-    }
-    original
+/// Replace the JSON layer with the typed serialization.
+///
+/// The typed struct was deserialized from the JSON *after* expression passes,
+/// so it already contains those results.  Using it as the authoritative source
+/// ensures that structural-pass changes to paint/layout (empty-object
+/// removal, zoom-stop pruning, …) are reflected in the output.
+fn merge_layer_json(_original: Value, typed: &Value) -> Value {
+    typed.clone()
 }
 
 /// Run expression-level passes on the JSON value.
