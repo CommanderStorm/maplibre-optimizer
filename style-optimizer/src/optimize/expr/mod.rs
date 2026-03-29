@@ -29,6 +29,280 @@ use super::source_util::VectorLayerInfo;
 use super::walk::{PropertyContext, StyleVisitor};
 use crate::stats::TileStatistics;
 
+// ── Stats-driven tree fold ───────────────────────────────────────────────────
+
+type StatsFoldFn =
+    fn(&mut Vec<Value>, Option<&TileStatistics>, Option<&[Option<VectorLayerInfo>]>, usize) -> bool;
+
+/// Generic recursive walker for stats-driven folds on expression arrays.
+fn fold_in_tree(
+    v: &mut Value,
+    stats: Option<&TileStatistics>,
+    layer_info: Option<&[Option<VectorLayerInfo>]>,
+    layer_index: usize,
+    changed: &mut bool,
+    try_fold: StatsFoldFn,
+) {
+    let Value::Array(arr) = v else {
+        return;
+    };
+    if try_fold(arr, stats, layer_info, layer_index) {
+        *changed = true;
+        return;
+    }
+    for child in arr.iter_mut() {
+        fold_in_tree(child, stats, layer_info, layer_index, changed, try_fold);
+    }
+}
+
+// ── Rule table ───────────────────────────────────────────────────────────────
+
+/// Which pass flag enables this rule.
+enum RuleGate {
+    ExpressionKind,
+    ConstantFold,
+    SimplifyExpressions,
+}
+
+/// Where the rule applies in the visitor.
+enum RuleScope {
+    /// Peephole: applied per expression node inside `rewrite_expression_array`.
+    Peephole,
+    /// Tree fold on filters only (stats-driven, recursive).
+    FilterOnly,
+    /// Tree fold on both filters and properties (stats-driven, recursive).
+    FilterAndProperty,
+}
+
+enum RewriteRule {
+    /// Rule that operates on the expression array alone.
+    Pure {
+        gate: RuleGate,
+        scope: RuleScope,
+        apply: fn(&mut Vec<Value>) -> bool,
+    },
+    /// Rule that also needs the MIR spec.
+    WithMir {
+        gate: RuleGate,
+        scope: RuleScope,
+        apply: fn(&mut Vec<Value>, &MirSpec) -> bool,
+    },
+    /// Stats-driven rule that needs tile statistics and layer info.
+    WithStats {
+        gate: RuleGate,
+        scope: RuleScope,
+        apply: StatsFoldFn,
+    },
+}
+
+impl RuleGate {
+    const fn enabled(&self, passes: &OptPasses) -> bool {
+        match self {
+            Self::ExpressionKind => passes.expression_kind,
+            Self::ConstantFold => passes.constant_fold,
+            Self::SimplifyExpressions => passes.simplify_expressions,
+        }
+    }
+}
+
+impl RewriteRule {
+    const fn gate(&self) -> &RuleGate {
+        match self {
+            Self::Pure { gate, .. } | Self::WithMir { gate, .. } | Self::WithStats { gate, .. } => {
+                gate
+            }
+        }
+    }
+
+    const fn scope(&self) -> &RuleScope {
+        match self {
+            Self::Pure { scope, .. }
+            | Self::WithMir { scope, .. }
+            | Self::WithStats { scope, .. } => scope,
+        }
+    }
+
+    /// Try to apply as a peephole rewrite (single node). Returns true if rewritten.
+    fn apply_peephole(&self, arr: &mut Vec<Value>, mir: &MirSpec) -> bool {
+        match self {
+            Self::Pure { apply, .. } => apply(arr),
+            Self::WithMir { apply, .. } => apply(arr, mir),
+            Self::WithStats { .. } => false,
+        }
+    }
+
+    /// Try to apply as a recursive tree fold (stats-driven).
+    fn apply_tree_fold(
+        &self,
+        v: &mut Value,
+        stats: Option<&TileStatistics>,
+        layer_info: Option<&[Option<VectorLayerInfo>]>,
+        layer_index: usize,
+        changed: &mut bool,
+    ) {
+        if let Self::WithStats { apply, .. } = self {
+            fold_in_tree(v, stats, layer_info, layer_index, changed, *apply);
+        }
+    }
+}
+
+static RULES: &[RewriteRule] = &[
+    // ── expression_kind ──
+    RewriteRule::WithMir {
+        gate: RuleGate::ExpressionKind,
+        scope: RuleScope::Peephole,
+        apply: try_negate_comparison,
+    },
+    // ── constant_fold: peephole ──
+    RewriteRule::Pure {
+        gate: RuleGate::ConstantFold,
+        scope: RuleScope::Peephole,
+        apply: try_fold_boolean_algebra,
+    },
+    RewriteRule::Pure {
+        gate: RuleGate::ConstantFold,
+        scope: RuleScope::Peephole,
+        apply: try_fold_not,
+    },
+    RewriteRule::Pure {
+        gate: RuleGate::ConstantFold,
+        scope: RuleScope::Peephole,
+        apply: try_fold_comparison,
+    },
+    RewriteRule::WithMir {
+        gate: RuleGate::ConstantFold,
+        scope: RuleScope::Peephole,
+        apply: try_fold_pure_operator,
+    },
+    RewriteRule::Pure {
+        gate: RuleGate::ConstantFold,
+        scope: RuleScope::Peephole,
+        apply: try_algebraic_simplify,
+    },
+    RewriteRule::Pure {
+        gate: RuleGate::ConstantFold,
+        scope: RuleScope::Peephole,
+        apply: try_dead_branch_case,
+    },
+    RewriteRule::Pure {
+        gate: RuleGate::ConstantFold,
+        scope: RuleScope::Peephole,
+        apply: try_dead_branch_match_literal,
+    },
+    RewriteRule::Pure {
+        gate: RuleGate::ConstantFold,
+        scope: RuleScope::Peephole,
+        apply: try_filter_contradiction,
+    },
+    RewriteRule::Pure {
+        gate: RuleGate::ConstantFold,
+        scope: RuleScope::Peephole,
+        apply: try_range_tightening,
+    },
+    RewriteRule::Pure {
+        gate: RuleGate::ConstantFold,
+        scope: RuleScope::Peephole,
+        apply: try_predicate_subsumption,
+    },
+    RewriteRule::Pure {
+        gate: RuleGate::ConstantFold,
+        scope: RuleScope::Peephole,
+        apply: try_fold_redundant_coercion,
+    },
+    RewriteRule::Pure {
+        gate: RuleGate::ConstantFold,
+        scope: RuleScope::Peephole,
+        apply: try_fold_redundant_properties,
+    },
+    // ── constant_fold: stats-driven tree folds ──
+    RewriteRule::WithStats {
+        gate: RuleGate::ConstantFold,
+        scope: RuleScope::FilterOnly,
+        apply: try_fold_has_from_stats,
+    },
+    RewriteRule::WithStats {
+        gate: RuleGate::ConstantFold,
+        scope: RuleScope::FilterAndProperty,
+        apply: try_fold_get_from_stats,
+    },
+    RewriteRule::WithStats {
+        gate: RuleGate::ConstantFold,
+        scope: RuleScope::FilterOnly,
+        apply: try_fold_geometry_type_from_stats,
+    },
+    RewriteRule::WithStats {
+        gate: RuleGate::ConstantFold,
+        scope: RuleScope::FilterAndProperty,
+        apply: try_fold_comparison_from_stats,
+    },
+    RewriteRule::WithStats {
+        gate: RuleGate::ConstantFold,
+        scope: RuleScope::FilterAndProperty,
+        apply: try_prune_in_from_stats,
+    },
+    RewriteRule::WithStats {
+        gate: RuleGate::ConstantFold,
+        scope: RuleScope::FilterAndProperty,
+        apply: try_prune_match_from_stats,
+    },
+    RewriteRule::WithStats {
+        gate: RuleGate::ConstantFold,
+        scope: RuleScope::FilterAndProperty,
+        apply: try_fold_coalesce_from_stats,
+    },
+    // ── simplify_expressions ──
+    RewriteRule::Pure {
+        gate: RuleGate::SimplifyExpressions,
+        scope: RuleScope::Peephole,
+        apply: try_simplify_interpolate_or_step,
+    },
+    RewriteRule::Pure {
+        gate: RuleGate::SimplifyExpressions,
+        scope: RuleScope::Peephole,
+        apply: try_simplify_match,
+    },
+    RewriteRule::Pure {
+        gate: RuleGate::SimplifyExpressions,
+        scope: RuleScope::Peephole,
+        apply: try_rewrite_any_to_in,
+    },
+    RewriteRule::Pure {
+        gate: RuleGate::SimplifyExpressions,
+        scope: RuleScope::Peephole,
+        apply: try_simplify_case,
+    },
+    RewriteRule::Pure {
+        gate: RuleGate::SimplifyExpressions,
+        scope: RuleScope::Peephole,
+        apply: try_simplify_coalesce,
+    },
+    RewriteRule::Pure {
+        gate: RuleGate::SimplifyExpressions,
+        scope: RuleScope::Peephole,
+        apply: try_boolean_flattening,
+    },
+    RewriteRule::Pure {
+        gate: RuleGate::SimplifyExpressions,
+        scope: RuleScope::Peephole,
+        apply: try_demorgan,
+    },
+    RewriteRule::Pure {
+        gate: RuleGate::SimplifyExpressions,
+        scope: RuleScope::Peephole,
+        apply: try_simplify_single_in,
+    },
+    RewriteRule::Pure {
+        gate: RuleGate::SimplifyExpressions,
+        scope: RuleScope::Peephole,
+        apply: try_merge_in_expressions,
+    },
+    RewriteRule::Pure {
+        gate: RuleGate::SimplifyExpressions,
+        scope: RuleScope::Peephole,
+        apply: try_inline_let_var,
+    },
+];
+
 // ── Visitors ──────────────────────────────────────────────────────────────────
 
 pub(crate) struct NormalizeFoldVisitor<'a> {
@@ -41,138 +315,64 @@ pub(crate) struct NormalizeFoldVisitor<'a> {
 
 impl StyleVisitor for NormalizeFoldVisitor<'_> {
     fn visit_filter(&mut self, layer_index: usize, _: &str, filter: &mut Value) {
-        // Stats-driven: fold ["id"] → ["literal", null] when no feature IDs.
-        if self.passes.constant_fold
-            && should_fold_id(self.stats, self.layer_info, layer_index)
-            && fold_id_to_null(filter)
-        {
-            self.changed = true;
-        }
-        // Stats-driven: fold ["has", p] → true when present in all features.
         if self.passes.constant_fold {
-            fold_has_in_tree(
-                filter,
-                self.stats,
-                self.layer_info,
-                layer_index,
-                &mut self.changed,
-            );
-        }
-        // Stats-driven: fold ["get", p] → ["literal", v] when property is constant.
-        if self.passes.constant_fold {
-            fold_get_in_tree(
-                filter,
-                self.stats,
-                self.layer_info,
-                layer_index,
-                &mut self.changed,
-            );
-        }
-        // Stats-driven: fold ["=="|"!=", ["geometry-type"], T] → true/false.
-        if self.passes.constant_fold {
-            fold_geometry_type_in_tree(
-                filter,
-                self.stats,
-                self.layer_info,
-                layer_index,
-                &mut self.changed,
-            );
-        }
-        // Stats-driven: fold comparisons to true/false when provable from min/max.
-        if self.passes.constant_fold {
-            fold_comparison_in_tree(
-                filter,
-                self.stats,
-                self.layer_info,
-                layer_index,
-                &mut self.changed,
-            );
-        }
-        // Stats-driven: prune dead values from "in" expressions.
-        if self.passes.constant_fold {
-            fold_in_tree(
-                filter,
-                self.stats,
-                self.layer_info,
-                layer_index,
-                &mut self.changed,
-                try_prune_in_from_stats,
-            );
-        }
-        // Stats-driven: prune dead arms from "match" expressions.
-        if self.passes.constant_fold {
-            fold_in_tree(
-                filter,
-                self.stats,
-                self.layer_info,
-                layer_index,
-                &mut self.changed,
-                try_prune_match_from_stats,
-            );
-        }
-        // Stats-driven: remove dead coalesce arms.
-        if self.passes.constant_fold {
-            fold_in_tree(
-                filter,
-                self.stats,
-                self.layer_info,
-                layer_index,
-                &mut self.changed,
-                try_fold_coalesce_from_stats,
-            );
+            // Special case: fold ["id"] → ["literal", null] when no feature IDs.
+            if should_fold_id(self.stats, self.layer_info, layer_index)
+                && fold_id_to_null(filter)
+            {
+                self.changed = true;
+            }
+            for rule in RULES {
+                if !matches!(
+                    rule.scope(),
+                    RuleScope::FilterOnly | RuleScope::FilterAndProperty
+                ) {
+                    continue;
+                }
+                if !rule.gate().enabled(self.passes) {
+                    continue;
+                }
+                rule.apply_tree_fold(
+                    filter,
+                    self.stats,
+                    self.layer_info,
+                    layer_index,
+                    &mut self.changed,
+                );
+            }
         }
         normalize_and_fold(filter, self.mir, self.passes, &mut self.changed);
     }
 
     fn visit_property(&mut self, ctx: &PropertyContext<'_>, value: &mut Value) {
-        // Stats-driven: fold ["get", p] → ["literal", v] in paint/layout expressions too.
         if self.passes.constant_fold {
-            fold_get_in_tree(
-                value,
-                self.stats,
-                self.layer_info,
-                ctx.layer_index,
-                &mut self.changed,
-            );
-        }
-        // Stats-driven: fold comparisons in paint/layout expressions too.
-        if self.passes.constant_fold {
-            fold_comparison_in_tree(
-                value,
-                self.stats,
-                self.layer_info,
-                ctx.layer_index,
-                &mut self.changed,
-            );
-        }
-        // Stats-driven: prune dead values from "in"/"match"/"coalesce" in paint/layout too.
-        if self.passes.constant_fold {
-            fold_in_tree(
-                value,
-                self.stats,
-                self.layer_info,
-                ctx.layer_index,
-                &mut self.changed,
-                try_prune_in_from_stats,
-            );
-            fold_in_tree(
-                value,
-                self.stats,
-                self.layer_info,
-                ctx.layer_index,
-                &mut self.changed,
-                try_prune_match_from_stats,
-            );
-            fold_in_tree(
-                value,
-                self.stats,
-                self.layer_info,
-                ctx.layer_index,
-                &mut self.changed,
-                try_fold_coalesce_from_stats,
-            );
+            for rule in RULES {
+                if !matches!(rule.scope(), RuleScope::FilterAndProperty) {
+                    continue;
+                }
+                if !rule.gate().enabled(self.passes) {
+                    continue;
+                }
+                rule.apply_tree_fold(
+                    value,
+                    self.stats,
+                    self.layer_info,
+                    ctx.layer_index,
+                    &mut self.changed,
+                );
+            }
         }
         normalize_and_fold(value, self.mir, self.passes, &mut self.changed);
+        // Unwrap ["literal", scalar] → scalar.
+        if let Value::Array(arr) = value
+            && arr.len() == 2
+            && arr[0].as_str() == Some("literal")
+            && !arr[1].is_array()
+            && !arr[1].is_object()
+        {
+            *value = arr[1].take();
+            self.changed = true;
+        }
     }
 }
 
@@ -207,110 +407,6 @@ fn fold_id_to_null(v: &mut Value) -> bool {
         changed |= fold_id_to_null(child);
     }
     changed
-}
-
-/// Recursively fold `["has", p]` → `true` when stats confirm the property is always present.
-fn fold_has_in_tree(
-    v: &mut Value,
-    stats: Option<&TileStatistics>,
-    layer_info: Option<&[Option<VectorLayerInfo>]>,
-    layer_index: usize,
-    changed: &mut bool,
-) {
-    let Value::Array(arr) = v else {
-        return;
-    };
-    if try_fold_has_from_stats(arr, stats, layer_info, layer_index) {
-        *changed = true;
-        return;
-    }
-    for child in arr.iter_mut() {
-        fold_has_in_tree(child, stats, layer_info, layer_index, changed);
-    }
-}
-
-/// Recursively fold `["get", p]` → `["literal", v]` when stats show a single constant value.
-fn fold_get_in_tree(
-    v: &mut Value,
-    stats: Option<&TileStatistics>,
-    layer_info: Option<&[Option<VectorLayerInfo>]>,
-    layer_index: usize,
-    changed: &mut bool,
-) {
-    let Value::Array(arr) = v else {
-        return;
-    };
-    if try_fold_get_from_stats(arr, stats, layer_info, layer_index) {
-        *changed = true;
-        return;
-    }
-    for child in arr.iter_mut() {
-        fold_get_in_tree(child, stats, layer_info, layer_index, changed);
-    }
-}
-
-/// Recursively fold `["=="|"!=", ["geometry-type"], T]` → `true`/`false` based on geometry stats.
-fn fold_geometry_type_in_tree(
-    v: &mut Value,
-    stats: Option<&TileStatistics>,
-    layer_info: Option<&[Option<VectorLayerInfo>]>,
-    layer_index: usize,
-    changed: &mut bool,
-) {
-    let Value::Array(arr) = v else {
-        return;
-    };
-    if try_fold_geometry_type_from_stats(arr, stats, layer_info, layer_index) {
-        *changed = true;
-        return;
-    }
-    for child in arr.iter_mut() {
-        fold_geometry_type_in_tree(child, stats, layer_info, layer_index, changed);
-    }
-}
-
-/// Recursively fold comparisons to `true`/`false` when stats prove the result is constant.
-fn fold_comparison_in_tree(
-    v: &mut Value,
-    stats: Option<&TileStatistics>,
-    layer_info: Option<&[Option<VectorLayerInfo>]>,
-    layer_index: usize,
-    changed: &mut bool,
-) {
-    let Value::Array(arr) = v else {
-        return;
-    };
-    if try_fold_comparison_from_stats(arr, stats, layer_info, layer_index) {
-        *changed = true;
-        return;
-    }
-    for child in arr.iter_mut() {
-        fold_comparison_in_tree(child, stats, layer_info, layer_index, changed);
-    }
-}
-
-type StatsFoldFn =
-    fn(&mut Vec<Value>, Option<&TileStatistics>, Option<&[Option<VectorLayerInfo>]>, usize) -> bool;
-
-/// Generic recursive walker for stats-driven folds on expression arrays.
-fn fold_in_tree(
-    v: &mut Value,
-    stats: Option<&TileStatistics>,
-    layer_info: Option<&[Option<VectorLayerInfo>]>,
-    layer_index: usize,
-    changed: &mut bool,
-    try_fold: StatsFoldFn,
-) {
-    let Value::Array(arr) = v else {
-        return;
-    };
-    if try_fold(arr, stats, layer_info, layer_index) {
-        *changed = true;
-        return;
-    }
-    for child in arr.iter_mut() {
-        fold_in_tree(child, stats, layer_info, layer_index, changed, try_fold);
-    }
 }
 
 pub(crate) struct ReorderSelectivityVisitor<'a> {
@@ -413,80 +509,10 @@ fn rewrite_expression_array(
 }
 
 fn apply_one_rewrite_pass(arr: &mut Vec<Value>, mir: &MirSpec, passes: &OptPasses) -> bool {
-    if passes.expression_kind && try_negate_comparison(arr, mir) {
-        return true;
-    }
-    if passes.constant_fold {
-        if try_fold_boolean_algebra(arr) {
-            return true;
-        }
-        if try_fold_not(arr) {
-            return true;
-        }
-        if try_fold_comparison(arr) {
-            return true;
-        }
-        if try_fold_pure_operator(arr, mir) {
-            return true;
-        }
-        if try_algebraic_simplify(arr) {
-            return true;
-        }
-        if try_dead_branch_case(arr) {
-            return true;
-        }
-        if try_dead_branch_match_literal(arr) {
-            return true;
-        }
-        if try_filter_contradiction(arr) {
-            return true;
-        }
-        if try_range_tightening(arr) {
-            return true;
-        }
-        if try_predicate_subsumption(arr) {
-            return true;
-        }
-        if try_fold_redundant_coercion(arr) {
-            return true;
-        }
-        if try_fold_redundant_properties(arr) {
-            return true;
-        }
-    }
-    if passes.simplify_expressions {
-        if try_simplify_interpolate_or_step(arr) {
-            return true;
-        }
-        if try_simplify_match(arr) {
-            return true;
-        }
-        if try_rewrite_any_to_in(arr) {
-            return true;
-        }
-        if try_simplify_case(arr) {
-            return true;
-        }
-        if try_simplify_coalesce(arr) {
-            return true;
-        }
-        if try_boolean_flattening(arr) {
-            return true;
-        }
-        if try_demorgan(arr) {
-            return true;
-        }
-        if try_simplify_single_in(arr) {
-            return true;
-        }
-        if try_merge_in_expressions(arr) {
-            return true;
-        }
-        if try_inline_let_var(arr) {
-            return true;
-        }
-    }
-    false
+    RULES
+        .iter()
+        .filter(|r| matches!(r.scope(), RuleScope::Peephole) && r.gate().enabled(passes))
+        .any(|r| r.apply_peephole(arr, mir))
 }
 
 #[cfg(test)]
