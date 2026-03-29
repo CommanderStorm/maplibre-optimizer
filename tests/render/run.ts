@@ -574,37 +574,14 @@ function buildOptimizer(): void {
 
 // ── auto-generate tile stats ─────────────────────────────────────────────────
 
-/** Generate stats from tile directories and merge them into a single file. */
+/** Generate stats from the root tiles directory. */
 function autoGenerateStats(): string {
-  const tileDirs = [
-    path.join(ASSETS, "tiles"),
-    path.join(ASSETS, "tiles/mapbox.mapbox-streets-v7"),
-  ];
-
-  const tmpStats: string[] = [];
-  for (const dir of tileDirs) {
-    if (!fs.existsSync(dir)) continue;
-    const tmp = path.join(RESULTS_DIR, `_stats_${tmpStats.length}.json`);
-    execSync(
-      `"${OPTIMIZER}" stats --input "${dir}" --source-name maplibre --output "${tmp}"`,
-      { stdio: "pipe" },
-    );
-    tmpStats.push(tmp);
-  }
-
-  // Merge: combine source-layer maps from all stats files
-  const merged = { sources: { maplibre: { layers: {} as Record<string, unknown> } }, sample_rate: 1.0 };
-  for (const tmp of tmpStats) {
-    const stats = JSON.parse(fs.readFileSync(tmp, "utf8"));
-    const srcLayers = stats.sources?.maplibre?.layers;
-    if (srcLayers) {
-      Object.assign(merged.sources.maplibre.layers, srcLayers);
-    }
-    fs.unlinkSync(tmp);
-  }
-
+  const tileDir = path.join(ASSETS, "tiles");
   const out = path.join(RESULTS_DIR, "_auto_stats.json");
-  fs.writeFileSync(out, JSON.stringify(merged));
+  execSync(
+    `"${OPTIMIZER}" stats --input "${tileDir}" --source-name maplibre --output "${out}"`,
+    { stdio: "pipe" },
+  );
   return out;
 }
 
