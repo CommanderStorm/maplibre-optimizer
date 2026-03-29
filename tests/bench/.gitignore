@@ -1,5 +1,6 @@
 node_modules/
 *.png
 *.html
+__pycache__/
 results/
 .venv/

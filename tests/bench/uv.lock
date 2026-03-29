@@ -16,6 +16,7 @@ version = "0.1.0"
 source = { virtual = "." }
 dependencies = [
     { name = "kaleido" },
+    { name = "numpy" },
     { name = "pandas" },
     { name = "plotly" },
 ]
@@ -23,6 +24,7 @@ dependencies = [
 [package.metadata]
 requires-dist = [
     { name = "kaleido", specifier = ">=0.4" },
+    { name = "numpy", specifier = ">=1.26" },
     { name = "pandas", specifier = ">=2.2" },
     { name = "plotly", specifier = ">=6.1" },
 ]
