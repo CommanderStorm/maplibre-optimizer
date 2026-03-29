@@ -55,6 +55,19 @@ fn style_with_paint(prop: &str, value: serde_json::Value) -> serde_json::Value {
     })
 }
 
+/// Minimal valid style wrapping a single layer with both a filter and a paint property.
+fn style_with_filter_and_paint(
+    filter: serde_json::Value,
+    prop: &str,
+    value: serde_json::Value,
+) -> serde_json::Value {
+    serde_json::json!({
+        "version": 8,
+        "sources": {"src": {"type": "vector", "url": "x"}},
+        "layers": [{"id": "l", "type": "fill", "source": "src", "source-layer": "lyr", "filter": filter, "paint": {prop: value}}]
+    })
+}
+
 /// Minimal valid style wrapping a single symbol layer with a layout property.
 fn style_with_layout(prop: &str, value: serde_json::Value) -> serde_json::Value {
     serde_json::json!({
@@ -658,4 +671,98 @@ fn sccp_case_skips_not_equal_condition() {
         - type
       - other
     "#);
+}
+
+// ── Filter-to-property constant propagation ───────────────────────────
+
+#[test]
+fn filter_propagation_match_folds_to_literal() {
+    let mir = sample_mir();
+    let mut v = style_with_filter_and_paint(
+        serde_json::json!(["==", ["get", "class"], "road"]),
+        "fill-color",
+        serde_json::json!(["match", ["get", "class"], "road", "#333", "rail", "#666", "#999"]),
+    );
+    optimize_style_json_value(&mut v, &mir, &fold_passes());
+    assert_yaml_snapshot!(v["layers"][0]["paint"], @r##"
+    fill-color: "#333"
+    "##);
+}
+
+#[test]
+fn filter_propagation_case_folds_true_branch() {
+    let mir = sample_mir();
+    let mut v = style_with_filter_and_paint(
+        serde_json::json!(["==", ["get", "kind"], "park"]),
+        "fill-color",
+        serde_json::json!(["case", ["==", ["get", "kind"], "park"], "#0f0", "#ccc"]),
+    );
+    optimize_style_json_value(&mut v, &mir, &fold_passes());
+    assert_yaml_snapshot!(v["layers"][0]["paint"], @r##"
+    fill-color: "#0f0"
+    "##);
+}
+
+#[test]
+fn filter_propagation_all_extracts_multiple_constraints() {
+    let mir = sample_mir();
+    let mut v = style_with_filter_and_paint(
+        serde_json::json!(["all", ["==", ["get", "class"], "road"], ["==", ["get", "type"], 3]]),
+        "fill-color",
+        serde_json::json!(["match", ["get", "class"], "road", "#333", "rail", "#666", "#999"]),
+    );
+    optimize_style_json_value(&mut v, &mir, &fold_passes());
+    assert_yaml_snapshot!(v["layers"][0]["paint"], @r##"
+    fill-color: "#333"
+    "##);
+}
+
+#[test]
+fn filter_propagation_commuted_equality() {
+    let mir = sample_mir();
+    let mut v = style_with_filter_and_paint(
+        serde_json::json!(["==", "road", ["get", "class"]]),
+        "fill-color",
+        serde_json::json!(["match", ["get", "class"], "road", "#333", "rail", "#666", "#999"]),
+    );
+    optimize_style_json_value(&mut v, &mir, &fold_passes());
+    assert_yaml_snapshot!(v["layers"][0]["paint"], @r##"
+    fill-color: "#333"
+    "##);
+}
+
+#[test]
+fn filter_propagation_no_leak_across_layers() {
+    let mir = sample_mir();
+    // Two layers: first has filter, second doesn't — constraints shouldn't leak.
+    let mut v = serde_json::json!({
+        "version": 8,
+        "sources": {"src": {"type": "vector", "url": "x"}},
+        "layers": [
+            {
+                "id": "a", "type": "fill", "source": "src", "source-layer": "lyr",
+                "filter": ["==", ["get", "class"], "road"],
+                "paint": {"fill-color": ["match", ["get", "class"], "road", "#333", "#999"]}
+            },
+            {
+                "id": "b", "type": "fill", "source": "src", "source-layer": "lyr",
+                "paint": {"fill-color": ["match", ["get", "class"], "road", "#333", "#999"]}
+            }
+        ]
+    });
+    optimize_style_json_value(&mut v, &mir, &fold_passes());
+    // First layer should be folded.
+    assert_yaml_snapshot!(v["layers"][0]["paint"], @r##"
+    fill-color: "#333"
+    "##);
+    // Second layer should remain data-driven (no filter constraint).
+    assert_yaml_snapshot!(v["layers"][1]["paint"], @r##"
+    fill-color:
+      - match
+      - - get
+        - class
+      - road
+      - "#333"
+      - "#999"
+    "##);
 }

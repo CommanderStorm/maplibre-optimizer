@@ -335,6 +335,9 @@ pub(crate) struct NormalizeFoldVisitor<'a> {
     pub stats: Option<&'a TileStatistics>,
     pub layer_info: Option<&'a [Option<VectorLayerInfo>]>,
     pub changed: bool,
+    /// Equality constraints extracted from the current layer's filter.
+    /// Each entry is `(target_expr, literal_value)` — e.g. `(["get","class"], "road")`.
+    pub filter_constraints: Vec<(Value, Value)>,
 }
 
 impl StyleVisitor for NormalizeFoldVisitor<'_> {
@@ -364,10 +367,26 @@ impl StyleVisitor for NormalizeFoldVisitor<'_> {
             }
         }
         normalize_and_fold(filter, self.mir, self.passes, &mut self.changed);
+
+        // Extract equality constraints for filter-to-property propagation.
+        self.filter_constraints.clear();
+        if self.passes.constant_fold {
+            extract_filter_constraints(filter, &mut self.filter_constraints);
+        }
     }
 
     fn visit_property(&mut self, ctx: &PropertyContext<'_>, value: &mut Value) {
         if self.passes.constant_fold {
+            // Filter-to-property constant propagation: substitute ["get", "prop"]
+            // with the known literal value when the filter guarantees it.
+            for (target, replacement) in &self.filter_constraints {
+                let substituted = simplify::substitute_expr(value, target, replacement);
+                if substituted != *value {
+                    *value = substituted;
+                    self.changed = true;
+                }
+            }
+
             for rule in RULES {
                 if !matches!(rule.scope(), RuleScope::FilterAndProperty) {
                     continue;
@@ -395,6 +414,11 @@ impl StyleVisitor for NormalizeFoldVisitor<'_> {
             *value = arr[1].take();
             self.changed = true;
         }
+    }
+
+    fn visit_layer(&mut self, _layer_index: usize, _layer_type: &str, _layer: &mut Value) {
+        // Clear constraints so layers without filters don't inherit stale state.
+        self.filter_constraints.clear();
     }
 }
 
@@ -429,6 +453,34 @@ fn fold_id_to_null(v: &mut Value) -> bool {
         changed |= fold_id_to_null(child);
     }
     changed
+}
+
+/// Extract equality constraints from a filter for constant propagation into properties.
+///
+/// Recognises `["==", ["get", p], lit]` (and the commuted form) at the top level
+/// or inside a top-level `["all", …]`.  Nested `all` is handled recursively.
+fn extract_filter_constraints(filter: &Value, out: &mut Vec<(Value, Value)>) {
+    let Value::Array(arr) = filter else { return };
+    match arr.first().and_then(Value::as_str) {
+        Some("all") => {
+            for clause in &arr[1..] {
+                extract_filter_constraints(clause, out);
+            }
+        }
+        Some("==") if arr.len() == 3 => {
+            // ["==", A, B] — one side must be a literal, the other a non-literal expression.
+            if let Some(lit) = extract_json_literal(&arr[2])
+                && extract_json_literal(&arr[1]).is_none()
+            {
+                out.push((arr[1].clone(), lit));
+            } else if let Some(lit) = extract_json_literal(&arr[1])
+                && extract_json_literal(&arr[2]).is_none()
+            {
+                out.push((arr[2].clone(), lit));
+            }
+        }
+        _ => {}
+    }
 }
 
 pub(crate) struct ReorderSelectivityVisitor<'a> {

@@ -321,6 +321,7 @@ fn run_json_expression_passes(
                 stats,
                 layer_info: layer_info.as_deref(),
                 changed: false,
+                filter_constraints: Vec::new(),
             };
             walk_style_mut(v, mir, &mut visitor);
             if !visitor.changed {
@@ -368,6 +369,7 @@ fn run_normalize_fold_only(
             stats,
             layer_info: layer_info.as_deref(),
             changed: false,
+            filter_constraints: Vec::new(),
         };
         walk_style_mut(v, mir, &mut visitor);
         if !visitor.changed {
