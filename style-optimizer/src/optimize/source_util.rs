@@ -8,6 +8,8 @@ use serde_json::Value;
 pub(crate) struct VectorLayerInfo {
     pub source: String,
     pub source_layer: String,
+    /// The source's maxzoom (tiles at this zoom are overzoomed for higher zooms).
+    pub source_maxzoom: Option<f64>,
 }
 
 /// Check if a source is a `"vector"` type by looking it up in the style root.
@@ -48,9 +50,17 @@ pub(crate) fn precompute_vector_layer_info(style: &Value) -> Vec<Option<VectorLa
             if !is_vector_source(style, source) {
                 return None;
             }
+            let source_maxzoom = root
+                .get("sources")
+                .and_then(Value::as_object)
+                .and_then(|s| s.get(source))
+                .and_then(Value::as_object)
+                .and_then(|s| s.get("maxzoom"))
+                .and_then(|v| v.as_f64());
             Some(VectorLayerInfo {
                 source: source.to_string(),
                 source_layer: source_layer.to_string(),
+                source_maxzoom,
             })
         })
         .collect()

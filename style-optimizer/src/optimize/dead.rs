@@ -66,8 +66,7 @@ fn is_dead_by_empty_source_layer(
     stats: &TileStatistics,
     layer_info: Option<&[Option<VectorLayerInfo>]>,
 ) -> bool {
-    resolve_layer_stats(layer_index, stats, layer_info)
-        .is_some_and(|ls| ls.total_features == 0)
+    resolve_layer_stats(layer_index, stats, layer_info).is_some_and(|ls| ls.total_features == 0)
 }
 
 fn is_dead_by_geometry(
