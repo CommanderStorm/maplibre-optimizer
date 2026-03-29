@@ -21,6 +21,7 @@ mod defaults;
 pub(crate) mod expr;
 mod merge;
 mod metadata;
+mod ramp;
 pub(crate) mod selectivity;
 pub(crate) mod source_util;
 mod strip;
@@ -136,7 +137,13 @@ pub fn optimize_style_json_value_with_stats(
         sync_typed_to_json(&style, v);
     }
 
-    // 3. Layer merging — runs on JSON after all other passes so that dead
+    // 3. Zoom-bounded stop pruning — runs after structural passes have
+    //    tightened zoom bounds (metadata_refinement) and synced them to JSON.
+    if passes.simplify_expressions {
+        ramp::prune_zoom_stops(v);
+    }
+
+    // 4. Layer merging — runs on JSON after all other passes so that dead
     //    layers are gone and expressions are simplified before grouping.
     if passes.layer_merge {
         merge::layer_merge(v, mir);
@@ -1066,8 +1073,6 @@ mod tests {
             - interpolate
             - - linear
             - - zoom
-            - 5
-            - 0
             - 10
             - 0
             - 14

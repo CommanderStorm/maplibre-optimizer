@@ -48,6 +48,12 @@ pub(super) fn try_simplify_interpolate_or_step(arr: &mut Vec<Value>) -> bool {
                 *arr = vec![Value::String("literal".to_string()), val];
                 return true;
             }
+            // Default == first stop output → first stop is redundant.
+            if arr.len() >= 5 && arr[2] == arr.last().unwrap() {
+                arr.remove(2); // stop output
+                arr.remove(1); // stop threshold
+                return true;
+            }
             // Dedup adjacent same-output stops.
             try_step_stop_dedup(arr)
         }

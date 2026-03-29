@@ -1,4 +1,4 @@
-#![allow(clippy::large_enum_variant)]
+#![allow(clippy::large_enum_variant, clippy::type_complexity)]
 #[allow(unused_imports)]
 use super::*;
 #[allow(unused_imports)]

@@ -1,4 +1,4 @@
-#![allow(clippy::large_enum_variant)]
+#![allow(clippy::large_enum_variant, clippy::type_complexity)]
 #[allow(unused_imports)]
 use super::*;
 #[allow(unused_imports)]
@@ -1980,7 +1980,7 @@ pub enum ColorOrArrayOfColor {
         (
             Interpolation,
             Number,
-            Vec<(NumberLiteral, ColorOrArrayOfColorAsUnion)>,
+            Vec<(NumberLiteral, Box<ColorOrArrayOfColorAsUnion>)>,
         ),
     ),
     /// Produces continuous, smooth results by interpolating between pairs of input and output values ("stops"). Works like `interpolate`, but the output type must be `color` or `array<color>`, and the interpolation is performed in the CIELAB color space.
@@ -1988,7 +1988,19 @@ pub enum ColorOrArrayOfColor {
         (
             Interpolation,
             Number,
-            Vec<(NumberLiteral, ColorOrArrayOfColorAsUnion)>,
+            Vec<(NumberLiteral, Box<ColorOrArrayOfColorAsUnion>)>,
+        ),
+    ),
+    /// Produces discrete, stepped results by evaluating a piecewise-constant function defined by pairs of input and output values ("stops"). The `input` may be any numeric expression (e.g., `["get", "population"]`). Stop inputs must be numeric literals in strictly ascending order.
+    ///
+    /// Returns the output value of the stop just less than the input, or the first output if the input is less than the first stop.
+    ///
+    ///  - [Create and style clusters](https://maplibre.org/maplibre-gl-js/docs/examples/create-and-style-clusters/)
+    Step(
+        (
+            Number,
+            Box<ColorOrArrayOfColorAsUnion>,
+            Vec<(NumberLiteral, Box<ColorOrArrayOfColorAsUnion>)>,
         ),
     ),
 }
@@ -2035,7 +2047,7 @@ impl<'de> serde::de::Visitor<'de> for ColorOrArrayOfColorVisitor {
                 let input: Number = visit_seq_field(&mut seq, "input")?;
                 let mut stops = Vec::new();
                 while let Some(stop_input_i) = seq.next_element::<NumberLiteral>()? {
-                    let stop_output_i: ColorOrArrayOfColorAsUnion =
+                    let stop_output_i: Box<ColorOrArrayOfColorAsUnion> =
                         seq.next_element()?.ok_or_else(|| {
                             serde::de::Error::custom(
                                 "expected stop_output_i in ColorOrArrayOfColor::InterpolateHcl",
@@ -2055,7 +2067,7 @@ impl<'de> serde::de::Visitor<'de> for ColorOrArrayOfColorVisitor {
                 let input: Number = visit_seq_field(&mut seq, "input")?;
                 let mut stops = Vec::new();
                 while let Some(stop_input_i) = seq.next_element::<NumberLiteral>()? {
-                    let stop_output_i: ColorOrArrayOfColorAsUnion =
+                    let stop_output_i: Box<ColorOrArrayOfColorAsUnion> =
                         seq.next_element()?.ok_or_else(|| {
                             serde::de::Error::custom(
                                 "expected stop_output_i in ColorOrArrayOfColor::InterpolateLab",
@@ -2069,9 +2081,25 @@ impl<'de> serde::de::Visitor<'de> for ColorOrArrayOfColorVisitor {
                     stops,
                 )))
             }
+            "step" => {
+                let input: Number = visit_seq_field(&mut seq, "input")?;
+                let output_0: Box<ColorOrArrayOfColorAsUnion> =
+                    visit_seq_field(&mut seq, "output_0")?;
+                let mut stops = Vec::new();
+                while let Some(stop_input_i) = seq.next_element::<NumberLiteral>()? {
+                    let stop_output_i: Box<ColorOrArrayOfColorAsUnion> =
+                        seq.next_element()?.ok_or_else(|| {
+                            serde::de::Error::custom(
+                                "expected stop_output_i in ColorOrArrayOfColor::Step",
+                            )
+                        })?;
+                    stops.push((stop_input_i, stop_output_i));
+                }
+                Ok(ColorOrArrayOfColor::Step((input, output_0, stops)))
+            }
             _ => Err(serde::de::Error::unknown_variant(
                 &op,
-                &["interpolate-hcl", "interpolate-lab"],
+                &["interpolate-hcl", "interpolate-lab", "step"],
             )),
         }
     }
@@ -2121,6 +2149,39 @@ impl serde::Serialize for ColorOrArrayOfColor {
                 let inner_val = serde_json::to_value(inner).map_err(serde::ser::Error::custom)?;
                 let mut seq = serializer.serialize_seq(None)?;
                 seq.serialize_element("interpolate-lab")?;
+                if let serde_json::Value::Array(top) = &inner_val {
+                    for elem in top {
+                        if let serde_json::Value::Array(sub) = elem {
+                            if sub.is_empty() {
+                                // Empty Vec — nothing to flatten.
+                            } else if sub[0].is_array() {
+                                // An array-of-arrays is the Vec<(A,B)> — flatten it.
+                                for pair in sub {
+                                    if let serde_json::Value::Array(pair_elems) = pair {
+                                        for pe in pair_elems {
+                                            seq.serialize_element(pe)?;
+                                        }
+                                    } else {
+                                        seq.serialize_element(pair)?;
+                                    }
+                                }
+                            } else {
+                                // Plain array value (e.g. a sub-expression like ["zoom"]).
+                                seq.serialize_element(elem)?;
+                            }
+                        } else {
+                            seq.serialize_element(elem)?;
+                        }
+                    }
+                } else {
+                    seq.serialize_element(&inner_val)?;
+                }
+                seq.end()
+            }
+            ColorOrArrayOfColor::Step(inner) => {
+                let inner_val = serde_json::to_value(inner).map_err(serde::ser::Error::custom)?;
+                let mut seq = serializer.serialize_seq(None)?;
+                seq.serialize_element("step")?;
                 if let serde_json::Value::Array(top) = &inner_val {
                     for elem in top {
                         if let serde_json::Value::Array(sub) = elem {
@@ -3294,7 +3355,22 @@ pub enum NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection {
             Number,
             Vec<(
                 NumberLiteral,
-                NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjectionAsUnion,
+                Box<NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjectionAsUnion>,
+            )>,
+        ),
+    ),
+    /// Produces discrete, stepped results by evaluating a piecewise-constant function defined by pairs of input and output values ("stops"). The `input` may be any numeric expression (e.g., `["get", "population"]`). Stop inputs must be numeric literals in strictly ascending order.
+    ///
+    /// Returns the output value of the stop just less than the input, or the first output if the input is less than the first stop.
+    ///
+    ///  - [Create and style clusters](https://maplibre.org/maplibre-gl-js/docs/examples/create-and-style-clusters/)
+    Step(
+        (
+            Number,
+            Box<NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjectionAsUnion>,
+            Vec<(
+                NumberLiteral,
+                Box<NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjectionAsUnion>,
             )>,
         ),
     ),
@@ -3344,7 +3420,7 @@ impl<'de> serde::de::Visitor<'de>
                 let input: Number = visit_seq_field(&mut seq, "input")?;
                 let mut stops = Vec::new();
                 while let Some(stop_input_i) = seq.next_element::<NumberLiteral>()? {
-                    let stop_output_i: NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjectionAsUnion = seq.next_element()?.ok_or_else(|| serde::de::Error::custom("expected stop_output_i in NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection::Interpolate"))?;
+                    let stop_output_i: Box<NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjectionAsUnion> = seq.next_element()?.ok_or_else(|| serde::de::Error::custom("expected stop_output_i in NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection::Interpolate"))?;
                     stops.push((stop_input_i, stop_output_i));
                 }
                 Ok(
@@ -3355,7 +3431,25 @@ impl<'de> serde::de::Visitor<'de>
                     )),
                 )
             }
-            _ => Err(serde::de::Error::unknown_variant(&op, &["interpolate"])),
+            "step" => {
+                let input: Number = visit_seq_field(&mut seq, "input")?;
+                let output_0: Box<NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjectionAsUnion> =
+                    visit_seq_field(&mut seq, "output_0")?;
+                let mut stops = Vec::new();
+                while let Some(stop_input_i) = seq.next_element::<NumberLiteral>()? {
+                    let stop_output_i: Box<NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjectionAsUnion> = seq.next_element()?.ok_or_else(|| serde::de::Error::custom("expected stop_output_i in NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection::Step"))?;
+                    stops.push((stop_input_i, stop_output_i));
+                }
+                Ok(
+                    NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection::Step((
+                        input, output_0, stops,
+                    )),
+                )
+            }
+            _ => Err(serde::de::Error::unknown_variant(
+                &op,
+                &["interpolate", "step"],
+            )),
         }
     }
 }
@@ -3371,6 +3465,39 @@ impl serde::Serialize for NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection
                 let inner_val = serde_json::to_value(inner).map_err(serde::ser::Error::custom)?;
                 let mut seq = serializer.serialize_seq(None)?;
                 seq.serialize_element("interpolate")?;
+                if let serde_json::Value::Array(top) = &inner_val {
+                    for elem in top {
+                        if let serde_json::Value::Array(sub) = elem {
+                            if sub.is_empty() {
+                                // Empty Vec — nothing to flatten.
+                            } else if sub[0].is_array() {
+                                // An array-of-arrays is the Vec<(A,B)> — flatten it.
+                                for pair in sub {
+                                    if let serde_json::Value::Array(pair_elems) = pair {
+                                        for pe in pair_elems {
+                                            seq.serialize_element(pe)?;
+                                        }
+                                    } else {
+                                        seq.serialize_element(pair)?;
+                                    }
+                                }
+                            } else {
+                                // Plain array value (e.g. a sub-expression like ["zoom"]).
+                                seq.serialize_element(elem)?;
+                            }
+                        } else {
+                            seq.serialize_element(elem)?;
+                        }
+                    }
+                } else {
+                    seq.serialize_element(&inner_val)?;
+                }
+                seq.end()
+            }
+            NumberOrArrayOfNumberOrColorOrArrayOfColorOrProjection::Step(inner) => {
+                let inner_val = serde_json::to_value(inner).map_err(serde::ser::Error::custom)?;
+                let mut seq = serializer.serialize_seq(None)?;
+                seq.serialize_element("step")?;
                 if let serde_json::Value::Array(top) = &inner_val {
                     for elem in top {
                         if let serde_json::Value::Array(sub) = elem {

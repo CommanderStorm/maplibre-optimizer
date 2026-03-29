@@ -989,6 +989,12 @@ fn box_recursive_types(parent_syntax_enum: &str, rust_type: &str) -> String {
     if t == parent_syntax_enum {
         return format!("Box<{t}>");
     }
+    // Ramp group ↔ AsUnion mutual recursion: e.g. `ColorOrArrayOfColor` contains
+    // `ColorOrArrayOfColorAsUnion` which in turn contains `ColorOrArrayOfColor` via
+    // the `ArrayOfColor` arm. Box the union type to break the cycle.
+    if t == format!("{parent_syntax_enum}AsUnion") {
+        return format!("Box<{t}>");
+    }
     // Cross-type recursion: expression enums that can mutually contain each other
     // need `Box` to break the cycle.
     // Expression enums can mutually contain each other (e.g. Number ↔ String via
