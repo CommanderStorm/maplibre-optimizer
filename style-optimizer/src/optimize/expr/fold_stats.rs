@@ -557,6 +557,119 @@ pub(super) fn try_prune_match_from_stats(
     !dead_arms.is_empty() || changed
 }
 
+/// Look up the frequency (feature count) of a single JSON value in a property's `value_counts`.
+///
+/// Returns `None` when `value_counts` is unavailable (Mixed type, cardinality exceeded, etc.)
+/// — callers should bail out entirely. Returns `Some(0)` for values not found in counts
+/// (rare/unseen values sort last).
+fn value_frequency(v: &Value, prop_stats: &crate::stats::PropertyStats) -> Option<u64> {
+    use super::util::{json_as_i64, json_as_u64};
+    use crate::stats::PropertyStats;
+
+    match prop_stats {
+        PropertyStats::String {
+            value_counts: Some(vc),
+            ..
+        } => Some(v.as_str().and_then(|s| vc.get(s).copied()).unwrap_or(0)),
+        PropertyStats::Integer {
+            value_counts: Some(vc),
+            ..
+        } => Some(json_as_i64(v).and_then(|n| vc.get(&n).copied()).unwrap_or(0)),
+        PropertyStats::UnsignedInteger {
+            value_counts: Some(vc),
+            ..
+        } => Some(json_as_u64(v).and_then(|n| vc.get(&n).copied()).unwrap_or(0)),
+        // No value_counts available — cannot determine frequency.
+        _ => None,
+    }
+}
+
+/// Reorder match arms by descending value frequency so the most common values are tested first.
+///
+/// This is a pure performance optimisation — match labels are disjoint so reordering is
+/// semantically safe. Unlike pruning, this is safe even with sampled data since relative
+/// frequencies are still meaningful.
+pub(super) fn try_reorder_match_from_stats(
+    arr: &mut Vec<Value>,
+    stats: Option<&crate::stats::TileStatistics>,
+    layer_info: Option<&[Option<crate::optimize::source_util::VectorLayerInfo>]>,
+    layer_index: usize,
+) -> bool {
+    use super::util::get_prop_name;
+
+    if arr.first().and_then(Value::as_str) != Some("match") {
+        return false;
+    }
+    // ["match", input, label1, out1, ..., fallback] — min 5 elements, odd length.
+    if arr.len() < 5 || arr.len().is_multiple_of(2) {
+        return false;
+    }
+    let Some(prop) = get_prop_name(&arr[1]) else {
+        return false;
+    };
+
+    let Some(layer_stats) = super::util::resolve_layer_stats(stats, layer_info, layer_index) else {
+        return false;
+    };
+    let Some(prop_stats) = layer_stats.properties.get(prop) else {
+        return false;
+    };
+
+    let arm_count = (arr.len() - 3) / 2;
+
+    // Compute frequency for each arm; bail if any value lacks count data.
+    let mut arm_freqs: Vec<(usize, u64)> = Vec::with_capacity(arm_count);
+    for i in 0..arm_count {
+        let label_idx = 2 + i * 2;
+        let label = &arr[label_idx];
+
+        let freq = match label {
+            Value::Array(labels) => {
+                let mut total: u64 = 0;
+                for v in labels {
+                    let Some(f) = value_frequency(v, prop_stats) else {
+                        return false;
+                    };
+                    total += f;
+                }
+                total
+            }
+            single => {
+                let Some(f) = value_frequency(single, prop_stats) else {
+                    return false;
+                };
+                f
+            }
+        };
+
+        arm_freqs.push((i, freq));
+    }
+
+    // Sort by descending frequency, preserving relative order for ties.
+    arm_freqs.sort_by(|a, b| b.1.cmp(&a.1));
+
+    // Check if the order actually changed.
+    if arm_freqs.iter().enumerate().all(|(pos, (orig, _))| pos == *orig) {
+        return false;
+    }
+
+    // Rebuild the arms in the new order.
+    let mut new_pairs: Vec<(Value, Value)> = Vec::with_capacity(arm_count);
+    for &(orig_idx, _) in &arm_freqs {
+        let label_idx = 2 + orig_idx * 2;
+        new_pairs.push((arr[label_idx].clone(), arr[label_idx + 1].clone()));
+    }
+
+    // Write back in place.
+    for (i, (label, output)) in new_pairs.into_iter().enumerate() {
+        let label_idx = 2 + i * 2;
+        arr[label_idx] = label;
+        arr[label_idx + 1] = output;
+    }
+
+    true
+}
+
 /// Remove dead arms from `["coalesce", arm1, arm2, ...]` when stats prove a `["get", prop]`
 /// arm is always non-null (present on all features), making subsequent arms unreachable.
 ///
