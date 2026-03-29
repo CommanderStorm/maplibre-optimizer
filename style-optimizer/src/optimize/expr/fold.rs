@@ -1182,6 +1182,224 @@ pub(super) fn try_boolean_absorption_typed(filter: &mut Boolean) -> bool {
     true
 }
 
+/// Distributive factoring on JSON expression arrays.
+///
+/// `["any", ["all", A, B], ["all", A, C]]` → `["all", A, ["any", B, C]]`
+/// `["all", ["any", A, B], ["any", A, C]]` → `["any", A, ["all", B, C]]`
+///
+/// Fires when **every** child of the outer operator is the dual operator and all
+/// children share at least one common operand.
+pub(super) fn try_distributive_factoring(arr: &mut Vec<Value>) -> bool {
+    let (outer, dual) = match arr.first().and_then(Value::as_str) {
+        Some("any") => ("any", "all"),
+        Some("all") => ("all", "any"),
+        _ => return false,
+    };
+
+    // Need at least 2 children.
+    if arr.len() < 3 {
+        return false;
+    }
+
+    // Every child must be the dual operator.
+    let children: Vec<&Vec<Value>> = arr[1..]
+        .iter()
+        .filter_map(|child| {
+            let Value::Array(inner) = child else {
+                return None;
+            };
+            if inner.first().and_then(Value::as_str) == Some(dual) && inner.len() >= 2 {
+                Some(inner)
+            } else {
+                None
+            }
+        })
+        .collect();
+
+    if children.len() != arr.len() - 1 {
+        return false;
+    }
+
+    // Find common operands across all children (intersection).
+    // Start with operands of the first child, keep only those present in all others.
+    let first_operands: Vec<&Value> = children[0][1..].iter().collect();
+    let common: Vec<&Value> = first_operands
+        .into_iter()
+        .filter(|op| {
+            children[1..]
+                .iter()
+                .all(|child| child[1..].iter().any(|v| v == *op))
+        })
+        .collect();
+
+    if common.is_empty() {
+        return false;
+    }
+
+    // Build remainders for each child (operands not in the common set).
+    let remainders: Vec<Vec<Value>> = children
+        .iter()
+        .map(|child| {
+            child[1..]
+                .iter()
+                .filter(|v| !common.iter().any(|c| c == v))
+                .cloned()
+                .collect()
+        })
+        .collect();
+
+    // Build the inner expression from remainders wrapped in the outer operator.
+    // Each remainder with 0 elements → identity (true for all, false for any).
+    // Each remainder with 1 element → unwrap.
+    let inner_children: Vec<Value> = remainders
+        .into_iter()
+        .filter_map(|mut rem| {
+            if rem.is_empty() {
+                // This child was entirely common factors → identity element.
+                // For "any" outer: identity is false; for "all" outer: identity is true.
+                // But since we factor into dual(common..., outer(remainders...)),
+                // an empty remainder means the child contributes nothing new.
+                // E.g. ["any", ["all", A], ["all", A, B]] → common={A}, remainders=[[], [B]]
+                // → ["all", A, ["any", true, B]] → ["all", A, true] → ["all", A]
+                // The identity for "any" inner is false, identity for "all" inner is true.
+                // But since outer is what wraps remainders:
+                // outer="any" means the wrapper around remainders is "any",
+                // identity for "any" is false (no-op) - but we want the vacuous
+                // truth/false: all() = true, any() = false.
+                // Actually, a child that was entirely common means ["all", A] contributed A.
+                // After factoring: the remainder is empty, so this slot in the outer
+                // wrapper is: identity of the dual = vacuous dual.
+                // dual="all" → vacuous all = true; dual="any" → vacuous any = false.
+                // The outer wrapper is the original operator:
+                // outer="any" wraps remainders → ["any", vacuous_dual, ...]
+                // vacuous_dual for dual="all" is true → ["any", true, ...] → true (absorbing)
+                // So the entire expression simplifies, but let's just emit the literal
+                // and let other passes clean up.
+                let vacuous = dual == "all";
+                Some(Value::Bool(vacuous))
+            } else if rem.len() == 1 {
+                Some(rem.remove(0))
+            } else {
+                let mut inner = vec![Value::String(dual.to_string())];
+                inner.extend(rem);
+                Some(Value::Array(inner))
+            }
+        })
+        .collect();
+
+    // Build result: [dual, common..., [outer, remainders...]]
+    let mut result = vec![Value::String(dual.to_string())];
+    result.extend(common.into_iter().cloned());
+
+    if inner_children.len() == 1 {
+        result.push(inner_children.into_iter().next().unwrap());
+    } else {
+        let mut wrapper = vec![Value::String(outer.to_string())];
+        wrapper.extend(inner_children);
+        result.push(Value::Array(wrapper));
+    }
+
+    *arr = result;
+    true
+}
+
+/// Distributive factoring on typed `Boolean`:
+///
+/// `Any([All([A, B]), All([A, C])])` → `All([A, Any([B, C])])`
+/// `All([Any([A, B]), Any([A, C])])` → `Any([A, All([B, C])])`
+pub(super) fn try_distributive_factoring_typed(filter: &mut Boolean) -> bool {
+    let is_all = match filter {
+        Boolean::All(_) => true,
+        Boolean::Any(_) => false,
+        _ => return false,
+    };
+
+    let (Boolean::All(children) | Boolean::Any(children)) = filter else {
+        return false;
+    };
+
+    if children.len() < 2 {
+        return false;
+    }
+
+    // Every child must be the dual operator.
+    let all_dual = children.iter().all(|c| {
+        if is_all {
+            matches!(c, Boolean::Any(_))
+        } else {
+            matches!(c, Boolean::All(_))
+        }
+    });
+    if !all_dual {
+        return false;
+    }
+
+    // Extract inner children of each dual-op child.
+    let inner_vecs: Vec<&Vec<Boolean>> = children
+        .iter()
+        .map(|c| match c {
+            Boolean::All(v) | Boolean::Any(v) => v,
+            _ => unreachable!(),
+        })
+        .collect();
+
+    // Find common operands: present in every child.
+    let common: Vec<Boolean> = inner_vecs[0]
+        .iter()
+        .filter(|op| inner_vecs[1..].iter().all(|v| v.contains(op)))
+        .cloned()
+        .collect();
+
+    if common.is_empty() {
+        return false;
+    }
+
+    // Build remainders.
+    let remainders: Vec<Vec<Boolean>> = inner_vecs
+        .iter()
+        .map(|v| v.iter().filter(|x| !common.contains(x)).cloned().collect())
+        .collect();
+
+    // Build inner children for the outer-op wrapper.
+    let inner_children: Vec<Boolean> = remainders
+        .into_iter()
+        .map(|mut rem| {
+            if rem.is_empty() {
+                // Vacuous dual: all()=true, any()=false
+                Boolean::Literal(!is_all)
+            } else if rem.len() == 1 {
+                rem.remove(0)
+            } else if is_all {
+                // Outer is all → dual is any → remainders wrap in any
+                Boolean::Any(rem)
+            } else {
+                // Outer is any → dual is all → remainders wrap in all
+                Boolean::All(rem)
+            }
+        })
+        .collect();
+
+    // Build result: dual(common..., outer(inner_children...))
+    let mut result_children = common;
+    if inner_children.len() == 1 {
+        result_children.push(inner_children.into_iter().next().unwrap());
+    } else {
+        let wrapper = if is_all {
+            Boolean::All(inner_children)
+        } else {
+            Boolean::Any(inner_children)
+        };
+        result_children.push(wrapper);
+    }
+
+    *filter = if is_all {
+        Boolean::Any(result_children)
+    } else {
+        Boolean::All(result_children)
+    };
+    true
+}
+
 /// Check if an `ExprOrLiteral` is a literal (not a computed expression).
 pub(super) fn is_literal(v: &ExprOrLiteral) -> bool {
     matches!(

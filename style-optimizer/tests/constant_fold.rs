@@ -26,6 +26,15 @@ fn fold_passes() -> OptPasses {
     }
 }
 
+fn simplify_passes() -> OptPasses {
+    OptPasses {
+        constant_fold: true,
+        simplify_unary: true,
+        simplify_expressions: true,
+        ..Default::default()
+    }
+}
+
 fn make_stats(layer_name: &str, layer_stats: LayerStats) -> TileStatistics {
     let mut layers = BTreeMap::new();
     layers.insert(layer_name.to_string(), layer_stats);
@@ -681,7 +690,15 @@ fn filter_propagation_match_folds_to_literal() {
     let mut v = style_with_filter_and_paint(
         serde_json::json!(["==", ["get", "class"], "road"]),
         "fill-color",
-        serde_json::json!(["match", ["get", "class"], "road", "#333", "rail", "#666", "#999"]),
+        serde_json::json!([
+            "match",
+            ["get", "class"],
+            "road",
+            "#333",
+            "rail",
+            "#666",
+            "#999"
+        ]),
     );
     optimize_style_json_value(&mut v, &mir, &fold_passes());
     assert_yaml_snapshot!(v["layers"][0]["paint"], @r##"
@@ -707,9 +724,21 @@ fn filter_propagation_case_folds_true_branch() {
 fn filter_propagation_all_extracts_multiple_constraints() {
     let mir = sample_mir();
     let mut v = style_with_filter_and_paint(
-        serde_json::json!(["all", ["==", ["get", "class"], "road"], ["==", ["get", "type"], 3]]),
+        serde_json::json!([
+            "all",
+            ["==", ["get", "class"], "road"],
+            ["==", ["get", "type"], 3]
+        ]),
         "fill-color",
-        serde_json::json!(["match", ["get", "class"], "road", "#333", "rail", "#666", "#999"]),
+        serde_json::json!([
+            "match",
+            ["get", "class"],
+            "road",
+            "#333",
+            "rail",
+            "#666",
+            "#999"
+        ]),
     );
     optimize_style_json_value(&mut v, &mir, &fold_passes());
     assert_yaml_snapshot!(v["layers"][0]["paint"], @r##"
@@ -723,7 +752,15 @@ fn filter_propagation_commuted_equality() {
     let mut v = style_with_filter_and_paint(
         serde_json::json!(["==", "road", ["get", "class"]]),
         "fill-color",
-        serde_json::json!(["match", ["get", "class"], "road", "#333", "rail", "#666", "#999"]),
+        serde_json::json!([
+            "match",
+            ["get", "class"],
+            "road",
+            "#333",
+            "rail",
+            "#666",
+            "#999"
+        ]),
     );
     optimize_style_json_value(&mut v, &mir, &fold_passes());
     assert_yaml_snapshot!(v["layers"][0]["paint"], @r##"
@@ -765,4 +802,119 @@ fn filter_propagation_no_leak_across_layers() {
       - "#333"
       - "#999"
     "##);
+}
+
+// ── Distributive factoring ────────────────────────────────────────────
+
+#[test]
+fn distributive_factor_any_of_alls() {
+    let mir = sample_mir();
+    // ["any", ["all", A, B], ["all", A, C]] → ["all", A, ["any", B, C]]
+    let mut v = style_with_filter(serde_json::json!([
+        "any",
+        ["all", ["has", "name"], ["==", ["get", "class"], "road"]],
+        ["all", ["has", "name"], ["==", ["get", "class"], "rail"]]
+    ]));
+    optimize_style_json_value(&mut v, &mir, &simplify_passes());
+    // Factoring produces ["all", ["has","name"], ["any", ==road, ==rail]]
+    // then any_to_in rewrites the inner any to ["in", ...].
+    assert_yaml_snapshot!(v["layers"][0]["filter"], @r#"
+    - all
+    - - has
+      - name
+    - - in
+      - - get
+        - class
+      - - literal
+        - - road
+          - rail
+    "#);
+}
+
+#[test]
+fn distributive_factor_all_of_anys() {
+    let mir = sample_mir();
+    // ["all", ["any", A, B], ["any", A, C]] → ["any", A, ["all", B, C]]
+    let mut v = style_with_filter(serde_json::json!([
+        "all",
+        ["any", ["has", "name"], ["==", ["get", "class"], "road"]],
+        ["any", ["has", "name"], ["==", ["get", "class"], "rail"]]
+    ]));
+    optimize_style_json_value(&mut v, &mir, &simplify_passes());
+    // Factoring extracts ["has","name"], absorption may also interact.
+    assert_yaml_snapshot!(v["layers"][0]["filter"], @r"
+    - has
+    - name
+    ");
+}
+
+#[test]
+fn distributive_factor_multiple_common() {
+    let mir = sample_mir();
+    // ["any", ["all", A, B, C], ["all", A, B, D]] → ["all", A, B, ["any", C, D]]
+    let mut v = style_with_filter(serde_json::json!([
+        "any",
+        [
+            "all",
+            ["has", "name"],
+            ["has", "rank"],
+            ["==", ["get", "class"], "road"]
+        ],
+        [
+            "all",
+            ["has", "name"],
+            ["has", "rank"],
+            ["==", ["get", "class"], "rail"]
+        ]
+    ]));
+    optimize_style_json_value(&mut v, &mir, &simplify_passes());
+    // Factoring then any_to_in on the remainder.
+    assert_yaml_snapshot!(v["layers"][0]["filter"], @r#"
+    - all
+    - - has
+      - name
+    - - has
+      - rank
+    - - in
+      - - get
+        - class
+      - - literal
+        - - road
+          - rail
+    "#);
+}
+
+#[test]
+fn distributive_factor_no_common_unchanged() {
+    let mir = sample_mir();
+    // No common factor → no change.
+    let mut v = style_with_filter(serde_json::json!([
+        "any",
+        ["all", ["has", "name"], ["==", ["get", "class"], "road"]],
+        ["all", ["has", "rank"], ["==", ["get", "class"], "rail"]]
+    ]));
+    let original = v["layers"][0]["filter"].clone();
+    optimize_style_json_value(&mut v, &mir, &simplify_passes());
+    assert_eq!(v["layers"][0]["filter"], original);
+}
+
+#[test]
+fn distributive_factor_single_child_unchanged() {
+    let mir = sample_mir();
+    // Only one child → no factoring possible.
+    let mut v = style_with_filter(serde_json::json!([
+        "any",
+        ["all", ["has", "name"], ["==", ["get", "class"], "road"]]
+    ]));
+    optimize_style_json_value(&mut v, &mir, &simplify_passes());
+    // simplify_unary unwraps: ["any", X] → X
+    assert_yaml_snapshot!(v["layers"][0]["filter"], @r#"
+    - all
+    - - has
+      - name
+    - - "=="
+      - - get
+        - class
+      - road
+    "#);
 }
