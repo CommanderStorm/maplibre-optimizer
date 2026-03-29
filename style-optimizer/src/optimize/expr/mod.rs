@@ -1,18 +1,21 @@
 //! Expression-tree passes: normalisation, constant folding, selectivity reordering.
 
 mod fold;
+mod fold_stats;
 mod reorder;
 mod simplify;
 pub(crate) mod util;
 
 use fold::{
     try_algebraic_simplify, try_dead_branch_case, try_dead_branch_match_literal,
-    try_filter_contradiction, try_fold_boolean_algebra, try_fold_coalesce_from_stats,
-    try_fold_comparison, try_fold_comparison_from_stats, try_fold_geometry_type_from_stats,
-    try_fold_get_from_stats, try_fold_has_from_stats, try_fold_not, try_fold_pure_operator,
-    try_fold_redundant_coercion, try_fold_redundant_properties, try_negate_comparison,
-    try_predicate_subsumption, try_prune_data_ramp_from_stats, try_prune_in_from_stats,
-    try_prune_match_from_stats, try_range_tightening,
+    try_filter_contradiction, try_fold_boolean_algebra, try_fold_comparison, try_fold_not,
+    try_fold_pure_operator, try_fold_redundant_coercion, try_fold_redundant_properties,
+    try_negate_comparison, try_predicate_subsumption, try_range_tightening,
+};
+use fold_stats::{
+    try_fold_coalesce_from_stats, try_fold_comparison_from_stats,
+    try_fold_geometry_type_from_stats, try_fold_get_from_stats, try_fold_has_from_stats,
+    try_prune_data_ramp_from_stats, try_prune_in_from_stats, try_prune_match_from_stats,
 };
 use maplibre_style_spec::mir::MirSpec;
 use reorder::{LayerContext, reorder_selectivity};
