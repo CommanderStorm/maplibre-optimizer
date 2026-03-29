@@ -589,6 +589,7 @@ fn value_frequency(v: &Value, prop_stats: &crate::stats::PropertyStats) -> Optio
 /// This is a pure performance optimisation — match labels are disjoint so reordering is
 /// semantically safe. Unlike pruning, this is safe even with sampled data since relative
 /// frequencies are still meaningful.
+#[expect(clippy::ptr_arg, reason = "signature must match StatsFoldFn")]
 pub(super) fn try_reorder_match_from_stats(
     arr: &mut Vec<Value>,
     stats: Option<&crate::stats::TileStatistics>,
@@ -646,7 +647,7 @@ pub(super) fn try_reorder_match_from_stats(
     }
 
     // Sort by descending frequency, preserving relative order for ties.
-    arm_freqs.sort_by(|a, b| b.1.cmp(&a.1));
+    arm_freqs.sort_by_key(|entry| std::cmp::Reverse(entry.1));
 
     // Check if the order actually changed.
     if arm_freqs.iter().enumerate().all(|(pos, (orig, _))| pos == *orig) {

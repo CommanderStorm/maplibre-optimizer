@@ -1095,3 +1095,111 @@ fn zoom_fold_in_filter() {
     - name
     "#);
 }
+
+// ── Stats: match arm reordering ─────────────────────────────────────────
+
+#[test]
+fn match_arms_reordered_by_frequency() {
+    let mir = sample_mir();
+    let mut vc = indexmap::IndexMap::new();
+    vc.insert("rare".to_string(), 10_u64);
+    vc.insert("common".to_string(), 1000);
+    vc.insert("medium".to_string(), 100);
+    let stats = make_stats(
+        "lyr",
+        LayerStats {
+            total_features: 1110,
+            properties: BTreeMap::from([(
+                "class".to_string(),
+                PropertyStats::String {
+                    present_count: 1110,
+                    cardinality: 3,
+                    value_counts: Some(vc),
+                },
+            )]),
+            ..Default::default()
+        },
+    );
+    // Arms are in alphabetical order: common, medium, rare.
+    // After reordering, they should be: common (1000), medium (100), rare (10).
+    let mut v = style_with_paint(
+        "fill-color",
+        serde_json::json!([
+            "match", ["get", "class"],
+            "rare", "red",
+            "common", "blue",
+            "medium", "green",
+            "black"
+        ]),
+    );
+    optimize_style_json_value_with_stats(&mut v, &mir, &simplify_passes(), Some(&stats));
+    assert_yaml_snapshot!(v["layers"][0]["paint"]["fill-color"], @r#"
+    - match
+    - - get
+      - class
+    - common
+    - blue
+    - medium
+    - green
+    - rare
+    - red
+    - black
+    "#);
+}
+
+#[test]
+fn match_arms_unchanged_when_already_ordered() {
+    let mir = sample_mir();
+    let mut vc = indexmap::IndexMap::new();
+    vc.insert("a".to_string(), 100_u64);
+    vc.insert("b".to_string(), 10);
+    let stats = make_stats(
+        "lyr",
+        LayerStats {
+            total_features: 110,
+            properties: BTreeMap::from([(
+                "class".to_string(),
+                PropertyStats::String {
+                    present_count: 110,
+                    cardinality: 2,
+                    value_counts: Some(vc),
+                },
+            )]),
+            ..Default::default()
+        },
+    );
+    let mut v = style_with_paint(
+        "fill-color",
+        serde_json::json!(["match", ["get", "class"], "a", "red", "b", "blue", "black"]),
+    );
+    let original = v["layers"][0]["paint"]["fill-color"].clone();
+    optimize_style_json_value_with_stats(&mut v, &mir, &simplify_passes(), Some(&stats));
+    assert_eq!(v["layers"][0]["paint"]["fill-color"], original);
+}
+
+#[test]
+fn match_arms_not_reordered_without_value_counts() {
+    let mir = sample_mir();
+    let stats = make_stats(
+        "lyr",
+        LayerStats {
+            total_features: 100,
+            properties: BTreeMap::from([(
+                "class".to_string(),
+                PropertyStats::String {
+                    present_count: 100,
+                    cardinality: 50,
+                    value_counts: None,
+                },
+            )]),
+            ..Default::default()
+        },
+    );
+    let mut v = style_with_paint(
+        "fill-color",
+        serde_json::json!(["match", ["get", "class"], "b", "red", "a", "blue", "black"]),
+    );
+    let original = v["layers"][0]["paint"]["fill-color"].clone();
+    optimize_style_json_value_with_stats(&mut v, &mir, &simplify_passes(), Some(&stats));
+    assert_eq!(v["layers"][0]["paint"]["fill-color"], original);
+}
