@@ -422,55 +422,24 @@ pub(super) fn try_algebraic_simplify(arr: &mut Vec<Value>) -> bool {
     let Some(op) = arr[0].as_str() else {
         return false;
     };
+    // NOTE on identity-element removal: `op(identity, x) → x` is only sound
+    // when x is guaranteed to be a number. If x could be null at runtime,
+    // the arithmetic operator coerces null → 0, but bare x would remain null.
+    // Only apply these when the other operand is a known literal (which proves
+    // the expression is well-typed and won't produce null from the identity side).
+    // We conservatively only apply when the non-identity operand is itself a
+    // literal (both sides known), handled by try_fold_pure_operator instead.
+    //
+    // NOTE: `x * 0 → 0` is unsound because x may be NaN at runtime
+    // (0 * NaN = NaN, not 0). Same for `0 * x`.
+    // NOTE: `0 / x → 0` is unsound (0 / 0 = NaN in IEEE 754, not 0).
+    //
+    // The only safe algebraic simplification is x ^ 0 → 1, because
+    // JavaScript's Math.pow(x, 0) === 1 for all x including NaN and Infinity.
     match op {
-        "*" => {
-            if is_num(&arr[2], 1.0) {
-                let x = arr[1].clone();
-                replace_arr_with_value(arr, x);
-                return true;
-            }
-            if is_num(&arr[1], 1.0) {
-                let x = arr[2].clone();
-                replace_arr_with_value(arr, x);
-                return true;
-            }
-            // NOTE: `x * 0 → 0` is unsound because x may be NaN at runtime
-            // (0 * NaN = NaN, not 0). Same for `0 * x`.
-        }
-        "+" => {
-            if is_num(&arr[2], 0.0) {
-                let x = arr[1].clone();
-                replace_arr_with_value(arr, x);
-                return true;
-            }
-            if is_num(&arr[1], 0.0) {
-                let x = arr[2].clone();
-                replace_arr_with_value(arr, x);
-                return true;
-            }
-        }
-        "-" if is_num(&arr[2], 0.0) => {
-            let x = arr[1].clone();
-            replace_arr_with_value(arr, x);
+        "^" if is_num(&arr[2], 0.0) => {
+            *arr = vec![Value::String("literal".to_string()), Value::from(1.0)];
             return true;
-        }
-        // NOTE: `0 / x → 0` is unsound (0 / 0 = NaN in IEEE 754, not 0).
-        "/" if is_num(&arr[2], 1.0) => {
-            let x = arr[1].clone();
-            replace_arr_with_value(arr, x);
-            return true;
-        }
-        "^" => {
-            if is_num(&arr[2], 1.0) {
-                let x = arr[1].clone();
-                replace_arr_with_value(arr, x);
-                return true;
-            }
-            // x ^ 0 → 1
-            if is_num(&arr[2], 0.0) {
-                *arr = vec![Value::String("literal".to_string()), Value::from(1.0)];
-                return true;
-            }
         }
         _ => {}
     }

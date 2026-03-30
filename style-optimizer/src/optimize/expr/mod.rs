@@ -29,7 +29,7 @@ use simplify::{
     try_inline_let_var, try_merge_in_expressions, try_rewrite_any_to_in, try_rewrite_boolean_match,
     try_rewrite_case_to_match, try_simplify_case, try_simplify_coalesce,
     try_simplify_interpolate_or_step, try_simplify_match, try_simplify_single_in,
-    try_strip_coalesce_in_comparison,
+    try_strip_coalesce_in_comparison, try_strip_coalesce_in_match,
 };
 pub(crate) use util::extract_json_literal;
 
@@ -316,6 +316,11 @@ static RULES: &[RewriteRule] = &[
         gate: RuleGate::SimplifyExpressions,
         scope: RuleScope::Peephole,
         apply: try_strip_coalesce_in_comparison,
+    },
+    RewriteRule::Pure {
+        gate: RuleGate::SimplifyExpressions,
+        scope: RuleScope::Peephole,
+        apply: try_strip_coalesce_in_match,
     },
     RewriteRule::Pure {
         gate: RuleGate::SimplifyExpressions,

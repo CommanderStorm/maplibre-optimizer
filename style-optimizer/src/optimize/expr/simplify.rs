@@ -451,6 +451,53 @@ pub(super) fn try_strip_coalesce_in_comparison(arr: &mut Vec<Value>) -> bool {
     false
 }
 
+/// Strip redundant `coalesce` wrapping on the input of a `match` expression.
+///
+/// `["match", ["coalesce", inner, default], label1, out1, ..., fallback]`
+/// → `["match", inner, label1, out1, ..., fallback]`
+///
+/// when `default` does not appear in any match label. In that case, a missing
+/// field produces `default` via coalesce → falls through to the match fallback.
+/// Without coalesce, a missing field produces `null` → also falls through to
+/// the match fallback. Same result.
+pub(super) fn try_strip_coalesce_in_match(arr: &mut Vec<Value>) -> bool {
+    if arr.first().and_then(Value::as_str) != Some("match") {
+        return false;
+    }
+    // match needs at least: ["match", input, label, output, fallback]
+    if arr.len() < 5 {
+        return false;
+    }
+    let Some(coalesce) = arr.get(1).and_then(Value::as_array) else {
+        return false;
+    };
+    if coalesce.len() != 3 || coalesce[0].as_str() != Some("coalesce") {
+        return false;
+    }
+    let Some(default_lit) = extract_json_literal(&coalesce[2]) else {
+        return false;
+    };
+
+    // Check that the default doesn't appear in any match label.
+    // Labels are at positions 2, 4, 6, ... (every other element before the fallback).
+    for label in arr[2..].iter().step_by(2).take((arr.len() - 2) / 2) {
+        match label {
+            Value::Array(values) => {
+                if values.iter().any(|v| *v == default_lit) {
+                    return false;
+                }
+            }
+            single if *single == default_lit => return false,
+            _ => {}
+        }
+    }
+
+    // Safe: replace coalesce with its inner expression.
+    let inner = coalesce[1].clone();
+    arr[1] = inner;
+    true
+}
+
 /// Simplify `coalesce` expressions:
 ///
 /// - `["coalesce", x]` → `x` (single arg)
