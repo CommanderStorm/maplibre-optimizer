@@ -21,6 +21,7 @@ use fold_stats::{
     try_reorder_match_from_stats,
 };
 use maplibre_style_spec::mir::MirSpec;
+use maplibre_style_spec::spec::Boolean;
 use reorder::{LayerContext, reorder_selectivity};
 use serde_json::Value;
 use simplify::{
@@ -363,9 +364,9 @@ pub(crate) struct NormalizeFoldVisitor<'a> {
     pub stats: Option<&'a TileStatistics>,
     pub layer_info: Option<&'a [Option<VectorLayerInfo>]>,
     pub changed: bool,
-    /// Equality constraints extracted from the current layer's filter.
-    /// Each entry is `(target_expr, literal_value)` — e.g. `(["get","class"], "road")`.
-    pub filter_constraints: Vec<(Value, Value)>,
+    /// Typed filter constraints extracted for propagation into properties.
+    /// Each entry is a `Boolean` variant from the generated spec types.
+    pub filter_constraints: Vec<Boolean>,
 }
 
 impl StyleVisitor for NormalizeFoldVisitor<'_> {
@@ -405,14 +406,9 @@ impl StyleVisitor for NormalizeFoldVisitor<'_> {
 
     fn visit_property(&mut self, ctx: &PropertyContext<'_>, value: &mut Value) {
         if self.passes.constant_fold {
-            // Filter-to-property constant propagation: substitute ["get", "prop"]
-            // with the known literal value when the filter guarantees it.
-            for (target, replacement) in &self.filter_constraints {
-                let substituted = simplify::substitute_expr(value, target, replacement);
-                if substituted != *value {
-                    *value = substituted;
-                    self.changed = true;
-                }
+            // Filter-to-property constant propagation.
+            for constraint in &self.filter_constraints {
+                self.changed |= simplify::apply_filter_constraint(value, constraint);
             }
 
             for rule in RULES {
@@ -483,31 +479,77 @@ fn fold_id_to_null(v: &mut Value) -> bool {
     changed
 }
 
-/// Extract equality constraints from a filter for constant propagation into properties.
+/// Extract typed filter constraints for constant propagation into properties.
 ///
-/// Recognises `["==", ["get", p], lit]` (and the commuted form) at the top level
-/// or inside a top-level `["all", …]`.  Nested `all` is handled recursively.
-fn extract_filter_constraints(filter: &Value, out: &mut Vec<(Value, Value)>) {
-    let Value::Array(arr) = filter else { return };
-    match arr.first().and_then(Value::as_str) {
-        Some("all") => {
-            for clause in &arr[1..] {
-                extract_filter_constraints(clause, out);
+/// Deserializes the JSON filter to `Boolean` and walks the typed tree, collecting
+/// constraints from `All` (recursively), `EqualEqual`, `Has`, `In`, and range comparisons.
+fn extract_filter_constraints(filter: &Value, out: &mut Vec<Boolean>) {
+    let Ok(b) = serde_json::from_value::<Boolean>(filter.clone()) else {
+        return;
+    };
+    extract_from_boolean(&b, out);
+}
+
+/// Walk a typed `Boolean` tree, collecting propagatable constraints.
+fn extract_from_boolean(b: &Boolean, out: &mut Vec<Boolean>) {
+    use maplibre_style_spec::spec::{Array, ExprOrLiteral};
+
+    match b {
+        Boolean::All(children) => {
+            for child in children {
+                extract_from_boolean(child, out);
             }
         }
-        Some("==") if arr.len() == 3 => {
-            // ["==", A, B] — one side must be a literal, the other a non-literal expression.
-            if let Some(lit) = extract_json_literal(&arr[2])
-                && extract_json_literal(&arr[1]).is_none()
-            {
-                out.push((arr[1].clone(), lit));
-            } else if let Some(lit) = extract_json_literal(&arr[1])
-                && extract_json_literal(&arr[2]).is_none()
-            {
-                out.push((arr[2].clone(), lit));
-            }
+        Boolean::EqualEqual(lhs, rhs, None)
+            if (fold::is_literal(rhs) && !fold::is_literal(lhs))
+                || (fold::is_literal(lhs) && !fold::is_literal(rhs)) =>
+        {
+            out.push(b.clone());
+        }
+        Boolean::Has(prop, None)
+            if matches!(prop.as_ref(), maplibre_style_spec::spec::String::Literal(_)) =>
+        {
+            out.push(b.clone());
+        }
+        Boolean::In(needle, haystack)
+            if !fold::is_literal(needle)
+                && extract_in_domain(haystack).is_some_and(|d| !d.is_empty()) =>
+        {
+            out.push(b.clone());
+        }
+        // Range comparisons — only with numeric literal bound on one side.
+        Boolean::Less(lhs, rhs, None)
+        | Boolean::LessEqual(lhs, rhs, None)
+        | Boolean::Greater(lhs, rhs, None)
+        | Boolean::GreaterEqual(lhs, rhs, None)
+            if (is_finite_number(rhs) && !fold::is_literal(lhs))
+                || (is_finite_number(lhs) && !fold::is_literal(rhs)) =>
+        {
+            out.push(b.clone());
         }
         _ => {}
+    }
+
+    /// Check if an `ExprOrLiteral` is a finite numeric literal.
+    fn is_finite_number(v: &ExprOrLiteral) -> bool {
+        matches!(v, ExprOrLiteral::NumberLiteral(n)
+            if n.as_f64().is_some_and(f64::is_finite))
+    }
+
+    /// Extract domain values from an `in` haystack expression.
+    /// `["literal", [v1, v2, ...]]` deserializes as `ArrayExpr(Literal(JSONArrayLiteral(...)))`.
+    fn extract_in_domain(haystack: &ExprOrLiteral) -> Option<&[Value]> {
+        match haystack {
+            ExprOrLiteral::ArrayExpr(arr) => {
+                if let Array::Literal(lit) = arr.as_ref() {
+                    Some(&lit.0)
+                } else {
+                    None
+                }
+            }
+            ExprOrLiteral::JSONArrayLiteral(lit) => Some(&lit.0),
+            _ => None,
+        }
     }
 }
 
@@ -628,7 +670,6 @@ use fold::{
     try_negate_comparison_typed,
 };
 use fold_stats::{try_fold_geometry_type_from_stats_typed, try_fold_has_from_stats_typed};
-use maplibre_style_spec::spec::Boolean;
 use simplify::{
     try_boolean_flattening_typed, try_demorgan_typed, try_rewrite_any_to_in_typed,
     try_simplify_unary_typed,

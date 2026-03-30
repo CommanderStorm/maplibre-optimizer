@@ -666,9 +666,303 @@ fn try_step_stop_dedup(arr: &mut Vec<Value>) -> bool {
     true
 }
 
-// ── Typed Boolean rules ──────────────────────────────────────────────────────
+// ── Filter-to-property constraint application ────────────────────────────────
 
-use maplibre_style_spec::spec::{Boolean, ExprOrLiteral};
+use maplibre_style_spec::spec::{self, Boolean, ExprOrLiteral};
+
+/// Serialize an `ExprOrLiteral` to a JSON `Value`.
+fn expr_to_value(e: &ExprOrLiteral) -> Value {
+    serde_json::to_value(e).unwrap_or(Value::Null)
+}
+
+/// Apply a typed `Boolean` constraint to a JSON property value.
+/// Returns `true` if the property was modified.
+pub(super) fn apply_filter_constraint(value: &mut Value, constraint: &Boolean) -> bool {
+    match constraint {
+        Boolean::EqualEqual(lhs, rhs, None) => {
+            let (target, lit) = if super::fold::is_literal(rhs) && !super::fold::is_literal(lhs) {
+                (expr_to_value(lhs), expr_to_value(rhs))
+            } else if super::fold::is_literal(lhs) && !super::fold::is_literal(rhs) {
+                (expr_to_value(rhs), expr_to_value(lhs))
+            } else {
+                return false;
+            };
+            let substituted = substitute_expr(value, &target, &lit);
+            if substituted != *value {
+                *value = substituted;
+                return true;
+            }
+            false
+        }
+        Boolean::Has(prop, None) => {
+            let spec::String::Literal(s) = prop.as_ref() else {
+                return false;
+            };
+            apply_has_constraint(value, s.as_str())
+        }
+        Boolean::In(needle, haystack) => {
+            let domain = match haystack {
+                ExprOrLiteral::ArrayExpr(arr) => {
+                    if let spec::Array::Literal(lit) = arr.as_ref() {
+                        &lit.0
+                    } else {
+                        return false;
+                    }
+                }
+                ExprOrLiteral::JSONArrayLiteral(lit) => &lit.0,
+                _ => return false,
+            };
+            let target = expr_to_value(needle);
+            apply_domain_constraint(value, &target, domain)
+        }
+        Boolean::Less(lhs, rhs, None) => apply_typed_range(value, lhs, rhs, "<"),
+        Boolean::LessEqual(lhs, rhs, None) => apply_typed_range(value, lhs, rhs, "<="),
+        Boolean::Greater(lhs, rhs, None) => apply_typed_range(value, lhs, rhs, ">"),
+        Boolean::GreaterEqual(lhs, rhs, None) => apply_typed_range(value, lhs, rhs, ">="),
+        _ => false,
+    }
+}
+
+/// Helper: normalise a typed range constraint to `[op, expr, lit]` form and apply.
+fn apply_typed_range(
+    value: &mut Value,
+    lhs: &ExprOrLiteral,
+    rhs: &ExprOrLiteral,
+    op: &str,
+) -> bool {
+    let lhs_is_lit = super::fold::is_literal(lhs);
+    let rhs_is_lit = super::fold::is_literal(rhs);
+    let (target, bound, norm_op) = if rhs_is_lit && !lhs_is_lit {
+        (expr_to_value(lhs), expr_to_value(rhs), op)
+    } else if lhs_is_lit && !rhs_is_lit {
+        // Commute: `[op, lit, expr]` → `[flipped_op, expr, lit]`.
+        let flipped = match op {
+            "<" => ">",
+            "<=" => ">=",
+            ">" => "<",
+            ">=" => "<=",
+            _ => return false,
+        };
+        (expr_to_value(rhs), expr_to_value(lhs), flipped)
+    } else {
+        return false;
+    };
+    apply_range_constraint(value, &target, norm_op, &bound)
+}
+
+/// `has` constraint: if a property is guaranteed to exist, `coalesce` with that
+/// property as an argument can be truncated at that argument (it won't be null).
+fn apply_has_constraint(v: &mut Value, property: &str) -> bool {
+    let Value::Array(arr) = v else {
+        return false;
+    };
+    // At coalesce nodes, truncate after the guaranteed-present `["get", property]`.
+    if arr.first().and_then(Value::as_str) == Some("coalesce") {
+        let get_target = Value::Array(vec![
+            Value::String("get".to_string()),
+            Value::String(property.to_string()),
+        ]);
+        if let Some(pos) = arr[1..].iter().position(|arg| *arg == get_target) {
+            let idx = pos + 1; // offset for the "coalesce" keyword
+            if idx + 1 < arr.len() {
+                // Truncate everything after this arg — it's guaranteed non-null.
+                arr.truncate(idx + 1);
+                return true;
+            }
+        }
+    }
+    // Recurse into children.
+    let mut changed = false;
+    for child in arr.iter_mut() {
+        changed |= apply_has_constraint(child, property);
+    }
+    changed
+}
+
+/// Domain (`in`) constraint: prune `match` arms whose labels are outside the domain.
+fn apply_domain_constraint(v: &mut Value, target: &Value, domain: &[Value]) -> bool {
+    let Value::Array(arr) = v else {
+        return false;
+    };
+    if arr.first().and_then(Value::as_str) == Some("match")
+        && arr.len() >= 5
+        && !arr.len().is_multiple_of(2)
+        && arr[1] == *target
+    {
+        return prune_match_arms_by_domain(arr, domain);
+    }
+    // Recurse into children.
+    let mut changed = false;
+    for child in arr.iter_mut() {
+        changed |= apply_domain_constraint(child, target, domain);
+    }
+    changed
+}
+
+/// Remove match arms whose labels have no intersection with the domain.
+/// Shrink grouped label arrays to only domain members.
+fn prune_match_arms_by_domain(arr: &mut Vec<Value>, domain: &[Value]) -> bool {
+    // ["match", input, label1, out1, ..., fallback]
+    let input = arr[1].clone();
+    let fallback = arr.last().unwrap().clone();
+    let arm_count = (arr.len() - 3) / 2;
+
+    let mut new_arr = vec![Value::String("match".to_string()), input];
+    let mut any_pruned = false;
+
+    for i in 0..arm_count {
+        let label_val = &arr[2 + i * 2];
+        let output = &arr[3 + i * 2];
+
+        let labels: Vec<&Value> = match label_val {
+            Value::Array(labels) => labels.iter().collect(),
+            single => vec![single],
+        };
+
+        let kept: Vec<Value> = labels
+            .into_iter()
+            .filter(|l| domain.contains(l))
+            .cloned()
+            .collect();
+
+        if kept.is_empty() {
+            any_pruned = true;
+            continue;
+        }
+        if kept.len()
+            < match label_val {
+                Value::Array(a) => a.len(),
+                _ => 1,
+            }
+        {
+            any_pruned = true;
+        }
+
+        let label = if kept.len() == 1 {
+            kept.into_iter().next().unwrap()
+        } else {
+            Value::Array(kept)
+        };
+        new_arr.push(label);
+        new_arr.push(output.clone());
+    }
+
+    if !any_pruned {
+        return false;
+    }
+
+    new_arr.push(fallback);
+
+    // All arms pruned → collapse to fallback.
+    if new_arr.len() == 3 {
+        *arr = vec![Value::String("literal".to_string()), new_arr.remove(2)];
+    } else {
+        *arr = new_arr;
+    }
+    true
+}
+
+/// Range constraint: fold comparisons that are implied true/false by the filter's range.
+fn apply_range_constraint(
+    v: &mut Value,
+    filter_target: &Value,
+    filter_op: &str,
+    filter_bound: &Value,
+) -> bool {
+    let Value::Array(arr) = v else {
+        return false;
+    };
+
+    if let Some(result) = try_fold_range_comparison(arr, filter_target, filter_op, filter_bound) {
+        replace_arr_with_value(arr, Value::Bool(result));
+        return true;
+    }
+
+    // Recurse into children.
+    let mut changed = false;
+    for child in arr.iter_mut() {
+        changed |= apply_range_constraint(child, filter_target, filter_op, filter_bound);
+    }
+    changed
+}
+
+/// Check if a comparison node `[cmp_op, lhs, rhs]` is implied true or false
+/// by the filter constraint `filter_op(filter_target, filter_bound)`.
+///
+/// Returns `Some(true)` / `Some(false)` when the implication is certain, `None` otherwise.
+fn try_fold_range_comparison(
+    arr: &[Value],
+    filter_target: &Value,
+    filter_op: &str,
+    filter_bound: &Value,
+) -> Option<bool> {
+    use std::cmp::Ordering::{Equal, Greater, Less};
+
+    use super::util::compare_json_values;
+
+    let prop_op = arr.first().and_then(Value::as_str)?;
+    if !matches!(prop_op, "<" | "<=" | ">" | ">=") || arr.len() != 3 {
+        return None;
+    }
+
+    // Determine which side is the target and which is the property's bound.
+    let (prop_op_norm, prop_bound) = if arr[1] == *filter_target {
+        // [op, target, lit] — already normalised.
+        (prop_op, &arr[2])
+    } else if arr[2] == *filter_target {
+        // [op, lit, target] — commute.
+        let flipped = match prop_op {
+            "<" => ">",
+            "<=" => ">=",
+            ">" => "<",
+            ">=" => "<=",
+            _ => return None,
+        };
+        (flipped, &arr[1])
+    } else {
+        return None;
+    };
+
+    // Both bounds must be numeric for comparison.
+    filter_bound.as_f64().filter(|f| f.is_finite())?;
+    prop_bound.as_f64().filter(|f| f.is_finite())?;
+
+    // ordering = compare(F, P): Greater means F > P, Less means F < P.
+    let ordering = compare_json_values(filter_bound, prop_bound)?;
+
+    // Filter guarantees: target `filter_op` F.
+    // Property tests:    target `prop_op_norm` P.
+    // We ask: does the filter imply the property is always true or always false?
+    match (filter_op, prop_op_norm) {
+        // Filter: target >= F
+        (">=", ">=") if matches!(ordering, Greater | Equal) => Some(true), // F >= P ⇒ target >= P
+        (">=", ">") if matches!(ordering, Greater) => Some(true),          // F > P ⇒ target > P
+        (">=", "<") if matches!(ordering, Greater | Equal) => Some(false), // F >= P ⇒ ¬(target < P)
+        (">=", "<=") if matches!(ordering, Greater) => Some(false),        // F > P ⇒ ¬(target <= P)
+
+        // Filter: target > F
+        (">", ">=") if matches!(ordering, Greater | Equal) => Some(true), // F >= P ⇒ target >= P
+        (">", ">") if matches!(ordering, Greater | Equal) => Some(true),  // F >= P ⇒ target > P
+        (">", "<") if matches!(ordering, Greater | Equal) => Some(false), // F >= P ⇒ ¬(target < P)
+        (">", "<=") if matches!(ordering, Greater | Equal) => Some(false), // F >= P ⇒ ¬(target <= P)
+
+        // Filter: target <= F
+        ("<=", "<=") if matches!(ordering, Less | Equal) => Some(true), // F <= P ⇒ target <= P
+        ("<=", "<") if matches!(ordering, Less) => Some(true),          // F < P ⇒ target < P
+        ("<=", ">") if matches!(ordering, Less | Equal) => Some(false), // F <= P ⇒ ¬(target > P)
+        ("<=", ">=") if matches!(ordering, Less) => Some(false),        // F < P ⇒ ¬(target >= P)
+
+        // Filter: target < F
+        ("<", "<=") if matches!(ordering, Less | Equal) => Some(true), // F <= P ⇒ target <= P
+        ("<", "<") if matches!(ordering, Less | Equal) => Some(true),  // F <= P ⇒ target < P
+        ("<", ">") if matches!(ordering, Less | Equal) => Some(false), // F <= P ⇒ ¬(target > P)
+        ("<", ">=") if matches!(ordering, Less | Equal) => Some(false), // F <= P ⇒ ¬(target >= P)
+
+        _ => None,
+    }
+}
+
+// ── Typed Boolean rules ──────────────────────────────────────────────────────
 
 /// De Morgan's law on typed `Boolean`:
 /// `Not(All([A, B, ...]))` → `Any([Not(A), Not(B), ...])`
@@ -775,10 +1069,9 @@ pub(super) fn try_rewrite_any_to_in_typed(filter: &mut Boolean) -> bool {
     let Some(expr) = common_expr else {
         return false;
     };
-    let literal_array =
-        ExprOrLiteral::JSONArrayLiteral(maplibre_style_spec::spec::JSONArrayLiteral(
-            values.into_iter().map(expr_or_literal_to_json).collect(),
-        ));
+    let literal_array = ExprOrLiteral::JSONArrayLiteral(spec::JSONArrayLiteral(
+        values.into_iter().map(expr_or_literal_to_json).collect(),
+    ));
     *filter = Boolean::In(expr.clone(), literal_array);
     true
 }

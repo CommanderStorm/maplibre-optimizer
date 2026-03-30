@@ -804,6 +804,258 @@ fn filter_propagation_no_leak_across_layers() {
     "##);
 }
 
+// ── Filter-to-property: `has` constraint ──────────────────────────────
+
+#[test]
+fn filter_propagation_has_eliminates_coalesce_fallback() {
+    let mir = sample_mir();
+    let mut v = style_with_filter_and_paint(
+        serde_json::json!(["has", "name"]),
+        "fill-color",
+        serde_json::json!(["coalesce", ["get", "name"], "unnamed"]),
+    );
+    // simplify_passes needed so try_simplify_coalesce unwraps single-arg coalesce.
+    optimize_style_json_value(&mut v, &mir, &simplify_passes());
+    assert_yaml_snapshot!(v["layers"][0]["paint"], @r##"
+    fill-color:
+      - get
+      - name
+    "##);
+}
+
+#[test]
+fn filter_propagation_has_coalesce_not_first_arg() {
+    let mir = sample_mir();
+    // `has` guarantees "alt_name" exists — it's the second coalesce arg.
+    // The first arg (["get", "name"]) is NOT guaranteed, so it stays.
+    let mut v = style_with_filter_and_paint(
+        serde_json::json!(["has", "alt_name"]),
+        "fill-color",
+        serde_json::json!(["coalesce", ["get", "name"], ["get", "alt_name"], "fallback"]),
+    );
+    optimize_style_json_value(&mut v, &mir, &fold_passes());
+    assert_yaml_snapshot!(v["layers"][0]["paint"], @r##"
+    fill-color:
+      - coalesce
+      - - get
+        - name
+      - - get
+        - alt_name
+    "##);
+}
+
+#[test]
+fn filter_propagation_has_nested() {
+    let mir = sample_mir();
+    // `has` constraint should propagate into nested expressions.
+    let mut v = style_with_filter_and_paint(
+        serde_json::json!(["has", "name"]),
+        "fill-color",
+        serde_json::json!([
+            "case",
+            ["==", ["get", "type"], "primary"],
+            ["coalesce", ["get", "name"], "unnamed"],
+            "#ccc"
+        ]),
+    );
+    optimize_style_json_value(&mut v, &mir, &simplify_passes());
+    assert_yaml_snapshot!(v["layers"][0]["paint"], @r##"
+    fill-color:
+      - case
+      - - "=="
+        - - get
+          - type
+        - primary
+      - - get
+        - name
+      - "#ccc"
+    "##);
+}
+
+// ── Filter-to-property: `in`/domain constraint ───────────────────────
+
+#[test]
+fn filter_propagation_in_prunes_match_arms() {
+    let mir = sample_mir();
+    let mut v = style_with_filter_and_paint(
+        serde_json::json!(["in", ["get", "class"], ["literal", ["road", "rail"]]]),
+        "fill-color",
+        serde_json::json!([
+            "match",
+            ["get", "class"],
+            "road",
+            "#333",
+            "rail",
+            "#666",
+            "water",
+            "#00f",
+            "#999"
+        ]),
+    );
+    optimize_style_json_value(&mut v, &mir, &fold_passes());
+    assert_yaml_snapshot!(v["layers"][0]["paint"], @r##"
+    fill-color:
+      - match
+      - - get
+        - class
+      - road
+      - "#333"
+      - rail
+      - "#666"
+      - "#999"
+    "##);
+}
+
+#[test]
+fn filter_propagation_in_collapses_to_fallback() {
+    let mir = sample_mir();
+    // Domain is ["park"] but match only has "road" and "rail" arms → all pruned → fallback.
+    let mut v = style_with_filter_and_paint(
+        serde_json::json!(["in", ["get", "class"], ["literal", ["park"]]]),
+        "fill-color",
+        serde_json::json!([
+            "match",
+            ["get", "class"],
+            "road",
+            "#333",
+            "rail",
+            "#666",
+            "#999"
+        ]),
+    );
+    optimize_style_json_value(&mut v, &mir, &fold_passes());
+    assert_yaml_snapshot!(v["layers"][0]["paint"], @r##"
+    fill-color: "#999"
+    "##);
+}
+
+#[test]
+fn filter_propagation_in_with_array_labels() {
+    let mir = sample_mir();
+    // Grouped labels: ["road", "rail"] maps to "#333". Domain is ["road", "water"].
+    // "rail" should be pruned from the group.
+    let mut v = style_with_filter_and_paint(
+        serde_json::json!(["in", ["get", "class"], ["literal", ["road", "water"]]]),
+        "fill-color",
+        serde_json::json!([
+            "match",
+            ["get", "class"],
+            ["road", "rail"],
+            "#333",
+            "water",
+            "#00f",
+            "#999"
+        ]),
+    );
+    optimize_style_json_value(&mut v, &mir, &fold_passes());
+    assert_yaml_snapshot!(v["layers"][0]["paint"], @r##"
+    fill-color:
+      - match
+      - - get
+        - class
+      - road
+      - "#333"
+      - water
+      - "#00f"
+      - "#999"
+    "##);
+}
+
+// ── Filter-to-property: range constraint ─────────────────────────────
+
+#[test]
+fn filter_propagation_range_folds_ge_to_true() {
+    let mir = sample_mir();
+    // Filter: scalerank >= 3. Property: scalerank >= 1 → always true.
+    let mut v = style_with_filter_and_paint(
+        serde_json::json!([">=", ["get", "scalerank"], 3]),
+        "fill-color",
+        serde_json::json!(["case", [">=", ["get", "scalerank"], 1], "#0f0", "#ccc"]),
+    );
+    optimize_style_json_value(&mut v, &mir, &fold_passes());
+    assert_yaml_snapshot!(v["layers"][0]["paint"], @r##"
+    fill-color: "#0f0"
+    "##);
+}
+
+#[test]
+fn filter_propagation_range_folds_lt_to_false() {
+    let mir = sample_mir();
+    // Filter: scalerank >= 3. Property: scalerank < 2 → always false.
+    let mut v = style_with_filter_and_paint(
+        serde_json::json!([">=", ["get", "scalerank"], 3]),
+        "fill-color",
+        serde_json::json!(["case", ["<", ["get", "scalerank"], 2], "#0f0", "#ccc"]),
+    );
+    optimize_style_json_value(&mut v, &mir, &fold_passes());
+    assert_yaml_snapshot!(v["layers"][0]["paint"], @r##"
+    fill-color: "#ccc"
+    "##);
+}
+
+#[test]
+fn filter_propagation_range_no_fold_ambiguous() {
+    let mir = sample_mir();
+    // Filter: scalerank >= 3. Property: scalerank >= 5 → can't determine.
+    let mut v = style_with_filter_and_paint(
+        serde_json::json!([">=", ["get", "scalerank"], 3]),
+        "fill-color",
+        serde_json::json!(["case", [">=", ["get", "scalerank"], 5], "#0f0", "#ccc"]),
+    );
+    optimize_style_json_value(&mut v, &mir, &fold_passes());
+    assert_yaml_snapshot!(v["layers"][0]["paint"], @r##"
+    fill-color:
+      - case
+      - - ">="
+        - - get
+          - scalerank
+        - 5
+      - "#0f0"
+      - "#ccc"
+    "##);
+}
+
+#[test]
+fn filter_propagation_range_commuted() {
+    let mir = sample_mir();
+    // Filter: `3 <= scalerank` (commuted form of scalerank >= 3).
+    // Property: scalerank >= 1 → always true.
+    let mut v = style_with_filter_and_paint(
+        serde_json::json!(["<=", 3, ["get", "scalerank"]]),
+        "fill-color",
+        serde_json::json!(["case", [">=", ["get", "scalerank"], 1], "#0f0", "#ccc"]),
+    );
+    optimize_style_json_value(&mut v, &mir, &fold_passes());
+    assert_yaml_snapshot!(v["layers"][0]["paint"], @r##"
+    fill-color: "#0f0"
+    "##);
+}
+
+// ── Filter-to-property: mixed constraints ────────────────────────────
+
+#[test]
+fn filter_propagation_all_with_mixed_constraints() {
+    let mir = sample_mir();
+    // `all` with `has` + `==`: both should apply.
+    let mut v = style_with_filter_and_paint(
+        serde_json::json!(["all", ["has", "name"], ["==", ["get", "class"], "road"]]),
+        "fill-color",
+        serde_json::json!([
+            "match",
+            ["get", "class"],
+            "road",
+            ["coalesce", ["get", "name"], "unnamed"],
+            "#ccc"
+        ]),
+    );
+    optimize_style_json_value(&mut v, &mir, &simplify_passes());
+    assert_yaml_snapshot!(v["layers"][0]["paint"], @r##"
+    fill-color:
+      - get
+      - name
+    "##);
+}
+
 // ── Distributive factoring ────────────────────────────────────────────
 
 #[test]
