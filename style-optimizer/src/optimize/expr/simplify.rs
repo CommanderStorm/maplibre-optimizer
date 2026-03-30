@@ -174,6 +174,49 @@ pub(super) fn try_simplify_match(arr: &mut Vec<Value>) -> bool {
     true
 }
 
+/// Rewrite boolean match expressions to `in` or `==`/`!=`.
+///
+/// - `["match", input, labels, true, false]` → `["in", input, ["literal", labels]]`
+///   (single-element labels will be further simplified to `==` by `try_simplify_single_in`)
+/// - `["match", input, [single], false, true]` → `["!=", input, single]`
+pub(super) fn try_rewrite_boolean_match(arr: &mut Vec<Value>) -> bool {
+    // Layout: ["match", input, label1, out1, ..., fallback] — must have exactly one arm.
+    // One arm means: ["match", input, labels, output, fallback] = 5 elements.
+    if arr.len() != 5 || arr[0].as_str() != Some("match") {
+        return false;
+    }
+
+    let (is_true_false, is_false_true) = match (&arr[3], &arr[4]) {
+        (Value::Bool(true), Value::Bool(false)) => (true, false),
+        (Value::Bool(false), Value::Bool(true)) => (false, true),
+        _ => return false,
+    };
+
+    let labels = match &arr[2] {
+        Value::Array(labels) => labels.clone(),
+        single => vec![single.clone()],
+    };
+
+    if is_true_false {
+        // ["match", input, labels, true, false] → ["in", input, ["literal", labels]]
+        let input = arr[1].take();
+        let literal_arr = Value::Array(vec![
+            Value::String("literal".to_string()),
+            Value::Array(labels),
+        ]);
+        *arr = vec![Value::String("in".to_string()), input, literal_arr];
+        true
+    } else if is_false_true && labels.len() == 1 {
+        // ["match", input, [single], false, true] → ["!=", input, single]
+        let input = arr[1].take();
+        let val = labels.into_iter().next().unwrap();
+        *arr = vec![Value::String("!=".to_string()), input, val];
+        true
+    } else {
+        false
+    }
+}
+
 /// Rewrite `["any", ["==", x, a], ["==", x, b], ...]` → `["in", x, ["literal", [a, b, ...]]]`.
 ///
 /// Only applies when every predicate is `["==", same_expr, literal]` (or the commuted form).

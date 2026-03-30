@@ -26,7 +26,7 @@ use reorder::{LayerContext, reorder_selectivity};
 use serde_json::Value;
 use simplify::{
     try_boolean_flattening, try_canonicalize_interpolation_curve, try_demorgan, try_flatten_case,
-    try_inline_let_var, try_merge_in_expressions, try_rewrite_any_to_in,
+    try_inline_let_var, try_merge_in_expressions, try_rewrite_any_to_in, try_rewrite_boolean_match,
     try_rewrite_case_to_match, try_simplify_case, try_simplify_coalesce,
     try_simplify_interpolate_or_step, try_simplify_match, try_simplify_single_in,
 };
@@ -308,6 +308,11 @@ static RULES: &[RewriteRule] = &[
         gate: RuleGate::SimplifyExpressions,
         scope: RuleScope::Peephole,
         apply: try_simplify_match,
+    },
+    RewriteRule::Pure {
+        gate: RuleGate::SimplifyExpressions,
+        scope: RuleScope::Peephole,
+        apply: try_rewrite_boolean_match,
     },
     RewriteRule::Pure {
         gate: RuleGate::SimplifyExpressions,

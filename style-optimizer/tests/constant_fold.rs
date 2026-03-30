@@ -1773,8 +1773,10 @@ fn case_to_match_string_labels() {
         "fill-color",
         serde_json::json!([
             "case",
-            ["==", ["get", "class"], "road"], "red",
-            ["==", ["get", "class"], "rail"], "blue",
+            ["==", ["get", "class"], "road"],
+            "red",
+            ["==", ["get", "class"], "rail"],
+            "blue",
             "gray"
         ]),
     );
@@ -1798,8 +1800,10 @@ fn case_to_match_numeric_labels() {
         "fill-color",
         serde_json::json!([
             "case",
-            ["==", ["get", "level"], 1], "a",
-            ["==", ["get", "level"], 2], "b",
+            ["==", ["get", "level"], 1],
+            "a",
+            ["==", ["get", "level"], 2],
+            "b",
             "c"
         ]),
     );
@@ -1823,8 +1827,10 @@ fn case_to_match_commuted_equality() {
         "fill-color",
         serde_json::json!([
             "case",
-            ["==", "road", ["get", "class"]], "red",
-            ["==", "rail", ["get", "class"]], "blue",
+            ["==", "road", ["get", "class"]],
+            "red",
+            ["==", "rail", ["get", "class"]],
+            "blue",
             "gray"
         ]),
     );
@@ -1846,11 +1852,7 @@ fn case_to_match_single_arm_no_conversion() {
     let mir = sample_mir();
     let mut v = style_with_paint(
         "fill-color",
-        serde_json::json!([
-            "case",
-            ["==", ["get", "class"], "road"], "red",
-            "gray"
-        ]),
+        serde_json::json!(["case", ["==", ["get", "class"], "road"], "red", "gray"]),
     );
     optimize_style_json_value(&mut v, &mir, &simplify_passes());
     // Single arm stays as case — not worth converting.
@@ -1872,8 +1874,10 @@ fn case_to_match_non_uniform_expr_no_conversion() {
         "fill-color",
         serde_json::json!([
             "case",
-            ["==", ["get", "class"], "road"], "red",
-            ["==", ["get", "type"], "rail"], "blue",
+            ["==", ["get", "class"], "road"],
+            "red",
+            ["==", ["get", "type"], "rail"],
+            "blue",
             "gray"
         ]),
     );
@@ -1902,8 +1906,10 @@ fn case_to_match_bool_labels_no_conversion() {
         "fill-color",
         serde_json::json!([
             "case",
-            ["==", ["get", "x"], true], "a",
-            ["==", ["get", "x"], false], "b",
+            ["==", ["get", "x"], true],
+            "a",
+            ["==", ["get", "x"], false],
+            "b",
             "c"
         ]),
     );
@@ -1962,20 +1968,21 @@ fn case_to_match_in_filter() {
     let mir = sample_mir();
     let mut v = style_with_filter(serde_json::json!([
         "case",
-        ["==", ["get", "class"], "road"], true,
-        ["==", ["get", "class"], "rail"], true,
+        ["==", ["get", "class"], "road"],
+        true,
+        ["==", ["get", "class"], "rail"],
+        true,
         false
     ]));
     optimize_style_json_value(&mut v, &mir, &simplify_passes());
-    assert_yaml_snapshot!(v["layers"][0]["filter"], @r#"
-    - match
+    assert_yaml_snapshot!(v["layers"][0]["filter"], @r"
+    - in
     - - get
       - class
-    - - road
-      - rail
-    - true
-    - false
-    "#);
+    - - literal
+      - - road
+        - rail
+    ");
 }
 
 #[test]
@@ -1988,11 +1995,16 @@ fn nested_case_flatten_then_match() {
         "fill-color",
         serde_json::json!([
             "case",
-            ["==", ["get", "class"], "road"], "red",
-            ["==", ["get", "class"], "water"], "aqua",
-            ["case",
-                ["==", ["get", "class"], "rail"], "blue",
-                ["==", ["get", "class"], "path"], "green",
+            ["==", ["get", "class"], "road"],
+            "red",
+            ["==", ["get", "class"], "water"],
+            "aqua",
+            [
+                "case",
+                ["==", ["get", "class"], "rail"],
+                "blue",
+                ["==", ["get", "class"], "path"],
+                "green",
                 "gray"
             ]
         ]),

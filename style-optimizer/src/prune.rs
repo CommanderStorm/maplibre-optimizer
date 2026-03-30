@@ -5,9 +5,7 @@
 
 use std::collections::HashSet;
 
-use maplibre_style_spec::spec::expressions::{
-    Any, Boolean, ExprOrLiteral, String as StringExpr,
-};
+use maplibre_style_spec::spec::expressions::{Any, Boolean, ExprOrLiteral, String as StringExpr};
 use serde_json::Value;
 
 use crate::advisory::{GeometryType, SourceAdvisory, SourceLayerAdvisory, UnusedValues};
@@ -429,9 +427,7 @@ fn resolve_expr<'a>(
 ) -> Resolved<'a> {
     match expr {
         ExprOrLiteral::Bool(b) => Resolved::Bool(*b),
-        ExprOrLiteral::NumberLiteral(n) => {
-            Resolved::Number(n.as_f64().unwrap_or(f64::NAN))
-        }
+        ExprOrLiteral::NumberLiteral(n) => Resolved::Number(n.as_f64().unwrap_or(f64::NAN)),
         ExprOrLiteral::StringLiteral(s) => Resolved::Str(s.as_str()),
         ExprOrLiteral::AnyExpr(any) => match any.as_ref() {
             Any::Get(prop, None) => {
@@ -443,12 +439,10 @@ fn resolve_expr<'a>(
                     None => Resolved::Null,
                 }
             }
-            Any::Id => feature
-                .id
-                .map_or(Resolved::Null, |id| {
-                    #[expect(clippy::cast_precision_loss)]
-                    Resolved::Number(id as f64)
-                }),
+            Any::Id => feature.id.map_or(Resolved::Null, |id| {
+                #[expect(clippy::cast_precision_loss)]
+                Resolved::Number(id as f64)
+            }),
             _ => Resolved::Null,
         },
         ExprOrLiteral::StringExpr(s) => match s.as_ref() {
@@ -478,11 +472,7 @@ fn resolve_string_expr(expr: &StringExpr) -> Option<&str> {
 }
 
 /// Check if a feature has a property by name.
-fn feature_has_property(
-    prop_name: &str,
-    feature: &mvt::tile::Feature,
-    keys: &[String],
-) -> bool {
+fn feature_has_property(prop_name: &str, feature: &mvt::tile::Feature, keys: &[String]) -> bool {
     let mut i = 0;
     while i + 1 < feature.tags.len() {
         let ki = feature.tags[i] as usize;
@@ -542,8 +532,7 @@ fn eval_filter(
             matches!((ra.as_f64(), rb.as_f64()), (Some(x), Some(y)) if x >= y)
         }
         Boolean::Has(prop, None) => {
-            resolve_string_expr(prop)
-                .is_some_and(|name| feature_has_property(name, feature, keys))
+            resolve_string_expr(prop).is_some_and(|name| feature_has_property(name, feature, keys))
         }
         Boolean::In(needle, haystack) => {
             let rn = resolve_expr(needle, feature, keys, values);
@@ -552,9 +541,7 @@ fn eval_filter(
                 && let Any::Get(prop, None) = any.as_ref()
             {
                 // ["in", needle, ["get", prop]] — check if needle is substring
-                if let (Some(name), Resolved::Str(needle_str)) =
-                    (resolve_string_expr(prop), &rn)
-                {
+                if let (Some(name), Resolved::Str(needle_str)) = (resolve_string_expr(prop), &rn) {
                     return lookup_property(name, feature, keys, values)
                         .and_then(|v| v.string_value.as_deref())
                         .is_some_and(|s| s.contains(needle_str));
@@ -568,8 +555,7 @@ fn eval_filter(
                 let (cases, fallback) = arms;
                 for (cond, result) in cases {
                     if eval_filter(cond, feature, keys, values) {
-                        return resolve_expr(result, feature, keys, values)
-                            != Resolved::Null
+                        return resolve_expr(result, feature, keys, values) != Resolved::Null
                             && resolve_expr(result, feature, keys, values)
                                 != Resolved::Bool(false);
                     }
@@ -600,10 +586,7 @@ fn count_matching_filters(
 /// Reorder features within a layer by the number of style-layer filters they match.
 /// Features matching more filters are placed first (higher priority).
 /// Uses stable sort to preserve original order for ties.
-fn reorder_features_by_priority(
-    layer: &mut mvt::tile::Layer,
-    layer_filters: &[Boolean],
-) {
+fn reorder_features_by_priority(layer: &mut mvt::tile::Layer, layer_filters: &[Boolean]) {
     if layer_filters.is_empty() {
         return;
     }
@@ -621,7 +604,10 @@ fn reorder_features_by_priority(
 
     // Apply the permutation.
     let old_features = std::mem::take(&mut layer.features);
-    layer.features = indices.into_iter().map(|i| old_features[i].clone()).collect();
+    layer.features = indices
+        .into_iter()
+        .map(|i| old_features[i].clone())
+        .collect();
 }
 
 #[cfg(test)]
@@ -1124,11 +1110,7 @@ mod tests {
         prune_tile(&mut tile, &advisory, 10);
 
         let transport = tile.layers.iter().find(|l| l.name == "transport").unwrap();
-        let ids: Vec<u64> = transport
-            .features
-            .iter()
-            .map(|f| f.id.unwrap())
-            .collect();
+        let ids: Vec<u64> = transport.features.iter().map(|f| f.id.unwrap()).collect();
 
         // road matches f1 + f3 = 2, rail matches f2 + f3 = 2, path matches 0.
         // road and rail tied at 2, so they keep original order. path last.
@@ -1169,11 +1151,7 @@ mod tests {
         prune_tile(&mut tile, &advisory, 10);
 
         let transport = tile.layers.iter().find(|l| l.name == "transport").unwrap();
-        let ids: Vec<u64> = transport
-            .features
-            .iter()
-            .map(|f| f.id.unwrap())
-            .collect();
+        let ids: Vec<u64> = transport.features.iter().map(|f| f.id.unwrap()).collect();
         // All match equally, so original order preserved.
         assert_eq!(ids, vec![1, 2, 3]);
     }
@@ -1202,11 +1180,7 @@ mod tests {
         prune_tile(&mut tile, &advisory, 10);
 
         let transport = tile.layers.iter().find(|l| l.name == "transport").unwrap();
-        let ids: Vec<u64> = transport
-            .features
-            .iter()
-            .map(|f| f.id.unwrap())
-            .collect();
+        let ids: Vec<u64> = transport.features.iter().map(|f| f.id.unwrap()).collect();
         // No filters → no reordering.
         assert_eq!(ids, vec![1, 2, 3]);
     }
@@ -1266,5 +1240,4 @@ mod tests {
         // So Point should come first.
         assert_eq!(ids, vec![2, 1]);
     }
-
 }
