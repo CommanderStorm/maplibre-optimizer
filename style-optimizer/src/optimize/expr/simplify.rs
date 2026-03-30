@@ -4,6 +4,28 @@ use serde_json::Value;
 
 use super::util::{extract_json_literal, replace_arr_with_value};
 
+/// Canonicalize `["exponential", 1]` → `["linear"]` in interpolate expressions.
+#[expect(clippy::ptr_arg, reason = "to make trait happy")]
+pub(super) fn try_canonicalize_interpolation_curve(arr: &mut Vec<Value>) -> bool {
+    let Some(op) = arr[0].as_str() else {
+        return false;
+    };
+    if !matches!(op, "interpolate" | "interpolate-hcl" | "interpolate-lab") {
+        return false;
+    }
+    let Some(method) = arr.get(1).and_then(Value::as_array) else {
+        return false;
+    };
+    if method.len() == 2
+        && method[0].as_str() == Some("exponential")
+        && method[1].as_f64() == Some(1.0)
+    {
+        arr[1] = Value::Array(vec![Value::String("linear".into())]);
+        return true;
+    }
+    false
+}
+
 /// Simplify `interpolate`/`interpolate-hcl`/`interpolate-lab` and `step` expressions
 /// when all output values are structurally equal.
 pub(super) fn try_simplify_interpolate_or_step(arr: &mut Vec<Value>) -> bool {

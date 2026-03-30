@@ -1391,11 +1391,9 @@ fn case_flatten_two_level() {
         "fill-opacity",
         serde_json::json!([
             "case",
-            ["==", ["get", "kind"], "park"], 0.8,
-            ["case",
-                ["==", ["get", "kind"], "water"], 0.6,
-                0.2
-            ]
+            ["==", ["get", "kind"], "park"],
+            0.8,
+            ["case", ["==", ["get", "kind"], "water"], 0.6, 0.2]
         ]),
     );
     optimize_style_json_value(&mut v, &mir, &simplify_passes());
@@ -1422,13 +1420,13 @@ fn case_flatten_three_level() {
         "fill-opacity",
         serde_json::json!([
             "case",
-            ["==", ["get", "kind"], "park"], 0.9,
-            ["case",
-                ["==", ["get", "kind"], "water"], 0.7,
-                ["case",
-                    ["==", ["get", "kind"], "sand"], 0.5,
-                    0.1
-                ]
+            ["==", ["get", "kind"], "park"],
+            0.9,
+            [
+                "case",
+                ["==", ["get", "kind"], "water"],
+                0.7,
+                ["case", ["==", ["get", "kind"], "sand"], 0.5, 0.1]
             ]
         ]),
     );
@@ -1459,11 +1457,7 @@ fn case_flatten_noop_non_case_fallback() {
     let mir = sample_mir();
     let mut v = style_with_paint(
         "fill-opacity",
-        serde_json::json!([
-            "case",
-            ["==", ["get", "kind"], "park"], 0.8,
-            0.2
-        ]),
+        serde_json::json!(["case", ["==", ["get", "kind"], "park"], 0.8, 0.2]),
     );
     optimize_style_json_value(&mut v, &mir, &simplify_passes());
     assert_yaml_snapshot!(v["layers"][0]["paint"]["fill-opacity"], @r#"
@@ -1475,4 +1469,72 @@ fn case_flatten_noop_non_case_fallback() {
     - 0.8
     - 0.2
     "#);
+}
+
+// ── Interpolation curve canonicalization ──────────────────────────────
+
+#[test]
+fn canonicalize_exponential_1_to_linear() {
+    let mir = sample_mir();
+    let mut v = style_with_paint(
+        "fill-opacity",
+        serde_json::json!(["interpolate", ["exponential", 1], ["zoom"], 0, 0.0, 10, 1.0]),
+    );
+    optimize_style_json_value(&mut v, &mir, &simplify_passes());
+    assert_yaml_snapshot!(v["layers"][0]["paint"]["fill-opacity"], @r"
+    - interpolate
+    - - linear
+    - - zoom
+    - 0
+    - 0
+    - 10
+    - 1
+    ");
+}
+
+#[test]
+fn canonicalize_exponential_1_hcl() {
+    let mir = sample_mir();
+    let mut v = style_with_paint(
+        "fill-color",
+        serde_json::json!([
+            "interpolate-hcl",
+            ["exponential", 1],
+            ["zoom"],
+            0,
+            "#000",
+            10,
+            "#fff"
+        ]),
+    );
+    optimize_style_json_value(&mut v, &mir, &simplify_passes());
+    assert_yaml_snapshot!(v["layers"][0]["paint"]["fill-color"], @r##"
+    - interpolate-hcl
+    - - linear
+    - - zoom
+    - 0
+    - "#000"
+    - 10
+    - "#fff"
+    "##);
+}
+
+#[test]
+fn no_canonicalize_exponential_non_1() {
+    let mir = sample_mir();
+    let mut v = style_with_paint(
+        "fill-opacity",
+        serde_json::json!([
+            "interpolate",
+            ["exponential", 1.5],
+            ["zoom"],
+            0,
+            0.0,
+            10,
+            1.0
+        ]),
+    );
+    let original = v["layers"][0]["paint"]["fill-opacity"].clone();
+    optimize_style_json_value(&mut v, &mir, &simplify_passes());
+    assert_eq!(v["layers"][0]["paint"]["fill-opacity"], original);
 }

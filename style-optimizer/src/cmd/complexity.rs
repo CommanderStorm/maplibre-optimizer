@@ -23,7 +23,10 @@ fn default_reference_path() -> PathBuf {
 }
 
 pub fn run(args: &ComplexityArgs) -> anyhow::Result<()> {
-    let reference_path = args.reference.clone().unwrap_or_else(default_reference_path);
+    let reference_path = args
+        .reference
+        .clone()
+        .unwrap_or_else(default_reference_path);
     let mir = load_intermediate_spec_from_v8_path(&reference_path)?;
 
     let json_text =
