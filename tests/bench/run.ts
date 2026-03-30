@@ -65,6 +65,9 @@ const BENCH_STYLES: BenchStyle[] = [
   { id: "osm-liberty",  url: "https://maputnik.github.io/osm-liberty/style.json",                                   cachePath: path.join(RESULTS_DIR, "_cached_osm-liberty.json") },
   { id: "americana",       url: "https://americanamap.org/style.json",                                              cachePath: path.join(RESULTS_DIR, "_cached_americana.json") },
   { id: "stadia-outdoors", url: "https://tiles.stadiamaps.com/styles/outdoors.json",                                 cachePath: path.join(RESULTS_DIR, "_cached_stadia-outdoors.json") },
+  // Government/institutional styles — verbose, many layers, legacy syntax needs migration
+  { id: "icgc-fosc",      url: "https://geoserveis.icgc.cat/contextmaps/icgc_mapa_base_fosc.json",                  cachePath: path.join(RESULTS_DIR, "_cached_icgc-fosc.json") },
+  { id: "icgc-gris",      url: "https://geoserveis.icgc.cat/contextmaps/icgc_mapa_base_gris.json",                  cachePath: path.join(RESULTS_DIR, "_cached_icgc-gris.json") },
 ];
 
 // ── CLI args ─────────────────────────────────────────────────────────────────
@@ -216,9 +219,24 @@ async function fetchStyle(style: BenchStyle): Promise<string> {
   if (!resp.ok) throw new Error(`Failed to fetch ${style.id}: ${resp.status} ${resp.statusText}`);
   const text = await resp.text();
   JSON.parse(text);
-  fs.writeFileSync(style.cachePath, text);
-  console.log(`Cached ${style.id} (${(text.length / 1024).toFixed(1)} KB)`);
-  return text;
+
+  // Run gl-style-migrate to convert legacy property functions and filters to expressions
+  const rawPath = style.cachePath + ".raw";
+  fs.writeFileSync(rawPath, text);
+  try {
+    const migrated = execFileSync("gl-style-migrate", [rawPath], { encoding: "utf8", timeout: 10_000 });
+    JSON.parse(migrated);
+    fs.writeFileSync(style.cachePath, migrated);
+    console.log(`Cached ${style.id} (${(text.length / 1024).toFixed(1)} KB raw → ${(migrated.length / 1024).toFixed(1)} KB migrated)`);
+    return migrated;
+  } catch {
+    // Migration failed — use the raw style as-is
+    fs.writeFileSync(style.cachePath, text);
+    console.log(`Cached ${style.id} (${(text.length / 1024).toFixed(1)} KB, migration skipped)`);
+    return text;
+  } finally {
+    try { fs.unlinkSync(rawPath); } catch {}
+  }
 }
 
 // ── optimize style via Rust binary ───────────────────────────────────────────
