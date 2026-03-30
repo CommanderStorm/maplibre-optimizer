@@ -41,7 +41,9 @@ const TILE_PROXY_PORT = 8765;
 const TILE_PROXY_URL = `http://localhost:${TILE_PROXY_PORT}`;
 
 // ── benchmark styles ────────────────────────────────────────────────────────
-// All styles must share the same upstream origin so the tile proxy can serve them.
+// Styles are fetched, cached, and their tile sources rewritten to use the
+// openfreemap proxy. All styles must use OpenMapTiles schema so the tiles
+// are interchangeable.
 
 interface BenchStyle {
   id: string;
@@ -50,10 +52,19 @@ interface BenchStyle {
 }
 
 const BENCH_STYLES: BenchStyle[] = [
+  // OpenFreeMap built-in styles (already point to the right tile server)
   { id: "liberty",  url: "https://tiles.openfreemap.org/styles/liberty",  cachePath: path.join(RESULTS_DIR, "_cached_liberty.json") },
   { id: "bright",   url: "https://tiles.openfreemap.org/styles/bright",   cachePath: path.join(RESULTS_DIR, "_cached_bright.json") },
   { id: "positron", url: "https://tiles.openfreemap.org/styles/positron", cachePath: path.join(RESULTS_DIR, "_cached_positron.json") },
   { id: "fiord",    url: "https://tiles.openfreemap.org/styles/fiord",    cachePath: path.join(RESULTS_DIR, "_cached_fiord.json") },
+  // OpenMapTiles community styles — more verbose/unoptimized, good for showing optimizer impact
+  { id: "dark-matter",  url: "https://cdn.jsdelivr.net/gh/openmaptiles/dark-matter-gl-style@v1.9/style.json",      cachePath: path.join(RESULTS_DIR, "_cached_dark-matter.json") },
+  { id: "osm-bright",   url: "https://cdn.jsdelivr.net/gh/openmaptiles/osm-bright-gl-style@v1.11/style.json",      cachePath: path.join(RESULTS_DIR, "_cached_osm-bright.json") },
+  { id: "klokan-basic", url: "https://cdn.jsdelivr.net/gh/openmaptiles/klokantech-basic-gl-style@v1.10/style.json", cachePath: path.join(RESULTS_DIR, "_cached_klokan-basic.json") },
+  { id: "toner",        url: "https://cdn.jsdelivr.net/gh/openmaptiles/toner-gl-style@v1.0/style.json",             cachePath: path.join(RESULTS_DIR, "_cached_toner.json") },
+  { id: "osm-liberty",  url: "https://maputnik.github.io/osm-liberty/style.json",                                   cachePath: path.join(RESULTS_DIR, "_cached_osm-liberty.json") },
+  { id: "americana",       url: "https://americanamap.org/style.json",                                              cachePath: path.join(RESULTS_DIR, "_cached_americana.json") },
+  { id: "stadia-outdoors", url: "https://tiles.stadiamaps.com/styles/outdoors.json",                                 cachePath: path.join(RESULTS_DIR, "_cached_stadia-outdoors.json") },
 ];
 
 // ── CLI args ─────────────────────────────────────────────────────────────────
@@ -140,19 +151,23 @@ interface ScenarioResult {
  * The `pass` is the human-readable pass name (with underscores).
  */
 const ABLATION_STEPS: { pass: string; flag: string }[] = [
-  { pass: "simplify_unary",      flag: "--simplify-unary" },
-  { pass: "expression_kind",     flag: "--expression-kind" },
-  { pass: "constant_fold",       flag: "--constant-fold" },
-  { pass: "simplify_expressions", flag: "--simplify-expressions" },
-  { pass: "strip_defaults",      flag: "--strip-defaults" },
-  { pass: "minify_colors",       flag: "--minify-colors" },
-  { pass: "strip_metadata",      flag: "--strip-metadata" },
-  { pass: "dead_elimination",    flag: "--dead-elimination" },
-  { pass: "metadata_refinement", flag: "--metadata-refinement" },
-  { pass: "cleanup",             flag: "--cleanup" },
-  { pass: "layer_merge",         flag: "--layer-merge" },
+  { pass: "simplify_unary",           flag: "--simplify-unary" },
+  { pass: "expression_kind",          flag: "--expression-kind" },
+  { pass: "constant_fold",            flag: "--constant-fold" },
+  { pass: "constant_fold_stats",      flag: "--constant-fold-stats" },
+  { pass: "simplify_expressions",     flag: "--simplify-expressions" },
+  { pass: "strip_defaults",           flag: "--strip-defaults" },
+  { pass: "minify_colors",            flag: "--minify-colors" },
+  { pass: "strip_metadata",           flag: "--strip-metadata" },
+  { pass: "dead_elimination",         flag: "--dead-elimination" },
+  { pass: "dead_elimination_stats",   flag: "--dead-elimination-stats" },
+  { pass: "metadata_refinement",      flag: "--metadata-refinement" },
+  { pass: "metadata_refinement_paint", flag: "--metadata-refinement-paint" },
+  { pass: "metadata_refinement_stats", flag: "--metadata-refinement-stats" },
+  { pass: "cleanup",                  flag: "--cleanup" },
+  { pass: "layer_merge",              flag: "--layer-merge" },
   // Only when --mbtiles is provided
-  { pass: "selectivity_reorder", flag: "--selectivity-reorder" },
+  { pass: "selectivity_reorder",      flag: "--selectivity-reorder" },
 ];
 
 // ── Puppeteer args ───────────────────────────────────────────────────────────
@@ -507,10 +522,44 @@ async function checkTileProxy(): Promise<void> {
 }
 
 function rewriteStyleForProxy(styleJson: string): string {
-  return styleJson.replaceAll(
-    "https://tiles.openfreemap.org",
-    TILE_PROXY_URL,
-  );
+  const style = JSON.parse(styleJson);
+
+  // Rewrite all vector tile sources to use the proxy's openfreemap tiles
+  if (style.sources) {
+    for (const [key, src] of Object.entries(style.sources as Record<string, any>)) {
+      if (src.type === "vector") {
+        // Point to the proxy's openmaptiles source
+        src.url = `${TILE_PROXY_URL}/sources/openmaptiles`;
+        delete src.tiles;
+      }
+      // Rewrite raster/raster-dem tile URLs if they point to openfreemap
+      if (src.tiles && Array.isArray(src.tiles)) {
+        src.tiles = src.tiles.map((t: string) =>
+          t.replace("https://tiles.openfreemap.org", TILE_PROXY_URL),
+        );
+      }
+      if (src.url && typeof src.url === "string") {
+        src.url = src.url.replace("https://tiles.openfreemap.org", TILE_PROXY_URL);
+      }
+    }
+  }
+
+  // Rewrite sprite and glyphs URLs to use the proxy
+  if (style.sprite && typeof style.sprite === "string") {
+    style.sprite = style.sprite.replace("https://tiles.openfreemap.org", TILE_PROXY_URL);
+    // External sprites (jsdelivr etc.) → use openfreemap's sprite via proxy
+    if (!style.sprite.startsWith(TILE_PROXY_URL)) {
+      style.sprite = `${TILE_PROXY_URL}/sprites/liberty/sprite`;
+    }
+  }
+  if (style.glyphs && typeof style.glyphs === "string") {
+    style.glyphs = style.glyphs.replace("https://tiles.openfreemap.org", TILE_PROXY_URL);
+    if (!style.glyphs.startsWith(TILE_PROXY_URL)) {
+      style.glyphs = `${TILE_PROXY_URL}/fonts/{fontstack}/{range}.pbf`;
+    }
+  }
+
+  return JSON.stringify(style);
 }
 
 // ── run a single benchmark in the browser ────────────────────────────────────
