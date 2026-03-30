@@ -36,11 +36,25 @@ const MAPLIBRE_CSS = path.resolve(
 );
 const OPTIMIZER = path.join(REPO_ROOT, "target/release/maplibre-style-optimize");
 const RESULTS_DIR = path.join(__dirname, "results");
-const CACHED_STYLE = path.join(RESULTS_DIR, "_cached_style.json");
-const STYLE_URL = "https://tiles.openfreemap.org/styles/liberty";
 
 const TILE_PROXY_PORT = 8765;
 const TILE_PROXY_URL = `http://localhost:${TILE_PROXY_PORT}`;
+
+// ── benchmark styles ────────────────────────────────────────────────────────
+// All styles must share the same upstream origin so the tile proxy can serve them.
+
+interface BenchStyle {
+  id: string;
+  url: string;
+  cachePath: string;
+}
+
+const BENCH_STYLES: BenchStyle[] = [
+  { id: "liberty",  url: "https://tiles.openfreemap.org/styles/liberty",  cachePath: path.join(RESULTS_DIR, "_cached_liberty.json") },
+  { id: "bright",   url: "https://tiles.openfreemap.org/styles/bright",   cachePath: path.join(RESULTS_DIR, "_cached_bright.json") },
+  { id: "positron", url: "https://tiles.openfreemap.org/styles/positron", cachePath: path.join(RESULTS_DIR, "_cached_positron.json") },
+  { id: "fiord",    url: "https://tiles.openfreemap.org/styles/fiord",    cachePath: path.join(RESULTS_DIR, "_cached_fiord.json") },
+];
 
 // ── CLI args ─────────────────────────────────────────────────────────────────
 
@@ -50,15 +64,22 @@ const isolated = argv.includes("--isolated");
 const runsArg = argv.findIndex((a) => a === "--runs");
 const warmupArg = argv.findIndex((a) => a === "--warmup");
 const mbtilesArg = argv.findIndex((a) => a === "--mbtiles");
+const stylesArg = argv.findIndex((a) => a === "--styles");
 const RUNS = runsArg >= 0 ? parseInt(argv[runsArg + 1], 10) : 15;
 const WARMUP = warmupArg >= 0 ? parseInt(argv[warmupArg + 1], 10) : 1;
 const MBTILES = mbtilesArg >= 0 ? argv[mbtilesArg + 1] : undefined;
+// --styles liberty,bright or omit for all
+const styleFilter = stylesArg >= 0 ? argv[stylesArg + 1].split(",") : undefined;
+const STYLES = styleFilter
+  ? BENCH_STYLES.filter((s) => styleFilter.includes(s.id))
+  : BENCH_STYLES;
 const filters = argv.filter(
   (a, i) =>
     !a.startsWith("--") &&
     i !== runsArg + 1 &&
     i !== warmupArg + 1 &&
-    i !== mbtilesArg + 1,
+    i !== mbtilesArg + 1 &&
+    i !== stylesArg + 1,
 );
 
 const RUN_TIMEOUT = 120_000;
@@ -139,12 +160,15 @@ const ABLATION_STEPS: { pass: string; flag: string }[] = [
 const HALF_CPUS = Math.max(1, Math.floor(os.cpus().length / 2));
 
 const PUPPETEER_ARGS = [
-  // Use real GPU for realistic performance measurement.
+  // Use real GPU via ANGLE/Vulkan for realistic performance measurement.
   // Unlike the render tests (which use SwiftShader for pixel-exact comparison),
   // benchmarks need real GPU timings to be meaningful.
   "--enable-gpu",
   "--enable-webgl",
   "--ignore-gpu-blocklist",
+  "--enable-unsafe-swiftshader",
+  "--use-angle=vulkan",
+  "--enable-features=Vulkan,UseSkiaRenderer",
   // Limit Chrome's parallelism to half the available CPUs for more stable benchmarks
   `--renderer-process-limit=${HALF_CPUS}`,
   "--disable-background-networking",
@@ -165,20 +189,20 @@ function buildOptimizer(): void {
   }
 }
 
-// ── fetch and cache the OpenFreeMap liberty style ────────────────────────────
+// ── fetch and cache styles ───────────────────────────────────────────────────
 
-async function fetchStyle(): Promise<string> {
-  if (fs.existsSync(CACHED_STYLE)) {
-    console.log("Using cached style from", CACHED_STYLE);
-    return fs.readFileSync(CACHED_STYLE, "utf8");
+async function fetchStyle(style: BenchStyle): Promise<string> {
+  if (fs.existsSync(style.cachePath)) {
+    console.log(`Using cached ${style.id} from ${style.cachePath}`);
+    return fs.readFileSync(style.cachePath, "utf8");
   }
-  console.log(`Fetching style from ${STYLE_URL}…`);
-  const resp = await fetch(STYLE_URL);
-  if (!resp.ok) throw new Error(`Failed to fetch style: ${resp.status} ${resp.statusText}`);
+  console.log(`Fetching ${style.id} from ${style.url}…`);
+  const resp = await fetch(style.url);
+  if (!resp.ok) throw new Error(`Failed to fetch ${style.id}: ${resp.status} ${resp.statusText}`);
   const text = await resp.text();
   JSON.parse(text);
-  fs.writeFileSync(CACHED_STYLE, text);
-  console.log(`Cached style (${(text.length / 1024).toFixed(1)} KB)`);
+  fs.writeFileSync(style.cachePath, text);
+  console.log(`Cached ${style.id} (${(text.length / 1024).toFixed(1)} KB)`);
   return text;
 }
 
@@ -693,17 +717,6 @@ async function main(): Promise<void> {
 
   await checkTileProxy();
 
-  const remoteStyleJson = await fetchStyle();
-  const originalStyleJson = rewriteStyleForProxy(remoteStyleJson);
-  const originalSize = Buffer.byteLength(originalStyleJson, "utf8");
-  console.log(`Original style: ${(originalSize / 1024).toFixed(1)} KB (URLs rewritten to local proxy)\n`);
-
-  // Build all ablation variants
-  const mode = isolated ? "isolated" : "cumulative";
-  console.log(`Building ${mode} ablation variants…`);
-  const variants = buildVariants(originalStyleJson);
-  console.log(`\n${variants.length} ablation steps: ${variants.map((v) => v.id).join(", ")}`);
-
   // Resolve scenarios
   const allScenarios = getAllScenarios();
   const scenarios = filterScenarios(allScenarios, filters);
@@ -711,7 +724,15 @@ async function main(): Promise<void> {
     console.error("No scenarios matched filters:", filters);
     process.exit(1);
   }
-  console.log(`\nRunning ${scenarios.length} scenarios × ${variants.length} variants, ${RUNS} runs each (${WARMUP} warmup)\n`);
+
+  const mode = isolated ? "isolated" : "cumulative";
+  const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
+  const jsonlPath = path.join(RESULTS_DIR, `bench-${timestamp}.jsonl`);
+  const jsonlFd = fs.openSync(jsonlPath, "w");
+  console.log(`Streaming results to ${jsonlPath}\n`);
+
+  console.log(`Styles: ${STYLES.map((s) => s.id).join(", ")}`);
+  console.log(`Scenarios: ${scenarios.length}, Runs: ${RUNS}, Warmup: ${WARMUP}, Mode: ${mode}\n`);
 
   let browser = await puppeteer.launch({ headless: true, args: PUPPETEER_ARGS });
 
@@ -721,141 +742,143 @@ async function main(): Promise<void> {
     p.on("pageerror", (err) => console.error(`  [browser error] ${err.message}`));
   }
 
-  // Open JSONL file for streaming
-  const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
-  const jsonlPath = path.join(RESULTS_DIR, `bench-${timestamp}.jsonl`);
-  const jsonlFd = fs.openSync(jsonlPath, "w");
-  console.log(`Streaming results to ${jsonlPath}\n`);
+  const allResults: ScenarioResult[] = [];
+  let lastVariants: Variant[] = [];
 
-  const results: ScenarioResult[] = [];
+  for (const benchStyle of STYLES) {
+    console.log(`\n${"═".repeat(72)}`);
+    console.log(`Style: ${benchStyle.id}`);
+    console.log(`${"═".repeat(72)}`);
 
-  for (let si = 0; si < scenarios.length; si++) {
-    const scenario = scenarios[si];
-    console.log(`[${si + 1}/${scenarios.length}] ${scenario.id} (${scenario.location.name}, ${scenario.animationType})`);
+    const remoteStyleJson = await fetchStyle(benchStyle);
+    const originalStyleJson = rewriteStyleForProxy(remoteStyleJson);
+    const originalSize = Buffer.byteLength(originalStyleJson, "utf8");
+    console.log(`Original: ${(originalSize / 1024).toFixed(1)} KB (URLs rewritten to local proxy)\n`);
 
-    const variantRuns: Record<string, RunMetrics[]> = {};
-    for (const v of variants) variantRuns[v.id] = [];
-    const totalRuns = WARMUP + RUNS;
+    console.log(`Building ${mode} ablation variants…`);
+    const variants = buildVariants(originalStyleJson);
+    lastVariants = variants;
+    console.log(`${variants.length} ablation steps\n`);
 
-    // Interleaved: run all variants in sequence per iteration
-    for (let run = 0; run < totalRuns; run++) {
-      const isWarmup = run < WARMUP;
-      const label = isWarmup ? `warmup ${run + 1}` : `run ${run - WARMUP + 1}/${RUNS}`;
+    for (let si = 0; si < scenarios.length; si++) {
+      const scenario = scenarios[si];
+      const scenarioId = `${benchStyle.id}/${scenario.id}`;
+      console.log(`[${si + 1}/${scenarios.length}] ${scenarioId} (${scenario.location.name}, ${scenario.animationType})`);
 
-      const parts: string[] = [];
+      const variantRuns: Record<string, RunMetrics[]> = {};
+      for (const v of variants) variantRuns[v.id] = [];
+      const totalRuns = WARMUP + RUNS;
 
-      for (let vi = 0; vi < variants.length; vi++) {
-        const variant = variants[vi];
-        const page = await browser.newPage();
-        applyDebugListeners(page);
+      for (let run = 0; run < totalRuns; run++) {
+        const isWarmup = run < WARMUP;
+        const label = isWarmup ? `warmup ${run + 1}` : `run ${run - WARMUP + 1}/${RUNS}`;
 
-        try {
-          const metrics = await runBenchmarkInBrowser(page, variant.styleJson, scenario);
-          if (!isWarmup) {
-            variantRuns[variant.id].push(metrics);
-            const record: Record<string, unknown> = {
-              scenario: scenario.id,
-              location: scenario.location.name,
-              lng: scenario.location.center[0],
-              lat: scenario.location.center[1],
-              zoom: scenario.location.zoom,
-              animation: scenario.animationType,
-              variant: variant.id,
-              passes: variant.passes,
-              mode,
-              style_bytes: variant.styleBytes,
-              gzip_bytes: variant.gzipBytes,
-              brotli_bytes: variant.brotliBytes,
-              run: run - WARMUP + 1,
-              timestamp,
-              ...metrics,
-            };
-            // Flatten complexity metrics into the record
-            if (variant.complexity) {
-              record.ast_nodes = variant.complexity.ast_nodes;
-              record.max_depth = variant.complexity.max_depth;
-              record.layer_count = variant.complexity.layer_count;
-              record.filter_count = variant.complexity.filter_count;
-              record.expression_types = variant.complexity.expression_types;
+        const parts: string[] = [];
+
+        for (let vi = 0; vi < variants.length; vi++) {
+          const variant = variants[vi];
+          const page = await browser.newPage();
+          applyDebugListeners(page);
+
+          try {
+            const metrics = await runBenchmarkInBrowser(page, variant.styleJson, scenario);
+            if (!isWarmup) {
+              variantRuns[variant.id].push(metrics);
+              const record: Record<string, unknown> = {
+                style: benchStyle.id,
+                scenario: scenarioId,
+                location: scenario.location.name,
+                lng: scenario.location.center[0],
+                lat: scenario.location.center[1],
+                zoom: scenario.location.zoom,
+                animation: scenario.animationType,
+                variant: variant.id,
+                passes: variant.passes,
+                mode,
+                style_bytes: variant.styleBytes,
+                gzip_bytes: variant.gzipBytes,
+                brotli_bytes: variant.brotliBytes,
+                run: run - WARMUP + 1,
+                timestamp,
+                ...metrics,
+              };
+              if (variant.complexity) {
+                record.layer_count = variant.complexity.layer_count;
+                record.filter_count = variant.complexity.filter_count;
+                record.property_count = variant.complexity.property_count;
+                record.expression_property_count = variant.complexity.expression_property_count;
+                record.scalar_property_count = variant.complexity.scalar_property_count;
+                record.total_expression_nodes = variant.complexity.total_expression_nodes;
+                record.ast_nodes = variant.complexity.ast_nodes;
+                record.max_depth = variant.complexity.max_depth;
+                record.expression_types = variant.complexity.expression_types;
+              }
+              fs.writeSync(jsonlFd, JSON.stringify(record) + "\n");
             }
-            fs.writeSync(jsonlFd, JSON.stringify(record) + "\n");
+            parts.push(`${variant.id.replace(/step-|isolated-/, "s")}: ${metrics.loadMs.toFixed(0)}ms`);
+          } catch (err: unknown) {
+            const msg = err instanceof Error ? err.message : String(err);
+            parts.push(`${variant.id}: ERR`);
+            if (msg.includes("Session closed") || msg.includes("Target closed") || msg.includes("Protocol error")) {
+              console.log("\n  Recovering browser…");
+              try { await browser.close(); } catch {}
+              browser = await puppeteer.launch({ headless: true, args: PUPPETEER_ARGS });
+            }
+          } finally {
+            try { await page.close(); } catch {}
           }
-          parts.push(`${variant.id.replace(/step-|isolated-/, "s")}: ${metrics.loadMs.toFixed(0)}ms`);
-        } catch (err: unknown) {
-          const msg = err instanceof Error ? err.message : String(err);
-          parts.push(`${variant.id}: ERR`);
-          if (msg.includes("Session closed") || msg.includes("Target closed") || msg.includes("Protocol error")) {
-            console.log("\n  Recovering browser…");
-            try { await browser.close(); } catch {}
-            browser = await puppeteer.launch({ headless: true, args: PUPPETEER_ARGS });
-          }
-        } finally {
-          try { await page.close(); } catch {}
+        }
+
+        console.log(`  ${label} ${parts.join(" | ")}`);
+      }
+
+      if (variantRuns[variants[0].id].length === 0) {
+        console.log(`  Skipping ${scenarioId} — no successful baseline runs`);
+        continue;
+      }
+
+      const aggregated: Record<string, AggregatedMetrics> = {};
+      for (const v of variants) {
+        if (variantRuns[v.id].length > 0) {
+          aggregated[v.id] = aggregate(variantRuns[v.id]);
         }
       }
 
-      console.log(`  ${label} ${parts.join(" | ")}`);
+      allResults.push({ scenarioId, variants: aggregated });
     }
 
-    // Aggregate results
-    if (variantRuns[variants[0].id].length === 0) {
-      console.log(`  Skipping ${scenario.id} — no successful baseline runs`);
-      continue;
-    }
-
-    const aggregated: Record<string, AggregatedMetrics> = {};
+    // Per-style size summary
+    console.log(`\n── ${benchStyle.id} Style Sizes ──`);
     for (const v of variants) {
-      if (variantRuns[v.id].length > 0) {
-        aggregated[v.id] = aggregate(variantRuns[v.id]);
-      }
+      const kb = (v.styleBytes / 1024).toFixed(1);
+      const gzKb = (v.gzipBytes / 1024).toFixed(1);
+      const brKb = (v.brotliBytes / 1024).toFixed(1);
+      const pct = v.id.includes("baseline")
+        ? ""
+        : ` (${((1 - v.styleBytes / variants[0].styleBytes) * 100).toFixed(1)}% smaller)`;
+      console.log(`  ${v.label}: ${kb} KB | gzip ${gzKb} KB | br ${brKb} KB${pct}`);
     }
-
-    results.push({ scenarioId: scenario.id, variants: aggregated });
   }
 
   await browser.close();
 
-  // ── output ──────────────────────────────────────────────────────────────────
-
-  if (results.length === 0) {
+  if (allResults.length === 0) {
     console.error("No results collected.");
     process.exit(1);
   }
 
-  printSummaryTable(results, variants);
-
-  // Style sizes
-  console.log("\n── Style Sizes (ablation) ──");
-  for (const v of variants) {
-    const kb = (v.styleBytes / 1024).toFixed(1);
-    const gzKb = (v.gzipBytes / 1024).toFixed(1);
-    const brKb = (v.brotliBytes / 1024).toFixed(1);
-    const pct = v.id.includes("baseline")
-      ? ""
-      : ` (${((1 - v.styleBytes / variants[0].styleBytes) * 100).toFixed(1)}% smaller)`;
-    console.log(`  ${v.label}: ${kb} KB | gzip ${gzKb} KB | br ${brKb} KB${pct}`);
-  }
+  printSummaryTable(allResults, lastVariants);
 
   fs.closeSync(jsonlFd);
 
-  // Write JSON metadata
   const meta = {
     timestamp,
-    style: STYLE_URL,
+    styles: STYLES.map((s) => s.id),
     mode,
     runsPerScenario: RUNS,
     warmupRuns: WARMUP,
     maplibreVersion: getMaplibreVersion(),
     renderer: "Hardware GPU (headless Chrome)",
-    ablationSteps: variants.map((v) => ({
-      id: v.id,
-      label: v.label,
-      passes: v.passes,
-      styleBytes: v.styleBytes,
-      gzipBytes: v.gzipBytes,
-      brotliBytes: v.brotliBytes,
-      complexity: v.complexity,
-    })),
   };
 
   const metaPath = path.join(RESULTS_DIR, `bench-${timestamp}.meta.json`);
