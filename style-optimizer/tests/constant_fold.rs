@@ -22,6 +22,7 @@ fn sample_mir() -> MirSpec {
 fn fold_passes() -> OptPasses {
     OptPasses {
         constant_fold: true,
+        constant_fold_stats: true,
         ..Default::default()
     }
 }
@@ -29,6 +30,7 @@ fn fold_passes() -> OptPasses {
 fn simplify_passes() -> OptPasses {
     OptPasses {
         constant_fold: true,
+        constant_fold_stats: true,
         simplify_unary: true,
         simplify_expressions: true,
         ..Default::default()
@@ -251,7 +253,13 @@ fn geometry_type_eq_folds_true_when_only_type() {
             ..Default::default()
         },
     );
-    let mut v = style_with_filter(serde_json::json!(["==", ["geometry-type"], "Point"]));
+    // Use symbol layer — accepts any geometry, so stats determine the fold.
+    let mut v = serde_json::json!({
+        "version": 8,
+        "sources": {"src": {"type": "vector", "url": "x"}},
+        "layers": [{"id": "l", "type": "symbol", "source": "src", "source-layer": "lyr",
+                     "filter": ["==", ["geometry-type"], "Point"]}]
+    });
     optimize_style_json_value_with_stats(&mut v, &mir, &fold_passes(), Some(&stats));
     assert_yaml_snapshot!(v["layers"][0]["filter"], @"true");
 }
@@ -272,7 +280,13 @@ fn geometry_type_eq_folds_false_when_absent() {
             ..Default::default()
         },
     );
-    let mut v = style_with_filter(serde_json::json!(["==", ["geometry-type"], "Polygon"]));
+    // Use symbol layer — accepts any geometry, so stats determine the fold.
+    let mut v = serde_json::json!({
+        "version": 8,
+        "sources": {"src": {"type": "vector", "url": "x"}},
+        "layers": [{"id": "l", "type": "symbol", "source": "src", "source-layer": "lyr",
+                     "filter": ["==", ["geometry-type"], "Polygon"]}]
+    });
     optimize_style_json_value_with_stats(&mut v, &mir, &fold_passes(), Some(&stats));
     assert_yaml_snapshot!(v["layers"][0]["filter"], @"false");
 }

@@ -69,6 +69,7 @@ fn fold_in_tree(
 enum RuleGate {
     ExpressionKind,
     ConstantFold,
+    ConstantFoldStats,
     SimplifyExpressions,
 }
 
@@ -108,6 +109,7 @@ impl RuleGate {
         match self {
             Self::ExpressionKind => passes.expression_kind,
             Self::ConstantFold => passes.constant_fold,
+            Self::ConstantFoldStats => passes.constant_fold_stats,
             Self::SimplifyExpressions => passes.simplify_expressions,
         }
     }
@@ -247,49 +249,49 @@ static RULES: &[RewriteRule] = &[
         scope: RuleScope::Peephole,
         apply: try_fold_redundant_properties,
     },
-    // ── constant_fold: stats-driven tree folds ──
+    // ── constant_fold_stats: stats-driven tree folds ──
     RewriteRule::WithStats {
-        gate: RuleGate::ConstantFold,
+        gate: RuleGate::ConstantFoldStats,
         scope: RuleScope::FilterOnly,
         apply: try_fold_has_from_stats,
     },
     RewriteRule::WithStats {
-        gate: RuleGate::ConstantFold,
+        gate: RuleGate::ConstantFoldStats,
         scope: RuleScope::FilterAndProperty,
         apply: try_fold_get_from_stats,
     },
     RewriteRule::WithStats {
-        gate: RuleGate::ConstantFold,
+        gate: RuleGate::ConstantFoldStats,
         scope: RuleScope::FilterOnly,
         apply: try_fold_geometry_type_from_stats,
     },
     RewriteRule::WithStats {
-        gate: RuleGate::ConstantFold,
+        gate: RuleGate::ConstantFoldStats,
         scope: RuleScope::FilterAndProperty,
         apply: try_fold_comparison_from_stats,
     },
     RewriteRule::WithStats {
-        gate: RuleGate::ConstantFold,
+        gate: RuleGate::ConstantFoldStats,
         scope: RuleScope::FilterAndProperty,
         apply: try_prune_in_from_stats,
     },
     RewriteRule::WithStats {
-        gate: RuleGate::ConstantFold,
+        gate: RuleGate::ConstantFoldStats,
         scope: RuleScope::FilterAndProperty,
         apply: try_prune_match_from_stats,
     },
     RewriteRule::WithStats {
-        gate: RuleGate::SimplifyExpressions,
+        gate: RuleGate::ConstantFoldStats,
         scope: RuleScope::FilterAndProperty,
         apply: try_reorder_match_from_stats,
     },
     RewriteRule::WithStats {
-        gate: RuleGate::ConstantFold,
+        gate: RuleGate::ConstantFoldStats,
         scope: RuleScope::FilterAndProperty,
         apply: try_fold_coalesce_from_stats,
     },
     RewriteRule::WithStats {
-        gate: RuleGate::ConstantFold,
+        gate: RuleGate::ConstantFoldStats,
         scope: RuleScope::FilterAndProperty,
         apply: try_prune_data_ramp_from_stats,
     },
@@ -380,10 +382,17 @@ pub(crate) struct NormalizeFoldVisitor<'a> {
 }
 
 impl StyleVisitor for NormalizeFoldVisitor<'_> {
-    fn visit_filter(&mut self, layer_index: usize, _: &str, filter: &mut Value) {
+    fn visit_filter(&mut self, layer_index: usize, layer_type: &str, filter: &mut Value) {
         if self.passes.constant_fold {
+            // Fold geometry-type comparisons when the layer type constrains the result.
+            if fold::fold_geometry_type_from_layer(filter, layer_type) {
+                self.changed = true;
+            }
             // Special case: fold ["id"] → ["literal", null] when no feature IDs.
-            if should_fold_id(self.stats, self.layer_info, layer_index) && fold_id_to_null(filter) {
+            if self.passes.constant_fold_stats
+                && should_fold_id(self.stats, self.layer_info, layer_index)
+                && fold_id_to_null(filter)
+            {
                 self.changed = true;
             }
             for rule in RULES {
@@ -722,7 +731,7 @@ impl TypedFoldCtx<'_> {
                 any_fired |= try_simplify_unary_typed(filter);
             }
 
-            if self.passes.constant_fold {
+            if self.passes.constant_fold_stats {
                 any_fired |= try_fold_has_from_stats_typed(
                     filter,
                     self.stats,

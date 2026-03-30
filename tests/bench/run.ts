@@ -2,14 +2,14 @@
 /**
  * Benchmark harness for maplibre-style-optimizer — cumulative ablation.
  *
- * Runs 12 ablation steps (baseline + 11 passes added one at a time) across
+ * Runs 16 ablation steps (baseline + 15 passes added one at a time) across
  * all scenarios.  Each step enables one additional optimizer pass on top of
  * all previous ones, showing the marginal contribution of each pass.
  *
  * Usage:
- *   just bench                                      # all scenarios, 15 runs, 12 ablation steps
+ *   just bench                                      # all scenarios, 15 runs, 16 ablation steps
  *   just bench --runs 1 munich-zigzag               # single quick scenario
- *   just bench --mbtiles /path/to/tiles.mbtiles     # enable step 12 (selectivity_reorder)
+ *   just bench --mbtiles /path/to/tiles.mbtiles     # enable step 16 (selectivity_reorder)
  *   just bench --isolated                           # per-pass isolated impact (non-cumulative)
  *   just bench-debug tokyo                          # with browser console output
  */
@@ -276,7 +276,7 @@ function formatKB(json: string): string {
  *
  * Returns an array of Variant objects: baseline (no passes) followed by one
  * variant per ablation step, each accumulating all passes from previous steps.
- * Step 12 (selectivity_reorder) is only included when --mbtiles is provided.
+ * Step 16 (selectivity_reorder) is only included when --mbtiles is provided.
  */
 function buildVariants(originalStyleJson: string): Variant[] {
   const variants: Variant[] = [];
@@ -341,9 +341,15 @@ function buildVariants(originalStyleJson: string): Variant[] {
         variantId = `step-${stepNum}-${step.pass}`;
       }
 
-      // Build extra args for selectivity_reorder
+      // Pass --stats when any accumulated pass needs tile statistics
       const extraArgs: string[] = [];
-      if (step.pass === "selectivity_reorder" && statsPath) {
+      const statsDependent = [
+        "constant_fold_stats",
+        "dead_elimination_stats",
+        "metadata_refinement_stats",
+        "selectivity_reorder",
+      ];
+      if (statsPath && passList.some((p) => statsDependent.includes(p))) {
         extraArgs.push("--stats", statsPath);
       }
 
