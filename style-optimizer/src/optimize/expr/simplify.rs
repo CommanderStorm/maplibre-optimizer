@@ -23,7 +23,7 @@ pub(super) fn try_simplify_interpolate_or_step(arr: &mut Vec<Value>) -> bool {
             let first = &arr[4];
             if arr[4..].iter().step_by(2).all(|v| v == first) {
                 let val = first.clone();
-                *arr = vec![Value::String("literal".to_string()), val];
+                replace_arr_with_value(arr, val);
                 return true;
             }
             // Prune intermediate stops between identical values.
@@ -35,7 +35,7 @@ pub(super) fn try_simplify_interpolate_or_step(arr: &mut Vec<Value>) -> bool {
             }
             if arr.len() == 3 {
                 let val = arr[2].clone();
-                *arr = vec![Value::String("literal".to_string()), val];
+                replace_arr_with_value(arr, val);
                 return true;
             }
             let pairs_after_default = arr.len() - 3;
@@ -45,7 +45,7 @@ pub(super) fn try_simplify_interpolate_or_step(arr: &mut Vec<Value>) -> bool {
             let default_val = &arr[2];
             if arr[4..].iter().step_by(2).all(|v| v == default_val) {
                 let val = default_val.clone();
-                *arr = vec![Value::String("literal".to_string()), val];
+                replace_arr_with_value(arr, val);
                 return true;
             }
             // Default == first stop output → first stop is redundant.
