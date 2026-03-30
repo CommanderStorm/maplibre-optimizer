@@ -1381,3 +1381,98 @@ fn equivalence_substitution_no_self_modification() {
       type: fill
     "#);
 }
+
+// ── case chain linearization ────────────────────────────────────────────────
+
+#[test]
+fn case_flatten_two_level() {
+    let mir = sample_mir();
+    let mut v = style_with_paint(
+        "fill-opacity",
+        serde_json::json!([
+            "case",
+            ["==", ["get", "kind"], "park"], 0.8,
+            ["case",
+                ["==", ["get", "kind"], "water"], 0.6,
+                0.2
+            ]
+        ]),
+    );
+    optimize_style_json_value(&mut v, &mir, &simplify_passes());
+    assert_yaml_snapshot!(v["layers"][0]["paint"]["fill-opacity"], @r#"
+    - case
+    - - "=="
+      - - get
+        - kind
+      - park
+    - 0.8
+    - - "=="
+      - - get
+        - kind
+      - water
+    - 0.6
+    - 0.2
+    "#);
+}
+
+#[test]
+fn case_flatten_three_level() {
+    let mir = sample_mir();
+    let mut v = style_with_paint(
+        "fill-opacity",
+        serde_json::json!([
+            "case",
+            ["==", ["get", "kind"], "park"], 0.9,
+            ["case",
+                ["==", ["get", "kind"], "water"], 0.7,
+                ["case",
+                    ["==", ["get", "kind"], "sand"], 0.5,
+                    0.1
+                ]
+            ]
+        ]),
+    );
+    optimize_style_json_value(&mut v, &mir, &simplify_passes());
+    assert_yaml_snapshot!(v["layers"][0]["paint"]["fill-opacity"], @r#"
+    - case
+    - - "=="
+      - - get
+        - kind
+      - park
+    - 0.9
+    - - "=="
+      - - get
+        - kind
+      - water
+    - 0.7
+    - - "=="
+      - - get
+        - kind
+      - sand
+    - 0.5
+    - 0.1
+    "#);
+}
+
+#[test]
+fn case_flatten_noop_non_case_fallback() {
+    let mir = sample_mir();
+    let mut v = style_with_paint(
+        "fill-opacity",
+        serde_json::json!([
+            "case",
+            ["==", ["get", "kind"], "park"], 0.8,
+            0.2
+        ]),
+    );
+    optimize_style_json_value(&mut v, &mir, &simplify_passes());
+    assert_yaml_snapshot!(v["layers"][0]["paint"]["fill-opacity"], @r#"
+    - case
+    - - "=="
+      - - get
+        - kind
+      - park
+    - 0.8
+    - 0.2
+    "#);
+}

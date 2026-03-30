@@ -204,6 +204,35 @@ fn extract_eq_chain(predicates: &[Value]) -> Option<(Value, Vec<Value>)> {
     common_expr.map(|e| (e, values))
 }
 
+/// Flatten nested `case` expressions: when the fallback of a `case` is itself
+/// another `case`, inline the inner arms into the outer expression.
+///
+/// `["case", c1, v1, ["case", c2, v2, fb]]` → `["case", c1, v1, c2, v2, fb]`
+pub(super) fn try_flatten_case(arr: &mut Vec<Value>) -> bool {
+    if arr.first().and_then(Value::as_str) != Some("case") {
+        return false;
+    }
+    if arr.len() < 4 || !arr.len().is_multiple_of(2) {
+        return false;
+    }
+
+    let is_nested_case = arr.last().unwrap().as_array().is_some_and(|inner| {
+        inner.first().and_then(Value::as_str) == Some("case")
+            && inner.len() >= 4
+            && inner.len().is_multiple_of(2)
+    });
+    if !is_nested_case {
+        return false;
+    }
+
+    let Value::Array(inner_arr) = arr.pop().unwrap() else {
+        unreachable!("checked above");
+    };
+    // Skip inner_arr[0] ("case" keyword), append arms + fallback.
+    arr.extend(inner_arr.into_iter().skip(1));
+    true
+}
+
 /// Simplify `case` expressions by removing redundant trailing arms.
 ///
 /// - All arms + fallback produce the same value → collapse to that value.
