@@ -1545,6 +1545,52 @@ fn try_fold_geom_node(arr: &mut Vec<Value>, known_geom: &str) -> bool {
     }
 }
 
+/// Strip `Multi*` variants from geometry-type expressions.
+///
+/// `["geometry-type"]` only returns `"Point"`, `"LineString"`, or `"Polygon"` —
+/// never `"MultiPoint"`, `"MultiLineString"`, or `"MultiPolygon"`.
+/// Removing dead values from `in` allows `try_simplify_single_in` to chain `in` → `==`.
+pub(super) fn prune_multi_geometry_types(v: &mut Value) -> bool {
+    let Value::Array(arr) = v else {
+        return false;
+    };
+
+    if try_prune_multi_geom_node(arr) {
+        return true;
+    }
+
+    let mut changed = false;
+    for child in arr.iter_mut() {
+        changed |= prune_multi_geometry_types(child);
+    }
+    changed
+}
+
+/// Prune Multi* values from a single `["in", ["geometry-type"], ["literal", [...]]]` node.
+fn try_prune_multi_geom_node(arr: &mut Vec<Value>) -> bool {
+    if arr.len() != 3
+        || arr[0].as_str() != Some("in")
+        || !is_geometry_type_expr(&arr[1])
+    {
+        return false;
+    }
+    let Value::Array(lit_arr) = &mut arr[2] else {
+        return false;
+    };
+    if lit_arr.len() != 2 || lit_arr[0].as_str() != Some("literal") {
+        return false;
+    }
+    let Value::Array(values) = &mut lit_arr[1] else {
+        return false;
+    };
+    let before = values.len();
+    values.retain(|v| {
+        v.as_str()
+            .is_none_or(|s| !s.starts_with("Multi"))
+    });
+    values.len() < before
+}
+
 /// Check if a value is `["geometry-type"]`.
 fn is_geometry_type_expr(v: &Value) -> bool {
     matches!(v, Value::Array(a) if a.len() == 1 && a[0].as_str() == Some("geometry-type"))

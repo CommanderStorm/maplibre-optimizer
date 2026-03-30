@@ -394,6 +394,11 @@ impl StyleVisitor for NormalizeFoldVisitor<'_> {
             if fold::fold_geometry_type_from_layer(filter, layer_type) {
                 self.changed = true;
             }
+            // Strip Multi* variants from geometry-type `in` expressions —
+            // `["geometry-type"]` never returns Multi* values in MapLibre.
+            if fold::prune_multi_geometry_types(filter) {
+                self.changed = true;
+            }
             // Special case: fold ["id"] → ["literal", null] when no feature IDs.
             if self.passes.constant_fold_stats
                 && should_fold_id(self.stats, self.layer_info, layer_index)
