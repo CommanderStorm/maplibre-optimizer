@@ -68,6 +68,8 @@ const BENCH_STYLES: BenchStyle[] = [
   // Government/institutional styles — verbose, many layers, legacy syntax needs migration
   { id: "icgc-fosc",      url: "https://geoserveis.icgc.cat/contextmaps/icgc_mapa_base_fosc.json",                  cachePath: path.join(RESULTS_DIR, "_cached_icgc-fosc.json") },
   { id: "icgc-gris",      url: "https://geoserveis.icgc.cat/contextmaps/icgc_mapa_base_gris.json",                  cachePath: path.join(RESULTS_DIR, "_cached_icgc-gris.json") },
+  { id: "basemap-top",    url: "https://sgx.geodatenzentrum.de/gdz_basemapde_vektor/styles/bm_web_top.json",        cachePath: path.join(RESULTS_DIR, "_cached_basemap-top.json") },
+  { id: "basemap-col",    url: "https://sgx.geodatenzentrum.de/gdz_basemapde_vektor/styles/bm_web_col.json",        cachePath: path.join(RESULTS_DIR, "_cached_basemap-col.json") },
 ];
 
 // ── CLI args ─────────────────────────────────────────────────────────────────
