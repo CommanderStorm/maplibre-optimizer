@@ -7,6 +7,7 @@
 
 use std::collections::{BTreeMap, BTreeSet, HashSet};
 
+use maplibre_style_spec::spec::expressions::Boolean;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
@@ -57,6 +58,11 @@ pub struct SourceLayerAdvisory {
     /// `None` means "keep all features" (at least one layer has no filter).
     /// When present, features not matching this filter can be pruned.
     pub combined_filter: Option<Value>,
+    /// Individual filters from each style layer targeting this source-layer.
+    /// Used by feature priority reordering: features matching more filters
+    /// are considered higher priority.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub layer_filters: Vec<Boolean>,
 }
 
 /// Zoom range in which a property or geometry type is needed.
@@ -147,6 +153,7 @@ pub fn compute_advisory(style: &Value, stats: &TileStatistics) -> TilePruningAdv
                     ),
                     feature_ids_needed,
                     combined_filter: compute_combined_filter(&targeting),
+                    layer_filters: compute_layer_filters(&targeting),
                 },
             );
         }
@@ -718,6 +725,15 @@ fn compute_combined_filter(targeting: &[&StyleLayerRef]) -> Option<Value> {
             Some(Value::Array(any_expr))
         }
     }
+}
+
+/// Collect individual typed filters from each targeting style layer.
+fn compute_layer_filters(targeting: &[&StyleLayerRef]) -> Vec<Boolean> {
+    targeting
+        .iter()
+        .filter_map(|r| r.filter.as_ref())
+        .filter_map(|v| serde_json::from_value::<Boolean>(v.clone()).ok())
+        .collect()
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────

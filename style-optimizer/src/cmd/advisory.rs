@@ -559,6 +559,7 @@ mod tests {
                             unused_property_values: BTreeMap::new(),
                             feature_ids_needed: false,
                             combined_filter: None,
+                            layer_filters: vec![],
                         },
                     )]),
                     unused_source_layers: vec![],

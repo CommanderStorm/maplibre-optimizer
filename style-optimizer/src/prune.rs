@@ -5,6 +5,9 @@
 
 use std::collections::HashSet;
 
+use maplibre_style_spec::spec::expressions::{
+    Any, Boolean, ExprOrLiteral, String as StringExpr,
+};
 use serde_json::Value;
 
 use crate::advisory::{GeometryType, SourceAdvisory, SourceLayerAdvisory, UnusedValues};
@@ -58,6 +61,9 @@ fn prune_layer(layer: &mut mvt::tile::Layer, advisory: &SourceLayerAdvisory, zoo
 
     // Filter by unused property values.
     filter_by_property_values(layer, &advisory.unused_property_values);
+
+    // Reorder features by priority: features matching more style-layer filters come first.
+    reorder_features_by_priority(layer, &advisory.layer_filters);
 
     // Strip feature IDs when no targeting layer uses them.
     if !advisory.feature_ids_needed {
@@ -340,6 +346,284 @@ fn mvt_value_matches_json(mvt_val: &mvt::tile::Value, json_val: &Value) -> bool 
     }
 }
 
+// ── Feature priority reordering ──────────────────────────────────────────────
+
+/// A resolved value from evaluating an expression against a feature.
+enum Resolved<'a> {
+    Null,
+    Bool(bool),
+    Number(f64),
+    Str(&'a str),
+}
+
+impl Resolved<'_> {
+    fn as_f64(&self) -> Option<f64> {
+        match self {
+            Self::Number(n) => Some(*n),
+            _ => None,
+        }
+    }
+}
+
+impl PartialEq for Resolved<'_> {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Self::Null, Self::Null) => true,
+            (Self::Bool(a), Self::Bool(b)) => a == b,
+            (Self::Number(a), Self::Number(b)) => a == b,
+            (Self::Str(a), Self::Str(b)) => a == b,
+            _ => false,
+        }
+    }
+}
+
+/// Look up a property value in an MVT feature's tag pairs.
+fn lookup_property<'a>(
+    prop_name: &str,
+    feature: &mvt::tile::Feature,
+    keys: &[String],
+    values: &'a [mvt::tile::Value],
+) -> Option<&'a mvt::tile::Value> {
+    let mut i = 0;
+    while i + 1 < feature.tags.len() {
+        let ki = feature.tags[i] as usize;
+        let vi = feature.tags[i + 1] as usize;
+        if keys.get(ki).is_some_and(|k| k == prop_name) {
+            return values.get(vi);
+        }
+        i += 2;
+    }
+    None
+}
+
+/// Convert an MVT value to a `Resolved`.
+fn mvt_value_to_resolved(v: &mvt::tile::Value) -> Resolved<'_> {
+    if let Some(s) = v.string_value.as_deref() {
+        Resolved::Str(s)
+    } else if let Some(b) = v.bool_value {
+        Resolved::Bool(b)
+    } else if let Some(n) = v.double_value {
+        Resolved::Number(n)
+    } else if let Some(n) = v.float_value {
+        Resolved::Number(f64::from(n))
+    } else if let Some(n) = v.int_value {
+        #[expect(clippy::cast_precision_loss)]
+        Resolved::Number(n as f64)
+    } else if let Some(n) = v.uint_value {
+        #[expect(clippy::cast_precision_loss)]
+        Resolved::Number(n as f64)
+    } else if let Some(n) = v.sint_value {
+        #[expect(clippy::cast_precision_loss)]
+        Resolved::Number(n as f64)
+    } else {
+        Resolved::Null
+    }
+}
+
+/// Resolve an `ExprOrLiteral` to a comparable value using feature properties.
+fn resolve_expr<'a>(
+    expr: &'a ExprOrLiteral,
+    feature: &mvt::tile::Feature,
+    keys: &[String],
+    values: &'a [mvt::tile::Value],
+) -> Resolved<'a> {
+    match expr {
+        ExprOrLiteral::Bool(b) => Resolved::Bool(*b),
+        ExprOrLiteral::NumberLiteral(n) => {
+            Resolved::Number(n.as_f64().unwrap_or(f64::NAN))
+        }
+        ExprOrLiteral::StringLiteral(s) => Resolved::Str(s.as_str()),
+        ExprOrLiteral::AnyExpr(any) => match any.as_ref() {
+            Any::Get(prop, None) => {
+                // Resolve the property name from the String expression.
+                let prop_name = resolve_string_expr(prop);
+                match prop_name {
+                    Some(name) => lookup_property(name, feature, keys, values)
+                        .map_or(Resolved::Null, mvt_value_to_resolved),
+                    None => Resolved::Null,
+                }
+            }
+            Any::Id => feature
+                .id
+                .map_or(Resolved::Null, |id| {
+                    #[expect(clippy::cast_precision_loss)]
+                    Resolved::Number(id as f64)
+                }),
+            _ => Resolved::Null,
+        },
+        ExprOrLiteral::StringExpr(s) => match s.as_ref() {
+            StringExpr::GeometryType => {
+                let gt = feature.r#type.unwrap_or(0);
+                let name = match mvt::tile::GeomType::try_from(gt) {
+                    Ok(mvt::tile::GeomType::Point) => "Point",
+                    Ok(mvt::tile::GeomType::Linestring) => "LineString",
+                    Ok(mvt::tile::GeomType::Polygon) => "Polygon",
+                    _ => "Unknown",
+                };
+                Resolved::Str(name)
+            }
+            StringExpr::Literal(s) => Resolved::Str(s.as_str()),
+            _ => Resolved::Null,
+        },
+        _ => Resolved::Null,
+    }
+}
+
+/// Extract a literal string from a `String` expression (the property name in `["get", prop]`).
+fn resolve_string_expr(expr: &StringExpr) -> Option<&str> {
+    match expr {
+        StringExpr::Literal(s) => Some(s.as_str()),
+        _ => None,
+    }
+}
+
+/// Check if a feature has a property by name.
+fn feature_has_property(
+    prop_name: &str,
+    feature: &mvt::tile::Feature,
+    keys: &[String],
+) -> bool {
+    let mut i = 0;
+    while i + 1 < feature.tags.len() {
+        let ki = feature.tags[i] as usize;
+        if keys.get(ki).is_some_and(|k| k == prop_name) {
+            return true;
+        }
+        i += 2;
+    }
+    false
+}
+
+/// Evaluate a typed `Boolean` filter expression against an MVT feature.
+/// Returns `true` if the feature matches the filter.
+fn eval_filter(
+    filter: &Boolean,
+    feature: &mvt::tile::Feature,
+    keys: &[String],
+    values: &[mvt::tile::Value],
+) -> bool {
+    match filter {
+        Boolean::Literal(b) => *b,
+        Boolean::Not(inner) => !eval_filter(inner, feature, keys, values),
+        Boolean::All(conditions) => conditions
+            .iter()
+            .all(|c| eval_filter(c, feature, keys, values)),
+        Boolean::Any(conditions) => conditions
+            .iter()
+            .any(|c| eval_filter(c, feature, keys, values)),
+        Boolean::EqualEqual(a, b, _) => {
+            let ra = resolve_expr(a, feature, keys, values);
+            let rb = resolve_expr(b, feature, keys, values);
+            ra == rb
+        }
+        Boolean::NotEqual(a, b, _) => {
+            let ra = resolve_expr(a, feature, keys, values);
+            let rb = resolve_expr(b, feature, keys, values);
+            ra != rb
+        }
+        Boolean::Less(a, b, _) => {
+            let ra = resolve_expr(a, feature, keys, values);
+            let rb = resolve_expr(b, feature, keys, values);
+            matches!((ra.as_f64(), rb.as_f64()), (Some(x), Some(y)) if x < y)
+        }
+        Boolean::LessEqual(a, b, _) => {
+            let ra = resolve_expr(a, feature, keys, values);
+            let rb = resolve_expr(b, feature, keys, values);
+            matches!((ra.as_f64(), rb.as_f64()), (Some(x), Some(y)) if x <= y)
+        }
+        Boolean::Greater(a, b, _) => {
+            let ra = resolve_expr(a, feature, keys, values);
+            let rb = resolve_expr(b, feature, keys, values);
+            matches!((ra.as_f64(), rb.as_f64()), (Some(x), Some(y)) if x > y)
+        }
+        Boolean::GreaterEqual(a, b, _) => {
+            let ra = resolve_expr(a, feature, keys, values);
+            let rb = resolve_expr(b, feature, keys, values);
+            matches!((ra.as_f64(), rb.as_f64()), (Some(x), Some(y)) if x >= y)
+        }
+        Boolean::Has(prop, None) => {
+            resolve_string_expr(prop)
+                .is_some_and(|name| feature_has_property(name, feature, keys))
+        }
+        Boolean::In(needle, haystack) => {
+            let rn = resolve_expr(needle, feature, keys, values);
+            // If haystack is a literal array, check membership.
+            if let ExprOrLiteral::AnyExpr(any) = haystack
+                && let Any::Get(prop, None) = any.as_ref()
+            {
+                // ["in", needle, ["get", prop]] — check if needle is substring
+                if let (Some(name), Resolved::Str(needle_str)) =
+                    (resolve_string_expr(prop), &rn)
+                {
+                    return lookup_property(name, feature, keys, values)
+                        .and_then(|v| v.string_value.as_deref())
+                        .is_some_and(|s| s.contains(needle_str));
+                }
+            }
+            // For literal arrays (not common in filter context), conservative false.
+            false
+        }
+        Boolean::AnyExpr(any) => match any.as_ref() {
+            Any::Case(arms) => {
+                let (cases, fallback) = arms;
+                for (cond, result) in cases {
+                    if eval_filter(cond, feature, keys, values) {
+                        return resolve_expr(result, feature, keys, values)
+                            != Resolved::Null
+                            && resolve_expr(result, feature, keys, values)
+                                != Resolved::Bool(false);
+                    }
+                }
+                let r = resolve_expr(fallback, feature, keys, values);
+                r != Resolved::Null && r != Resolved::Bool(false)
+            }
+            _ => false, // Conservative: unsupported expression → no match.
+        },
+        // Unsupported variants → conservative false.
+        _ => false,
+    }
+}
+
+/// Count how many of the given filters a feature matches.
+fn count_matching_filters(
+    feature: &mvt::tile::Feature,
+    keys: &[String],
+    values: &[mvt::tile::Value],
+    filters: &[Boolean],
+) -> usize {
+    filters
+        .iter()
+        .filter(|f| eval_filter(f, feature, keys, values))
+        .count()
+}
+
+/// Reorder features within a layer by the number of style-layer filters they match.
+/// Features matching more filters are placed first (higher priority).
+/// Uses stable sort to preserve original order for ties.
+fn reorder_features_by_priority(
+    layer: &mut mvt::tile::Layer,
+    layer_filters: &[Boolean],
+) {
+    if layer_filters.is_empty() {
+        return;
+    }
+
+    // Pre-compute scores to avoid O(n*m) comparisons during sort.
+    let scores: Vec<usize> = layer
+        .features
+        .iter()
+        .map(|f| count_matching_filters(f, &layer.keys, &layer.values, layer_filters))
+        .collect();
+
+    // Build index array and sort by score descending.
+    let mut indices: Vec<usize> = (0..layer.features.len()).collect();
+    indices.sort_by(|&a, &b| scores[b].cmp(&scores[a]));
+
+    // Apply the permutation.
+    let old_features = std::mem::take(&mut layer.features);
+    layer.features = indices.into_iter().map(|i| old_features[i].clone()).collect();
+}
+
 #[cfg(test)]
 mod tests {
     use std::collections::BTreeMap;
@@ -438,6 +722,7 @@ mod tests {
                         interned_properties: BTreeMap::new(),
                         feature_ids_needed: false,
                         combined_filter: None,
+                        layer_filters: vec![],
                     },
                 ),
                 (
@@ -450,6 +735,7 @@ mod tests {
                         interned_properties: BTreeMap::new(),
                         feature_ids_needed: false,
                         combined_filter: None,
+                        layer_filters: vec![],
                     },
                 ),
             ]),
@@ -534,6 +820,7 @@ mod tests {
                     interned_properties: BTreeMap::new(),
                     feature_ids_needed: false,
                     combined_filter: None,
+                    layer_filters: vec![],
                 },
             )]),
         };
@@ -568,6 +855,7 @@ mod tests {
                     interned_properties: BTreeMap::new(),
                     feature_ids_needed: false,
                     combined_filter: None,
+                    layer_filters: vec![],
                 },
             )]),
         };
@@ -605,6 +893,7 @@ mod tests {
                     interned_properties: BTreeMap::new(),
                     feature_ids_needed: false,
                     combined_filter: None,
+                    layer_filters: vec![],
                 },
             )]),
         };
@@ -754,4 +1043,228 @@ mod tests {
             "'paved' should remain in values"
         );
     }
+
+    // ── Feature priority reordering tests ────────────────────────────────────
+
+    /// Helper: parse a JSON filter expression into a typed `Boolean`.
+    fn parse_filter(json: Value) -> Boolean {
+        serde_json::from_value(json).expect("valid filter expression")
+    }
+
+    /// Helper: build a tile with a single source-layer containing features with string properties.
+    fn make_reorder_tile() -> mvt::Tile {
+        // 3 features: class=road, class=rail, class=path
+        mvt::Tile {
+            layers: vec![mvt::tile::Layer {
+                version: 2,
+                name: "transport".to_string(),
+                features: vec![
+                    mvt::tile::Feature {
+                        id: Some(1),
+                        tags: vec![0, 0], // class=road
+                        r#type: Some(mvt::tile::GeomType::Linestring.into()),
+                        geometry: vec![],
+                    },
+                    mvt::tile::Feature {
+                        id: Some(2),
+                        tags: vec![0, 1], // class=rail
+                        r#type: Some(mvt::tile::GeomType::Linestring.into()),
+                        geometry: vec![],
+                    },
+                    mvt::tile::Feature {
+                        id: Some(3),
+                        tags: vec![0, 2], // class=path
+                        r#type: Some(mvt::tile::GeomType::Linestring.into()),
+                        geometry: vec![],
+                    },
+                ],
+                keys: vec!["class".to_string()],
+                values: vec![
+                    make_string_value("road"),
+                    make_string_value("rail"),
+                    make_string_value("path"),
+                ],
+                extent: Some(4096),
+            }],
+        }
+    }
+
+    #[test]
+    fn reorders_features_by_filter_match_count() {
+        let mut tile = make_reorder_tile();
+
+        // Filter 1: class == "road"
+        let f1 = parse_filter(serde_json::json!(["==", ["get", "class"], "road"]));
+        // Filter 2: class == "rail"
+        let f2 = parse_filter(serde_json::json!(["==", ["get", "class"], "rail"]));
+        // Filter 3: class == "road" OR class == "rail"
+        let f3 = parse_filter(serde_json::json!([
+            "any",
+            ["==", ["get", "class"], "road"],
+            ["==", ["get", "class"], "rail"]
+        ]));
+
+        let advisory = SourceAdvisory {
+            unused_source_layers: vec![],
+            layers: BTreeMap::from([(
+                "transport".to_string(),
+                SourceLayerAdvisory {
+                    used_properties: BTreeMap::from([("class".to_string(), ZoomRange::All)]),
+                    used_geometry_types: BTreeMap::new(),
+                    unused_zoom_levels: vec![],
+                    unused_property_values: BTreeMap::new(),
+                    interned_properties: BTreeMap::new(),
+                    feature_ids_needed: true,
+                    combined_filter: None,
+                    layer_filters: vec![f1, f2, f3],
+                },
+            )]),
+        };
+
+        prune_tile(&mut tile, &advisory, 10);
+
+        let transport = tile.layers.iter().find(|l| l.name == "transport").unwrap();
+        let ids: Vec<u64> = transport
+            .features
+            .iter()
+            .map(|f| f.id.unwrap())
+            .collect();
+
+        // road matches f1 + f3 = 2, rail matches f2 + f3 = 2, path matches 0.
+        // road and rail tied at 2, so they keep original order. path last.
+        assert_eq!(ids, vec![1, 2, 3]);
+
+        // Verify path (id=3) is last — it matches 0 filters.
+        assert_eq!(ids[2], 3);
+        // Verify road and rail are before path.
+        assert!(ids[0] == 1 || ids[0] == 2);
+        assert!(ids[1] == 1 || ids[1] == 2);
+    }
+
+    #[test]
+    fn preserves_order_for_equal_scores() {
+        let mut tile = make_reorder_tile();
+
+        // All features match the same number of filters (1 each).
+        // Original order should be preserved.
+        let f1 = parse_filter(serde_json::json!(["has", "class"]));
+
+        let advisory = SourceAdvisory {
+            unused_source_layers: vec![],
+            layers: BTreeMap::from([(
+                "transport".to_string(),
+                SourceLayerAdvisory {
+                    used_properties: BTreeMap::from([("class".to_string(), ZoomRange::All)]),
+                    used_geometry_types: BTreeMap::new(),
+                    unused_zoom_levels: vec![],
+                    unused_property_values: BTreeMap::new(),
+                    interned_properties: BTreeMap::new(),
+                    feature_ids_needed: true,
+                    combined_filter: None,
+                    layer_filters: vec![f1],
+                },
+            )]),
+        };
+
+        prune_tile(&mut tile, &advisory, 10);
+
+        let transport = tile.layers.iter().find(|l| l.name == "transport").unwrap();
+        let ids: Vec<u64> = transport
+            .features
+            .iter()
+            .map(|f| f.id.unwrap())
+            .collect();
+        // All match equally, so original order preserved.
+        assert_eq!(ids, vec![1, 2, 3]);
+    }
+
+    #[test]
+    fn no_reorder_when_no_filters() {
+        let mut tile = make_reorder_tile();
+
+        let advisory = SourceAdvisory {
+            unused_source_layers: vec![],
+            layers: BTreeMap::from([(
+                "transport".to_string(),
+                SourceLayerAdvisory {
+                    used_properties: BTreeMap::from([("class".to_string(), ZoomRange::All)]),
+                    used_geometry_types: BTreeMap::new(),
+                    unused_zoom_levels: vec![],
+                    unused_property_values: BTreeMap::new(),
+                    interned_properties: BTreeMap::new(),
+                    feature_ids_needed: true,
+                    combined_filter: None,
+                    layer_filters: vec![],
+                },
+            )]),
+        };
+
+        prune_tile(&mut tile, &advisory, 10);
+
+        let transport = tile.layers.iter().find(|l| l.name == "transport").unwrap();
+        let ids: Vec<u64> = transport
+            .features
+            .iter()
+            .map(|f| f.id.unwrap())
+            .collect();
+        // No filters → no reordering.
+        assert_eq!(ids, vec![1, 2, 3]);
+    }
+
+    #[test]
+    fn geometry_type_filter_evaluation() {
+        // Tile with mixed geometry types.
+        let mut tile = mvt::Tile {
+            layers: vec![mvt::tile::Layer {
+                version: 2,
+                name: "mixed".to_string(),
+                features: vec![
+                    mvt::tile::Feature {
+                        id: Some(1),
+                        tags: vec![],
+                        r#type: Some(mvt::tile::GeomType::Linestring.into()),
+                        geometry: vec![],
+                    },
+                    mvt::tile::Feature {
+                        id: Some(2),
+                        tags: vec![],
+                        r#type: Some(mvt::tile::GeomType::Point.into()),
+                        geometry: vec![],
+                    },
+                ],
+                keys: vec![],
+                values: vec![],
+                extent: Some(4096),
+            }],
+        };
+
+        // Filter: geometry-type == "Point"
+        let f1 = parse_filter(serde_json::json!(["==", ["geometry-type"], "Point"]));
+
+        let advisory = SourceAdvisory {
+            unused_source_layers: vec![],
+            layers: BTreeMap::from([(
+                "mixed".to_string(),
+                SourceLayerAdvisory {
+                    used_properties: BTreeMap::new(),
+                    used_geometry_types: BTreeMap::new(),
+                    unused_zoom_levels: vec![],
+                    unused_property_values: BTreeMap::new(),
+                    interned_properties: BTreeMap::new(),
+                    feature_ids_needed: true,
+                    combined_filter: None,
+                    layer_filters: vec![f1],
+                },
+            )]),
+        };
+
+        prune_tile(&mut tile, &advisory, 10);
+
+        let mixed = tile.layers.iter().find(|l| l.name == "mixed").unwrap();
+        let ids: Vec<u64> = mixed.features.iter().map(|f| f.id.unwrap()).collect();
+        // Point (id=2) matches 1 filter, LineString (id=1) matches 0.
+        // So Point should come first.
+        assert_eq!(ids, vec![2, 1]);
+    }
+
 }
