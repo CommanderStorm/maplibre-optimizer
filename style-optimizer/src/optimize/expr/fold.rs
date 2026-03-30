@@ -1466,3 +1466,86 @@ pub(super) fn is_literal(v: &ExprOrLiteral) -> bool {
             | ExprOrLiteral::StringLiteral(_)
     )
 }
+
+// ── Geometry-type fold from layer type ───────────────────────────────────────
+
+/// Returns the geometry-type string that `["geometry-type"]` always evaluates to
+/// for a given layer type, or `None` if multiple geometry types are possible.
+fn layer_type_geometry(layer_type: &str) -> Option<&'static str> {
+    match layer_type {
+        "fill" | "fill-extrusion" => Some("Polygon"),
+        "line" => Some("LineString"),
+        "circle" | "heatmap" => Some("Point"),
+        // symbol layers accept both Point and LineString placement.
+        _ => None,
+    }
+}
+
+/// Fold `["geometry-type"]` comparisons when the layer type constrains the result.
+///
+/// Handles `==`, `!=`, and `in` patterns. Recurses into sub-expressions.
+pub(super) fn fold_geometry_type_from_layer(v: &mut Value, layer_type: &str) -> bool {
+    let Some(known_geom) = layer_type_geometry(layer_type) else {
+        return false;
+    };
+
+    let Value::Array(arr) = v else {
+        return false;
+    };
+
+    if try_fold_geom_node(arr, known_geom) {
+        return true;
+    }
+
+    let mut changed = false;
+    for child in arr.iter_mut() {
+        changed |= fold_geometry_type_from_layer(child, layer_type);
+    }
+    changed
+}
+
+/// Try to fold a single expression node that compares `["geometry-type"]`.
+fn try_fold_geom_node(arr: &mut Vec<Value>, known_geom: &str) -> bool {
+    let Some(op) = arr.first().and_then(Value::as_str) else {
+        return false;
+    };
+
+    match op {
+        // ["==", ["geometry-type"], "X"] or ["!=", ...]
+        "==" | "!=" if arr.len() == 3 => {
+            let (geom_str, _) = if is_geometry_type_expr(&arr[1]) && arr[2].is_string() {
+                (arr[2].as_str().unwrap(), 1)
+            } else if is_geometry_type_expr(&arr[2]) && arr[1].is_string() {
+                (arr[1].as_str().unwrap(), 2)
+            } else {
+                return false;
+            };
+
+            let matches = geom_str == known_geom;
+            let result = if op == "==" { matches } else { !matches };
+            *arr = vec![Value::String("literal".into()), Value::Bool(result)];
+            true
+        }
+        // ["in", ["geometry-type"], ["literal", [...]]]
+        "in" if arr.len() == 3 && is_geometry_type_expr(&arr[1]) => {
+            let Value::Array(lit_arr) = &arr[2] else {
+                return false;
+            };
+            if lit_arr.len() != 2 || lit_arr[0].as_str() != Some("literal") {
+                return false;
+            }
+            let Value::Array(values) = &lit_arr[1] else {
+                return false;
+            };
+            let result = values.iter().any(|v| v.as_str() == Some(known_geom));
+            *arr = vec![Value::String("literal".into()), Value::Bool(result)];
+            true
+        }
+        _ => false,
+    }
+}
+
+/// Check if a value is `["geometry-type"]`.
+fn is_geometry_type_expr(v: &Value) -> bool {
+    matches!(v, Value::Array(a) if a.len() == 1 && a[0].as_str() == Some("geometry-type"))
+}

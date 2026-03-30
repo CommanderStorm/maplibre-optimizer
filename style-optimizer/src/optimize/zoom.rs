@@ -231,7 +231,11 @@ pub(super) fn remove_consumed_zoom_predicates(
     let Value::Array(arr) = &*filter else {
         return;
     };
+    // Handle bare zoom predicate (not inside ["all", ...]).
     if arr.first().and_then(Value::as_str) != Some("all") {
+        if is_exact_zoom_predicate_consumed(filter, adopted_min, adopted_max) {
+            *filter = serde_json::json!(["literal", true]);
+        }
         return;
     }
 
