@@ -944,6 +944,7 @@ mod tests {
             &mir,
             &OptPasses {
                 metadata_refinement: true,
+                metadata_refinement_paint: true,
                 ..Default::default()
             },
         );
@@ -974,6 +975,7 @@ mod tests {
             &mir,
             &OptPasses {
                 metadata_refinement: true,
+                metadata_refinement_paint: true,
                 ..Default::default()
             },
         );

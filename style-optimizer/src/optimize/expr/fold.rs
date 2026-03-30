@@ -1567,11 +1567,8 @@ pub(super) fn prune_multi_geometry_types(v: &mut Value) -> bool {
 }
 
 /// Prune Multi* values from a single `["in", ["geometry-type"], ["literal", [...]]]` node.
-fn try_prune_multi_geom_node(arr: &mut Vec<Value>) -> bool {
-    if arr.len() != 3
-        || arr[0].as_str() != Some("in")
-        || !is_geometry_type_expr(&arr[1])
-    {
+fn try_prune_multi_geom_node(arr: &mut [Value]) -> bool {
+    if arr.len() != 3 || arr[0].as_str() != Some("in") || !is_geometry_type_expr(&arr[1]) {
         return false;
     }
     let Value::Array(lit_arr) = &mut arr[2] else {
@@ -1584,10 +1581,7 @@ fn try_prune_multi_geom_node(arr: &mut Vec<Value>) -> bool {
         return false;
     };
     let before = values.len();
-    values.retain(|v| {
-        v.as_str()
-            .is_none_or(|s| !s.starts_with("Multi"))
-    });
+    values.retain(|v| v.as_str().is_none_or(|s| !s.starts_with("Multi")));
     values.len() < before
 }
 
