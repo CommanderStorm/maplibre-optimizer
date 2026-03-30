@@ -49,14 +49,30 @@ pub struct OptimizeArgs {
     #[arg(long)]
     constant_fold: bool,
 
+    /// Enable stats-driven constant folds (requires --stats for effect).
+    #[arg(long)]
+    constant_fold_stats: bool,
+
     /// Remove layers with always-false filters and unused sources.
     #[arg(long)]
     dead_elimination: bool,
+
+    /// Enable stats-driven dead layer removal (empty source-layer, geometry mismatch).
+    #[arg(long)]
+    dead_elimination_stats: bool,
 
     /// Tighten `minzoom`/`maxzoom` from `["zoom"]` predicates inside filters.
     /// Also removes zoom predicates that are fully captured by the extracted bounds.
     #[arg(long)]
     metadata_refinement: bool,
+
+    /// Derive minzoom from paint-property visibility analysis.
+    #[arg(long)]
+    metadata_refinement_paint: bool,
+
+    /// Tighten zoom bounds from tile statistics (requires --stats for effect).
+    #[arg(long)]
+    metadata_refinement_stats: bool,
 
     /// Reorder `any`/`all` operands for static short-circuit hints (literals first/last).
     #[arg(long)]
@@ -140,8 +156,12 @@ pub fn run(args: OptimizeArgs) -> anyhow::Result<()> {
             simplify_unary: args.simplify_unary,
             expression_kind: args.expression_kind,
             constant_fold: args.constant_fold,
+            constant_fold_stats: args.constant_fold_stats,
             dead_elimination: args.dead_elimination,
+            dead_elimination_stats: args.dead_elimination_stats,
             metadata_refinement: args.metadata_refinement,
+            metadata_refinement_paint: args.metadata_refinement_paint,
+            metadata_refinement_stats: args.metadata_refinement_stats,
             selectivity_reorder: args.selectivity_reorder,
             strip_metadata: args.strip_metadata,
             strip_defaults: args.strip_defaults,

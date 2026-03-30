@@ -3,6 +3,7 @@
 use maplibre_style_spec::shared_expr::NumericExpression;
 use maplibre_style_spec::spec::{AnyLayer, Boolean, MaplibreStyleSpecification, TypedLayer};
 
+use super::OptPasses;
 use super::source_util::VectorLayerInfo;
 use super::zoom::visibility_minzoom_from_value;
 use crate::stats::TileStatistics;
@@ -10,6 +11,7 @@ use crate::stats::TileStatistics;
 /// Extract zoom bounds from filters and tighten minzoom/maxzoom.
 pub(crate) fn metadata_refinement(
     style: &mut MaplibreStyleSpecification,
+    passes: &OptPasses,
     stats: Option<&TileStatistics>,
     layer_info: Option<&[Option<VectorLayerInfo>]>,
 ) {
@@ -17,13 +19,14 @@ pub(crate) fn metadata_refinement(
         let AnyLayer::Typed(typed) = layer else {
             continue;
         };
-        refine_typed_layer(typed, i, stats, layer_info);
+        refine_typed_layer(typed, i, passes, stats, layer_info);
     }
 }
 
 fn refine_typed_layer(
     layer: &mut TypedLayer,
     layer_index: usize,
+    passes: &OptPasses,
     stats: Option<&TileStatistics>,
     layer_info: Option<&[Option<VectorLayerInfo>]>,
 ) {
@@ -89,7 +92,8 @@ fn refine_typed_layer(
     }
 
     // Paint-based visibility minzoom.
-    if let Some(paint_min) = paint_visibility_minzoom(layer)
+    if passes.metadata_refinement_paint
+        && let Some(paint_min) = paint_visibility_minzoom(layer)
         && paint_min != f64::INFINITY
     {
         let common = layer.common_mut();
@@ -103,7 +107,8 @@ fn refine_typed_layer(
     }
 
     // Stats-driven zoom tightening.
-    if let Some(stats) = stats
+    if passes.metadata_refinement_stats
+        && let Some(stats) = stats
         && let Some(infos) = layer_info
         && let Some(Some(info)) = infos.get(layer_index)
         && let Some(layer_stats) = stats.layer_stats(&info.source, &info.source_layer)

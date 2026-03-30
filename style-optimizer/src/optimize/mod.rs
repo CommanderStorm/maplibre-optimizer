@@ -54,8 +54,12 @@ pub struct OptPasses {
     pub simplify_unary: bool,
     pub expression_kind: bool,
     pub constant_fold: bool,
+    pub constant_fold_stats: bool,
     pub dead_elimination: bool,
+    pub dead_elimination_stats: bool,
     pub metadata_refinement: bool,
+    pub metadata_refinement_paint: bool,
+    pub metadata_refinement_stats: bool,
     pub selectivity_reorder: bool,
     pub strip_metadata: bool,
     pub strip_defaults: bool,
@@ -73,8 +77,12 @@ impl OptPasses {
             simplify_unary: true,
             expression_kind: true,
             constant_fold: true,
+            constant_fold_stats: true,
             dead_elimination: true,
+            dead_elimination_stats: true,
             metadata_refinement: true,
+            metadata_refinement_paint: true,
+            metadata_refinement_stats: true,
             selectivity_reorder: true,
             strip_metadata: true,
             strip_defaults: true,
@@ -205,12 +213,12 @@ fn run_structural_passes(
 
     if passes.dead_elimination {
         let layer_info = stats.map(|_| precompute_vector_layer_info_typed(style));
-        dead_elimination(style, stats, layer_info.as_deref());
+        dead_elimination(style, passes, stats, layer_info.as_deref());
     }
 
     if passes.metadata_refinement {
         let layer_info = stats.map(|_| precompute_vector_layer_info_typed(style));
-        metadata_refinement(style, stats, layer_info.as_deref());
+        metadata_refinement(style, passes, stats, layer_info.as_deref());
     }
 
     if passes.cleanup {
@@ -222,6 +230,7 @@ fn run_structural_passes(
     // zoom predicates) is caught without a JSON round-trip.
     if wants_expression_passes(passes) {
         let layer_info = stats.map(|_| precompute_vector_layer_info_typed(style));
+        let mut any_changed = false;
         for _ in 0..NORMALIZE_FOLD_FIXPOINT_CAP {
             let mut visitor = TypedNormalizeFoldVisitor {
                 passes,
@@ -233,6 +242,12 @@ fn run_structural_passes(
             if !visitor.changed {
                 break;
             }
+            any_changed = true;
+        }
+        // Re-run cleanup after typed filter simplification may have produced
+        // trivially-true filters (e.g. geometry-type fold on typed layers).
+        if any_changed && passes.cleanup {
+            cleanup(style);
         }
     }
 
@@ -1209,6 +1224,7 @@ mod tests {
             &mir,
             &OptPasses {
                 dead_elimination: true,
+                dead_elimination_stats: true,
                 ..Default::default()
             },
             Some(&stats),
@@ -1238,6 +1254,7 @@ mod tests {
             &mir,
             &OptPasses {
                 dead_elimination: true,
+                dead_elimination_stats: true,
                 ..Default::default()
             },
             Some(&stats),
@@ -1266,6 +1283,7 @@ mod tests {
             &mir,
             &OptPasses {
                 metadata_refinement: true,
+                metadata_refinement_stats: true,
                 ..Default::default()
             },
             Some(&stats),
@@ -1297,6 +1315,7 @@ mod tests {
             &mir,
             &OptPasses {
                 constant_fold: true,
+                constant_fold_stats: true,
                 ..Default::default()
             },
             Some(&stats),
@@ -1336,6 +1355,7 @@ mod tests {
             &mir,
             &OptPasses {
                 constant_fold: true,
+                constant_fold_stats: true,
                 ..Default::default()
             },
             Some(&stats),
@@ -1375,6 +1395,7 @@ mod tests {
             &mir,
             &OptPasses {
                 constant_fold: true,
+                constant_fold_stats: true,
                 ..Default::default()
             },
             Some(&stats),
@@ -1416,6 +1437,7 @@ mod tests {
             &mir,
             &OptPasses {
                 constant_fold: true,
+                constant_fold_stats: true,
                 ..Default::default()
             },
             Some(&stats),
@@ -1449,6 +1471,7 @@ mod tests {
             &mir,
             &OptPasses {
                 constant_fold: true,
+                constant_fold_stats: true,
                 ..Default::default()
             },
             Some(&stats),
@@ -1484,6 +1507,7 @@ mod tests {
             &mir,
             &OptPasses {
                 constant_fold: true,
+                constant_fold_stats: true,
                 ..Default::default()
             },
             Some(&stats),

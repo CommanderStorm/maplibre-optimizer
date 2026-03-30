@@ -4,6 +4,7 @@ use std::collections::{HashMap, HashSet};
 
 use maplibre_style_spec::spec::{AnyLayer, MaplibreStyleSpecification, TypedLayer};
 
+use super::OptPasses;
 use super::source_util::VectorLayerInfo;
 use crate::stats::TileStatistics;
 
@@ -11,6 +12,7 @@ use crate::stats::TileStatistics;
 /// then prune unused sources.
 pub(crate) fn dead_elimination(
     style: &mut MaplibreStyleSpecification,
+    passes: &OptPasses,
     stats: Option<&TileStatistics>,
     layer_info: Option<&[Option<VectorLayerInfo>]>,
 ) {
@@ -28,7 +30,8 @@ pub(crate) fn dead_elimination(
                 continue;
             }
             // Stats-driven: empty source-layer or geometry type mismatch.
-            if let Some(stats) = stats
+            if passes.dead_elimination_stats
+                && let Some(stats) = stats
                 && (is_dead_by_empty_source_layer(i, stats, layer_info)
                     || is_dead_by_geometry(i, t, stats, layer_info))
             {
