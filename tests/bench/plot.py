@@ -64,7 +64,11 @@ LOWER_IS_BETTER = {
 }
 
 SIZE_METRICS = ["style_bytes", "gzip_bytes", "brotli_bytes"]
-COMPLEXITY_METRICS = ["ast_nodes", "max_depth", "layer_count", "filter_count"]
+COMPLEXITY_METRICS = [
+    "layer_count", "filter_count",
+    "property_count", "expression_property_count", "scalar_property_count",
+    "total_expression_nodes", "ast_nodes", "max_depth",
+]
 
 METRIC_LABELS = {
     "loadMs": "Load Time (ms)",
@@ -82,10 +86,14 @@ METRIC_LABELS = {
     "firstFrameMs": "First Frame Rendered (ms)",
     "heapUsedMB": "Heap Used (MB)",
     "peakHeapMB": "Peak Heap (MB)",
-    "ast_nodes": "AST Node Count",
+    "ast_nodes": "Expression Structural Nodes",
     "max_depth": "Max Expression Depth",
     "layer_count": "Layer Count",
     "filter_count": "Filter Count",
+    "property_count": "Total Properties",
+    "expression_property_count": "Expression Properties",
+    "scalar_property_count": "Scalar Properties",
+    "total_expression_nodes": "Total Expression Nodes",
 }
 
 

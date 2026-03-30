@@ -2,10 +2,14 @@
 source: style-optimizer/tests/complexity.rs
 expression: report
 ---
-ast_nodes: 13
-max_depth: 3
 layer_count: 3
 filter_count: 2
+property_count: 4
+expression_property_count: 2
+scalar_property_count: 2
+total_expression_nodes: 42
+ast_nodes: 13
+max_depth: 3
 expression_types:
   "==": 2
   all: 1

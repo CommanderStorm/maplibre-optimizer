@@ -14,6 +14,7 @@
  *   just bench-debug tokyo                          # with browser console output
  */
 
+import os from "node:os";
 import path from "node:path";
 import fs from "node:fs";
 import zlib from "node:zlib";
@@ -133,12 +134,22 @@ const ABLATION_STEPS: { pass: string; flag: string }[] = [
   { pass: "selectivity_reorder", flag: "--selectivity-reorder" },
 ];
 
-// ── Puppeteer args (same SwiftShader setup as render tests) ──────────────────
+// ── Puppeteer args ───────────────────────────────────────────────────────────
+
+const HALF_CPUS = Math.max(1, Math.floor(os.cpus().length / 2));
 
 const PUPPETEER_ARGS = [
-  "--disable-gpu",
-  "--enable-features=AllowSwiftShaderFallback,AllowSoftwareGLFallbackDueToCrashes",
-  "--enable-unsafe-swiftshader",
+  // Use real GPU for realistic performance measurement.
+  // Unlike the render tests (which use SwiftShader for pixel-exact comparison),
+  // benchmarks need real GPU timings to be meaningful.
+  "--enable-gpu",
+  "--enable-webgl",
+  "--ignore-gpu-blocklist",
+  // Limit Chrome's parallelism to half the available CPUs for more stable benchmarks
+  `--renderer-process-limit=${HALF_CPUS}`,
+  "--disable-background-networking",
+  "--disable-background-timer-throttling",
+  "--disable-backgrounding-occluded-windows",
 ];
 
 // ── build optimizer ──────────────────────────────────────────────────────────
@@ -835,7 +846,7 @@ async function main(): Promise<void> {
     runsPerScenario: RUNS,
     warmupRuns: WARMUP,
     maplibreVersion: getMaplibreVersion(),
-    renderer: "SwiftShader (headless Chrome)",
+    renderer: "Hardware GPU (headless Chrome)",
     ablationSteps: variants.map((v) => ({
       id: v.id,
       label: v.label,

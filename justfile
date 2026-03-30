@@ -203,7 +203,7 @@ bench-proxy *ARGS:
 
 # Number of CPU cores to pin benchmarks to (reduces run-to-run variance by
 # preventing the process tree from migrating across all cores).
-bench_cores := env('BENCH_CORES', '0-4')
+bench_cores := env('BENCH_CORES', '0-' + `python3 -c "import os; print(max(1, os.cpu_count()//2 - 1))"` )
 
 # Run performance benchmarks comparing original vs optimised styles.
 # Requires tile proxy running (start with: just bench-proxy)
