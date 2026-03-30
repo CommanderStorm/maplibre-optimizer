@@ -1649,20 +1649,16 @@ fn case_flatten_two_level() {
         ]),
     );
     optimize_style_json_value(&mut v, &mir, &simplify_passes());
-    assert_yaml_snapshot!(v["layers"][0]["paint"]["fill-opacity"], @r#"
-    - case
-    - - "=="
-      - - get
-        - kind
-      - park
+    assert_yaml_snapshot!(v["layers"][0]["paint"]["fill-opacity"], @r"
+    - match
+    - - get
+      - kind
+    - park
     - 0.8
-    - - "=="
-      - - get
-        - kind
-      - water
+    - water
     - 0.6
     - 0.2
-    "#);
+    ");
 }
 
 #[test]
@@ -1690,17 +1686,14 @@ fn case_flatten_three_level() {
         - kind
       - park
     - 0.9
-    - - "=="
+    - - match
       - - get
         - kind
       - water
-    - 0.7
-    - - "=="
-      - - get
-        - kind
+      - 0.7
       - sand
-    - 0.5
-    - 0.1
+      - 0.5
+      - 0.1
     "#);
 }
 
@@ -1769,6 +1762,260 @@ fn canonicalize_exponential_1_hcl() {
     - 10
     - "#fff"
     "##);
+}
+
+// ── case → match conversion ───────────────────────────────────────────
+
+#[test]
+fn case_to_match_string_labels() {
+    let mir = sample_mir();
+    let mut v = style_with_paint(
+        "fill-color",
+        serde_json::json!([
+            "case",
+            ["==", ["get", "class"], "road"], "red",
+            ["==", ["get", "class"], "rail"], "blue",
+            "gray"
+        ]),
+    );
+    optimize_style_json_value(&mut v, &mir, &simplify_passes());
+    assert_yaml_snapshot!(v["layers"][0]["paint"]["fill-color"], @r#"
+    - match
+    - - get
+      - class
+    - road
+    - red
+    - rail
+    - blue
+    - gray
+    "#);
+}
+
+#[test]
+fn case_to_match_numeric_labels() {
+    let mir = sample_mir();
+    let mut v = style_with_paint(
+        "fill-color",
+        serde_json::json!([
+            "case",
+            ["==", ["get", "level"], 1], "a",
+            ["==", ["get", "level"], 2], "b",
+            "c"
+        ]),
+    );
+    optimize_style_json_value(&mut v, &mir, &simplify_passes());
+    assert_yaml_snapshot!(v["layers"][0]["paint"]["fill-color"], @r#"
+    - match
+    - - get
+      - level
+    - 1
+    - a
+    - 2
+    - b
+    - c
+    "#);
+}
+
+#[test]
+fn case_to_match_commuted_equality() {
+    let mir = sample_mir();
+    let mut v = style_with_paint(
+        "fill-color",
+        serde_json::json!([
+            "case",
+            ["==", "road", ["get", "class"]], "red",
+            ["==", "rail", ["get", "class"]], "blue",
+            "gray"
+        ]),
+    );
+    optimize_style_json_value(&mut v, &mir, &simplify_passes());
+    assert_yaml_snapshot!(v["layers"][0]["paint"]["fill-color"], @r#"
+    - match
+    - - get
+      - class
+    - road
+    - red
+    - rail
+    - blue
+    - gray
+    "#);
+}
+
+#[test]
+fn case_to_match_single_arm_no_conversion() {
+    let mir = sample_mir();
+    let mut v = style_with_paint(
+        "fill-color",
+        serde_json::json!([
+            "case",
+            ["==", ["get", "class"], "road"], "red",
+            "gray"
+        ]),
+    );
+    optimize_style_json_value(&mut v, &mir, &simplify_passes());
+    // Single arm stays as case — not worth converting.
+    assert_yaml_snapshot!(v["layers"][0]["paint"]["fill-color"], @r#"
+    - case
+    - - "=="
+      - - get
+        - class
+      - road
+    - red
+    - gray
+    "#);
+}
+
+#[test]
+fn case_to_match_non_uniform_expr_no_conversion() {
+    let mir = sample_mir();
+    let mut v = style_with_paint(
+        "fill-color",
+        serde_json::json!([
+            "case",
+            ["==", ["get", "class"], "road"], "red",
+            ["==", ["get", "type"], "rail"], "blue",
+            "gray"
+        ]),
+    );
+    optimize_style_json_value(&mut v, &mir, &simplify_passes());
+    // Different get expressions — stays as case.
+    assert_yaml_snapshot!(v["layers"][0]["paint"]["fill-color"], @r#"
+    - case
+    - - "=="
+      - - get
+        - class
+      - road
+    - red
+    - - "=="
+      - - get
+        - type
+      - rail
+    - blue
+    - gray
+    "#);
+}
+
+#[test]
+fn case_to_match_bool_labels_no_conversion() {
+    let mir = sample_mir();
+    let mut v = style_with_paint(
+        "fill-color",
+        serde_json::json!([
+            "case",
+            ["==", ["get", "x"], true], "a",
+            ["==", ["get", "x"], false], "b",
+            "c"
+        ]),
+    );
+    optimize_style_json_value(&mut v, &mir, &simplify_passes());
+    // Bool labels are rejected by match spec — stays as case.
+    assert_yaml_snapshot!(v["layers"][0]["paint"]["fill-color"], @r#"
+    - case
+    - - "=="
+      - - get
+        - x
+      - true
+    - a
+    - - "=="
+      - - get
+        - x
+      - false
+    - b
+    - c
+    "#);
+}
+
+#[test]
+fn case_to_match_collator_no_conversion() {
+    let mir = sample_mir();
+    let mut v = style_with_paint(
+        "fill-color",
+        serde_json::json!([
+            "case",
+            ["==", ["get", "class"], "road", {"locale": "en"}], "red",
+            ["==", ["get", "class"], "rail", {"locale": "en"}], "blue",
+            "gray"
+        ]),
+    );
+    optimize_style_json_value(&mut v, &mir, &simplify_passes());
+    // Collator (4-element ==) is rejected by extract_eq_chain — stays as case.
+    assert_yaml_snapshot!(v["layers"][0]["paint"]["fill-color"], @r#"
+    - case
+    - - "=="
+      - - get
+        - class
+      - road
+      - locale: en
+    - red
+    - - "=="
+      - - get
+        - class
+      - rail
+      - locale: en
+    - blue
+    - gray
+    "#);
+}
+
+#[test]
+fn case_to_match_in_filter() {
+    let mir = sample_mir();
+    let mut v = style_with_filter(serde_json::json!([
+        "case",
+        ["==", ["get", "class"], "road"], true,
+        ["==", ["get", "class"], "rail"], true,
+        false
+    ]));
+    optimize_style_json_value(&mut v, &mir, &simplify_passes());
+    assert_yaml_snapshot!(v["layers"][0]["filter"], @r#"
+    - match
+    - - get
+      - class
+    - - road
+      - rail
+    - true
+    - false
+    "#);
+}
+
+#[test]
+fn nested_case_flatten_then_match() {
+    let mir = sample_mir();
+    // Outer case has only 1 arm → won't convert, but inner case has 2 → converts.
+    // flatten_case runs per-node BEFORE case_to_match, but children are processed
+    // bottom-up, so the inner case becomes match before the outer can flatten it.
+    let mut v = style_with_paint(
+        "fill-color",
+        serde_json::json!([
+            "case",
+            ["==", ["get", "class"], "road"], "red",
+            ["==", ["get", "class"], "water"], "aqua",
+            ["case",
+                ["==", ["get", "class"], "rail"], "blue",
+                ["==", ["get", "class"], "path"], "green",
+                "gray"
+            ]
+        ]),
+    );
+    optimize_style_json_value(&mut v, &mir, &simplify_passes());
+    // Both outer and inner are independently converted to match.
+    assert_yaml_snapshot!(v["layers"][0]["paint"]["fill-color"], @r#"
+    - match
+    - - get
+      - class
+    - road
+    - red
+    - water
+    - aqua
+    - - match
+      - - get
+        - class
+      - rail
+      - blue
+      - path
+      - green
+      - gray
+    "#);
 }
 
 #[test]

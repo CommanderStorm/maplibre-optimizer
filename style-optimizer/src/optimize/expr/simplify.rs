@@ -290,6 +290,53 @@ pub(super) fn try_simplify_case(arr: &mut Vec<Value>) -> bool {
     false
 }
 
+/// Rewrite `case` to `match` when all arms test `["==", same_expr, literal]`.
+///
+/// `match` uses hash-based O(1) dispatch vs `case`'s sequential O(n) evaluation,
+/// providing both a size reduction and runtime speedup.
+///
+/// Requires at least 2 arms, and all labels must be strings or numbers (not
+/// booleans or null, which `match` doesn't accept per the spec).
+pub(super) fn try_rewrite_case_to_match(arr: &mut Vec<Value>) -> bool {
+    if arr.first().and_then(Value::as_str) != Some("case") {
+        return false;
+    }
+    // Need at least 2 arms: ["case", c1, v1, c2, v2, fallback] → len >= 6, even
+    if arr.len() < 6 || !arr.len().is_multiple_of(2) {
+        return false;
+    }
+
+    let n_arms = (arr.len() - 2) / 2;
+    let conditions: Vec<Value> = (0..n_arms).map(|i| arr[1 + 2 * i].clone()).collect();
+
+    let Some((common_expr, labels)) = extract_eq_chain(&conditions) else {
+        return false;
+    };
+
+    // match labels must be string or number — not bool or null.
+    if labels
+        .iter()
+        .any(|l| !matches!(l, Value::String(_) | Value::Number(_)))
+    {
+        return false;
+    }
+
+    let fallback = arr.last().unwrap().clone();
+    let outputs: Vec<Value> = (0..n_arms).map(|i| arr[2 + 2 * i].clone()).collect();
+
+    let mut result = Vec::with_capacity(2 + 2 * n_arms + 1);
+    result.push(Value::String("match".to_string()));
+    result.push(common_expr);
+    for (label, output) in labels.into_iter().zip(outputs) {
+        result.push(label);
+        result.push(output);
+    }
+    result.push(fallback);
+
+    *arr = result;
+    true
+}
+
 /// Simplify `coalesce` expressions:
 ///
 /// - `["coalesce", x]` → `x` (single arg)
