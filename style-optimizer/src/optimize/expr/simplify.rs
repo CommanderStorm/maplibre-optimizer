@@ -2,7 +2,7 @@
 
 use serde_json::Value;
 
-use super::util::{extract_json_literal, replace_arr_with_value};
+use super::util::{compare_json_values, extract_json_literal, replace_arr_with_value};
 
 /// Canonicalize `["exponential", 1]` → `["linear"]` in interpolate expressions.
 #[expect(clippy::ptr_arg, reason = "to make trait happy")]
@@ -378,6 +378,77 @@ pub(super) fn try_rewrite_case_to_match(arr: &mut Vec<Value>) -> bool {
 
     *arr = result;
     true
+}
+
+/// Strip redundant `coalesce` wrapping inside comparison operators.
+///
+/// `["op", ["coalesce", inner, default], cmp_value]` → `["op", inner, cmp_value]`
+/// when `default op cmp_value` evaluates to `false`, because `null op cmp_value`
+/// is also `false` in MapLibre expression semantics (any comparison involving
+/// `null` returns `false`).
+///
+/// Also handles the swapped operand case `["op", cmp_value, ["coalesce", inner, default]]`.
+pub(super) fn try_strip_coalesce_in_comparison(arr: &mut Vec<Value>) -> bool {
+    let Some(op) = arr.first().and_then(Value::as_str) else {
+        return false;
+    };
+    if !matches!(op, "==" | "!=" | ">=" | ">" | "<=" | "<") {
+        return false;
+    }
+    if arr.len() < 3 {
+        return false;
+    }
+
+    // Try both operand positions (skip collator arg if present).
+    for idx in [1, 2] {
+        let other_idx = if idx == 1 { 2 } else { 1 };
+        let Some(coalesce) = arr.get(idx).and_then(Value::as_array) else {
+            continue;
+        };
+        if coalesce.len() != 3 || coalesce[0].as_str() != Some("coalesce") {
+            continue;
+        }
+        let default = &coalesce[2];
+        let Some(default_lit) = extract_json_literal(default) else {
+            continue;
+        };
+        let Some(cmp_lit) = extract_json_literal(&arr[other_idx]) else {
+            continue;
+        };
+
+        // Evaluate: would `default op cmp_value` be false?
+        // If so, coalesce is redundant (null also produces false).
+        let default_result = match op {
+            "==" => default_lit == cmp_lit,
+            "!=" => default_lit != cmp_lit,
+            _ => {
+                // Ordered comparisons: evaluate default op cmp_value.
+                let Some(ord) = compare_json_values(&default_lit, &cmp_lit) else {
+                    continue;
+                };
+                match op {
+                    ">=" if idx == 1 => ord.is_ge(),
+                    ">" if idx == 1 => ord.is_gt(),
+                    "<=" if idx == 1 => ord.is_le(),
+                    "<" if idx == 1 => ord.is_lt(),
+                    // Swapped: cmp_value op coalesce → cmp_value op default
+                    ">=" => ord.is_le(),
+                    ">" => ord.is_lt(),
+                    "<=" => ord.is_ge(),
+                    "<" => ord.is_gt(),
+                    _ => continue,
+                }
+            }
+        };
+
+        if !default_result {
+            // Safe to strip coalesce: replace ["coalesce", inner, default] with inner.
+            let inner = coalesce[1].clone();
+            arr[idx] = inner;
+            return true;
+        }
+    }
+    false
 }
 
 /// Simplify `coalesce` expressions:
