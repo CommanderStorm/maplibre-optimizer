@@ -1,0 +1,9 @@
+---
+source: style-optimizer/tests/complexity.rs
+expression: report
+---
+ast_nodes: 0
+max_depth: 0
+layer_count: 0
+filter_count: 0
+expression_types: {}

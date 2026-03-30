@@ -167,11 +167,22 @@ function localizeURLs(style: Partial<TestStyle>, port: number): void {
     for (const s of style.sprite) s.url = rewrite(s.url);
   if (typeof style.glyphs === "string") style.glyphs = rewrite(style.glyphs);
 
+  // Rewrite addFakeCanvas image paths to absolute URLs
+  const test = style.metadata?.test as Record<string, unknown> | undefined;
+  if (test?.addFakeCanvas) {
+    const fc = test.addFakeCanvas as { image: string };
+    fc.image = `http://localhost:${port}/${fc.image.replace(/^\.\//, "")}`;
+  }
+
   // handle operations that set/add styles or sources
   const ops = style.metadata?.test?.operations;
   if (ops) {
     for (const op of ops) {
-      if (op[0] === "addSource" && op[2]) {
+      if (op[0] === "updateFakeCanvas") {
+        // Rewrite image paths in updateFakeCanvas operations
+        if (typeof op[2] === "string") op[2] = `http://localhost:${port}/${(op[2] as string).replace(/^\.\//, "")}`;
+        if (typeof op[3] === "string") op[3] = `http://localhost:${port}/${(op[3] as string).replace(/^\.\//, "")}`;
+      } else if (op[0] === "addSource" && op[2]) {
         localizeURLs(
           { sources: { _: op[2] as Record<string, unknown> } },
           port,
@@ -462,6 +473,32 @@ window.__renderStyle = function(style) {
     return new Promise(function(resolve) { setTimeout(resolve, ms); });
   }
 
+  async function createFakeCanvas(document, id, imagePath) {
+    var fakeCanvas = document.createElement('canvas');
+    var img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.src = imagePath;
+    await img.decode();
+    fakeCanvas.width = img.naturalWidth;
+    fakeCanvas.height = img.naturalHeight;
+    fakeCanvas.id = id;
+    var ctx = fakeCanvas.getContext('2d');
+    ctx.drawImage(img, 0, 0, img.naturalWidth, img.naturalHeight);
+    return fakeCanvas;
+  }
+
+  async function updateFakeCanvas(document, id, imagePath) {
+    var fakeCanvas = document.getElementById(id);
+    var img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.src = imagePath;
+    await img.decode();
+    fakeCanvas.width = img.naturalWidth;
+    fakeCanvas.height = img.naturalHeight;
+    var ctx = fakeCanvas.getContext('2d');
+    ctx.drawImage(img, 0, 0, img.naturalWidth, img.naturalHeight);
+  }
+
   async function applyOperations(map, ops) {
     if (!ops) return;
     for (var i = 0; i < ops.length; i++) {
@@ -487,6 +524,13 @@ window.__renderStyle = function(style) {
         await map.once("idle");
       } else if (name === "setStyle") {
         map.setStyle(args[0], {localIdeographFontFamily: false});
+      } else if (name === "updateFakeCanvas") {
+        var canvasSource = map.getSource(args[0]);
+        canvasSource.play();
+        await updateFakeCanvas(document, options.addFakeCanvas.id, args[1]);
+        canvasSource.pause();
+        await updateFakeCanvas(document, options.addFakeCanvas.id, args[2]);
+        map._render();
       } else if (typeof map[name] === "function") {
         map[name].apply(map, args);
       }
@@ -496,6 +540,11 @@ window.__renderStyle = function(style) {
   return new Promise(async function(resolve, reject) {
     setTimeout(function() { reject(new Error("render timeout")); }, options.timeout || 40000);
     try {
+      if (options.addFakeCanvas) {
+        var fakeCanvas = await createFakeCanvas(document, options.addFakeCanvas.id, options.addFakeCanvas.image);
+        document.body.appendChild(fakeCanvas);
+      }
+
       var map = new maplibregl.Map({
         container: "map",
         style: style,
@@ -514,7 +563,8 @@ window.__renderStyle = function(style) {
 
       var gl = map.painter.context.gl;
       var vp = gl.getParameter(gl.VIEWPORT);
-      var w = vp[2], h = vp[3];
+      var w = options.reportWidth || vp[2];
+      var h = options.reportHeight || vp[3];
       var buf = new Uint8Array(w * h * 4);
       gl.readPixels(0, 0, w, h, gl.RGBA, gl.UNSIGNED_BYTE, buf);
 
@@ -529,6 +579,10 @@ window.__renderStyle = function(style) {
       }
 
       map.remove();
+      if (options.addFakeCanvas) {
+        var fc = document.getElementById(options.addFakeCanvas.id);
+        if (fc) fc.parentNode.removeChild(fc);
+      }
       var binary = '';
       for (var k = 0; k < buf.length; k += 32768) {
         binary += String.fromCharCode.apply(null, buf.subarray(k, k + 32768));
@@ -786,10 +840,10 @@ async function main(): Promise<void> {
   async function processTest(ref: PageRef, result: PreOptResult): Promise<void> {
     const { style, optimised } = result;
     const id = style.metadata.test.id;
-    const w = Math.floor(
+    const w = (style.metadata.test as any).reportWidth ?? Math.floor(
       style.metadata.test.width * (style.metadata.test.pixelRatio || 1),
     );
-    const h = Math.floor(
+    const h = (style.metadata.test as any).reportHeight ?? Math.floor(
       style.metadata.test.height * (style.metadata.test.pixelRatio || 1),
     );
     const allowed = style.metadata.test.allowed;

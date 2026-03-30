@@ -7,6 +7,7 @@
 //! are provided for backward compatibility.
 
 pub mod advisory;
+pub mod complexity;
 pub mod encode_mlt;
 pub mod mbtiles;
 #[expect(

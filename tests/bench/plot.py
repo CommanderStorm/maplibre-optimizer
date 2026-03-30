@@ -52,8 +52,19 @@ def load_jsonl(paths: list[Path]) -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
-METRICS = ["loadMs", "idleMs", "fps", "p50FrameMs", "p95FrameMs", "p99FrameMs", "jankCount"]
-LOWER_IS_BETTER = {"loadMs", "idleMs", "p50FrameMs", "p95FrameMs", "p99FrameMs", "jankCount"}
+METRICS = [
+    "loadMs", "idleMs", "fps", "p50FrameMs", "p95FrameMs", "p99FrameMs", "jankCount",
+    "styleParseMs", "firstTileMs", "firstFrameMs",
+    "heapUsedMB", "peakHeapMB",
+]
+LOWER_IS_BETTER = {
+    "loadMs", "idleMs", "p50FrameMs", "p95FrameMs", "p99FrameMs", "jankCount",
+    "styleParseMs", "firstTileMs", "firstFrameMs",
+    "heapUsedMB", "peakHeapMB",
+}
+
+SIZE_METRICS = ["style_bytes", "gzip_bytes", "brotli_bytes"]
+COMPLEXITY_METRICS = ["ast_nodes", "max_depth", "layer_count", "filter_count"]
 
 METRIC_LABELS = {
     "loadMs": "Load Time (ms)",
@@ -64,6 +75,17 @@ METRIC_LABELS = {
     "p99FrameMs": "P99 Frame Time (ms)",
     "jankCount": "Jank Frames",
     "style_bytes": "Style Size (bytes)",
+    "gzip_bytes": "Gzip Size (bytes)",
+    "brotli_bytes": "Brotli Size (bytes)",
+    "styleParseMs": "Style Parse Time (ms)",
+    "firstTileMs": "First Tile Loaded (ms)",
+    "firstFrameMs": "First Frame Rendered (ms)",
+    "heapUsedMB": "Heap Used (MB)",
+    "peakHeapMB": "Peak Heap (MB)",
+    "ast_nodes": "AST Node Count",
+    "max_depth": "Max Expression Depth",
+    "layer_count": "Layer Count",
+    "filter_count": "Filter Count",
 }
 
 
@@ -125,6 +147,8 @@ def plot_ablation_waterfall(
     step_labels = [_step_label(v) for v in variants]
 
     for metric in metrics:
+        if metric not in medians.columns:
+            continue
         fig = go.Figure()
 
         scenarios = medians["scenario"].unique()
@@ -179,6 +203,8 @@ def plot_marginal_contribution(
     scenarios = sorted(medians["scenario"].unique())
 
     for metric in metrics:
+        if metric not in medians.columns:
+            continue
         lower_better = metric in LOWER_IS_BETTER
         marginals = compute_marginal_deltas(medians, variants, metric, scenarios)
 
@@ -221,47 +247,60 @@ def plot_marginal_contribution(
 def plot_style_size_ablation(df: pd.DataFrame, variants: list[str], out: Path, fmt: str) -> None:
     """
     Style size waterfall: X-axis is ablation step, Y-axis is style JSON bytes.
+    Shows raw, gzip, and brotli curves.
     """
-    if "style_bytes" not in df.columns:
-        print("  (skipped — no style_bytes in data)")
+    size_cols = [c for c in SIZE_METRICS if c in df.columns]
+    if not size_cols:
+        print("  (skipped — no size metrics in data)")
         return
 
-    # style_bytes is the same for all runs of a variant, take the first
-    size_by_variant = df.groupby("variant")["style_bytes"].first()
+    # Size is the same for all runs of a variant; take the first
+    size_by_variant = df.groupby("variant")[size_cols].first()
 
-    sizes = []
-    labels = []
+    step_labels = []
     for v in variants:
         if v in size_by_variant.index:
-            sizes.append(size_by_variant[v])
-            labels.append(_step_label(v))
-
-    if not sizes:
-        return
-
-    baseline = sizes[0]
-    pct_labels = [
-        f"{s / 1024:.1f} KB ({(1 - s / baseline) * 100:.1f}% smaller)" if i > 0
-        else f"{s / 1024:.1f} KB"
-        for i, s in enumerate(sizes)
-    ]
+            step_labels.append(_step_label(v))
 
     fig = go.Figure()
-    fig.add_trace(go.Scatter(
-        x=labels,
-        y=sizes,
-        mode="lines+markers+text",
-        line=dict(width=3, color="#1F77B4"),
-        marker=dict(size=10),
-        text=pct_labels,
-        textposition="top center",
-        textfont=dict(size=10),
-    ))
+
+    colors = {"style_bytes": "#1F77B4", "gzip_bytes": "#FF7F0E", "brotli_bytes": "#2CA02C"}
+    names = {"style_bytes": "Raw", "gzip_bytes": "Gzip", "brotli_bytes": "Brotli"}
+
+    for col in size_cols:
+        sizes = []
+        labels = []
+        for v in variants:
+            if v in size_by_variant.index:
+                sizes.append(size_by_variant.loc[v, col])
+                labels.append(_step_label(v))
+
+        if not sizes:
+            continue
+
+        baseline = sizes[0]
+        pct_labels = [
+            f"{s / 1024:.1f} KB ({(1 - s / baseline) * 100:.1f}%)" if i > 0
+            else f"{s / 1024:.1f} KB"
+            for i, s in enumerate(sizes)
+        ]
+
+        fig.add_trace(go.Scatter(
+            x=labels,
+            y=sizes,
+            mode="lines+markers",
+            line=dict(width=3, color=colors.get(col, "#333")),
+            marker=dict(size=8),
+            name=names.get(col, col),
+            text=pct_labels,
+            textposition="top center",
+            hovertext=pct_labels,
+        ))
 
     fig.update_layout(
-        title="Style Size Across Ablation Steps",
+        title="Style Size Across Ablation Steps (Raw, Gzip, Brotli)",
         xaxis_title="Cumulative Pass",
-        yaxis_title="Style Size (bytes)",
+        yaxis_title="Size (bytes)",
         xaxis_tickangle=-45,
         template="plotly_white",
     )
@@ -278,6 +317,8 @@ def plot_scenario_heatmap(
     scenarios = sorted(medians["scenario"].unique())
 
     for metric in metrics:
+        if metric not in medians.columns:
+            continue
         lower_better = metric in LOWER_IS_BETTER
         marginals = compute_marginal_deltas(medians, variants, metric, scenarios)
 
@@ -330,6 +371,8 @@ def plot_box_per_step(
     df = df.sort_values("step_order")
 
     for metric in metrics:
+        if metric not in df.columns:
+            continue
         fig = px.box(
             df,
             x="step_label",
@@ -346,6 +389,231 @@ def plot_box_per_step(
         write_fig(fig, out, f"box_{metric}", fmt)
 
 
+def plot_complexity_ablation(df: pd.DataFrame, variants: list[str], out: Path, fmt: str) -> None:
+    """
+    Complexity metrics waterfall: X-axis is ablation step, Y-axis is complexity value.
+    One line per complexity metric.
+    """
+    avail = [c for c in COMPLEXITY_METRICS if c in df.columns]
+    if not avail:
+        print("  (skipped — no complexity metrics in data)")
+        return
+
+    # Complexity is per-variant (same across runs/scenarios); take first
+    complexity_by_variant = df.groupby("variant")[avail].first()
+
+    step_labels = []
+    for v in variants:
+        if v in complexity_by_variant.index:
+            step_labels.append(_step_label(v))
+
+    colors = {"ast_nodes": "#1F77B4", "max_depth": "#FF7F0E", "layer_count": "#2CA02C", "filter_count": "#D62728"}
+
+    for metric in avail:
+        vals = []
+        labels = []
+        for v in variants:
+            if v in complexity_by_variant.index:
+                vals.append(complexity_by_variant.loc[v, metric])
+                labels.append(_step_label(v))
+
+        if not vals:
+            continue
+
+        baseline = vals[0]
+        fig = go.Figure()
+        fig.add_trace(go.Scatter(
+            x=labels,
+            y=vals,
+            mode="lines+markers",
+            line=dict(width=3, color=colors.get(metric, "#333")),
+            marker=dict(size=8),
+            name=METRIC_LABELS.get(metric, metric),
+            text=[
+                f"{v} ({(1 - v / baseline) * 100:.1f}% less)" if i > 0 and baseline > 0
+                else str(v)
+                for i, v in enumerate(vals)
+            ],
+            textposition="top center",
+        ))
+
+        fig.update_layout(
+            title=f"Complexity Across Ablation Steps: {METRIC_LABELS.get(metric, metric)}",
+            xaxis_title="Cumulative Pass",
+            yaxis_title=METRIC_LABELS.get(metric, metric),
+            xaxis_tickangle=-45,
+            template="plotly_white",
+        )
+        write_fig(fig, out, f"complexity_{metric}", fmt)
+
+
+def plot_time_breakdown(
+    medians: pd.DataFrame, variants: list[str], out: Path, fmt: str
+) -> None:
+    """
+    Stacked bar chart: time-to-interactive breakdown per ablation step.
+    Segments: styleParseMs, firstTileMs - styleParseMs, firstFrameMs - firstTileMs, loadMs - firstFrameMs.
+    """
+    time_cols = ["styleParseMs", "firstTileMs", "firstFrameMs", "loadMs"]
+    if not all(c in medians.columns for c in time_cols):
+        print("  (skipped — missing time breakdown columns)")
+        return
+
+    # Average across scenarios per variant
+    means = medians.groupby("variant")[time_cols].mean()
+
+    step_labels = []
+    parse_vals = []
+    tile_vals = []
+    frame_vals = []
+    load_vals = []
+
+    for v in variants:
+        if v not in means.index:
+            continue
+        step_labels.append(_step_label(v))
+        sp = max(0, means.loc[v, "styleParseMs"])
+        ft = max(0, means.loc[v, "firstTileMs"] - sp)
+        ff = max(0, means.loc[v, "firstFrameMs"] - sp - ft)
+        ld = max(0, means.loc[v, "loadMs"] - sp - ft - ff)
+        parse_vals.append(sp)
+        tile_vals.append(ft)
+        frame_vals.append(ff)
+        load_vals.append(ld)
+
+    if not step_labels:
+        return
+
+    fig = go.Figure()
+    fig.add_trace(go.Bar(name="Style Parse", x=step_labels, y=parse_vals, marker_color="#1F77B4"))
+    fig.add_trace(go.Bar(name="First Tile", x=step_labels, y=tile_vals, marker_color="#FF7F0E"))
+    fig.add_trace(go.Bar(name="First Frame", x=step_labels, y=frame_vals, marker_color="#2CA02C"))
+    fig.add_trace(go.Bar(name="Remaining Load", x=step_labels, y=load_vals, marker_color="#D62728"))
+
+    fig.update_layout(
+        barmode="stack",
+        title="Time-to-Interactive Breakdown per Ablation Step",
+        xaxis_title="Cumulative Pass",
+        yaxis_title="Time (ms)",
+        xaxis_tickangle=-45,
+        template="plotly_white",
+    )
+    write_fig(fig, out, "time_breakdown", fmt)
+
+
+def plot_isolated_impact(
+    medians: pd.DataFrame, variants: list[str], metrics: list[str], out: Path, fmt: str
+) -> None:
+    """
+    Per-pass isolated impact: bar chart showing the effect of each pass alone
+    vs the baseline. Only available when data includes isolated-mode variants.
+    """
+    isolated_variants = [v for v in variants if v.startswith("isolated-")]
+    if not isolated_variants:
+        return
+
+    baseline_v = [v for v in variants if "baseline" in v]
+    if not baseline_v:
+        return
+    baseline_id = baseline_v[0]
+    scenarios = sorted(medians["scenario"].unique())
+
+    for metric in metrics:
+        if metric not in medians.columns:
+            continue
+        lower_better = metric in LOWER_IS_BETTER
+
+        pass_names = []
+        mean_deltas = []
+        std_deltas = []
+
+        for iv in isolated_variants:
+            pass_name = _step_label(iv)
+            deltas = []
+            for scenario in scenarios:
+                sdf = medians[medians.scenario == scenario].set_index("variant")
+                if baseline_id in sdf.index and iv in sdf.index:
+                    d = _delta_pct(sdf.loc[baseline_id, metric], sdf.loc[iv, metric])
+                    if d is not None:
+                        deltas.append(d)
+            if deltas:
+                pass_names.append(pass_name)
+                mean_deltas.append(np.mean(deltas))
+                std_deltas.append(np.std(deltas))
+
+        if not pass_names:
+            continue
+
+        colors = []
+        for d in mean_deltas:
+            is_good = (d < 0) if lower_better else (d > 0)
+            colors.append("#2CA02C" if is_good else "#D62728" if abs(d) > 0.5 else "#999999")
+
+        fig = go.Figure()
+        fig.add_trace(go.Bar(
+            x=pass_names,
+            y=mean_deltas,
+            error_y=dict(type="data", array=std_deltas, visible=True),
+            marker_color=colors,
+            text=[f"{d:+.2f}%" for d in mean_deltas],
+            textposition="outside",
+        ))
+
+        direction = "(negative = improvement)" if lower_better else "(positive = improvement)"
+        fig.update_layout(
+            title=f"Isolated Pass Impact: {METRIC_LABELS.get(metric, metric)}",
+            xaxis_title="Pass (alone)",
+            yaxis_title=f"% Change vs Baseline {direction}",
+            xaxis_tickangle=-45,
+            template="plotly_white",
+        )
+        write_fig(fig, out, f"isolated_{metric}", fmt)
+
+
+def plot_memory_ablation(
+    medians: pd.DataFrame, variants: list[str], out: Path, fmt: str
+) -> None:
+    """
+    Memory usage across ablation steps: heap used and peak heap.
+    """
+    mem_cols = [c for c in ["heapUsedMB", "peakHeapMB"] if c in medians.columns]
+    if not mem_cols:
+        print("  (skipped — no memory metrics in data)")
+        return
+
+    # Average across scenarios
+    means = medians.groupby("variant")[mem_cols].mean()
+
+    step_labels = []
+    for v in variants:
+        if v in means.index:
+            step_labels.append(_step_label(v))
+
+    colors = {"heapUsedMB": "#1F77B4", "peakHeapMB": "#D62728"}
+    names = {"heapUsedMB": "Heap Used", "peakHeapMB": "Peak Heap"}
+
+    fig = go.Figure()
+    for col in mem_cols:
+        vals = [means.loc[v, col] for v in variants if v in means.index]
+        fig.add_trace(go.Scatter(
+            x=step_labels,
+            y=vals,
+            mode="lines+markers",
+            line=dict(width=3, color=colors.get(col, "#333")),
+            marker=dict(size=8),
+            name=names.get(col, col),
+        ))
+
+    fig.update_layout(
+        title="Browser Memory Usage Across Ablation Steps",
+        xaxis_title="Cumulative Pass",
+        yaxis_title="Memory (MB)",
+        xaxis_tickangle=-45,
+        template="plotly_white",
+    )
+    write_fig(fig, out, "memory_ablation", fmt)
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Plot ablation benchmark results from JSONL files.")
     parser.add_argument("files", nargs="+", type=Path, help="JSONL benchmark result files")
@@ -354,14 +622,20 @@ def main() -> None:
     parser.add_argument("--format", choices=["png", "html"], default="png", help="Output format (default: png)")
     args = parser.parse_args()
 
-    metrics = args.metrics or METRICS
+    # Filter to metrics actually present in data
     fmt = args.format
     args.out.mkdir(parents=True, exist_ok=True)
 
     df = load_jsonl(args.files)
     print(f"Loaded {len(df)} records from {len(args.files)} file(s)")
     print(f"Variants: {sorted(df['variant'].unique())}")
-    print(f"Scenarios: {sorted(df['scenario'].unique())}\n")
+    print(f"Scenarios: {sorted(df['scenario'].unique())}")
+
+    mode = df["mode"].iloc[0] if "mode" in df.columns else "cumulative"
+    print(f"Mode: {mode}\n")
+
+    available_metrics = [m for m in METRICS if m in df.columns]
+    metrics = args.metrics or available_metrics
 
     # Precompute shared data
     variants = ablation_step_order(df)
@@ -381,6 +655,18 @@ def main() -> None:
 
     print("\nBox plots per ablation step:")
     plot_box_per_step(df, variants, metrics, args.out, fmt)
+
+    print("\nComplexity ablation:")
+    plot_complexity_ablation(df, variants, args.out, fmt)
+
+    print("\nTime-to-interactive breakdown:")
+    plot_time_breakdown(medians, variants, args.out, fmt)
+
+    print("\nIsolated pass impact:")
+    plot_isolated_impact(medians, variants, metrics, args.out, fmt)
+
+    print("\nMemory usage ablation:")
+    plot_memory_ablation(medians, variants, args.out, fmt)
 
     print(f"\nAll figures written to {args.out}/")
 

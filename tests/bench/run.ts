@@ -10,11 +10,13 @@
  *   just bench                                      # all scenarios, 15 runs, 12 ablation steps
  *   just bench --runs 1 munich-zigzag               # single quick scenario
  *   just bench --mbtiles /path/to/tiles.mbtiles     # enable step 12 (selectivity_reorder)
+ *   just bench --isolated                           # per-pass isolated impact (non-cumulative)
  *   just bench-debug tokyo                          # with browser console output
  */
 
 import path from "node:path";
 import fs from "node:fs";
+import zlib from "node:zlib";
 import { execFileSync, execSync } from "node:child_process";
 import puppeteer, { type Page } from "puppeteer";
 import { getAllScenarios, filterScenarios, type Scenario } from "./scenarios.js";
@@ -43,6 +45,7 @@ const TILE_PROXY_URL = `http://localhost:${TILE_PROXY_PORT}`;
 
 const argv = process.argv.slice(2);
 const debug = argv.includes("--debug");
+const isolated = argv.includes("--isolated");
 const runsArg = argv.findIndex((a) => a === "--runs");
 const warmupArg = argv.findIndex((a) => a === "--warmup");
 const mbtilesArg = argv.findIndex((a) => a === "--mbtiles");
@@ -70,6 +73,11 @@ interface RunMetrics {
   p99FrameMs: number;
   jankCount: number;
   animationMs: number;
+  styleParseMs: number;
+  firstTileMs: number;
+  firstFrameMs: number;
+  heapUsedMB: number;
+  peakHeapMB: number;
 }
 
 interface AggregatedMetrics {
@@ -84,6 +92,17 @@ interface Variant {
   passes: string[];
   styleJson: string;
   styleBytes: number;
+  gzipBytes: number;
+  brotliBytes: number;
+  complexity: ComplexityReport | null;
+}
+
+interface ComplexityReport {
+  ast_nodes: number;
+  max_depth: number;
+  layer_count: number;
+  filter_count: number;
+  expression_types: Record<string, number>;
 }
 
 interface ScenarioResult {
@@ -172,6 +191,32 @@ function collectStats(mbtilesPath: string, outputPath: string): void {
   ]);
 }
 
+// ── compressed size helpers (Benchmark 1) ─────────────────────────────────────
+
+function gzipSize(data: string): number {
+  return zlib.gzipSync(Buffer.from(data, "utf8"), { level: 9 }).length;
+}
+
+function brotliSize(data: string): number {
+  return zlib.brotliCompressSync(Buffer.from(data, "utf8"), {
+    params: { [zlib.constants.BROTLI_PARAM_QUALITY]: zlib.constants.BROTLI_MAX_QUALITY },
+  }).length;
+}
+
+// ── complexity report (Benchmark 2) ──────────────────────────────────────────
+
+function getComplexityReport(styleJsonPath: string): ComplexityReport | null {
+  try {
+    const output = execFileSync(OPTIMIZER, ["complexity", "--input", styleJsonPath], {
+      timeout: 10_000,
+      encoding: "utf8",
+    });
+    return JSON.parse(output) as ComplexityReport;
+  } catch {
+    return null;
+  }
+}
+
 function formatKB(json: string): string {
   return `${(Buffer.byteLength(json, "utf8") / 1024).toFixed(1)} KB`;
 }
@@ -186,16 +231,26 @@ function formatKB(json: string): string {
 function buildVariants(originalStyleJson: string): Variant[] {
   const variants: Variant[] = [];
 
+  // Write input style once for all optimizer invocations
+  const inputPath = path.join(RESULTS_DIR, "_bench_input.json");
+  fs.writeFileSync(inputPath, originalStyleJson);
+
   // Step 0: baseline (no optimization)
   const baselineBytes = Buffer.byteLength(originalStyleJson, "utf8");
+  const baselineGzip = gzipSize(originalStyleJson);
+  const baselineBrotli = brotliSize(originalStyleJson);
+  const baselineComplexity = getComplexityReport(inputPath);
   variants.push({
     id: "step-00-baseline",
     label: "baseline",
     passes: [],
     styleJson: originalStyleJson,
     styleBytes: baselineBytes,
+    gzipBytes: baselineGzip,
+    brotliBytes: baselineBrotli,
+    complexity: baselineComplexity,
   });
-  console.log(`  step-00-baseline: ${formatKB(originalStyleJson)}`);
+  console.log(`  step-00-baseline: ${formatKB(originalStyleJson)} (gzip: ${(baselineGzip / 1024).toFixed(1)} KB, br: ${(baselineBrotli / 1024).toFixed(1)} KB)`);
 
   // Collect stats if mbtiles provided (needed for selectivity_reorder)
   let statsPath: string | undefined;
@@ -208,22 +263,33 @@ function buildVariants(originalStyleJson: string): Variant[] {
   // Determine how many steps to run
   const maxSteps = MBTILES ? ABLATION_STEPS.length : ABLATION_STEPS.length - 1;
 
-  // Write input style once for all optimizer invocations
-  const inputPath = path.join(RESULTS_DIR, "_bench_input.json");
-  fs.writeFileSync(inputPath, originalStyleJson);
-
-  // Build cumulative pass flags
+  // Build pass flags depending on mode
   const accumulatedFlags: string[] = [];
   const accumulatedPasses: string[] = [];
 
   try {
     for (let i = 0; i < maxSteps; i++) {
       const step = ABLATION_STEPS[i];
-      accumulatedFlags.push(step.flag);
-      accumulatedPasses.push(step.pass);
 
-      const stepNum = String(i + 1).padStart(2, "0");
-      const variantId = `step-${stepNum}-${step.pass}`;
+      let passFlags: string[];
+      let passList: string[];
+      let variantId: string;
+
+      if (isolated) {
+        // Isolated mode: each variant has only one pass
+        passFlags = [step.flag];
+        passList = [step.pass];
+        const stepNum = String(i + 1).padStart(2, "0");
+        variantId = `isolated-${stepNum}-${step.pass}`;
+      } else {
+        // Cumulative mode: accumulate passes
+        accumulatedFlags.push(step.flag);
+        accumulatedPasses.push(step.pass);
+        passFlags = [...accumulatedFlags];
+        passList = [...accumulatedPasses];
+        const stepNum = String(i + 1).padStart(2, "0");
+        variantId = `step-${stepNum}-${step.pass}`;
+      }
 
       // Build extra args for selectivity_reorder
       const extraArgs: string[] = [];
@@ -231,18 +297,30 @@ function buildVariants(originalStyleJson: string): Variant[] {
         extraArgs.push("--stats", statsPath);
       }
 
-      const optimizedJson = optimizeStyle(inputPath, accumulatedFlags, extraArgs);
+      const optimizedJson = optimizeStyle(inputPath, passFlags, extraArgs);
       const styleBytes = Buffer.byteLength(optimizedJson, "utf8");
+      const gzBytes = gzipSize(optimizedJson);
+      const brBytes = brotliSize(optimizedJson);
+
+      // Write optimized style to get complexity report
+      const tmpComplexity = path.join(RESULTS_DIR, "_bench_complexity.json");
+      fs.writeFileSync(tmpComplexity, optimizedJson);
+      const complexity = getComplexityReport(tmpComplexity);
+      try { fs.unlinkSync(tmpComplexity); } catch {}
+
       const pctSmaller = ((1 - styleBytes / baselineBytes) * 100).toFixed(1);
 
       variants.push({
         id: variantId,
-        label: `+${step.pass}`,
-        passes: [...accumulatedPasses],
+        label: isolated ? step.pass : `+${step.pass}`,
+        passes: passList,
         styleJson: optimizedJson,
         styleBytes,
+        gzipBytes: gzBytes,
+        brotliBytes: brBytes,
+        complexity,
       });
-      console.log(`  ${variantId}: ${formatKB(optimizedJson)} (${pctSmaller}% smaller)`);
+      console.log(`  ${variantId}: ${formatKB(optimizedJson)} (${pctSmaller}% smaller, gzip: ${(gzBytes / 1024).toFixed(1)} KB, br: ${(brBytes / 1024).toFixed(1)} KB)`);
     }
   } finally {
     try { fs.unlinkSync(inputPath); } catch {}
@@ -264,9 +342,17 @@ window.__runBenchmark = function(styleJSON, keyframes, locationCenter, locationZ
     }, ${RUN_TIMEOUT});
 
     try {
+      // Benchmark 5: measure style parse time
+      var parseStart = performance.now();
       var style = JSON.parse(styleJSON);
+      var styleParseMs = performance.now() - parseStart;
+
       var startTime = performance.now();
       var frameTimestamps = [];
+      var firstFrameMs = null;
+      var firstTileMs = null;
+      var peakHeap = 0;
+      var heapSampler = null;
 
       var map = new maplibregl.Map({
         container: "map",
@@ -280,14 +366,35 @@ window.__runBenchmark = function(styleJSON, keyframes, locationCenter, locationZ
         maxCanvasSize: [8192, 8192],
       });
 
+      // Benchmark 5: capture first tile data event
+      map.on("data", function(e) {
+        if (firstTileMs === null && e.dataType === "source" && e.tile) {
+          firstTileMs = performance.now() - startTime;
+        }
+      });
+
       map.on("render", function() {
-        frameTimestamps.push(performance.now());
+        var now = performance.now();
+        frameTimestamps.push(now);
+        if (firstFrameMs === null) {
+          firstFrameMs = now - startTime;
+        }
       });
 
       var loadMs, idleMs;
 
       map.once("load", function() {
         loadMs = performance.now() - startTime;
+
+        // Benchmark 7: start heap sampling
+        if (window.performance && window.performance.memory) {
+          heapSampler = setInterval(function() {
+            var mem = window.performance.memory;
+            if (mem && mem.usedJSHeapSize > peakHeap) {
+              peakHeap = mem.usedJSHeapSize;
+            }
+          }, 200);
+        }
 
         map.once("idle", function() {
           idleMs = performance.now() - startTime;
@@ -315,12 +422,27 @@ window.__runBenchmark = function(styleJSON, keyframes, locationCenter, locationZ
             map.once("idle", function() {
               var animationMs = performance.now() - animStart;
               clearTimeout(timeout);
+              if (heapSampler) clearInterval(heapSampler);
+
+              // Final heap measurement
+              var heapUsed = 0;
+              if (window.performance && window.performance.memory) {
+                var mem = window.performance.memory;
+                heapUsed = mem.usedJSHeapSize;
+                if (heapUsed > peakHeap) peakHeap = heapUsed;
+              }
+
               map.remove();
               resolve({
                 loadMs: loadMs,
                 idleMs: idleMs,
                 animationMs: animationMs,
                 frames: frameTimestamps,
+                styleParseMs: styleParseMs,
+                firstTileMs: firstTileMs || 0,
+                firstFrameMs: firstFrameMs || 0,
+                heapUsedMB: heapUsed / (1024 * 1024),
+                peakHeapMB: peakHeap / (1024 * 1024),
               });
             });
           });
@@ -385,9 +507,24 @@ ${MAPLIBRE_CSS_TEXT}
     scenario.keyframes as any,
     scenario.location.center as any,
     scenario.location.zoom,
-  ) as { loadMs: number; idleMs: number; animationMs: number; frames: number[] };
+  ) as {
+    loadMs: number; idleMs: number; animationMs: number; frames: number[];
+    styleParseMs: number; firstTileMs: number; firstFrameMs: number;
+    heapUsedMB: number; peakHeapMB: number;
+  };
 
-  return computeMetrics(raw);
+  // Benchmark 7: also capture Puppeteer-level heap metrics as fallback
+  let heapUsedMB = raw.heapUsedMB;
+  let peakHeapMB = raw.peakHeapMB;
+  if (heapUsedMB === 0) {
+    try {
+      const puppeteerMetrics = await page.metrics();
+      heapUsedMB = (puppeteerMetrics.JSHeapUsedSize ?? 0) / (1024 * 1024);
+      peakHeapMB = (puppeteerMetrics.JSHeapTotalSize ?? 0) / (1024 * 1024);
+    } catch {}
+  }
+
+  return computeMetrics({ ...raw, heapUsedMB, peakHeapMB });
 }
 
 // ── compute per-run metrics from raw frame data ──────────────────────────────
@@ -397,8 +534,13 @@ function computeMetrics(raw: {
   idleMs: number;
   animationMs: number;
   frames: number[];
+  styleParseMs: number;
+  firstTileMs: number;
+  firstFrameMs: number;
+  heapUsedMB: number;
+  peakHeapMB: number;
 }): RunMetrics {
-  const { loadMs, idleMs, animationMs, frames } = raw;
+  const { loadMs, idleMs, animationMs, frames, styleParseMs, firstTileMs, firstFrameMs, heapUsedMB, peakHeapMB } = raw;
 
   const deltas: number[] = [];
   for (let i = 1; i < frames.length; i++) {
@@ -409,6 +551,8 @@ function computeMetrics(raw: {
     return {
       loadMs, idleMs, animationMs,
       fps: 0, p50FrameMs: 0, p95FrameMs: 0, p99FrameMs: 0, jankCount: 0,
+      styleParseMs, firstTileMs, firstFrameMs,
+      heapUsedMB, peakHeapMB,
     };
   }
 
@@ -421,7 +565,11 @@ function computeMetrics(raw: {
   const median = p50FrameMs;
   const jankCount = deltas.filter((d) => d > 2 * median).length;
 
-  return { loadMs, idleMs, fps, p50FrameMs, p95FrameMs, p99FrameMs, jankCount, animationMs };
+  return {
+    loadMs, idleMs, fps, p50FrameMs, p95FrameMs, p99FrameMs, jankCount, animationMs,
+    styleParseMs, firstTileMs, firstFrameMs,
+    heapUsedMB, peakHeapMB,
+  };
 }
 
 function percentile(sorted: number[], p: number): number {
@@ -435,6 +583,8 @@ function percentile(sorted: number[], p: number): number {
 function aggregate(runs: RunMetrics[]): AggregatedMetrics {
   const keys: (keyof RunMetrics)[] = [
     "loadMs", "idleMs", "fps", "p50FrameMs", "p95FrameMs", "p99FrameMs", "jankCount", "animationMs",
+    "styleParseMs", "firstTileMs", "firstFrameMs",
+    "heapUsedMB", "peakHeapMB",
   ];
 
   const medianMetrics = {} as RunMetrics;
@@ -538,7 +688,8 @@ async function main(): Promise<void> {
   console.log(`Original style: ${(originalSize / 1024).toFixed(1)} KB (URLs rewritten to local proxy)\n`);
 
   // Build all ablation variants
-  console.log("Building ablation variants…");
+  const mode = isolated ? "isolated" : "cumulative";
+  console.log(`Building ${mode} ablation variants…`);
   const variants = buildVariants(originalStyleJson);
   console.log(`\n${variants.length} ablation steps: ${variants.map((v) => v.id).join(", ")}`);
 
@@ -591,7 +742,7 @@ async function main(): Promise<void> {
           const metrics = await runBenchmarkInBrowser(page, variant.styleJson, scenario);
           if (!isWarmup) {
             variantRuns[variant.id].push(metrics);
-            const record = {
+            const record: Record<string, unknown> = {
               scenario: scenario.id,
               location: scenario.location.name,
               lng: scenario.location.center[0],
@@ -600,14 +751,25 @@ async function main(): Promise<void> {
               animation: scenario.animationType,
               variant: variant.id,
               passes: variant.passes,
+              mode,
               style_bytes: variant.styleBytes,
+              gzip_bytes: variant.gzipBytes,
+              brotli_bytes: variant.brotliBytes,
               run: run - WARMUP + 1,
               timestamp,
               ...metrics,
             };
+            // Flatten complexity metrics into the record
+            if (variant.complexity) {
+              record.ast_nodes = variant.complexity.ast_nodes;
+              record.max_depth = variant.complexity.max_depth;
+              record.layer_count = variant.complexity.layer_count;
+              record.filter_count = variant.complexity.filter_count;
+              record.expression_types = variant.complexity.expression_types;
+            }
             fs.writeSync(jsonlFd, JSON.stringify(record) + "\n");
           }
-          parts.push(`${variant.id.replace("step-", "s")}: ${metrics.loadMs.toFixed(0)}ms`);
+          parts.push(`${variant.id.replace(/step-|isolated-/, "s")}: ${metrics.loadMs.toFixed(0)}ms`);
         } catch (err: unknown) {
           const msg = err instanceof Error ? err.message : String(err);
           parts.push(`${variant.id}: ERR`);
@@ -655,10 +817,12 @@ async function main(): Promise<void> {
   console.log("\n── Style Sizes (ablation) ──");
   for (const v of variants) {
     const kb = (v.styleBytes / 1024).toFixed(1);
+    const gzKb = (v.gzipBytes / 1024).toFixed(1);
+    const brKb = (v.brotliBytes / 1024).toFixed(1);
     const pct = v.id.includes("baseline")
       ? ""
       : ` (${((1 - v.styleBytes / variants[0].styleBytes) * 100).toFixed(1)}% smaller)`;
-    console.log(`  ${v.label}: ${kb} KB${pct}`);
+    console.log(`  ${v.label}: ${kb} KB | gzip ${gzKb} KB | br ${brKb} KB${pct}`);
   }
 
   fs.closeSync(jsonlFd);
@@ -667,6 +831,7 @@ async function main(): Promise<void> {
   const meta = {
     timestamp,
     style: STYLE_URL,
+    mode,
     runsPerScenario: RUNS,
     warmupRuns: WARMUP,
     maplibreVersion: getMaplibreVersion(),
@@ -676,6 +841,9 @@ async function main(): Promise<void> {
       label: v.label,
       passes: v.passes,
       styleBytes: v.styleBytes,
+      gzipBytes: v.gzipBytes,
+      brotliBytes: v.brotliBytes,
+      complexity: v.complexity,
     })),
   };
 

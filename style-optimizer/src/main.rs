@@ -19,6 +19,9 @@ enum Command {
 
     /// Apply a tile pruning advisory: prune + MLT-encode tiles, rewrite style.
     Advisory(cmd::advisory::AdvisoryArgs),
+
+    /// Compute static complexity metrics for a style JSON document.
+    Complexity(cmd::complexity::ComplexityArgs),
 }
 
 fn main() -> anyhow::Result<()> {
@@ -27,5 +30,6 @@ fn main() -> anyhow::Result<()> {
         Command::Optimize(args) => cmd::optimize::run(args),
         Command::Stats(ref args) => cmd::stats::run(args),
         Command::Advisory(ref args) => cmd::advisory::run(args),
+        Command::Complexity(ref args) => cmd::complexity::run(args),
     }
 }

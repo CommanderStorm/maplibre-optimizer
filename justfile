@@ -227,6 +227,23 @@ bench-venv:
 bench-plot *ARGS: bench-venv
     uv run plot.py {{ARGS}}
 
+# Run isolated (non-cumulative) ablation benchmarks
+[working-directory: 'tests/bench']
+bench-isolated *ARGS:
+    npm install --no-fund --no-audit
+    taskset -c {{bench_cores}} npx tsx run.ts --isolated {{ARGS}}
+
+# Run cross-style generalization benchmark
+[working-directory: 'tests/bench']
+bench-cross-style *ARGS:
+    npm install --no-fund --no-audit
+    npx tsx cross_style.ts {{ARGS}}
+
+# Plot cross-style benchmark results
+[working-directory: 'tests/bench']
+bench-plot-cross-style *ARGS: bench-venv
+    uv run plot_cross_style.py {{ARGS}}
+
 # Install SQLX cli if not already installed.
 [private]
 install-sqlx:  (cargo-install 'cargo-sqlx' 'sqlx-cli' '--no-default-features' '--features' 'sqlite,native-tls')

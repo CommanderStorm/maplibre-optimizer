@@ -1,0 +1,19 @@
+---
+source: style-optimizer/tests/complexity.rs
+expression: report
+---
+ast_nodes: 13
+max_depth: 3
+layer_count: 3
+filter_count: 2
+expression_types:
+  "==": 2
+  all: 1
+  geometry-type: 1
+  get: 2
+  interpolate: 1
+  linear: 1
+  match: 1
+  motorway: 1
+  step: 1
+  zoom: 2
