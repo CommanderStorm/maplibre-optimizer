@@ -494,6 +494,28 @@ fn extract_filter_constraints(filter: &Value, out: &mut Vec<Boolean>) {
 fn extract_from_boolean(b: &Boolean, out: &mut Vec<Boolean>) {
     use maplibre_style_spec::spec::{Array, ExprOrLiteral};
 
+    /// Check if an `ExprOrLiteral` is a finite numeric literal.
+    fn is_finite_number(v: &ExprOrLiteral) -> bool {
+        matches!(v, ExprOrLiteral::NumberLiteral(n)
+            if n.as_f64().is_some_and(f64::is_finite))
+    }
+
+    /// Extract domain values from an `in` haystack expression.
+    /// `["literal", [v1, v2, ...]]` deserializes as `ArrayExpr(Literal(JSONArrayLiteral(...)))`.
+    fn extract_in_domain(haystack: &ExprOrLiteral) -> Option<&[Value]> {
+        match haystack {
+            ExprOrLiteral::ArrayExpr(arr) => {
+                if let Array::Literal(lit) = arr.as_ref() {
+                    Some(&lit.0)
+                } else {
+                    None
+                }
+            }
+            ExprOrLiteral::JSONArrayLiteral(lit) => Some(&lit.0),
+            _ => None,
+        }
+    }
+
     match b {
         Boolean::All(children) => {
             for child in children {
@@ -528,28 +550,6 @@ fn extract_from_boolean(b: &Boolean, out: &mut Vec<Boolean>) {
             out.push(b.clone());
         }
         _ => {}
-    }
-
-    /// Check if an `ExprOrLiteral` is a finite numeric literal.
-    fn is_finite_number(v: &ExprOrLiteral) -> bool {
-        matches!(v, ExprOrLiteral::NumberLiteral(n)
-            if n.as_f64().is_some_and(f64::is_finite))
-    }
-
-    /// Extract domain values from an `in` haystack expression.
-    /// `["literal", [v1, v2, ...]]` deserializes as `ArrayExpr(Literal(JSONArrayLiteral(...)))`.
-    fn extract_in_domain(haystack: &ExprOrLiteral) -> Option<&[Value]> {
-        match haystack {
-            ExprOrLiteral::ArrayExpr(arr) => {
-                if let Array::Literal(lit) = arr.as_ref() {
-                    Some(&lit.0)
-                } else {
-                    None
-                }
-            }
-            ExprOrLiteral::JSONArrayLiteral(lit) => Some(&lit.0),
-            _ => None,
-        }
     }
 }
 
