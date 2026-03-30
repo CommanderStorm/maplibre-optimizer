@@ -384,10 +384,11 @@ pub(super) fn try_rewrite_case_to_match(arr: &mut Vec<Value>) -> bool {
 ///
 /// `["op", ["coalesce", inner, default], cmp_value]` → `["op", inner, cmp_value]`
 /// when `default op cmp_value` evaluates to `false`, because `null op cmp_value`
-/// is also `false` in MapLibre expression semantics (any comparison involving
+/// is also `false` in `MapLibre` expression semantics (any comparison involving
 /// `null` returns `false`).
 ///
 /// Also handles the swapped operand case `["op", cmp_value, ["coalesce", inner, default]]`.
+#[expect(clippy::ptr_arg, reason = "to make trait happy")]
 pub(super) fn try_strip_coalesce_in_comparison(arr: &mut Vec<Value>) -> bool {
     let Some(op) = arr.first().and_then(Value::as_str) else {
         return false;
@@ -460,6 +461,7 @@ pub(super) fn try_strip_coalesce_in_comparison(arr: &mut Vec<Value>) -> bool {
 /// field produces `default` via coalesce → falls through to the match fallback.
 /// Without coalesce, a missing field produces `null` → also falls through to
 /// the match fallback. Same result.
+#[expect(clippy::ptr_arg, reason = "to make trait happy")]
 pub(super) fn try_strip_coalesce_in_match(arr: &mut Vec<Value>) -> bool {
     if arr.first().and_then(Value::as_str) != Some("match") {
         return false;
@@ -482,11 +484,7 @@ pub(super) fn try_strip_coalesce_in_match(arr: &mut Vec<Value>) -> bool {
     // Labels are at positions 2, 4, 6, ... (every other element before the fallback).
     for label in arr[2..].iter().step_by(2).take((arr.len() - 2) / 2) {
         match label {
-            Value::Array(values) => {
-                if values.iter().any(|v| *v == default_lit) {
-                    return false;
-                }
-            }
+            Value::Array(values) if values.contains(&default_lit) => return false,
             single if *single == default_lit => return false,
             _ => {}
         }
