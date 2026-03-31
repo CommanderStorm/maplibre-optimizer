@@ -944,6 +944,10 @@ pub(super) fn try_fold_redundant_coercion(arr: &mut Vec<Value>) -> bool {
                 arr[1] = inner_arg;
                 return true;
             }
+            // to-string(null) = "", so trailing "" in coalesce is redundant.
+            if try_strip_coalesce_null_identity(&mut arr[1], |v| v.as_str() == Some("")) {
+                return true;
+            }
         }
         "to-number" => {
             if arr[1].is_number() {
@@ -957,6 +961,10 @@ pub(super) fn try_fold_redundant_coercion(arr: &mut Vec<Value>) -> bool {
             {
                 let inner_arg = inner[1].clone();
                 arr[1] = inner_arg;
+                return true;
+            }
+            // to-number(null) = 0, so trailing 0 in coalesce is redundant.
+            if try_strip_coalesce_null_identity(&mut arr[1], |v| v.as_f64() == Some(0.0)) {
                 return true;
             }
         }
@@ -974,10 +982,32 @@ pub(super) fn try_fold_redundant_coercion(arr: &mut Vec<Value>) -> bool {
                 arr[1] = inner_arg;
                 return true;
             }
+            // to-boolean(null) = false, so trailing false in coalesce is redundant.
+            if try_strip_coalesce_null_identity(&mut arr[1], |v| v.as_bool() == Some(false)) {
+                return true;
+            }
         }
         _ => {}
     }
     false
+}
+
+/// Strip the last arg of a coalesce when it matches the null-identity of the
+/// surrounding type coercion. E.g. `["coalesce", x, ""]` inside `to-string`
+/// → `["coalesce", x]`, which the existing single-arg unwrap will then clean up.
+fn try_strip_coalesce_null_identity(v: &mut Value, is_identity: impl Fn(&Value) -> bool) -> bool {
+    let Value::Array(inner) = v else {
+        return false;
+    };
+    if inner.len() < 3 || inner[0].as_str() != Some("coalesce") {
+        return false;
+    }
+    let last = inner.last().expect("len >= 3");
+    if !is_identity(last) {
+        return false;
+    }
+    inner.pop();
+    true
 }
 
 /// Rewrite `["get", key, ["properties"]]` → `["get", key]` and

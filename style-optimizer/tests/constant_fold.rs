@@ -2063,3 +2063,155 @@ fn no_canonicalize_exponential_non_1() {
     optimize_style_json_value(&mut v, &mir, &simplify_passes());
     assert_eq!(v["layers"][0]["paint"]["fill-opacity"], original);
 }
+
+// ── Coalesce default inside type coercion ─────────────────────────────
+
+#[test]
+fn strip_coalesce_default_in_to_string() {
+    let mir = sample_mir();
+    let mut v = style_with_layout(
+        "text-field",
+        serde_json::json!(["to-string", ["coalesce", ["get", "name"], ""]]),
+    );
+    optimize_style_json_value(&mut v, &mir, &simplify_passes());
+    assert_yaml_snapshot!(v["layers"][0]["layout"], @r"
+    text-field:
+      - to-string
+      - - get
+        - name
+    ");
+}
+
+#[test]
+fn strip_coalesce_default_in_to_number() {
+    let mir = sample_mir();
+    let mut v = style_with_layout(
+        "text-size",
+        serde_json::json!(["to-number", ["coalesce", ["get", "size"], 0]]),
+    );
+    optimize_style_json_value(&mut v, &mir, &simplify_passes());
+    assert_yaml_snapshot!(v["layers"][0]["layout"], @r"
+    text-size:
+      - to-number
+      - - get
+        - size
+    ");
+}
+
+#[test]
+fn strip_coalesce_default_in_to_boolean() {
+    let mir = sample_mir();
+    let mut v = style_with_filter(serde_json::json!([
+        "to-boolean",
+        ["coalesce", ["get", "active"], false]
+    ]));
+    optimize_style_json_value(&mut v, &mir, &simplify_passes());
+    assert_yaml_snapshot!(v["layers"][0]["filter"], @r"
+    - to-boolean
+    - - get
+      - active
+    ");
+}
+
+#[test]
+fn no_strip_coalesce_nondefault_in_to_string() {
+    let mir = sample_mir();
+    let mut v = style_with_layout(
+        "text-field",
+        serde_json::json!(["to-string", ["coalesce", ["get", "name"], "fallback"]]),
+    );
+    let original = v["layers"][0]["layout"]["text-field"].clone();
+    optimize_style_json_value(&mut v, &mir, &simplify_passes());
+    assert_eq!(v["layers"][0]["layout"]["text-field"], original);
+}
+
+// ── Coalesce flattening ───────────────────────────────────────────────
+
+#[test]
+fn flatten_nested_coalesce() {
+    let mir = sample_mir();
+    let mut v = style_with_layout(
+        "text-field",
+        serde_json::json!([
+            "coalesce",
+            ["coalesce", ["get", "name_en"], ["get", "name"]],
+            ["get", "ref"]
+        ]),
+    );
+    optimize_style_json_value(&mut v, &mir, &simplify_passes());
+    assert_yaml_snapshot!(v["layers"][0]["layout"], @r"
+    text-field:
+      - coalesce
+      - - get
+        - name_en
+      - - get
+        - name
+      - - get
+        - ref
+    ");
+}
+
+#[test]
+fn flatten_deeply_nested_coalesce() {
+    let mir = sample_mir();
+    let mut v = style_with_layout(
+        "text-field",
+        serde_json::json!([
+            "coalesce",
+            [
+                "coalesce",
+                ["coalesce", ["get", "a"], ["get", "b"]],
+                ["get", "c"]
+            ],
+            ["get", "d"]
+        ]),
+    );
+    optimize_style_json_value(&mut v, &mir, &simplify_passes());
+    assert_yaml_snapshot!(v["layers"][0]["layout"], @r"
+    text-field:
+      - coalesce
+      - - get
+        - a
+      - - get
+        - b
+      - - get
+        - c
+      - - get
+        - d
+    ");
+}
+
+// ── Coalesce stripping in `in` expressions ────────────────────────────
+
+#[test]
+fn strip_coalesce_in_in_expression() {
+    let mir = sample_mir();
+    let mut v = style_with_filter(serde_json::json!([
+        "in",
+        ["coalesce", ["get", "class"], "other"],
+        ["literal", ["lake", "river", "pond"]]
+    ]));
+    optimize_style_json_value(&mut v, &mir, &simplify_passes());
+    assert_yaml_snapshot!(v["layers"][0]["filter"], @r"
+    - in
+    - - get
+      - class
+    - - literal
+      - - lake
+        - river
+        - pond
+    ");
+}
+
+#[test]
+fn no_strip_coalesce_in_in_when_default_in_haystack() {
+    let mir = sample_mir();
+    let mut v = style_with_filter(serde_json::json!([
+        "in",
+        ["coalesce", ["get", "class"], "lake"],
+        ["literal", ["lake", "river", "pond"]]
+    ]));
+    let original = v["layers"][0]["filter"].clone();
+    optimize_style_json_value(&mut v, &mir, &simplify_passes());
+    assert_eq!(v["layers"][0]["filter"], original);
+}

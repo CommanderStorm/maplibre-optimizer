@@ -496,6 +496,52 @@ pub(super) fn try_strip_coalesce_in_match(arr: &mut Vec<Value>) -> bool {
     true
 }
 
+/// Strip redundant `coalesce` wrapping on the needle of an `in` expression.
+///
+/// `["in", ["coalesce", inner, default], haystack]`
+/// → `["in", inner, haystack]`
+///
+/// when `default` is not in the literal haystack. In `MapLibre`, `null` is never
+/// found in a literal array, so if the default also isn't in it, the coalesce
+/// is redundant: both `default` and `null` would produce `false`.
+#[expect(clippy::ptr_arg, reason = "to make trait happy")]
+pub(super) fn try_strip_coalesce_in_in(arr: &mut Vec<Value>) -> bool {
+    if arr.first().and_then(Value::as_str) != Some("in") {
+        return false;
+    }
+    if arr.len() != 3 {
+        return false;
+    }
+    let Some(coalesce) = arr.get(1).and_then(Value::as_array) else {
+        return false;
+    };
+    if coalesce.len() != 3 || coalesce[0].as_str() != Some("coalesce") {
+        return false;
+    }
+    let Some(default_lit) = extract_json_literal(&coalesce[2]) else {
+        return false;
+    };
+
+    // Extract the literal haystack array.
+    let haystack_values = match &arr[2] {
+        Value::Array(h) if h.len() == 2 && h[0].as_str() == Some("literal") => h[1].as_array(),
+        _ => None,
+    };
+    let Some(values) = haystack_values else {
+        return false;
+    };
+
+    // If the default is in the haystack, we can't strip.
+    if values.contains(&default_lit) {
+        return false;
+    }
+
+    // Safe: replace coalesce with its inner expression.
+    let inner = coalesce[1].clone();
+    arr[1] = inner;
+    true
+}
+
 /// Simplify `coalesce` expressions:
 ///
 /// - `["coalesce", x]` → `x` (single arg)
@@ -534,6 +580,38 @@ pub(super) fn try_simplify_coalesce(arr: &mut Vec<Value>) -> bool {
         }
     }
     false
+}
+
+/// Flatten nested coalesce: `["coalesce", ["coalesce", a, b], c]` → `["coalesce", a, b, c]`.
+///
+/// Coalesce returns the first non-null value, so nesting is redundant.
+pub(super) fn try_coalesce_flattening(arr: &mut Vec<Value>) -> bool {
+    if arr.first().and_then(Value::as_str) != Some("coalesce") {
+        return false;
+    }
+    if arr.len() < 2 {
+        return false;
+    }
+
+    let mut flattened = vec![Value::String("coalesce".to_string())];
+    let mut did_flatten = false;
+
+    for child in arr.iter().skip(1) {
+        if let Value::Array(inner) = child
+            && !inner.is_empty()
+            && inner[0].as_str() == Some("coalesce")
+        {
+            flattened.extend(inner.iter().skip(1).cloned());
+            did_flatten = true;
+        } else {
+            flattened.push(child.clone());
+        }
+    }
+
+    if did_flatten {
+        *arr = flattened;
+    }
+    did_flatten
 }
 
 /// Flatten nested boolean operators: `["all", ["all", A, B], C]` → `["all", A, B, C]`.
