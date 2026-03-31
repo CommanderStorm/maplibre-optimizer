@@ -205,14 +205,18 @@ bench-proxy *ARGS:
 # preventing the process tree from migrating across all cores).
 bench_cores := env('BENCH_CORES', '0-' + `python3 -c "import os; print(max(1, os.cpu_count()//2 - 1))"` )
 
-# Run performance benchmarks comparing original vs optimised styles.
+# Run all benchmarks (runtime + cross-style) and generate plots (.eps + .png).
+# Requires tile proxy running (start with: just bench-proxy)
+bench *ARGS: (bench-runtime ARGS) (bench-cross-style ARGS) bench-plot bench-plot-cross-style
+
+# Run runtime performance benchmarks comparing original vs optimised styles.
 # Requires tile proxy running (start with: just bench-proxy)
 [working-directory: 'tests/bench']
-bench *ARGS:
+bench-runtime *ARGS:
     npm install --no-fund --no-audit
     taskset -c {{bench_cores}} npx tsx run.ts {{ARGS}}
 
-# Run benchmarks with browser console debug output
+# Run runtime benchmarks with browser console debug output
 [working-directory: 'tests/bench']
 bench-debug *ARGS:
     taskset -c {{bench_cores}} npx tsx run.ts --debug {{ARGS}}
