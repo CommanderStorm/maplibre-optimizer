@@ -53,27 +53,28 @@ interface BenchStyle {
   id: string;
   url: string;
   cachePath: string;
+  schema: string;
 }
 
 const BENCH_STYLES: BenchStyle[] = [
   // OpenFreeMap built-in styles (already point to the right tile server)
-  { id: "liberty",  url: "https://tiles.openfreemap.org/styles/liberty",  cachePath: path.join(RESULTS_DIR, "_cached_liberty.json") },
-  { id: "bright",   url: "https://tiles.openfreemap.org/styles/bright",   cachePath: path.join(RESULTS_DIR, "_cached_bright.json") },
-  { id: "positron", url: "https://tiles.openfreemap.org/styles/positron", cachePath: path.join(RESULTS_DIR, "_cached_positron.json") },
-  { id: "fiord",    url: "https://tiles.openfreemap.org/styles/fiord",    cachePath: path.join(RESULTS_DIR, "_cached_fiord.json") },
+  { id: "liberty",  url: "https://tiles.openfreemap.org/styles/liberty",  cachePath: path.join(RESULTS_DIR, "_cached_liberty.json"),  schema: "omt" },
+  { id: "bright",   url: "https://tiles.openfreemap.org/styles/bright",   cachePath: path.join(RESULTS_DIR, "_cached_bright.json"),   schema: "omt" },
+  { id: "positron", url: "https://tiles.openfreemap.org/styles/positron", cachePath: path.join(RESULTS_DIR, "_cached_positron.json"), schema: "omt" },
+  { id: "fiord",    url: "https://tiles.openfreemap.org/styles/fiord",    cachePath: path.join(RESULTS_DIR, "_cached_fiord.json"),    schema: "omt" },
   // OpenMapTiles community styles — more verbose/unoptimized, good for showing optimizer impact
-  { id: "dark-matter",  url: "https://cdn.jsdelivr.net/gh/openmaptiles/dark-matter-gl-style@v1.9/style.json",      cachePath: path.join(RESULTS_DIR, "_cached_dark-matter.json") },
-  { id: "osm-bright",   url: "https://cdn.jsdelivr.net/gh/openmaptiles/osm-bright-gl-style@v1.11/style.json",      cachePath: path.join(RESULTS_DIR, "_cached_osm-bright.json") },
-  { id: "klokan-basic", url: "https://cdn.jsdelivr.net/gh/openmaptiles/klokantech-basic-gl-style@v1.10/style.json", cachePath: path.join(RESULTS_DIR, "_cached_klokan-basic.json") },
-  { id: "toner",        url: "https://cdn.jsdelivr.net/gh/openmaptiles/toner-gl-style@v1.0/style.json",             cachePath: path.join(RESULTS_DIR, "_cached_toner.json") },
-  { id: "osm-liberty",  url: "https://maputnik.github.io/osm-liberty/style.json",                                   cachePath: path.join(RESULTS_DIR, "_cached_osm-liberty.json") },
-  { id: "americana",       url: "https://americanamap.org/style.json",                                              cachePath: path.join(RESULTS_DIR, "_cached_americana.json") },
-  { id: "stadia-outdoors", url: "https://tiles.stadiamaps.com/styles/outdoors.json",                                 cachePath: path.join(RESULTS_DIR, "_cached_stadia-outdoors.json") },
+  { id: "dark-matter",  url: "https://cdn.jsdelivr.net/gh/openmaptiles/dark-matter-gl-style@v1.9/style.json",      cachePath: path.join(RESULTS_DIR, "_cached_dark-matter.json"),  schema: "omt" },
+  { id: "osm-bright",   url: "https://cdn.jsdelivr.net/gh/openmaptiles/osm-bright-gl-style@v1.11/style.json",      cachePath: path.join(RESULTS_DIR, "_cached_osm-bright.json"),   schema: "omt" },
+  { id: "klokan-basic", url: "https://cdn.jsdelivr.net/gh/openmaptiles/klokantech-basic-gl-style@v1.10/style.json", cachePath: path.join(RESULTS_DIR, "_cached_klokan-basic.json"), schema: "omt" },
+  { id: "toner",        url: "https://cdn.jsdelivr.net/gh/openmaptiles/toner-gl-style@v1.0/style.json",             cachePath: path.join(RESULTS_DIR, "_cached_toner.json"),        schema: "omt" },
+  { id: "osm-liberty",  url: "https://maputnik.github.io/osm-liberty/style.json",                                   cachePath: path.join(RESULTS_DIR, "_cached_osm-liberty.json"),  schema: "omt" },
+  { id: "americana",       url: "https://americanamap.org/style.json",                                              cachePath: path.join(RESULTS_DIR, "_cached_americana.json"),       schema: "omt" },
+  { id: "stadia-outdoors", url: "https://tiles.stadiamaps.com/styles/outdoors.json",                                 cachePath: path.join(RESULTS_DIR, "_cached_stadia-outdoors.json"), schema: "omt" },
   // Government/institutional styles — verbose, many layers, legacy syntax needs migration
-  { id: "icgc-fosc",      url: "https://geoserveis.icgc.cat/contextmaps/icgc_mapa_base_fosc.json",                  cachePath: path.join(RESULTS_DIR, "_cached_icgc-fosc.json") },
-  { id: "icgc-gris",      url: "https://geoserveis.icgc.cat/contextmaps/icgc_mapa_base_gris.json",                  cachePath: path.join(RESULTS_DIR, "_cached_icgc-gris.json") },
-  { id: "basemap-top",    url: "https://sgx.geodatenzentrum.de/gdz_basemapde_vektor/styles/bm_web_top.json",        cachePath: path.join(RESULTS_DIR, "_cached_basemap-top.json") },
-  { id: "basemap-col",    url: "https://sgx.geodatenzentrum.de/gdz_basemapde_vektor/styles/bm_web_col.json",        cachePath: path.join(RESULTS_DIR, "_cached_basemap-col.json") },
+  { id: "icgc-fosc",      url: "https://geoserveis.icgc.cat/contextmaps/icgc_mapa_base_fosc.json",                  cachePath: path.join(RESULTS_DIR, "_cached_icgc-fosc.json"),  schema: "omt" },
+  { id: "icgc-gris",      url: "https://geoserveis.icgc.cat/contextmaps/icgc_mapa_base_gris.json",                  cachePath: path.join(RESULTS_DIR, "_cached_icgc-gris.json"),  schema: "omt" },
+  { id: "basemap-top",    url: "https://sgx.geodatenzentrum.de/gdz_basemapde_vektor/styles/bm_web_top.json",        cachePath: path.join(RESULTS_DIR, "_cached_basemap-top.json"), schema: "basemap-de" },
+  { id: "basemap-col",    url: "https://sgx.geodatenzentrum.de/gdz_basemapde_vektor/styles/bm_web_col.json",        cachePath: path.join(RESULTS_DIR, "_cached_basemap-col.json"), schema: "basemap-de" },
 ];
 
 // ── CLI args ─────────────────────────────────────────────────────────────────
@@ -353,7 +354,7 @@ function formatKB(json: string): string {
  * Steps 16 (selectivity_reorder) and 17 (tile_rewrite) are only included when
  * --mbtiles is provided.
  */
-async function buildVariants(originalStyleJson: string): Promise<Variant[]> {
+async function buildVariants(originalStyleJson: string, schema: string): Promise<Variant[]> {
   const variants: Variant[] = [];
 
   // Write input style once for all optimizer invocations
@@ -377,9 +378,9 @@ async function buildVariants(originalStyleJson: string): Promise<Variant[]> {
   });
   console.log(`  step-00-baseline: ${formatKB(originalStyleJson)} (gzip: ${(baselineGzip / 1024).toFixed(1)} KB, br: ${(baselineBrotli / 1024).toFixed(1)} KB)`);
 
-  // Collect stats if mbtiles provided (needed for selectivity_reorder)
+  // Collect stats if mbtiles provided and schema matches OMT (stats are meaningless for other schemas)
   let statsPath: string | undefined;
-  if (MBTILES) {
+  if (MBTILES && schema === "omt") {
     statsPath = path.join(RESULTS_DIR, "_bench_stats.json");
     console.log(`Collecting tile statistics from ${MBTILES}…`);
     collectStats(MBTILES, statsPath);
@@ -970,7 +971,7 @@ async function main(): Promise<void> {
     console.log(`Original: ${(originalSize / 1024).toFixed(1)} KB (URLs rewritten to local proxy)\n`);
 
     console.log(`Building ${mode} ablation variants…`);
-    const variants = await buildVariants(originalStyleJson);
+    const variants = await buildVariants(originalStyleJson, benchStyle.schema);
     lastVariants = variants;
     console.log(`${variants.length} ablation steps\n`);
 
@@ -1000,6 +1001,8 @@ async function main(): Promise<void> {
               variantRuns[variant.id].push(metrics);
               const record: Record<string, unknown> = {
                 style: benchStyle.id,
+                schema: benchStyle.schema,
+                has_stats: MBTILES !== undefined && benchStyle.schema === "omt",
                 scenario: scenarioId,
                 location: scenario.location.name,
                 lng: scenario.location.center[0],

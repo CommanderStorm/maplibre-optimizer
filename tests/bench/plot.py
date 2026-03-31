@@ -33,9 +33,12 @@ def write_fig(fig: go.Figure, out: Path, name: str, fmt: str) -> None:
         path = out / f"{name}.html"
         fig.write_html(path)
     else:
-        path = out / f"{name}.png"
-        fig.write_image(path, width=IMG_WIDTH, height=IMG_HEIGHT, scale=IMG_SCALE)
-    print(f"  {path}")
+        path_png = out / f"{name}.png"
+        path_eps = out / f"{name}.eps"
+        fig.write_image(path_png, width=IMG_WIDTH, height=IMG_HEIGHT, scale=IMG_SCALE)
+        fig.write_image(path_eps, width=IMG_WIDTH, height=IMG_HEIGHT, scale=IMG_SCALE)
+        print(f"  {path_png}")
+        print(f"  {path_eps}")
 
 
 def load_jsonl(paths: list[Path]) -> pd.DataFrame:
@@ -104,12 +107,39 @@ def ablation_step_order(df: pd.DataFrame) -> list[str]:
     return variants
 
 
+STATS_DEPENDENT_PASSES = {
+    "constant_fold_stats",
+    "dead_elimination_stats",
+    "metadata_refinement_stats",
+    "selectivity_reorder",
+}
+
+
 def _step_label(variant_id: str) -> str:
     """Extract a short label from a variant ID like 'step-04-constant_fold'."""
     parts = variant_id.split("-", 2)
     if len(parts) == 3:
         return parts[2]
     return variant_id
+
+
+def _annotate_stats_passes(label: str) -> str:
+    """Append a star marker to labels of stats-dependent passes."""
+    if label in STATS_DEPENDENT_PASSES:
+        return label + " \u2605"
+    return label
+
+
+def _add_stats_annotation(fig: go.Figure) -> None:
+    """Add a footnote annotation explaining the stats-dependent pass marker."""
+    fig.add_annotation(
+        text="\u2605 = requires tile statistics",
+        xref="paper", yref="paper",
+        x=1.0, y=-0.22,
+        showarrow=False,
+        font=dict(size=11, color="#666"),
+        xanchor="right",
+    )
 
 
 def _delta_pct(old: float, new: float) -> float | None:
@@ -152,7 +182,7 @@ def plot_ablation_waterfall(
     Ablation waterfall: X-axis is ablation step, Y-axis is metric value.
     One thin line per scenario, bold line for the mean across scenarios.
     """
-    step_labels = [_step_label(v) for v in variants]
+    step_labels = [_annotate_stats_passes(_step_label(v)) for v in variants]
 
     for metric in metrics:
         if metric not in medians.columns:
@@ -198,6 +228,7 @@ def plot_ablation_waterfall(
             template="plotly_white",
             legend=dict(x=0.01, y=0.99),
         )
+        _add_stats_annotation(fig)
         write_fig(fig, out, f"waterfall_{metric}", fmt)
 
 
@@ -222,7 +253,7 @@ def plot_marginal_contribution(
         for pass_name, deltas in marginals.items():
             valid = [d for d in deltas if d is not None]
             if valid:
-                pass_names.append(pass_name)
+                pass_names.append(_annotate_stats_passes(pass_name))
                 mean_deltas.append(np.mean(valid))
                 std_deltas.append(np.std(valid))
 
@@ -249,6 +280,7 @@ def plot_marginal_contribution(
             xaxis_tickangle=-45,
             template="plotly_white",
         )
+        _add_stats_annotation(fig)
         write_fig(fig, out, f"marginal_{metric}", fmt)
 
 
@@ -268,7 +300,7 @@ def plot_style_size_ablation(df: pd.DataFrame, variants: list[str], out: Path, f
     step_labels = []
     for v in variants:
         if v in size_by_variant.index:
-            step_labels.append(_step_label(v))
+            step_labels.append(_annotate_stats_passes(_step_label(v)))
 
     fig = go.Figure()
 
@@ -281,7 +313,7 @@ def plot_style_size_ablation(df: pd.DataFrame, variants: list[str], out: Path, f
         for v in variants:
             if v in size_by_variant.index:
                 sizes.append(size_by_variant.loc[v, col])
-                labels.append(_step_label(v))
+                labels.append(_annotate_stats_passes(_step_label(v)))
 
         if not sizes:
             continue
@@ -312,6 +344,7 @@ def plot_style_size_ablation(df: pd.DataFrame, variants: list[str], out: Path, f
         xaxis_tickangle=-45,
         template="plotly_white",
     )
+    _add_stats_annotation(fig)
     write_fig(fig, out, "style_size_ablation", fmt)
 
 
@@ -330,10 +363,10 @@ def plot_scenario_heatmap(
         lower_better = metric in LOWER_IS_BETTER
         marginals = compute_marginal_deltas(medians, variants, metric, scenarios)
 
-        pass_names = list(marginals.keys())
+        pass_names = [_annotate_stats_passes(p) for p in marginals]
         # Build matrix: each row is a pass, each column is a scenario
         matrix = []
-        for pass_name in pass_names:
+        for pass_name in marginals:
             row = []
             for d in marginals[pass_name]:
                 if d is None:
@@ -364,6 +397,7 @@ def plot_scenario_heatmap(
             template="plotly_white",
             height=max(500, 30 * len(scenarios) + 200),
         )
+        _add_stats_annotation(fig)
         write_fig(fig, out, f"heatmap_{metric}", fmt)
 
 
@@ -372,9 +406,9 @@ def plot_box_per_step(
 ) -> None:
     """Box plots with X-axis as ablation step."""
     variant_order = {v: i for i, v in enumerate(variants)}
-    step_labels = [_step_label(v) for v in variants]
+    step_labels = [_annotate_stats_passes(_step_label(v)) for v in variants]
     df = df.copy()
-    df["step_label"] = df["variant"].map(_step_label)
+    df["step_label"] = df["variant"].map(lambda v: _annotate_stats_passes(_step_label(v)))
     df["step_order"] = df["variant"].map(lambda v: variant_order.get(v, 99))
     df = df.sort_values("step_order")
 
@@ -394,6 +428,7 @@ def plot_box_per_step(
             template="plotly_white",
         )
         fig.update_traces(marker_color="#1F77B4")
+        _add_stats_annotation(fig)
         write_fig(fig, out, f"box_{metric}", fmt)
 
 
@@ -413,7 +448,7 @@ def plot_complexity_ablation(df: pd.DataFrame, variants: list[str], out: Path, f
     step_labels = []
     for v in variants:
         if v in complexity_by_variant.index:
-            step_labels.append(_step_label(v))
+            step_labels.append(_annotate_stats_passes(_step_label(v)))
 
     colors = {"ast_nodes": "#1F77B4", "max_depth": "#FF7F0E", "layer_count": "#2CA02C", "filter_count": "#D62728"}
 
@@ -423,7 +458,7 @@ def plot_complexity_ablation(df: pd.DataFrame, variants: list[str], out: Path, f
         for v in variants:
             if v in complexity_by_variant.index:
                 vals.append(complexity_by_variant.loc[v, metric])
-                labels.append(_step_label(v))
+                labels.append(_annotate_stats_passes(_step_label(v)))
 
         if not vals:
             continue
@@ -452,6 +487,7 @@ def plot_complexity_ablation(df: pd.DataFrame, variants: list[str], out: Path, f
             xaxis_tickangle=-45,
             template="plotly_white",
         )
+        _add_stats_annotation(fig)
         write_fig(fig, out, f"complexity_{metric}", fmt)
 
 
@@ -479,7 +515,7 @@ def plot_time_breakdown(
     for v in variants:
         if v not in means.index:
             continue
-        step_labels.append(_step_label(v))
+        step_labels.append(_annotate_stats_passes(_step_label(v)))
         sp = max(0, means.loc[v, "styleParseMs"])
         ft = max(0, means.loc[v, "firstTileMs"] - sp)
         ff = max(0, means.loc[v, "firstFrameMs"] - sp - ft)
@@ -506,6 +542,7 @@ def plot_time_breakdown(
         xaxis_tickangle=-45,
         template="plotly_white",
     )
+    _add_stats_annotation(fig)
     write_fig(fig, out, "time_breakdown", fmt)
 
 
@@ -536,7 +573,7 @@ def plot_isolated_impact(
         std_deltas = []
 
         for iv in isolated_variants:
-            pass_name = _step_label(iv)
+            pass_name = _annotate_stats_passes(_step_label(iv))
             deltas = []
             for scenario in scenarios:
                 sdf = medians[medians.scenario == scenario].set_index("variant")
@@ -575,6 +612,7 @@ def plot_isolated_impact(
             xaxis_tickangle=-45,
             template="plotly_white",
         )
+        _add_stats_annotation(fig)
         write_fig(fig, out, f"isolated_{metric}", fmt)
 
 
@@ -595,7 +633,7 @@ def plot_memory_ablation(
     step_labels = []
     for v in variants:
         if v in means.index:
-            step_labels.append(_step_label(v))
+            step_labels.append(_annotate_stats_passes(_step_label(v)))
 
     colors = {"heapUsedMB": "#1F77B4", "peakHeapMB": "#D62728"}
     names = {"heapUsedMB": "Heap Used", "peakHeapMB": "Peak Heap"}
@@ -619,6 +657,7 @@ def plot_memory_ablation(
         xaxis_tickangle=-45,
         template="plotly_white",
     )
+    _add_stats_annotation(fig)
     write_fig(fig, out, "memory_ablation", fmt)
 
 

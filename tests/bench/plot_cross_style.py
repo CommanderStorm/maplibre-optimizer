@@ -25,9 +25,12 @@ def write_fig(fig: go.Figure, out: Path, name: str, fmt: str) -> None:
         path = out / f"{name}.html"
         fig.write_html(path)
     else:
-        path = out / f"{name}.png"
-        fig.write_image(path, width=IMG_WIDTH, height=IMG_HEIGHT, scale=IMG_SCALE)
-    print(f"  {path}")
+        path_png = out / f"{name}.png"
+        path_eps = out / f"{name}.eps"
+        fig.write_image(path_png, width=IMG_WIDTH, height=IMG_HEIGHT, scale=IMG_SCALE)
+        fig.write_image(path_eps, width=IMG_WIDTH, height=IMG_HEIGHT, scale=IMG_SCALE)
+        print(f"  {path_png}")
+        print(f"  {path_eps}")
 
 
 def load_jsonl(paths: list[Path]) -> pd.DataFrame:
