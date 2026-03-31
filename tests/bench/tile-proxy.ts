@@ -16,6 +16,7 @@
 import http from "node:http";
 import fs from "node:fs";
 import path from "node:path";
+import Database from "better-sqlite3";
 const __dirname = import.meta.dirname!;
 const CACHE_DIR = path.join(__dirname, "results", "_tile_cache");
 const UPSTREAM = "https://tiles.openfreemap.org";
@@ -30,6 +31,35 @@ const BYTES_PER_SEC = BANDWIDTH_MBPS > 0 ? (BANDWIDTH_MBPS * 1_000_000) / 8 : 0;
 
 fs.mkdirSync(CACHE_DIR, { recursive: true });
 
+// ── mbtiles serving ──────────────────────────────────────────────────────────
+
+let mbtilesDb: InstanceType<typeof Database> | null = null;
+let mbtilesTileStmt: ReturnType<InstanceType<typeof Database>["prepare"]> | null = null;
+
+function loadMbtiles(filePath: string): void {
+  closeMbtiles();
+  mbtilesDb = new Database(filePath, { readonly: true });
+  mbtilesTileStmt = mbtilesDb.prepare(
+    "SELECT tile_data FROM tiles WHERE zoom_level = ? AND tile_column = ? AND tile_row = ?",
+  );
+  console.log(`Loaded mbtiles: ${filePath}`);
+}
+
+function closeMbtiles(): void {
+  if (mbtilesDb) {
+    mbtilesDb.close();
+    mbtilesDb = null;
+    mbtilesTileStmt = null;
+    console.log("Unloaded mbtiles");
+  }
+}
+
+// Load initial mbtiles if provided via CLI
+const mbtilesIdx = argv.findIndex((a) => a === "--mbtiles");
+if (mbtilesIdx >= 0) {
+  loadMbtiles(argv[mbtilesIdx + 1]);
+}
+
 function cachePath(key: string): string {
   // Use 2-level directory structure to avoid too many files in one dir
   return path.join(CACHE_DIR, key.slice(0, 2), key.slice(2, 4), key);
@@ -43,7 +73,72 @@ let hits = 0;
 let misses = 0;
 
 const server = http.createServer(async (req, res) => {
-  const upstreamUrl = UPSTREAM + (req.url ?? "/");
+  const url = req.url ?? "/";
+
+  // ── control endpoints ────────────────────────────────────────────────────
+  if (url === "/control/load-mbtiles" && req.method === "POST") {
+    const chunks: Buffer[] = [];
+    for await (const chunk of req) chunks.push(chunk as Buffer);
+    try {
+      const { path: mbPath } = JSON.parse(Buffer.concat(chunks).toString("utf8"));
+      loadMbtiles(mbPath);
+      res.writeHead(200);
+      res.end("ok");
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      res.writeHead(400);
+      res.end(msg);
+    }
+    return;
+  }
+
+  if (url === "/control/unload-mbtiles" && req.method === "POST") {
+    closeMbtiles();
+    res.writeHead(200);
+    res.end("ok");
+    return;
+  }
+
+  // ── mbtiles tile serving: /mbtiles/{z}/{x}/{y} ──────────────────────────
+  const mbtilesMatch = url.match(/^\/mbtiles\/(\d+)\/(\d+)\/(\d+)$/);
+  if (mbtilesMatch) {
+    if (!mbtilesTileStmt) {
+      res.writeHead(404);
+      res.end("no mbtiles loaded");
+      return;
+    }
+    const z = parseInt(mbtilesMatch[1], 10);
+    const x = parseInt(mbtilesMatch[2], 10);
+    const xyzY = parseInt(mbtilesMatch[3], 10);
+    // MBTiles uses TMS y-coordinate convention
+    const tmsY = (1 << z) - 1 - xyzY;
+
+    const row = mbtilesTileStmt.get(z, x, tmsY) as { tile_data: Buffer } | undefined;
+    if (!row) {
+      res.writeHead(404);
+      res.end("tile not found");
+      return;
+    }
+
+    const tileData = row.tile_data;
+
+    if (BYTES_PER_SEC > 0) {
+      const delayMs = (tileData.length / BYTES_PER_SEC) * 1000;
+      await new Promise((resolve) => setTimeout(resolve, delayMs));
+    }
+
+    hits++;
+    res.writeHead(200, {
+      "content-type": "application/octet-stream",
+      "content-length": String(tileData.length),
+      "access-control-allow-origin": "*",
+    });
+    res.end(tileData);
+    return;
+  }
+
+  // ── upstream proxy with caching ──────────────────────────────────────────
+  const upstreamUrl = UPSTREAM + url;
   const key = upstreamUrl.replace("https://tiles.openfreemap.org/", "");
   const body = cachePath(key);
   const meta = metaPath(key);
@@ -106,6 +201,11 @@ server.listen(PORT, () => {
   console.log(`Tile caching proxy listening on http://localhost:${PORT}`);
   console.log(`Cache directory: ${CACHE_DIR}`);
   console.log(`Upstream: ${UPSTREAM}`);
+  if (mbtilesDb) {
+    console.log(`MBTiles: loaded (serving on /mbtiles/{z}/{x}/{y})`);
+  } else {
+    console.log("MBTiles: none (use --mbtiles <path> or POST /control/load-mbtiles)");
+  }
   if (BANDWIDTH_MBPS > 0) {
     console.log(`Bandwidth throttle: ${BANDWIDTH_MBPS} Mbps (${(BYTES_PER_SEC / 1024).toFixed(0)} KB/s)`);
   } else {

@@ -2,14 +2,18 @@
 /**
  * Benchmark harness for maplibre-style-optimizer — cumulative ablation.
  *
- * Runs 16 ablation steps (baseline + 15 passes added one at a time) across
- * all scenarios.  Each step enables one additional optimizer pass on top of
- * all previous ones, showing the marginal contribution of each pass.
+ * Runs up to 17 ablation steps (baseline + 16 passes added one at a time)
+ * across all scenarios.  Each step enables one additional optimizer pass on
+ * top of all previous ones, showing the marginal contribution of each pass.
+ *
+ * Steps 16 (selectivity_reorder) and 17 (tile_rewrite) require --mbtiles.
+ * The tile_rewrite step runs the advisory pipeline to produce MLT-encoded
+ * tiles and a rewritten style, then serves those tiles via the proxy.
  *
  * Usage:
- *   just bench                                      # all scenarios, 15 runs, 16 ablation steps
+ *   just bench                                      # all scenarios, 15 runs, 15 ablation steps
  *   just bench --runs 1 munich-zigzag               # single quick scenario
- *   just bench --mbtiles /path/to/tiles.mbtiles     # enable step 16 (selectivity_reorder)
+ *   just bench --mbtiles /path/to/tiles.mbtiles     # enable steps 16-17 (selectivity + tile rewrite)
  *   just bench --isolated                           # per-pass isolated impact (non-cumulative)
  *   just bench-debug tokyo                          # with browser console output
  */
@@ -173,6 +177,8 @@ const ABLATION_STEPS: { pass: string; flag: string }[] = [
   { pass: "layer_merge",              flag: "--layer-merge" },
   // Only when --mbtiles is provided
   { pass: "selectivity_reorder",      flag: "--selectivity-reorder" },
+  // Virtual step: runs advisory to rewrite tiles (MLT) and style; requires --mbtiles
+  { pass: "tile_rewrite",             flag: "__tile_rewrite__" },
 ];
 
 // ── Puppeteer args ───────────────────────────────────────────────────────────
@@ -261,6 +267,54 @@ function collectStats(mbtilesPath: string, outputPath: string): void {
   ]);
 }
 
+/** Run the advisory command to rewrite tiles and style for MLT serving. */
+function runAdvisory(
+  advisoryJsonPath: string,
+  mbtilesPath: string,
+  stylePath: string,
+  outputDir: string,
+): void {
+  fs.mkdirSync(outputDir, { recursive: true });
+  execFileSync(OPTIMIZER, [
+    "advisory",
+    "--advisory", advisoryJsonPath,
+    "--tiles", mbtilesPath,
+    "--style", stylePath,
+    "--output", outputDir,
+  ], { timeout: 300_000 });
+}
+
+/** Signal the tile proxy to load a new mbtiles file. */
+async function proxyLoadMbtiles(mbtilesPath: string): Promise<void> {
+  const resp = await fetch(`${TILE_PROXY_URL}/control/load-mbtiles`, {
+    method: "POST",
+    body: JSON.stringify({ path: mbtilesPath }),
+  });
+  if (!resp.ok) throw new Error(`Failed to load mbtiles in proxy: ${resp.status} ${await resp.text()}`);
+}
+
+/** Signal the tile proxy to unload the current mbtiles file. */
+async function proxyUnloadMbtiles(): Promise<void> {
+  const resp = await fetch(`${TILE_PROXY_URL}/control/unload-mbtiles`, {
+    method: "POST",
+  });
+  if (!resp.ok) throw new Error(`Failed to unload mbtiles in proxy: ${resp.status} ${await resp.text()}`);
+}
+
+/** Rewrite a style's vector sources to serve from the proxy's mbtiles endpoint. */
+function rewriteStyleForMbtiles(styleJson: string): string {
+  const style = JSON.parse(styleJson);
+  if (style.sources) {
+    for (const src of Object.values(style.sources as Record<string, any>)) {
+      if (src.type === "vector") {
+        src.tiles = [`${TILE_PROXY_URL}/mbtiles/{z}/{x}/{y}`];
+        delete src.url;
+      }
+    }
+  }
+  return JSON.stringify(style);
+}
+
 // ── compressed size helpers (Benchmark 1) ─────────────────────────────────────
 
 function gzipSize(data: string): number {
@@ -296,9 +350,10 @@ function formatKB(json: string): string {
  *
  * Returns an array of Variant objects: baseline (no passes) followed by one
  * variant per ablation step, each accumulating all passes from previous steps.
- * Step 16 (selectivity_reorder) is only included when --mbtiles is provided.
+ * Steps 16 (selectivity_reorder) and 17 (tile_rewrite) are only included when
+ * --mbtiles is provided.
  */
-function buildVariants(originalStyleJson: string): Variant[] {
+async function buildVariants(originalStyleJson: string): Promise<Variant[]> {
   const variants: Variant[] = [];
 
   // Write input style once for all optimizer invocations
@@ -331,15 +386,97 @@ function buildVariants(originalStyleJson: string): Variant[] {
   }
 
   // Determine how many steps to run
-  const maxSteps = MBTILES ? ABLATION_STEPS.length : ABLATION_STEPS.length - 1;
+  // Last two steps (selectivity_reorder, tile_rewrite) require --mbtiles
+  const maxSteps = MBTILES ? ABLATION_STEPS.length : ABLATION_STEPS.length - 2;
 
   // Build pass flags depending on mode
   const accumulatedFlags: string[] = [];
   const accumulatedPasses: string[] = [];
 
+  const advisoryDir = path.join(RESULTS_DIR, "_bench_advisory");
+
   try {
     for (let i = 0; i < maxSteps; i++) {
       const step = ABLATION_STEPS[i];
+
+      // tile_rewrite is a virtual step — skip in isolated mode
+      if (step.pass === "tile_rewrite" && isolated) continue;
+
+      // tile_rewrite: run advisory pipeline to rewrite tiles + style for MLT
+      if (step.pass === "tile_rewrite") {
+        const stepNum = String(i + 1).padStart(2, "0");
+        const variantId = `step-${stepNum}-${step.pass}`;
+
+        // Run the full optimizer with --advisory to produce the advisory JSON
+        const advisoryJsonPath = path.join(RESULTS_DIR, "_bench_advisory.json");
+        const allPassFlags = accumulatedFlags.filter((f) => f !== "__tile_rewrite__");
+        const optimizedStylePath = path.join(RESULTS_DIR, "_bench_optimized_for_advisory.json");
+        const tmpOut = path.join(RESULTS_DIR, "_bench_advisory_opt.json");
+        try {
+          execFileSync(OPTIMIZER, [
+            "optimize", "--input", inputPath, "--output", tmpOut,
+            ...allPassFlags,
+            "--stats", statsPath!,
+            "--advisory", advisoryJsonPath,
+          ], { timeout: 30_000 });
+          fs.copyFileSync(tmpOut, optimizedStylePath);
+        } finally {
+          try { fs.unlinkSync(tmpOut); } catch {}
+        }
+
+        // Run the advisory command to produce rewritten mbtiles + style
+        console.log(`  Running advisory tile rewrite…`);
+        runAdvisory(advisoryJsonPath, MBTILES!, optimizedStylePath, advisoryDir);
+
+        // Find the rewritten mbtiles and style in the output directory
+        const advisoryFiles = fs.readdirSync(advisoryDir);
+        const rewrittenMbtiles = advisoryFiles.find((f) => f.endsWith(".mbtiles"));
+        const rewrittenStyle = advisoryFiles.find((f) => f.endsWith(".json"));
+
+        if (!rewrittenStyle) {
+          console.log(`  WARNING: advisory produced no rewritten style, skipping tile_rewrite step`);
+          continue;
+        }
+
+        // Read the advisory-rewritten style and rewrite source URLs for the proxy
+        let advisoryStyleJson = fs.readFileSync(path.join(advisoryDir, rewrittenStyle), "utf8");
+        advisoryStyleJson = rewriteStyleForMbtiles(advisoryStyleJson);
+
+        // Signal the proxy to serve the rewritten mbtiles
+        if (rewrittenMbtiles) {
+          await proxyLoadMbtiles(path.resolve(advisoryDir, rewrittenMbtiles));
+        }
+
+        const styleBytes = Buffer.byteLength(advisoryStyleJson, "utf8");
+        const gzBytes = gzipSize(advisoryStyleJson);
+        const brBytes = brotliSize(advisoryStyleJson);
+
+        const tmpComplexity = path.join(RESULTS_DIR, "_bench_complexity.json");
+        fs.writeFileSync(tmpComplexity, advisoryStyleJson);
+        const complexity = getComplexityReport(tmpComplexity);
+        try { fs.unlinkSync(tmpComplexity); } catch {}
+
+        const pctSmaller = ((1 - styleBytes / baselineBytes) * 100).toFixed(1);
+
+        accumulatedPasses.push(step.pass);
+        variants.push({
+          id: variantId,
+          label: `+${step.pass}`,
+          passes: [...accumulatedPasses],
+          styleJson: advisoryStyleJson,
+          styleBytes,
+          gzipBytes: gzBytes,
+          brotliBytes: brBytes,
+          complexity,
+        });
+        console.log(`  ${variantId}: ${formatKB(advisoryStyleJson)} (${pctSmaller}% smaller, gzip: ${(gzBytes / 1024).toFixed(1)} KB, br: ${(brBytes / 1024).toFixed(1)} KB)`);
+
+        // Clean up advisory intermediate files
+        try { fs.unlinkSync(advisoryJsonPath); } catch {}
+        try { fs.unlinkSync(optimizedStylePath); } catch {}
+
+        continue;
+      }
 
       let passFlags: string[];
       let passList: string[];
@@ -403,6 +540,8 @@ function buildVariants(originalStyleJson: string): Variant[] {
     if (statsPath) {
       try { fs.unlinkSync(statsPath); } catch {}
     }
+    // Clean up advisory output directory
+    try { fs.rmSync(advisoryDir, { recursive: true, force: true }); } catch {}
   }
 
   return variants;
@@ -831,7 +970,7 @@ async function main(): Promise<void> {
     console.log(`Original: ${(originalSize / 1024).toFixed(1)} KB (URLs rewritten to local proxy)\n`);
 
     console.log(`Building ${mode} ablation variants…`);
-    const variants = buildVariants(originalStyleJson);
+    const variants = await buildVariants(originalStyleJson);
     lastVariants = variants;
     console.log(`${variants.length} ablation steps\n`);
 
@@ -920,6 +1059,11 @@ async function main(): Promise<void> {
       }
 
       allResults.push({ scenarioId, variants: aggregated });
+    }
+
+    // Unload mbtiles from proxy if tile_rewrite was active
+    if (MBTILES && variants.some((v) => v.passes.includes("tile_rewrite"))) {
+      await proxyUnloadMbtiles();
     }
 
     // Per-style size summary
