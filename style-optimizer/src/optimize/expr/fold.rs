@@ -446,6 +446,106 @@ pub(super) fn try_algebraic_simplify(arr: &mut Vec<Value>) -> bool {
     false
 }
 
+/// Strip redundant `typeof` guards from migrated filters.
+///
+/// `gl-style-migrate` wraps `==`/`!=` comparisons in a `case` with a `typeof` guard:
+///
+/// ```json
+/// ["case", ["==", ["typeof", ["get", P]], TYPE], ["==", ["get", P], LIT], false]
+/// ```
+///
+/// This guard is redundant because `==` already returns `false` on type mismatch and `!=`
+/// returns `true`, per the MapLibre spec. We strip it to `["==", ["get", P], LIT]`.
+///
+/// **Safety:** Only strips for `==` (fallback `false`) and `!=` (fallback `true`).
+/// Relational operators (`<`, `>`, etc.) produce errors on type mismatch, so their guards
+/// are load-bearing and must not be touched.
+pub(super) fn try_strip_typeof_eq_guard(arr: &mut Vec<Value>) -> bool {
+    // Must be ["case", COND, BODY, FALLBACK] — exactly one arm.
+    if arr.len() != 4 || arr[0].as_str() != Some("case") {
+        return false;
+    }
+
+    // COND must be ["==", ["typeof", EXPR], TYPE_STR] (or reversed operand order).
+    let Value::Array(cond) = &arr[1] else {
+        return false;
+    };
+    if cond.len() != 3 || cond[0].as_str() != Some("==") {
+        return false;
+    }
+    let (typeof_arg, type_str) = match (&cond[1], &cond[2]) {
+        (Value::Array(inner), Value::String(s)) if is_typeof_expr(inner) => (&inner[1], s.as_str()),
+        (Value::String(s), Value::Array(inner)) if is_typeof_expr(inner) => (&inner[1], s.as_str()),
+        _ => return false,
+    };
+
+    // BODY must be ["==" | "!=", EXPR', LITERAL] (or reversed operand order).
+    let Value::Array(body) = &arr[2] else {
+        return false;
+    };
+    let Some(body_op @ ("==" | "!=")) = body.first().and_then(Value::as_str) else {
+        return false;
+    };
+    if body.len() != 3 {
+        return false;
+    }
+
+    // Identify which operand is the expression matching typeof_arg, and which is the literal.
+    let (body_expr, body_literal) = if body[1] == *typeof_arg {
+        (&body[1], &body[2])
+    } else if body[2] == *typeof_arg {
+        (&body[2], &body[1])
+    } else {
+        return false;
+    };
+    // body_expr must match typeof_arg (already checked above by the equality test).
+    let _ = body_expr;
+
+    // The literal's JSON type must match the typeof TYPE_STR.
+    if !json_type_matches(body_literal, type_str) {
+        return false;
+    }
+
+    // FALLBACK must match the operator's type-mismatch return value.
+    let expected_fallback = match body_op {
+        "==" => false,
+        "!=" => true,
+        _ => return false,
+    };
+    if bool_literal(&arr[3]) != Some(expected_fallback) {
+        return false;
+    }
+
+    // Safe to strip — replace with BODY.
+    let body = arr[2].take();
+    let Value::Array(body_arr) = body else {
+        unreachable!();
+    };
+    *arr = body_arr;
+    true
+}
+
+/// Check if an array is `["typeof", EXPR]`.
+fn is_typeof_expr(a: &[Value]) -> bool {
+    a.len() == 2 && a[0].as_str() == Some("typeof")
+}
+
+/// Check if a JSON value's type matches a `MapLibre` type string.
+fn json_type_matches(v: &Value, type_str: &str) -> bool {
+    // The literal can be bare or wrapped in ["literal", ...].
+    let resolved = match v {
+        Value::Array(a) if a.len() == 2 && a[0].as_str() == Some("literal") => &a[1],
+        _ => v,
+    };
+    match type_str {
+        "string" => resolved.is_string(),
+        "number" => resolved.is_number(),
+        "boolean" => resolved.is_boolean(),
+        "null" => resolved.is_null(),
+        _ => false,
+    }
+}
+
 /// Resolve `case` arms with known-at-compile-time boolean conditions.
 pub(super) fn try_dead_branch_case(arr: &mut Vec<Value>) -> bool {
     if arr.first().and_then(Value::as_str) != Some("case") {

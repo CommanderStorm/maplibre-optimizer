@@ -12,7 +12,7 @@ use fold::{
     try_filter_contradiction, try_fold_boolean_algebra, try_fold_comparison, try_fold_not,
     try_fold_pure_operator, try_fold_redundant_coercion, try_fold_redundant_properties,
     try_negate_comparison, try_predicate_subsumption, try_range_tightening, try_sccp_case,
-    try_sccp_match,
+    try_sccp_match, try_strip_typeof_eq_guard,
 };
 use fold_stats::{
     try_fold_coalesce_from_stats, try_fold_comparison_from_stats,
@@ -190,6 +190,11 @@ static RULES: &[RewriteRule] = &[
         gate: RuleGate::ConstantFold,
         scope: RuleScope::Peephole,
         apply: try_algebraic_simplify,
+    },
+    RewriteRule::Pure {
+        gate: RuleGate::ConstantFold,
+        scope: RuleScope::Peephole,
+        apply: try_strip_typeof_eq_guard,
     },
     RewriteRule::Pure {
         gate: RuleGate::ConstantFold,

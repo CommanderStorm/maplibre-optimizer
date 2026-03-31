@@ -2203,6 +2203,152 @@ fn strip_coalesce_in_in_expression() {
     ");
 }
 
+// ── typeof guard stripping ────────────────────────────────────────────
+
+#[test]
+fn strip_typeof_guard_eq_string() {
+    let mir = sample_mir();
+    let mut v = style_with_filter(serde_json::json!([
+        "case",
+        ["==", ["typeof", ["get", "klasse"]], "string"],
+        ["==", ["get", "klasse"], "Eisenbahn"],
+        false
+    ]));
+    optimize_style_json_value(&mut v, &mir, &fold_passes());
+    assert_yaml_snapshot!(v["layers"][0]["filter"], @r#"
+    - "=="
+    - - get
+      - klasse
+    - Eisenbahn
+    "#);
+}
+
+#[test]
+fn strip_typeof_guard_neq_string() {
+    let mir = sample_mir();
+    let mut v = style_with_filter(serde_json::json!([
+        "case",
+        ["==", ["typeof", ["get", "klasse"]], "string"],
+        ["!=", ["get", "klasse"], "Eisenbahn"],
+        true
+    ]));
+    optimize_style_json_value(&mut v, &mir, &fold_passes());
+    assert_yaml_snapshot!(v["layers"][0]["filter"], @r#"
+    - "!="
+    - - get
+      - klasse
+    - Eisenbahn
+    "#);
+}
+
+#[test]
+fn strip_typeof_guard_eq_number() {
+    let mir = sample_mir();
+    let mut v = style_with_filter(serde_json::json!([
+        "case",
+        ["==", ["typeof", ["get", "level"]], "number"],
+        ["==", ["get", "level"], 5],
+        false
+    ]));
+    optimize_style_json_value(&mut v, &mir, &fold_passes());
+    assert_yaml_snapshot!(v["layers"][0]["filter"], @r#"
+    - "=="
+    - - get
+      - level
+    - 5
+    "#);
+}
+
+#[test]
+fn no_strip_typeof_guard_relational_op() {
+    let mir = sample_mir();
+    let mut v = style_with_filter(serde_json::json!([
+        "case",
+        ["==", ["typeof", ["get", "level"]], "number"],
+        [">=", ["get", "level"], 5],
+        false
+    ]));
+    optimize_style_json_value(&mut v, &mir, &fold_passes());
+    // The guard wrapping >= must NOT be stripped (relational ops error on type mismatch).
+    let filter_str = serde_json::to_string(&v["layers"][0]["filter"]).unwrap();
+    assert!(
+        filter_str.contains(">="),
+        "relational guard should not be stripped: {filter_str}"
+    );
+}
+
+#[test]
+fn no_strip_typeof_guard_wrong_fallback() {
+    let mir = sample_mir();
+    let mut v = style_with_filter(serde_json::json!([
+        "case",
+        ["==", ["typeof", ["get", "klasse"]], "string"],
+        ["==", ["get", "klasse"], "Eisenbahn"],
+        "unknown"
+    ]));
+    optimize_style_json_value(&mut v, &mir, &fold_passes());
+    // Should NOT strip — fallback is "unknown", not false.
+    let filter_str = serde_json::to_string(&v["layers"][0]["filter"]).unwrap();
+    assert!(
+        filter_str.contains("typeof"),
+        "guard with wrong fallback should not be stripped: {filter_str}"
+    );
+}
+
+#[test]
+fn no_strip_typeof_guard_type_mismatch() {
+    let mir = sample_mir();
+    let mut v = style_with_filter(serde_json::json!([
+        "case",
+        ["==", ["typeof", ["get", "klasse"]], "string"],
+        ["==", ["get", "klasse"], 42],
+        false
+    ]));
+    optimize_style_json_value(&mut v, &mir, &fold_passes());
+    // Should NOT strip — literal (42) is a number but typeof checks for "string".
+    let filter_str = serde_json::to_string(&v["layers"][0]["filter"]).unwrap();
+    assert!(
+        filter_str.contains("typeof"),
+        "guard with type mismatch should not be stripped: {filter_str}"
+    );
+}
+
+#[test]
+fn strip_typeof_guard_any_to_in_end_to_end() {
+    let mir = sample_mir();
+    let mut v = style_with_filter(serde_json::json!([
+        "any",
+        [
+            "case",
+            ["==", ["typeof", ["get", "klasse"]], "string"],
+            ["==", ["get", "klasse"], "Eisenbahn"],
+            false
+        ],
+        [
+            "case",
+            ["==", ["typeof", ["get", "klasse"]], "string"],
+            ["==", ["get", "klasse"], "Güterverkehr"],
+            false
+        ],
+        [
+            "case",
+            ["==", ["typeof", ["get", "klasse"]], "string"],
+            ["==", ["get", "klasse"], "Personenverkehr"],
+            false
+        ]
+    ]));
+    optimize_style_json_value(&mut v, &mir, &simplify_passes());
+    assert_yaml_snapshot!(v["layers"][0]["filter"], @r"
+    - in
+    - - get
+      - klasse
+    - - literal
+      - - Eisenbahn
+        - Güterverkehr
+        - Personenverkehr
+    ");
+}
+
 #[test]
 fn no_strip_coalesce_in_in_when_default_in_haystack() {
     let mir = sample_mir();
