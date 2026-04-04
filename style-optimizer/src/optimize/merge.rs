@@ -157,6 +157,12 @@ fn differing_props_are_mergeable(layers: &[Value], layer_type: &str, mir: &MirSp
             if !is_feature_driven {
                 return false;
             }
+            // Values containing zoom-dependent expressions (interpolate/step
+            // over ["zoom"]) cannot be placed inside case/match arms — zoom
+            // interpolation must be at the top level of a property expression.
+            if values.iter().flatten().any(|v| super::zoom::is_zoom_ramp(v)) {
+                return false;
+            }
         }
     }
     true
@@ -813,7 +819,7 @@ mod tests {
     }
 
     #[test]
-    fn merge_group_with_feature_driven_expression_property() {
+    fn skip_merge_when_zoom_expression_in_differing_property() {
         let mir = mir();
         let mut v = json!({
             "version": 8,
@@ -834,7 +840,34 @@ mod tests {
             ]
         });
         layer_merge(&mut v, &mir);
-        // line-color is feature-driven, so expression values can be merged.
+        // Zoom expressions cannot be nested inside case/match arms, so layers
+        // with differing zoom-dependent property values must not be merged.
+        assert_eq!(v["layers"].as_array().unwrap().len(), 2);
+    }
+
+    #[test]
+    fn merge_group_with_feature_driven_literal_property() {
+        let mir = mir();
+        let mut v = json!({
+            "version": 8,
+            "sources": {"s": {"type": "vector"}},
+            "layers": [
+                {
+                    "id": "a", "type": "line", "source": "s",
+                    "source-layer": "road",
+                    "filter": ["==", ["get", "class"], "x"],
+                    "paint": {"line-color": "#aaa"}
+                },
+                {
+                    "id": "b", "type": "line", "source": "s",
+                    "source-layer": "road",
+                    "filter": ["==", ["get", "class"], "y"],
+                    "paint": {"line-color": "#ccc"}
+                }
+            ]
+        });
+        layer_merge(&mut v, &mir);
+        // line-color differs but values are literals, so merge is valid.
         assert_eq!(v["layers"].as_array().unwrap().len(), 1);
         let merged = &v["layers"][0];
         assert_eq!(merged["filter"][0], "match");

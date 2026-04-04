@@ -15,6 +15,25 @@ pub(super) fn is_zoom_expr(val: &Value) -> bool {
     )
 }
 
+/// Returns `true` if `v` is an `interpolate`/`step` expression over `["zoom"]`.
+///
+/// Such expressions must remain at the property root — nesting them inside
+/// `case`/`match` violates the `MapLibre` expression grammar.
+pub(super) fn is_zoom_ramp(v: &Value) -> bool {
+    let Some(arr) = v.as_array() else {
+        return false;
+    };
+    let Some(op) = arr.first().and_then(Value::as_str) else {
+        return false;
+    };
+    let input_idx = match op {
+        "interpolate" | "interpolate-hcl" | "interpolate-lab" => 2,
+        "step" => 1,
+        _ => return false,
+    };
+    arr.get(input_idx).is_some_and(is_zoom_expr)
+}
+
 pub(super) fn zoom_bounds_from_expression(expr: &Value) -> (Option<f64>, Option<f64>) {
     match expr {
         Value::Array(arr) if !arr.is_empty() => {

@@ -1035,6 +1035,7 @@ async function main(): Promise<void> {
             parts.push(`${variant.id.replace(/step-|isolated-/, "s")}: ${metrics.loadMs.toFixed(0)}ms`);
           } catch (err: unknown) {
             const msg = err instanceof Error ? err.message : String(err);
+            console.error(`\n  ⚠ ${variant.id} error: ${msg}`);
             parts.push(`${variant.id}: ERR`);
             if (msg.includes("Session closed") || msg.includes("Target closed") || msg.includes("Protocol error")) {
               console.log("\n  Recovering browser…");
