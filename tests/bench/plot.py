@@ -7,9 +7,6 @@ optimizer pass via cumulative ablation.
 
 Usage:
     uv run plot.py results/bench-*.jsonl
-    uv run plot.py results/bench-*.jsonl --out figures/
-    uv run plot.py results/bench-*.jsonl --metric loadMs --metric p95FrameMs
-    uv run plot.py results/bench-*.jsonl --format html
 """
 
 import argparse
@@ -27,18 +24,14 @@ IMG_HEIGHT = 700
 IMG_SCALE = 2  # 2x for retina-quality PNGs
 
 
-def write_fig(fig: go.Figure, out: Path, name: str, fmt: str) -> None:
-    """Write a figure in the chosen format (png or html)."""
-    if fmt == "html":
-        path = out / f"{name}.html"
-        fig.write_html(path)
-    else:
-        path_png = out / f"{name}.png"
-        path_eps = out / f"{name}.eps"
-        fig.write_image(path_png, width=IMG_WIDTH, height=IMG_HEIGHT, scale=IMG_SCALE)
-        fig.write_image(path_eps, width=IMG_WIDTH, height=IMG_HEIGHT, scale=IMG_SCALE)
-        print(f"  {path_png}")
-        print(f"  {path_eps}")
+def write_fig(fig: go.Figure, out: Path, name: str) -> None:
+    """Write a figure as both PNG (for viewing) and EPS (for LaTeX)."""
+    path_png = out / f"{name}.png"
+    path_eps = out / f"{name}.eps"
+    fig.write_image(path_png, width=IMG_WIDTH, height=IMG_HEIGHT, scale=IMG_SCALE)
+    fig.write_image(path_eps, width=IMG_WIDTH, height=IMG_HEIGHT, scale=IMG_SCALE)
+    print(f"  {path_png}")
+    print(f"  {path_eps}")
 
 
 def load_jsonl(paths: list[Path]) -> pd.DataFrame:
@@ -55,15 +48,29 @@ def load_jsonl(paths: list[Path]) -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
-METRICS = [
-    "loadMs", "idleMs", "fps", "p50FrameMs", "p95FrameMs", "p99FrameMs", "jankCount",
-    "styleParseMs", "firstTileMs", "firstFrameMs",
+PRIMARY_METRICS = [
+    "fps", "meanFrameMs",
+    "loadMs", "idleMs",
+    "styleParseMs",
+    "style_bytes", "gzip_bytes", "brotli_bytes",
+]
+
+SECONDARY_METRICS = [
+    "p50FrameMs", "p95FrameMs", "p99FrameMs",
+    "jankCount", "droppedFrameRatio",
+    "frameTimeVariance",
+    "firstTileMs", "firstFrameMs",
     "heapUsedMB", "peakHeapMB",
 ]
+
+METRICS = PRIMARY_METRICS + SECONDARY_METRICS
+
 LOWER_IS_BETTER = {
-    "loadMs", "idleMs", "p50FrameMs", "p95FrameMs", "p99FrameMs", "jankCount",
+    "loadMs", "idleMs", "meanFrameMs", "frameTimeVariance", "droppedFrameRatio",
+    "p50FrameMs", "p95FrameMs", "p99FrameMs", "jankCount",
     "styleParseMs", "firstTileMs", "firstFrameMs",
     "heapUsedMB", "peakHeapMB",
+    "style_bytes", "gzip_bytes", "brotli_bytes",
 }
 
 SIZE_METRICS = ["style_bytes", "gzip_bytes", "brotli_bytes"]
@@ -77,6 +84,9 @@ METRIC_LABELS = {
     "loadMs": "Load Time (ms)",
     "idleMs": "Time to Idle (ms)",
     "fps": "Frames per Second",
+    "meanFrameMs": "Mean Frame Time (ms)",
+    "frameTimeVariance": "Frame Time Stddev (ms)",
+    "droppedFrameRatio": "Dropped Frame Ratio",
     "p50FrameMs": "Median Frame Time (ms)",
     "p95FrameMs": "P95 Frame Time (ms)",
     "p99FrameMs": "P99 Frame Time (ms)",
@@ -176,7 +186,7 @@ def compute_marginal_deltas(
 
 
 def plot_ablation_waterfall(
-    medians: pd.DataFrame, variants: list[str], metrics: list[str], out: Path, fmt: str
+    medians: pd.DataFrame, variants: list[str], metrics: list[str], out: Path,
 ) -> None:
     """
     Ablation waterfall: X-axis is ablation step, Y-axis is metric value.
@@ -229,11 +239,11 @@ def plot_ablation_waterfall(
             legend=dict(x=0.01, y=0.99),
         )
         _add_stats_annotation(fig)
-        write_fig(fig, out, f"waterfall_{metric}", fmt)
+        write_fig(fig, out, f"waterfall_{metric}")
 
 
 def plot_marginal_contribution(
-    medians: pd.DataFrame, variants: list[str], metrics: list[str], out: Path, fmt: str
+    medians: pd.DataFrame, variants: list[str], metrics: list[str], out: Path,
 ) -> None:
     """
     Bar chart of marginal % change when each pass is added.
@@ -281,10 +291,10 @@ def plot_marginal_contribution(
             template="plotly_white",
         )
         _add_stats_annotation(fig)
-        write_fig(fig, out, f"marginal_{metric}", fmt)
+        write_fig(fig, out, f"marginal_{metric}")
 
 
-def plot_style_size_ablation(df: pd.DataFrame, variants: list[str], out: Path, fmt: str) -> None:
+def plot_style_size_ablation(df: pd.DataFrame, variants: list[str], out: Path) -> None:
     """
     Style size waterfall: X-axis is ablation step, Y-axis is style JSON bytes.
     Shows raw, gzip, and brotli curves.
@@ -345,11 +355,11 @@ def plot_style_size_ablation(df: pd.DataFrame, variants: list[str], out: Path, f
         template="plotly_white",
     )
     _add_stats_annotation(fig)
-    write_fig(fig, out, "style_size_ablation", fmt)
+    write_fig(fig, out, "style_size_ablation")
 
 
 def plot_scenario_heatmap(
-    medians: pd.DataFrame, variants: list[str], metrics: list[str], out: Path, fmt: str
+    medians: pd.DataFrame, variants: list[str], metrics: list[str], out: Path
 ) -> None:
     """
     Heatmap: rows = scenarios, columns = passes (marginal contribution).
@@ -398,11 +408,11 @@ def plot_scenario_heatmap(
             height=max(500, 30 * len(scenarios) + 200),
         )
         _add_stats_annotation(fig)
-        write_fig(fig, out, f"heatmap_{metric}", fmt)
+        write_fig(fig, out, f"heatmap_{metric}")
 
 
 def plot_box_per_step(
-    df: pd.DataFrame, variants: list[str], metrics: list[str], out: Path, fmt: str
+    df: pd.DataFrame, variants: list[str], metrics: list[str], out: Path
 ) -> None:
     """Box plots with X-axis as ablation step."""
     variant_order = {v: i for i, v in enumerate(variants)}
@@ -429,10 +439,10 @@ def plot_box_per_step(
         )
         fig.update_traces(marker_color="#1F77B4")
         _add_stats_annotation(fig)
-        write_fig(fig, out, f"box_{metric}", fmt)
+        write_fig(fig, out, f"box_{metric}")
 
 
-def plot_complexity_ablation(df: pd.DataFrame, variants: list[str], out: Path, fmt: str) -> None:
+def plot_complexity_ablation(df: pd.DataFrame, variants: list[str], out: Path) -> None:
     """
     Complexity metrics waterfall: X-axis is ablation step, Y-axis is complexity value.
     One line per complexity metric.
@@ -488,11 +498,11 @@ def plot_complexity_ablation(df: pd.DataFrame, variants: list[str], out: Path, f
             template="plotly_white",
         )
         _add_stats_annotation(fig)
-        write_fig(fig, out, f"complexity_{metric}", fmt)
+        write_fig(fig, out, f"complexity_{metric}")
 
 
 def plot_time_breakdown(
-    medians: pd.DataFrame, variants: list[str], out: Path, fmt: str
+    medians: pd.DataFrame, variants: list[str], out: Path
 ) -> None:
     """
     Stacked bar chart: time-to-interactive breakdown per ablation step.
@@ -543,11 +553,11 @@ def plot_time_breakdown(
         template="plotly_white",
     )
     _add_stats_annotation(fig)
-    write_fig(fig, out, "time_breakdown", fmt)
+    write_fig(fig, out, "time_breakdown")
 
 
 def plot_isolated_impact(
-    medians: pd.DataFrame, variants: list[str], metrics: list[str], out: Path, fmt: str
+    medians: pd.DataFrame, variants: list[str], metrics: list[str], out: Path
 ) -> None:
     """
     Per-pass isolated impact: bar chart showing the effect of each pass alone
@@ -613,11 +623,11 @@ def plot_isolated_impact(
             template="plotly_white",
         )
         _add_stats_annotation(fig)
-        write_fig(fig, out, f"isolated_{metric}", fmt)
+        write_fig(fig, out, f"isolated_{metric}")
 
 
 def plot_memory_ablation(
-    medians: pd.DataFrame, variants: list[str], out: Path, fmt: str
+    medians: pd.DataFrame, variants: list[str], out: Path
 ) -> None:
     """
     Memory usage across ablation steps: heap used and peak heap.
@@ -658,20 +668,16 @@ def plot_memory_ablation(
         template="plotly_white",
     )
     _add_stats_annotation(fig)
-    write_fig(fig, out, "memory_ablation", fmt)
+    write_fig(fig, out, "memory_ablation")
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Plot ablation benchmark results from JSONL files.")
     parser.add_argument("files", nargs="+", type=Path, help="JSONL benchmark result files")
-    parser.add_argument("--out", type=Path, default=Path("tests/bench/figures"), help="Output directory for figures")
-    parser.add_argument("--metric", action="append", dest="metrics", help="Metrics to plot (default: all)")
-    parser.add_argument("--format", choices=["png", "html"], default="png", help="Output format (default: png)")
     args = parser.parse_args()
 
-    # Filter to metrics actually present in data
-    fmt = args.format
-    args.out.mkdir(parents=True, exist_ok=True)
+    out = Path("tests/bench/figures")
+    out.mkdir(parents=True, exist_ok=True)
 
     df = load_jsonl(args.files)
     print(f"Loaded {len(df)} records from {len(args.files)} file(s)")
@@ -681,41 +687,40 @@ def main() -> None:
     mode = df["mode"].iloc[0] if "mode" in df.columns else "cumulative"
     print(f"Mode: {mode}\n")
 
-    available_metrics = [m for m in METRICS if m in df.columns]
-    metrics = args.metrics or available_metrics
+    metrics = [m for m in METRICS if m in df.columns]
 
     # Precompute shared data
     variants = ablation_step_order(df)
     medians = df.groupby(["scenario", "variant"])[metrics].median().reset_index()
 
     print("Ablation waterfalls:")
-    plot_ablation_waterfall(medians, variants, metrics, args.out, fmt)
+    plot_ablation_waterfall(medians, variants, metrics, out)
 
     print("\nMarginal contribution bars:")
-    plot_marginal_contribution(medians, variants, metrics, args.out, fmt)
+    plot_marginal_contribution(medians, variants, metrics, out)
 
     print("\nStyle size ablation:")
-    plot_style_size_ablation(df, variants, args.out, fmt)
+    plot_style_size_ablation(df, variants, out)
 
     print("\nScenario × pass heatmaps:")
-    plot_scenario_heatmap(medians, variants, metrics, args.out, fmt)
+    plot_scenario_heatmap(medians, variants, metrics, out)
 
     print("\nBox plots per ablation step:")
-    plot_box_per_step(df, variants, metrics, args.out, fmt)
+    plot_box_per_step(df, variants, metrics, out)
 
     print("\nComplexity ablation:")
-    plot_complexity_ablation(df, variants, args.out, fmt)
+    plot_complexity_ablation(df, variants, out)
 
     print("\nTime-to-interactive breakdown:")
-    plot_time_breakdown(medians, variants, args.out, fmt)
+    plot_time_breakdown(medians, variants, out)
 
     print("\nIsolated pass impact:")
-    plot_isolated_impact(medians, variants, metrics, args.out, fmt)
+    plot_isolated_impact(medians, variants, metrics, out)
 
     print("\nMemory usage ablation:")
-    plot_memory_ablation(medians, variants, args.out, fmt)
+    plot_memory_ablation(medians, variants, out)
 
-    print(f"\nAll figures written to {args.out}/")
+    print(f"\nAll figures written to {out}/")
 
 
 if __name__ == "__main__":

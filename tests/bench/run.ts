@@ -111,6 +111,9 @@ interface RunMetrics {
   loadMs: number;
   idleMs: number;
   fps: number;
+  meanFrameMs: number;
+  frameTimeVariance: number;
+  droppedFrameRatio: number;
   p50FrameMs: number;
   p95FrameMs: number;
   p99FrameMs: number;
@@ -196,6 +199,11 @@ const PUPPETEER_ARGS = [
   "--enable-unsafe-swiftshader",
   "--use-angle=vulkan",
   "--enable-features=Vulkan,UseSkiaRenderer",
+  // Disable vsync so the GPU renders as fast as it can — without this, all
+  // frame-time metrics are ceiling-limited at 16.67ms (60 Hz) and show zero
+  // differentiation between baseline and optimized styles.
+  "--disable-frame-rate-limit",
+  "--disable-gpu-vsync",
   // Limit Chrome's parallelism to half the available CPUs for more stable benchmarks
   `--renderer-process-limit=${HALF_CPUS}`,
   "--disable-background-networking",
@@ -800,7 +808,8 @@ function computeMetrics(raw: {
   if (deltas.length === 0) {
     return {
       loadMs, idleMs, animationMs,
-      fps: 0, p50FrameMs: 0, p95FrameMs: 0, p99FrameMs: 0, jankCount: 0,
+      fps: 0, meanFrameMs: 0, frameTimeVariance: 0, droppedFrameRatio: 0,
+      p50FrameMs: 0, p95FrameMs: 0, p99FrameMs: 0, jankCount: 0,
       styleParseMs, firstTileMs, firstFrameMs,
       heapUsedMB, peakHeapMB,
     };
@@ -812,11 +821,19 @@ function computeMetrics(raw: {
   const p95FrameMs = percentile(sorted, 0.95);
   const p99FrameMs = percentile(sorted, 0.99);
 
+  const meanFrameMs = animationMs / frames.length;
+  const meanDelta = deltas.reduce((a, b) => a + b, 0) / deltas.length;
+  const frameTimeVariance = Math.sqrt(
+    deltas.reduce((sum, d) => sum + (d - meanDelta) ** 2, 0) / deltas.length,
+  );
+  const droppedFrameRatio = deltas.filter((d) => d > 16.67).length / deltas.length;
+
   const median = p50FrameMs;
   const jankCount = deltas.filter((d) => d > 2 * median).length;
 
   return {
-    loadMs, idleMs, fps, p50FrameMs, p95FrameMs, p99FrameMs, jankCount, animationMs,
+    loadMs, idleMs, fps, meanFrameMs, frameTimeVariance, droppedFrameRatio,
+    p50FrameMs, p95FrameMs, p99FrameMs, jankCount, animationMs,
     styleParseMs, firstTileMs, firstFrameMs,
     heapUsedMB, peakHeapMB,
   };
@@ -832,7 +849,8 @@ function percentile(sorted: number[], p: number): number {
 
 function aggregate(runs: RunMetrics[]): AggregatedMetrics {
   const keys: (keyof RunMetrics)[] = [
-    "loadMs", "idleMs", "fps", "p50FrameMs", "p95FrameMs", "p99FrameMs", "jankCount", "animationMs",
+    "loadMs", "idleMs", "fps", "meanFrameMs", "frameTimeVariance", "droppedFrameRatio",
+    "p50FrameMs", "p95FrameMs", "p99FrameMs", "jankCount", "animationMs",
     "styleParseMs", "firstTileMs", "firstFrameMs",
     "heapUsedMB", "peakHeapMB",
   ];
@@ -1083,6 +1101,7 @@ async function main(): Promise<void> {
     }
   }
 
+  const chromeVersion = await browser.version();
   await browser.close();
 
   if (allResults.length === 0) {
@@ -1101,7 +1120,10 @@ async function main(): Promise<void> {
     runsPerScenario: RUNS,
     warmupRuns: WARMUP,
     maplibreVersion: getMaplibreVersion(),
-    renderer: "Hardware GPU (headless Chrome)",
+    renderer: "Hardware GPU (headless Chrome, vsync disabled)",
+    chromeVersion,
+    cpuModel: os.cpus()[0]?.model ?? "unknown",
+    nodeVersion: process.version,
   };
 
   const metaPath = path.join(RESULTS_DIR, `bench-${timestamp}.meta.json`);
