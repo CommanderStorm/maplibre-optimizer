@@ -43,9 +43,11 @@ export interface Keyframe {
 
 export type AnimationFactory = (loc: Location) => Keyframe[];
 
+const KEYFRAME_DURATION = 750;
+
 const animations: Record<string, AnimationFactory> = {
   zigzag(loc) {
-    // 8 steps alternating zoom 10/14, moving along a bearing, 2s each
+    // 8 steps alternating zoom 10/14, moving along a bearing
     const steps: Keyframe[] = [];
     const [lng, lat] = loc.center;
     for (let i = 0; i < 8; i++) {
@@ -54,14 +56,14 @@ const animations: Record<string, AnimationFactory> = {
         center: [lng + offset, lat + (i % 2 === 0 ? offset : -offset)],
         zoom: i % 2 === 0 ? 10 : 14,
         bearing: i * 15,
-        duration: 2000,
+        duration: KEYFRAME_DURATION,
       });
     }
     return steps;
   },
 
   spiral(loc) {
-    // 12 steps tracing a circle at constant zoom, rotating bearing 0-360, 1.5s each
+    // 12 steps tracing a circle at constant zoom, rotating bearing 0-360
     const steps: Keyframe[] = [];
     const [lng, lat] = loc.center;
     const radius = 0.01;
@@ -71,40 +73,40 @@ const animations: Record<string, AnimationFactory> = {
         center: [lng + radius * Math.cos(angle), lat + radius * Math.sin(angle)],
         zoom: loc.zoom,
         bearing: (i / 12) * 360,
-        duration: 1500,
+        duration: KEYFRAME_DURATION,
       });
     }
     return steps;
   },
 
   zoomdrill(_loc) {
-    // zoom 4→8→12→16→12→8→4, stationary, 3s each
+    // zoom 4→8→12→16→12→8→4, stationary
     return [4, 8, 12, 16, 12, 8, 4].map((z) => ({
       zoom: z,
-      duration: 3000,
+      duration: KEYFRAME_DURATION,
     }));
   },
 
   pansweep(loc) {
-    // 6 steps at constant zoom sweeping across a region, 2.5s each
+    // 6 steps at constant zoom sweeping across a region
     const steps: Keyframe[] = [];
     const [lng, lat] = loc.center;
     for (let i = 0; i < 6; i++) {
       steps.push({
         center: [lng + (i - 3) * 0.02, lat + (i % 2 === 0 ? 0.01 : -0.01)],
         zoom: loc.zoom,
-        duration: 2500,
+        duration: KEYFRAME_DURATION,
       });
     }
     return steps;
   },
 
   bearingspin(_loc) {
-    // 8 steps rotating bearing 0-360 at 60 pitch, stationary, 1.5s each
+    // 8 steps rotating bearing 0-360 at 60 pitch, stationary
     return Array.from({ length: 8 }, (_, i) => ({
       bearing: (i / 8) * 360,
       pitch: 60,
-      duration: 1500,
+      duration: KEYFRAME_DURATION,
     }));
   },
 };

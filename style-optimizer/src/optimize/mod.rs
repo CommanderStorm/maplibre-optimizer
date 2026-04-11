@@ -19,6 +19,7 @@ mod color;
 mod dead;
 mod defaults;
 pub(crate) mod expr;
+mod legacy_filter;
 mod merge;
 mod metadata;
 mod ramp;
@@ -138,6 +139,12 @@ pub fn optimize_style_json_value_with_stats(
     if !wants_expression_passes(passes) && !wants_structural_passes(passes) {
         return;
     }
+
+    // 0. Normalize legacy filter syntax to expressions up front. Expression
+    //    passes treat bare strings as literals (e.g. `["==", "class", "x"]`
+    //    folds to `false` because `"class" != "x"`), so styles using legacy
+    //    filters must be converted before any other pass runs.
+    legacy_filter::convert_legacy_filters_in_style(v);
 
     // 1. Expression passes directly on JSON (no typed round-trip).
     run_json_expression_passes(v, mir, passes, stats);

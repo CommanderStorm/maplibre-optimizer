@@ -22,6 +22,7 @@ import os from "node:os";
 import path from "node:path";
 import fs from "node:fs";
 import zlib from "node:zlib";
+import { createHash } from "node:crypto";
 import { execFileSync, execSync } from "node:child_process";
 import { performance } from "node:perf_hooks";
 import puppeteer, { type Page } from "puppeteer";
@@ -138,6 +139,14 @@ interface Variant {
   label: string;
   passes: string[];
   styleJson: string;
+  /**
+   * SHA-256 of `styleJson`. Used to dedupe browser-side measurements within
+   * a scenario iteration: ablation steps whose output is byte-identical to
+   * an earlier step (common when a pass is a no-op for a given style) share
+   * a single render and copy the metrics across. Saves 20-60% of iteration
+   * time on styles with sparse ablation deltas.
+   */
+  styleHash: string;
   styleBytes: number;
   gzipBytes: number;
   brotliBytes: number;
@@ -371,6 +380,10 @@ function formatKB(json: string): string {
  * Steps 16 (selectivity_reorder) and 17 (tile_rewrite) are only included when
  * --mbtiles is provided.
  */
+function hashStyleJson(styleJson: string): string {
+  return createHash("sha256").update(styleJson).digest("hex");
+}
+
 async function buildVariants(originalStyleJson: string, schema: string): Promise<Variant[]> {
   const variants: Variant[] = [];
 
@@ -388,6 +401,7 @@ async function buildVariants(originalStyleJson: string, schema: string): Promise
     label: "baseline",
     passes: [],
     styleJson: originalStyleJson,
+    styleHash: hashStyleJson(originalStyleJson),
     styleBytes: baselineBytes,
     gzipBytes: baselineGzip,
     brotliBytes: baselineBrotli,
@@ -487,6 +501,7 @@ async function buildVariants(originalStyleJson: string, schema: string): Promise
           label: `+${step.pass}`,
           passes: [...accumulatedPasses],
           styleJson: advisoryStyleJson,
+          styleHash: hashStyleJson(advisoryStyleJson),
           styleBytes,
           gzipBytes: gzBytes,
           brotliBytes: brBytes,
@@ -554,6 +569,7 @@ async function buildVariants(originalStyleJson: string, schema: string): Promise
         label: isolated ? step.pass : `+${step.pass}`,
         passes: passList,
         styleJson: optimizedJson,
+        styleHash: hashStyleJson(optimizedJson),
         styleBytes,
         gzipBytes: gzBytes,
         brotliBytes: brBytes,
@@ -1025,14 +1041,38 @@ async function main(): Promise<void> {
         const label = isWarmup ? `warmup ${run + 1}` : `run ${run - WARMUP + 1}/${RUNS}`;
 
         const parts: string[] = [];
+        // Dedupe: skip browser render for variants with byte-identical style.
+        const metricsByHash = new Map<string, RunMetrics>();
+        const errorByHash = new Map<string, string>();
 
         for (let vi = 0; vi < variants.length; vi++) {
           const variant = variants[vi];
-          const page = await browser.newPage();
-          applyDebugListeners(page);
 
-          try {
-            const metrics = await runBenchmarkInBrowser(page, variant.styleJson, scenario);
+          let metrics: RunMetrics | undefined = metricsByHash.get(variant.styleHash);
+          let errMsg: string | undefined;
+          let deduped = false;
+
+          if (metrics === undefined) {
+            errMsg = errorByHash.get(variant.styleHash);
+            if (errMsg === undefined) {
+              const page = await browser.newPage();
+              applyDebugListeners(page);
+
+              try {
+                metrics = await runBenchmarkInBrowser(page, variant.styleJson, scenario);
+                metricsByHash.set(variant.styleHash, metrics);
+              } catch (err: unknown) {
+                errMsg = err instanceof Error ? err.message : String(err);
+                errorByHash.set(variant.styleHash, errMsg);
+              } finally {
+                try { await page.close(); } catch {}
+              }
+            }
+          } else {
+            deduped = true;
+          }
+
+          if (metrics !== undefined) {
             if (!isWarmup) {
               variantRuns[variant.id].push(metrics);
               const record: Record<string, unknown> = {
@@ -1051,6 +1091,8 @@ async function main(): Promise<void> {
                 style_bytes: variant.styleBytes,
                 gzip_bytes: variant.gzipBytes,
                 brotli_bytes: variant.brotliBytes,
+                style_hash: variant.styleHash,
+                deduped,
                 preprocessing_ms: variant.preprocessingMs,
                 run: run - WARMUP + 1,
                 timestamp,
@@ -1069,18 +1111,16 @@ async function main(): Promise<void> {
               }
               fs.writeSync(jsonlFd, JSON.stringify(record) + "\n");
             }
-            parts.push(`${variant.id.replace(/step-|isolated-/, "s")}: ${metrics.loadMs.toFixed(0)}ms`);
-          } catch (err: unknown) {
-            const msg = err instanceof Error ? err.message : String(err);
-            console.error(`\n  ⚠ ${variant.id} error: ${msg}`);
+            const marker = deduped ? "·" : "";
+            parts.push(`${variant.id.replace(/step-|isolated-/, "s")}: ${metrics.loadMs.toFixed(0)}ms${marker}`);
+          } else if (errMsg !== undefined) {
+            console.error(`\n  ⚠ ${variant.id} error: ${errMsg}`);
             parts.push(`${variant.id}: ERR`);
-            if (msg.includes("Session closed") || msg.includes("Target closed") || msg.includes("Protocol error")) {
+            if (errMsg.includes("Session closed") || errMsg.includes("Target closed") || errMsg.includes("Protocol error")) {
               console.log("\n  Recovering browser…");
               try { await browser.close(); } catch {}
               browser = await puppeteer.launch({ headless: true, args: PUPPETEER_ARGS });
             }
-          } finally {
-            try { await page.close(); } catch {}
           }
         }
 

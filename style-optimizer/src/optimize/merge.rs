@@ -6,6 +6,7 @@
 //! **Phase 3** — zoom-tolerant merging: layers with different minzoom/maxzoom are
 //!   merged by wrapping each sub-layer's filter contribution with zoom guards.
 
+use maplibre_style_spec::mir::types::MirType;
 use maplibre_style_spec::mir::{MirPropertySection, MirSpec};
 use serde_json::Value;
 
@@ -149,12 +150,20 @@ fn differing_props_are_mergeable(layers: &[Value], layer_type: &str, mir: &MirSp
                 continue;
             }
             // Property differs — check if the field supports feature-driven expressions.
-            let is_feature_driven = mir
-                .layers
-                .field_for(layer_type, mir_section, prop)
+            let field = mir.layers.field_for(layer_type, mir_section, prop);
+            let is_feature_driven = field
                 .and_then(|f| f.expression.as_ref())
                 .is_some_and(|e| e.feature);
             if !is_feature_driven {
+                return false;
+            }
+            // Array-typed properties (e.g. `line-dasharray`, `*-translate`,
+            // `*-offset`) are classified as feature-driven in the spec but
+            // MapLibre GL JS's expression compiler cannot actually evaluate
+            // complex `case`/`match` expressions that return arrays — the
+            // rendering loop hangs on styles that try. Treat any array-valued
+            // property as non-mergeable when values differ.
+            if field.is_some_and(|f| is_array_type(&f.r#type)) {
                 return false;
             }
             // Values containing zoom-dependent expressions (interpolate/step
@@ -166,6 +175,20 @@ fn differing_props_are_mergeable(layers: &[Value], layer_type: &str, mir: &MirSp
         }
     }
     true
+}
+
+/// Return true for MIR types whose values are always JSON arrays. Feature-
+/// driven `case`/`match` expressions returning arrays are nominally allowed
+/// by the spec but not actually supported by MapLibre GL JS's runtime, so
+/// layer merging must treat these conservatively as non-mergeable.
+fn is_array_type(ty: &MirType) -> bool {
+    matches!(
+        ty,
+        MirType::Array { .. }
+            | MirType::NumberArray { .. }
+            | MirType::ColorArray
+            | MirType::VariableAnchorOffsetCollection
+    )
 }
 
 fn collect_property_names(layers: &[Value], section: &str) -> Vec<String> {
@@ -893,6 +916,37 @@ mod tests {
                     "source-layer": "road",
                     "filter": ["==", ["get", "class"], "y"],
                     "paint": {"line-translate": [0, 1]}
+                }
+            ]
+        });
+        let original = v.clone();
+        layer_merge(&mut v, &mir);
+        assert_eq!(v, original);
+    }
+
+    #[test]
+    fn skip_group_with_differing_array_property() {
+        // line-dasharray is nominally feature-driven in the spec
+        // (parameters include "feature") but it is a cross-faded-data-driven
+        // array property. MapLibre GL JS cannot actually evaluate `case` /
+        // `match` expressions that return arrays for line-dasharray — the
+        // renderer hangs. Layer merge must refuse this group.
+        let mir = mir();
+        let mut v = json!({
+            "version": 8,
+            "sources": {"s": {"type": "vector"}},
+            "layers": [
+                {
+                    "id": "a", "type": "line", "source": "s",
+                    "source-layer": "road",
+                    "filter": ["==", ["get", "class"], "rail"],
+                    "paint": {"line-dasharray": [0.2, 8]}
+                },
+                {
+                    "id": "b", "type": "line", "source": "s",
+                    "source-layer": "road",
+                    "filter": ["==", ["get", "class"], "transit"],
+                    "paint": {"line-dasharray": [1, 2]}
                 }
             ]
         });

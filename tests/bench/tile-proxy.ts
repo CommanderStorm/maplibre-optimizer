@@ -71,6 +71,7 @@ function metaPath(key: string): string {
 
 let hits = 0;
 let misses = 0;
+let cachedTileJson: string | null = null;
 
 const server = http.createServer(async (req, res) => {
   const url = req.url ?? "/";
@@ -96,6 +97,57 @@ const server = http.createServer(async (req, res) => {
     closeMbtiles();
     res.writeHead(200);
     res.end("ok");
+    return;
+  }
+
+  // ── synthetic TileJSON at /sources/openmaptiles ─────────────────────────
+  // OpenFreeMap serves TileJSON at `/planet`, not `/sources/openmaptiles`.
+  // Fetch once, rewrite tile URLs to route through this proxy, cache in memory.
+  if (url === "/sources/openmaptiles") {
+    if (!cachedTileJson) {
+      try {
+        const upstream = await fetch(`${UPSTREAM}/planet`, {
+          headers: {
+            "User-Agent":
+              "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/131 Safari/537.36",
+            "Accept": "application/json",
+          },
+        });
+        if (!upstream.ok) {
+          res.writeHead(upstream.status, {
+            "content-type": "text/plain",
+            "access-control-allow-origin": "*",
+          });
+          res.end(`upstream error: ${upstream.status}`);
+          return;
+        }
+        const json = (await upstream.json()) as {
+          tiles?: string[];
+          [k: string]: unknown;
+        };
+        if (Array.isArray(json.tiles)) {
+          json.tiles = json.tiles.map((t) =>
+            t.replace(/^https?:\/\/tiles\.openfreemap\.org/, `http://localhost:${PORT}`),
+          );
+        }
+        cachedTileJson = JSON.stringify(json);
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err);
+        res.writeHead(502, {
+          "content-type": "text/plain",
+          "access-control-allow-origin": "*",
+        });
+        res.end(`upstream error: ${msg}`);
+        return;
+      }
+    }
+    hits++;
+    res.writeHead(200, {
+      "content-type": "application/json",
+      "content-length": String(Buffer.byteLength(cachedTileJson)),
+      "access-control-allow-origin": "*",
+    });
+    res.end(cachedTileJson);
     return;
   }
 
@@ -147,6 +199,10 @@ const server = http.createServer(async (req, res) => {
   if (fs.existsSync(body) && fs.existsSync(meta)) {
     hits++;
     const { status, headers } = JSON.parse(fs.readFileSync(meta, "utf8"));
+    // Always advertise CORS regardless of what upstream sent — MapLibre runs
+    // under `file://` (Puppeteer's `about:blank`) and needs `Access-Control-
+    // Allow-Origin: *` on every response or the fetch is rejected.
+    headers["access-control-allow-origin"] = "*";
 
     if (BYTES_PER_SEC > 0) {
       // Simulate network transfer time proportional to response size
@@ -178,21 +234,27 @@ const server = http.createServer(async (req, res) => {
     delete headers["transfer-encoding"];
     delete headers["content-encoding"];
     headers["content-length"] = String(respBody.length);
+    headers["access-control-allow-origin"] = "*";
 
-    // Write to cache
-    const dir = path.dirname(body);
-    fs.mkdirSync(dir, { recursive: true });
-    fs.writeFileSync(body, respBody);
-    fs.writeFileSync(
-      meta,
-      JSON.stringify({ status: upstream.status, headers }),
-    );
+    // Only cache successful responses. Caching a 403/404/5xx would pin the
+    // proxy to that error indefinitely (we hit this when openfreemap briefly
+    // rejected `/sources/openmaptiles` — the bad response was served for
+    // weeks afterwards, silently invalidating every benchmark run).
+    if (upstream.status >= 200 && upstream.status < 300) {
+      const dir = path.dirname(body);
+      fs.mkdirSync(dir, { recursive: true });
+      fs.writeFileSync(body, respBody);
+      fs.writeFileSync(
+        meta,
+        JSON.stringify({ status: upstream.status, headers }),
+      );
+    }
 
     res.writeHead(upstream.status, headers);
     res.end(respBody);
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);
-    res.writeHead(502);
+    res.writeHead(502, { "access-control-allow-origin": "*" });
     res.end(`upstream error: ${msg}`);
   }
 });
