@@ -25,13 +25,13 @@ IMG_SCALE = 2  # 2x for retina-quality PNGs
 
 
 def write_fig(fig: go.Figure, out: Path, name: str) -> None:
-    """Write a figure as both PNG (for viewing) and EPS (for LaTeX)."""
+    """Write a figure as both PNG (for viewing) and PDF (for LaTeX)."""
     path_png = out / f"{name}.png"
-    path_eps = out / f"{name}.eps"
+    path_pdf = out / f"{name}.pdf"
     fig.write_image(path_png, width=IMG_WIDTH, height=IMG_HEIGHT, scale=IMG_SCALE)
-    fig.write_image(path_eps, width=IMG_WIDTH, height=IMG_HEIGHT, scale=IMG_SCALE)
+    fig.write_image(path_pdf, width=IMG_WIDTH, height=IMG_HEIGHT, scale=IMG_SCALE)
     print(f"  {path_png}")
-    print(f"  {path_eps}")
+    print(f"  {path_pdf}")
 
 
 def load_jsonl(paths: list[Path]) -> pd.DataFrame:

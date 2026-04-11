@@ -1,3 +1,4 @@
 /target
 data
 crash-*
+tests/bench/tests/bench/figures

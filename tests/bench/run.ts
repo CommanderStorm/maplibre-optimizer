@@ -23,6 +23,7 @@ import path from "node:path";
 import fs from "node:fs";
 import zlib from "node:zlib";
 import { execFileSync, execSync } from "node:child_process";
+import { performance } from "node:perf_hooks";
 import puppeteer, { type Page } from "puppeteer";
 import { getAllScenarios, filterScenarios, type Scenario } from "./scenarios.js";
 
@@ -141,6 +142,14 @@ interface Variant {
   gzipBytes: number;
   brotliBytes: number;
   complexity: ComplexityReport | null;
+  /**
+   * Wall-clock time of the style-optimizer CLI invocation that produced this
+   * variant (ms). For `tile_rewrite` variants this covers the combined
+   * optimize-with-advisory + advisory-rewrite invocations. For the `baseline`
+   * variant (no passes) this is 0. Consumed by the post-hoc Pareto analysis
+   * in `thesis/scripts/pareto_analysis.py` as the `preprocessing_ms` axis.
+   */
+  preprocessingMs: number;
 }
 
 interface ComplexityReport {
@@ -259,7 +268,7 @@ async function fetchStyle(style: BenchStyle): Promise<string> {
 // ── optimize style via Rust binary ───────────────────────────────────────────
 
 function optimizeStyle(inputPath: string, passFlags: string[], extraArgs: string[] = []): string {
-  const tmpOut = path.join(RESULTS_DIR, "_bench_output.json");
+  const tmpOut = path.join(RESULTS_DIR, `_bench_output_${process.pid}.json`);
   try {
     execFileSync(OPTIMIZER, ["optimize", "--input", inputPath, "--output", tmpOut, ...passFlags, ...extraArgs], {
       timeout: 30_000,
@@ -366,7 +375,7 @@ async function buildVariants(originalStyleJson: string, schema: string): Promise
   const variants: Variant[] = [];
 
   // Write input style once for all optimizer invocations
-  const inputPath = path.join(RESULTS_DIR, "_bench_input.json");
+  const inputPath = path.join(RESULTS_DIR, `_bench_input_${process.pid}.json`);
   fs.writeFileSync(inputPath, originalStyleJson);
 
   // Step 0: baseline (no optimization)
@@ -383,13 +392,14 @@ async function buildVariants(originalStyleJson: string, schema: string): Promise
     gzipBytes: baselineGzip,
     brotliBytes: baselineBrotli,
     complexity: baselineComplexity,
+    preprocessingMs: 0,
   });
   console.log(`  step-00-baseline: ${formatKB(originalStyleJson)} (gzip: ${(baselineGzip / 1024).toFixed(1)} KB, br: ${(baselineBrotli / 1024).toFixed(1)} KB)`);
 
   // Collect stats if mbtiles provided and schema matches OMT (stats are meaningless for other schemas)
   let statsPath: string | undefined;
   if (MBTILES && schema === "omt") {
-    statsPath = path.join(RESULTS_DIR, "_bench_stats.json");
+    statsPath = path.join(RESULTS_DIR, `_bench_stats_${process.pid}.json`);
     console.log(`Collecting tile statistics from ${MBTILES}…`);
     collectStats(MBTILES, statsPath);
   }
@@ -402,7 +412,7 @@ async function buildVariants(originalStyleJson: string, schema: string): Promise
   const accumulatedFlags: string[] = [];
   const accumulatedPasses: string[] = [];
 
-  const advisoryDir = path.join(RESULTS_DIR, "_bench_advisory");
+  const advisoryDir = path.join(RESULTS_DIR, `_bench_advisory_${process.pid}`);
 
   try {
     for (let i = 0; i < maxSteps; i++) {
@@ -417,10 +427,13 @@ async function buildVariants(originalStyleJson: string, schema: string): Promise
         const variantId = `step-${stepNum}-${step.pass}`;
 
         // Run the full optimizer with --advisory to produce the advisory JSON
-        const advisoryJsonPath = path.join(RESULTS_DIR, "_bench_advisory.json");
+        const advisoryJsonPath = path.join(RESULTS_DIR, `_bench_advisory_${process.pid}.json`);
         const allPassFlags = accumulatedFlags.filter((f) => f !== "__tile_rewrite__");
-        const optimizedStylePath = path.join(RESULTS_DIR, "_bench_optimized_for_advisory.json");
-        const tmpOut = path.join(RESULTS_DIR, "_bench_advisory_opt.json");
+        const optimizedStylePath = path.join(RESULTS_DIR, `_bench_optimized_for_advisory_${process.pid}.json`);
+        const tmpOut = path.join(RESULTS_DIR, `_bench_advisory_opt_${process.pid}.json`);
+        // Preprocessing timer covers the combined optimize-with-advisory + advisory-rewrite
+        // invocations, since together they are the offline pipeline this variant exercises.
+        const preprocessingStart = performance.now();
         try {
           execFileSync(OPTIMIZER, [
             "optimize", "--input", inputPath, "--output", tmpOut,
@@ -436,6 +449,7 @@ async function buildVariants(originalStyleJson: string, schema: string): Promise
         // Run the advisory command to produce rewritten mbtiles + style
         console.log(`  Running advisory tile rewrite…`);
         runAdvisory(advisoryJsonPath, MBTILES!, optimizedStylePath, advisoryDir);
+        const preprocessingMs = performance.now() - preprocessingStart;
 
         // Find the rewritten mbtiles and style in the output directory
         const advisoryFiles = fs.readdirSync(advisoryDir);
@@ -460,7 +474,7 @@ async function buildVariants(originalStyleJson: string, schema: string): Promise
         const gzBytes = gzipSize(advisoryStyleJson);
         const brBytes = brotliSize(advisoryStyleJson);
 
-        const tmpComplexity = path.join(RESULTS_DIR, "_bench_complexity.json");
+        const tmpComplexity = path.join(RESULTS_DIR, `_bench_complexity_${process.pid}.json`);
         fs.writeFileSync(tmpComplexity, advisoryStyleJson);
         const complexity = getComplexityReport(tmpComplexity);
         try { fs.unlinkSync(tmpComplexity); } catch {}
@@ -477,6 +491,7 @@ async function buildVariants(originalStyleJson: string, schema: string): Promise
           gzipBytes: gzBytes,
           brotliBytes: brBytes,
           complexity,
+          preprocessingMs,
         });
         console.log(`  ${variantId}: ${formatKB(advisoryStyleJson)} (${pctSmaller}% smaller, gzip: ${(gzBytes / 1024).toFixed(1)} KB, br: ${(brBytes / 1024).toFixed(1)} KB)`);
 
@@ -519,13 +534,15 @@ async function buildVariants(originalStyleJson: string, schema: string): Promise
         extraArgs.push("--stats", statsPath);
       }
 
+      const preprocessingStart = performance.now();
       const optimizedJson = optimizeStyle(inputPath, passFlags, extraArgs);
+      const preprocessingMs = performance.now() - preprocessingStart;
       const styleBytes = Buffer.byteLength(optimizedJson, "utf8");
       const gzBytes = gzipSize(optimizedJson);
       const brBytes = brotliSize(optimizedJson);
 
       // Write optimized style to get complexity report
-      const tmpComplexity = path.join(RESULTS_DIR, "_bench_complexity.json");
+      const tmpComplexity = path.join(RESULTS_DIR, `_bench_complexity_${process.pid}.json`);
       fs.writeFileSync(tmpComplexity, optimizedJson);
       const complexity = getComplexityReport(tmpComplexity);
       try { fs.unlinkSync(tmpComplexity); } catch {}
@@ -541,6 +558,7 @@ async function buildVariants(originalStyleJson: string, schema: string): Promise
         gzipBytes: gzBytes,
         brotliBytes: brBytes,
         complexity,
+        preprocessingMs,
       });
       console.log(`  ${variantId}: ${formatKB(optimizedJson)} (${pctSmaller}% smaller, gzip: ${(gzBytes / 1024).toFixed(1)} KB, br: ${(brBytes / 1024).toFixed(1)} KB)`);
     }
@@ -1033,6 +1051,7 @@ async function main(): Promise<void> {
                 style_bytes: variant.styleBytes,
                 gzip_bytes: variant.gzipBytes,
                 brotli_bytes: variant.brotliBytes,
+                preprocessing_ms: variant.preprocessingMs,
                 run: run - WARMUP + 1,
                 timestamp,
                 ...metrics,

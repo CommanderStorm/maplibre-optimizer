@@ -13,6 +13,7 @@
 
 import path from "node:path";
 import fs from "node:fs";
+import zlib from "node:zlib";
 import { execFileSync, execSync } from "node:child_process";
 
 const __dirname = import.meta.dirname!;
@@ -119,12 +120,10 @@ function tryOptimize(inputPath: string, outputPath: string): boolean {
 }
 
 function gzipSize(data: string): number {
-  const zlib = require("node:zlib");
   return zlib.gzipSync(Buffer.from(data, "utf8"), { level: 9 }).length;
 }
 
 function brotliSize(data: string): number {
-  const zlib = require("node:zlib");
   return zlib.brotliCompressSync(Buffer.from(data, "utf8"), {
     params: { [zlib.constants.BROTLI_PARAM_QUALITY]: zlib.constants.BROTLI_MAX_QUALITY },
   }).length;
