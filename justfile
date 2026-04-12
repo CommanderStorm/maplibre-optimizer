@@ -187,7 +187,7 @@ cargo-install $COMMAND $INSTALL_CMD='' *args='':
 clean-test:
     rm -rf tests/output
 
-# Remove a previusly generated spec file
+# Remove a previously generated spec file
 [private]
 clean-gen:
     rm -rf style-spec/src/spec
