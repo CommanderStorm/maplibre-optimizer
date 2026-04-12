@@ -59,7 +59,9 @@ fn is_expression_filter(filter: &Value) -> bool {
     };
     match op {
         // `has` is an expression when its argument is not a legacy special key.
-        "has" => arr.len() >= 2 && arr[1].as_str() != Some("$id") && arr[1].as_str() != Some("$type"),
+        "has" => {
+            arr.len() >= 2 && arr[1].as_str() != Some("$id") && arr[1].as_str() != Some("$type")
+        }
         // Expression `in` takes exactly `["in", needle, haystack]` where haystack is an array.
         "in" => arr.len() >= 3 && (!arr[1].is_string() || arr[2].is_array()),
         // Purely legacy operators have no expression form.
@@ -304,7 +306,13 @@ mod tests {
         });
         convert_legacy_filters_in_style(&mut style);
         let layers = style["layers"].as_array().unwrap();
-        assert_eq!(layers[0]["filter"], json!(["==", ["get", "class"], "residential"]));
-        assert_eq!(layers[1]["filter"], json!(["==", ["get", "class"], "water"]));
+        assert_eq!(
+            layers[0]["filter"],
+            json!(["==", ["get", "class"], "residential"])
+        );
+        assert_eq!(
+            layers[1]["filter"],
+            json!(["==", ["get", "class"], "water"])
+        );
     }
 }

@@ -169,7 +169,11 @@ fn differing_props_are_mergeable(layers: &[Value], layer_type: &str, mir: &MirSp
             // Values containing zoom-dependent expressions (interpolate/step
             // over ["zoom"]) cannot be placed inside case/match arms — zoom
             // interpolation must be at the top level of a property expression.
-            if values.iter().flatten().any(|v| super::zoom::is_zoom_ramp(v)) {
+            if values
+                .iter()
+                .flatten()
+                .any(|v| super::zoom::is_zoom_ramp(v))
+            {
                 return false;
             }
         }
