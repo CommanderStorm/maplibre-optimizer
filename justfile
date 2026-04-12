@@ -2,6 +2,10 @@
 
 set shell := ['bash', '-c']
 
+# Source nvm so that `npm`/`npx` use the nvm-managed Node instead of the
+# system Node (whose bundled npm is broken on Node v25).
+nvm_prefix := 'source "${NVM_DIR:-$HOME/.nvm}/nvm.sh" --no-use && nvm use v25 --silent &&'
+
 main_crate := 'martin'
 
 export CARGO_TERM_COLOR := 'always'
@@ -91,8 +95,8 @@ env-info:
     @echo "RUSTFLAGS='$RUSTFLAGS'"
     @echo "RUSTDOCFLAGS='$RUSTDOCFLAGS'"
     @echo "RUST_BACKTRACE='$RUST_BACKTRACE'"
-    npm --version
-    node --version
+    {{nvm_prefix}} npm --version
+    {{nvm_prefix}} node --version
 
 # Reformat all code `cargo fmt`. If nightly is available, use it for better results
 fmt:
@@ -128,13 +132,13 @@ fuzz *args:
 # Run render tests comparing original vs optimised styles (builds optimizer first)
 [working-directory: 'tests/render']
 render-test *ARGS:
-    npm install --no-fund --no-audit
-    npx tsx run.ts {{ARGS}}
+    {{nvm_prefix}} npm install --no-fund --no-audit
+    {{nvm_prefix}} npx tsx run.ts {{ARGS}}
 
 # Run render tests with browser console debug output
 [working-directory: 'tests/render']
 render-test-debug *ARGS:
-    npx tsx run.ts --debug {{ARGS}}
+    {{nvm_prefix}} npx tsx run.ts --debug {{ARGS}}
 
 # Run all tests using a test database
 test: (test-cargo '--all-targets') test-doc
@@ -199,7 +203,7 @@ clean-gen:
 # Pass --bandwidth <Mbps> to simulate network latency (e.g. just bench-proxy --bandwidth 10).
 [working-directory: 'tests/bench']
 bench-proxy *ARGS:
-    npx tsx tile-proxy.ts {{ARGS}}
+    {{nvm_prefix}} npx tsx tile-proxy.ts {{ARGS}}
 
 # Number of CPU cores to pin benchmarks to (reduces run-to-run variance by
 # preventing the process tree from migrating across all cores).
@@ -213,13 +217,13 @@ bench *ARGS: (bench-runtime ARGS) (bench-cross-style ARGS) bench-plot bench-plot
 # Requires tile proxy running (start with: just bench-proxy)
 [working-directory: 'tests/bench']
 bench-runtime *ARGS:
-    npm install --no-fund --no-audit
-    taskset -c {{bench_cores}} npx tsx run.ts {{ARGS}}
+    {{nvm_prefix}} npm install --no-fund --no-audit
+    {{nvm_prefix}} taskset -c {{bench_cores}} npx tsx run.ts {{ARGS}}
 
 # Run runtime benchmarks with browser console debug output
 [working-directory: 'tests/bench']
 bench-debug *ARGS:
-    taskset -c {{bench_cores}} npx tsx run.ts --debug {{ARGS}}
+    {{nvm_prefix}} taskset -c {{bench_cores}} npx tsx run.ts --debug {{ARGS}}
 
 # Sync bench Python venv from lockfile
 [private]
@@ -234,14 +238,14 @@ bench-plot *ARGS: bench-venv
 # Run isolated (non-cumulative) ablation benchmarks
 [working-directory: 'tests/bench']
 bench-isolated *ARGS:
-    npm install --no-fund --no-audit
-    taskset -c {{bench_cores}} npx tsx run.ts --isolated {{ARGS}}
+    {{nvm_prefix}} npm install --no-fund --no-audit
+    {{nvm_prefix}} taskset -c {{bench_cores}} npx tsx run.ts --isolated {{ARGS}}
 
 # Run cross-style generalization benchmark
 [working-directory: 'tests/bench']
 bench-cross-style *ARGS:
-    npm install --no-fund --no-audit
-    npx tsx cross_style.ts {{ARGS}}
+    {{nvm_prefix}} npm install --no-fund --no-audit
+    {{nvm_prefix}} npx tsx cross_style.ts {{ARGS}}
 
 # Plot cross-style benchmark results
 [working-directory: 'tests/bench']
