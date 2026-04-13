@@ -1,9 +1,10 @@
 use std::collections::BTreeMap;
+use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::{fs, io};
 
 use anyhow::Context;
-use clap::Args;
+use clap::{Args, ValueEnum};
 use maplibre_style_optimizer::encode_mlt::mvt_to_mlt;
 use maplibre_style_optimizer::prune::{intern_string_properties, prune_tile};
 use maplibre_style_optimizer::stats::collect::{available_zoom_levels, decode_tile, open_mbtiles};
@@ -14,13 +15,24 @@ use rayon::iter::{IntoParallelIterator, ParallelIterator};
 /// Number of tiles to read, process in parallel, then write back per batch.
 const TILE_BATCH_SIZE: usize = 1024;
 
+/// Output tile format.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
+pub enum OutputFormat {
+    /// Re-encode pruned tiles as MLT (columnar). Applies string interning.
+    Mlt,
+    /// Keep pruned tiles as MVT (protobuf). Skips string interning.
+    Mvt,
+}
+
 /// Apply a tile pruning advisory to rewrite tiles and/or style.
 ///
 /// Reads an advisory JSON produced by `optimize --advisory`, then:
 /// - **`--tiles`**: reads an input `.mbtiles`, prunes MVT data per the advisory,
-///   re-encodes as MLT, and writes a new `.mbtiles`.
-/// - **`--style`**: rewrites the style JSON, setting `encoding: "mlt"` on
-///   relevant vector sources.
+///   and writes a new `.mbtiles`. The `--format` flag controls whether tiles are
+///   re-encoded as MLT (default) or kept as pruned MVT.
+/// - **`--style`**: rewrites the style JSON. For MLT output, sets `encoding: "mlt"`
+///   on relevant vector sources and rewrites expressions for string interning.
+///   For MVT output, only prunes unused data without changing the encoding.
 #[derive(Args, Debug)]
 pub struct AdvisoryArgs {
     /// Path to the advisory JSON (output of `optimize --advisory`).
@@ -38,6 +50,11 @@ pub struct AdvisoryArgs {
     /// Output directory for rewritten tiles and/or style.
     #[arg(long)]
     output: PathBuf,
+
+    /// Output tile format: `mlt` (default) re-encodes to columnar MLT with string
+    /// interning; `mvt` keeps protobuf encoding and skips interning.
+    #[arg(long, value_enum, default_value_t = OutputFormat::Mlt)]
+    format: OutputFormat,
 }
 
 pub fn run(args: &AdvisoryArgs) -> anyhow::Result<()> {
@@ -66,12 +83,12 @@ pub fn run(args: &AdvisoryArgs) -> anyhow::Result<()> {
 
     // Process tiles.
     if let Some(ref tiles_path) = args.tiles {
-        process_tiles(tiles_path, &advisory, &args.output)?;
+        process_tiles(tiles_path, &advisory, &args.output, args.format)?;
     }
 
     // Process style.
     if let Some(ref style_path) = args.style {
-        process_style(style_path, &advisory, &args.output)?;
+        process_style(style_path, &advisory, &args.output, args.format)?;
     }
 
     Ok(())
@@ -81,6 +98,7 @@ fn process_tiles(
     tiles_path: &Path,
     advisory: &TilePruningAdvisory,
     output_dir: &Path,
+    format: OutputFormat,
 ) -> anyhow::Result<()> {
     // We process each source in the advisory. For now, assume a single mbtiles input
     // corresponds to the first (or only) source in the advisory.
@@ -90,7 +108,7 @@ fn process_tiles(
         .next()
         .context("advisory has no sources")?;
 
-    eprintln!("Processing source: {source_name}");
+    eprintln!("Processing source: {source_name} (format: {format:?})");
 
     let src_conn = open_mbtiles(tiles_path)?;
     let zooms = available_zoom_levels(&src_conn)?;
@@ -113,7 +131,11 @@ fn process_tiles(
     if has_metadata {
         mbtiles::copy_metadata(&src_conn, &dst_conn)?;
     }
-    mbtiles::set_metadata(&dst_conn, "format", "mlt")?;
+    let format_str = match format {
+        OutputFormat::Mlt => "mlt",
+        OutputFormat::Mvt => "pbf",
+    };
+    mbtiles::set_metadata(&dst_conn, "format", format_str)?;
 
     let mut total_in = 0u64;
     let mut total_out = 0u64;
@@ -134,7 +156,8 @@ fn process_tiles(
             continue;
         }
 
-        let (zoom_in, zoom_out) = process_zoom(&src_conn, &dst_conn, z, *zoom, source_advisory)?;
+        let (zoom_in, zoom_out) =
+            process_zoom(&src_conn, &dst_conn, z, *zoom, source_advisory, format)?;
 
         total_in += zoom_in;
         total_out += zoom_out;
@@ -157,6 +180,7 @@ fn process_zoom(
     z: i32,
     zoom: u8,
     source_advisory: &maplibre_style_optimizer::advisory::SourceAdvisory,
+    format: OutputFormat,
 ) -> anyhow::Result<(u64, u64)> {
     let mut stmt = src_conn
         .prepare("SELECT tile_column, tile_row, tile_data FROM tiles WHERE zoom_level = ?1")?;
@@ -180,11 +204,11 @@ fn process_zoom(
         }
         zoom_in += batch.len() as u64;
 
-        // Process the batch in parallel: decode → prune → intern → encode → MLT.
+        // Process the batch in parallel: decode → prune → (optionally intern) → encode.
         let results: Vec<_> = batch
             .into_par_iter()
             .filter_map(|(col, row_val, data)| {
-                process_single_tile(&data, col, row_val, zoom, source_advisory)
+                process_single_tile(&data, col, row_val, zoom, source_advisory, format)
             })
             .collect();
 
@@ -201,14 +225,17 @@ fn process_zoom(
     Ok((zoom_in, zoom_out))
 }
 
-/// Decode, prune, intern, and re-encode a single tile. Returns `None` if the tile
-/// is empty after pruning or if encoding fails.
+/// Decode, prune, and re-encode a single tile. For MLT output, also interns string
+/// properties and re-encodes to columnar format. For MVT output, gzip-compresses
+/// the pruned protobuf. Returns `None` if the tile is empty after pruning or if
+/// encoding fails.
 fn process_single_tile(
     data: &[u8],
     col: i32,
     row_val: i32,
     zoom: u8,
     source_advisory: &maplibre_style_optimizer::advisory::SourceAdvisory,
+    format: OutputFormat,
 ) -> Option<(i32, i32, Vec<u8>)> {
     let mut tile = match decode_tile(data) {
         Ok(t) => t,
@@ -220,22 +247,35 @@ fn process_single_tile(
 
     prune_tile(&mut tile, source_advisory, zoom);
 
-    for layer in &mut tile.layers {
-        if let Some(la) = source_advisory.layers.get(&layer.name) {
-            intern_string_properties(layer, &la.interned_properties);
-        }
-    }
-
     if tile.layers.is_empty() {
         return None;
     }
 
-    let mvt_bytes = tile.encode_to_vec();
-    match mvt_to_mlt(mvt_bytes) {
-        Ok(encoded) => Some((col, row_val, encoded)),
-        Err(e) => {
-            eprintln!("  warning: MLT encode failed for z{zoom}/{col}/{row_val}: {e}");
-            None
+    match format {
+        OutputFormat::Mlt => {
+            // Intern string properties, encode protobuf, then convert to MLT.
+            for layer in &mut tile.layers {
+                if let Some(la) = source_advisory.layers.get(&layer.name) {
+                    intern_string_properties(layer, &la.interned_properties);
+                }
+            }
+            let mvt_bytes = tile.encode_to_vec();
+            match mvt_to_mlt(mvt_bytes) {
+                Ok(encoded) => Some((col, row_val, encoded)),
+                Err(e) => {
+                    eprintln!("  warning: MLT encode failed for z{zoom}/{col}/{row_val}: {e}");
+                    None
+                }
+            }
+        }
+        OutputFormat::Mvt => {
+            // Encode back to protobuf and gzip-compress (matching standard mbtiles convention).
+            let mvt_bytes = tile.encode_to_vec();
+            let mut encoder =
+                flate2::write::GzEncoder::new(Vec::new(), flate2::Compression::fast());
+            encoder.write_all(&mvt_bytes).ok()?;
+            let compressed = encoder.finish().ok()?;
+            Some((col, row_val, compressed))
         }
     }
 }
@@ -244,33 +284,36 @@ fn process_style(
     style_path: &Path,
     advisory: &TilePruningAdvisory,
     output_dir: &Path,
+    format: OutputFormat,
 ) -> anyhow::Result<()> {
     let style_text = fs::read_to_string(style_path)
         .with_context(|| format!("read style {}", style_path.display()))?;
     let mut style: serde_json::Value = serde_json::from_str(&style_text)
         .with_context(|| format!("parse style JSON {}", style_path.display()))?;
 
-    // For each source in the advisory, set encoding="mlt" on matching vector sources.
-    if let Some(sources) = style
-        .as_object_mut()
-        .and_then(|o| o.get_mut("sources"))
-        .and_then(|s| s.as_object_mut())
-    {
-        for source_name in advisory.sources.keys() {
-            if let Some(source) = sources.get_mut(source_name)
-                && source.get("type").and_then(|t| t.as_str()) == Some("vector")
-            {
-                source.as_object_mut().expect("source is object").insert(
-                    "encoding".to_string(),
-                    serde_json::Value::String("mlt".to_string()),
-                );
-                eprintln!("Style: set encoding=\"mlt\" on source \"{source_name}\"");
+    if format == OutputFormat::Mlt {
+        // For each source in the advisory, set encoding="mlt" on matching vector sources.
+        if let Some(sources) = style
+            .as_object_mut()
+            .and_then(|o| o.get_mut("sources"))
+            .and_then(|s| s.as_object_mut())
+        {
+            for source_name in advisory.sources.keys() {
+                if let Some(source) = sources.get_mut(source_name)
+                    && source.get("type").and_then(|t| t.as_str()) == Some("vector")
+                {
+                    source.as_object_mut().expect("source is object").insert(
+                        "encoding".to_string(),
+                        serde_json::Value::String("mlt".to_string()),
+                    );
+                    eprintln!("Style: set encoding=\"mlt\" on source \"{source_name}\"");
+                }
             }
         }
-    }
 
-    // Rewrite filter expressions to use interned integer values.
-    rewrite_style_interning(&mut style, advisory);
+        // Rewrite filter expressions to use interned integer values.
+        rewrite_style_interning(&mut style, advisory);
+    }
 
     let out_path = output_dir.join(
         style_path

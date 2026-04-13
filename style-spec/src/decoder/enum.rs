@@ -174,18 +174,41 @@ pub struct Parameter {
 
 impl Parameter {
     pub fn matches_overload_parameter_name(&self, overloaded_name: &str) -> bool {
-        if let Some(maybe_template) = self.name.strip_suffix("_i") {
-            for suffix in &["_1", "_2", "_1?", "_2?"] {
-                if let Some(param) = overloaded_name.strip_suffix(suffix) {
-                    return maybe_template == param;
+        matches_template_name(&self.name, overloaded_name)
+    }
+}
+
+/// Check whether a template parameter name (e.g. `val_i`, `stop_i_input`)
+/// matches an overload parameter name (e.g. `val_1`, `stop_1_input`).
+///
+/// Shared implementation used by both [`Parameter`] and
+/// [`crate::mir::types::MirParameter`].
+pub fn matches_template_name(template: &str, overloaded_name: &str) -> bool {
+    // Suffix-position template: `val_i` matches `val_1`, `val_2`, `val_n`, and optional variants.
+    if let Some(maybe_template) = template.strip_suffix("_i") {
+        for suffix in &["_1", "_2", "_n", "_1?", "_2?", "_n?"] {
+            if let Some(param) = overloaded_name.strip_suffix(suffix) {
+                return maybe_template == param;
+            }
+        }
+        template == overloaded_name
+    // Mid-name template: `stop_i_input` matches `stop_1_input`, `stop_n_input`.
+    } else if let Some(pos) = template.find("_i_") {
+        let prefix = &template[..pos];
+        let suffix = &template[pos + 3..];
+        let base = overloaded_name.strip_suffix('?').unwrap_or(overloaded_name);
+        for marker in ["_1_", "_2_", "_n_"] {
+            if let Some(p) = base.find(marker) {
+                if &base[..p] == prefix && &base[p + marker.len()..] == suffix {
+                    return true;
                 }
             }
-            self.name == overloaded_name
-        } else if let Some(opt) = overloaded_name.strip_suffix('?') {
-            self.name == opt
-        } else {
-            self.name == overloaded_name
         }
+        template == overloaded_name
+    } else if let Some(opt) = overloaded_name.strip_suffix('?') {
+        template == opt
+    } else {
+        template == overloaded_name
     }
 }
 
@@ -599,7 +622,15 @@ mod tests {
     #[case::template_exact_fallback("val_i", "val_i", true)]
     #[case::template_invalid_numeric_suffix("val_i", "val_3", false)]
     #[case::template_base_name_mismatch("val_i", "other_1", false)]
+    #[case::template_match_n("val_i", "val_n", true)]
+    #[case::template_match_n_optional("val_i", "val_n?", true)]
     #[case::template_missing_suffix("val_i", "val", false)]
+    #[case::mid_template_match_1("stop_i_input", "stop_1_input", true)]
+    #[case::mid_template_match_n("stop_i_output", "stop_n_output", true)]
+    #[case::mid_template_match_2("stop_i_input", "stop_2_input", true)]
+    #[case::mid_template_suffix_mismatch("stop_i_input", "stop_1_output", false)]
+    #[case::mid_template_prefix_mismatch("stop_i_input", "other_1_input", false)]
+    #[case::mid_template_exact_fallback("stop_i_input", "stop_i_input", true)]
     fn test_parameter_matching(
         #[case] param_name: &str,
         #[case] overload: &str,

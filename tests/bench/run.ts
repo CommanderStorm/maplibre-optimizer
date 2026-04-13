@@ -2,18 +2,20 @@
 /**
  * Benchmark harness for maplibre-style-optimizer — cumulative ablation.
  *
- * Runs up to 17 ablation steps (baseline + 16 passes added one at a time)
+ * Runs up to 19 ablation steps (baseline + 18 passes added one at a time)
  * across all scenarios.  Each step enables one additional optimizer pass on
  * top of all previous ones, showing the marginal contribution of each pass.
  *
- * Steps 16 (selectivity_reorder) and 17 (tile_rewrite) require --mbtiles.
- * The tile_rewrite step runs the advisory pipeline to produce MLT-encoded
- * tiles and a rewritten style, then serves those tiles via the proxy.
+ * Steps 16-19 require --mbtiles:
+ *   16: selectivity_reorder — reorder filter arms by tile-statistics selectivity
+ *   17: tile_shave_only    — prune tiles as MVT using advisory from BASELINE style (thesis config 3)
+ *   18: tile_shave         — prune tiles as MVT using advisory from OPTIMISED style (thesis config 4)
+ *   19: tile_rewrite       — prune + re-encode tiles as MLT with interning (thesis config 5)
  *
  * Usage:
  *   just bench                                      # all scenarios, 15 runs, 15 ablation steps
  *   just bench --runs 1 munich-zigzag               # single quick scenario
- *   just bench --mbtiles /path/to/tiles.mbtiles     # enable steps 16-17 (selectivity + tile rewrite)
+ *   just bench --mbtiles /path/to/tiles.mbtiles     # enable steps 16-19 (selectivity + tile steps)
  *   just bench --isolated                           # per-pass isolated impact (non-cumulative)
  *   just bench-debug tokyo                          # with browser console output
  */
@@ -105,7 +107,7 @@ const filters = argv.filter(
     i !== stylesArg + 1,
 );
 
-const RUN_TIMEOUT = 120_000;
+const RUN_TIMEOUT = 180_000;
 
 // ── types ────────────────────────────────────────────────────────────────────
 
@@ -199,7 +201,14 @@ const ABLATION_STEPS: { pass: string; flag: string }[] = [
   { pass: "layer_merge",              flag: "--layer-merge" },
   // Only when --mbtiles is provided
   { pass: "selectivity_reorder",      flag: "--selectivity-reorder" },
+  // Virtual step: prune tiles as MVT using advisory from BASELINE (unoptimised) style.
+  // Benchmarks the original style against shaved tiles (thesis config 3: shaving-only).
+  { pass: "tile_shave_only",          flag: "__tile_shave_only__" },
+  // Virtual step: prune tiles as MVT using advisory from the OPTIMISED style.
+  // Benchmarks the optimised style against shaved tiles (thesis config 4: style+shaving).
+  { pass: "tile_shave",               flag: "__tile_shave__" },
   // Virtual step: runs advisory to rewrite tiles (MLT) and style; requires --mbtiles
+  // (thesis config 5: style+shaving+MLT)
   { pass: "tile_rewrite",             flag: "__tile_rewrite__" },
 ];
 
@@ -294,30 +303,50 @@ function collectStats(mbtilesPath: string, outputPath: string): void {
   ]);
 }
 
-/** Run the advisory command to rewrite tiles and style for MLT serving. */
+/** Run the advisory command to rewrite tiles (and optionally style).
+ *  @param format - "mlt" (default) re-encodes to MLT; "mvt" keeps protobuf. */
 function runAdvisory(
   advisoryJsonPath: string,
   mbtilesPath: string,
-  stylePath: string,
+  stylePath: string | undefined,
   outputDir: string,
+  format: "mlt" | "mvt" = "mlt",
 ): void {
   fs.mkdirSync(outputDir, { recursive: true });
-  execFileSync(OPTIMIZER, [
+  const args = [
     "advisory",
     "--advisory", advisoryJsonPath,
     "--tiles", mbtilesPath,
-    "--style", stylePath,
     "--output", outputDir,
-  ], { timeout: 300_000 });
+    "--format", format,
+  ];
+  if (stylePath) {
+    args.push("--style", stylePath);
+  }
+  execFileSync(OPTIMIZER, args, { timeout: 300_000 });
 }
 
 /** Signal the tile proxy to load a new mbtiles file. */
 async function proxyLoadMbtiles(mbtilesPath: string): Promise<void> {
-  const resp = await fetch(`${TILE_PROXY_URL}/control/load-mbtiles`, {
-    method: "POST",
-    body: JSON.stringify({ path: mbtilesPath }),
-  });
-  if (!resp.ok) throw new Error(`Failed to load mbtiles in proxy: ${resp.status} ${await resp.text()}`);
+  // Retry once on connection failure — long-running execFileSync (advisory, stats)
+  // can cause idle TCP connections to the proxy to time out.
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      const resp = await fetch(`${TILE_PROXY_URL}/control/load-mbtiles`, {
+        method: "POST",
+        body: JSON.stringify({ path: mbtilesPath }),
+      });
+      if (!resp.ok) throw new Error(`Failed to load mbtiles in proxy: ${resp.status} ${await resp.text()}`);
+      return;
+    } catch (err) {
+      if (attempt === 0) {
+        console.log(`  Retrying proxy load-mbtiles after connection error…`);
+        await new Promise((r) => setTimeout(r, 500));
+        continue;
+      }
+      throw err;
+    }
+  }
 }
 
 /** Signal the tile proxy to unload the current mbtiles file. */
@@ -419,8 +448,8 @@ async function buildVariants(originalStyleJson: string, schema: string): Promise
   }
 
   // Determine how many steps to run
-  // Last two steps (selectivity_reorder, tile_rewrite) require --mbtiles
-  const maxSteps = MBTILES ? ABLATION_STEPS.length : ABLATION_STEPS.length - 2;
+  // Last 4 steps (selectivity_reorder, tile_shave_only, tile_shave, tile_rewrite) require --mbtiles
+  const maxSteps = MBTILES ? ABLATION_STEPS.length : ABLATION_STEPS.length - 4;
 
   // Build pass flags depending on mode
   const accumulatedFlags: string[] = [];
@@ -432,8 +461,130 @@ async function buildVariants(originalStyleJson: string, schema: string): Promise
     for (let i = 0; i < maxSteps; i++) {
       const step = ABLATION_STEPS[i];
 
-      // tile_rewrite is a virtual step — skip in isolated mode
-      if (step.pass === "tile_rewrite" && isolated) continue;
+      // Virtual tile steps — skip in isolated mode
+      if (["tile_shave_only", "tile_shave", "tile_rewrite"].includes(step.pass) && isolated) continue;
+
+      // tile_shave_only: prune tiles using advisory from BASELINE style (thesis config 3)
+      if (step.pass === "tile_shave_only") {
+        const stepNum = String(i + 1).padStart(2, "0");
+        const variantId = `step-${stepNum}-${step.pass}`;
+        const shaveDir = path.join(RESULTS_DIR, `_bench_shave_only_${process.pid}`);
+
+        // Compute advisory from the ORIGINAL (unoptimised) style — no pass flags
+        const advisoryJsonPath = path.join(RESULTS_DIR, `_bench_advisory_shave_only_${process.pid}.json`);
+        const preprocessingStart = performance.now();
+        execFileSync(OPTIMIZER, [
+          "optimize", "--input", inputPath, "--output", path.join(RESULTS_DIR, `_bench_shave_only_opt_${process.pid}.json`),
+          "--stats", statsPath!,
+          "--advisory", advisoryJsonPath,
+        ], { timeout: 30_000 });
+
+        // Prune tiles as MVT (no style rewrite, no interning)
+        console.log(`  Running advisory tile shave (MVT, baseline style)…`);
+        runAdvisory(advisoryJsonPath, MBTILES!, undefined, shaveDir, "mvt");
+        const preprocessingMs = performance.now() - preprocessingStart;
+
+        const shaveFiles = fs.readdirSync(shaveDir);
+        const shavedMbtiles = shaveFiles.find((f) => f.endsWith(".mbtiles"));
+
+        if (shavedMbtiles) {
+          await proxyLoadMbtiles(path.resolve(shaveDir, shavedMbtiles));
+        }
+
+        // Use original baseline style with the pruned MVT tiles
+        let shaveStyleJson = rewriteStyleForMbtiles(originalStyleJson);
+        const styleBytes = Buffer.byteLength(shaveStyleJson, "utf8");
+        const gzBytes = gzipSize(shaveStyleJson);
+        const brBytes = brotliSize(shaveStyleJson);
+
+        const tmpComplexity = path.join(RESULTS_DIR, `_bench_complexity_${process.pid}.json`);
+        fs.writeFileSync(tmpComplexity, shaveStyleJson);
+        const complexity = getComplexityReport(tmpComplexity);
+        try { fs.unlinkSync(tmpComplexity); } catch {}
+
+        accumulatedPasses.push(step.pass);
+        variants.push({
+          id: variantId,
+          label: `+${step.pass}`,
+          passes: [...accumulatedPasses],
+          styleJson: shaveStyleJson,
+          styleHash: hashStyleJson(shaveStyleJson),
+          styleBytes,
+          gzipBytes: gzBytes,
+          brotliBytes: brBytes,
+          complexity,
+          preprocessingMs,
+        });
+        console.log(`  ${variantId}: baseline style + pruned MVT tiles`);
+
+        try { fs.unlinkSync(advisoryJsonPath); } catch {}
+        try { fs.unlinkSync(path.join(RESULTS_DIR, `_bench_shave_only_opt_${process.pid}.json`)); } catch {}
+        continue;
+      }
+
+      // tile_shave: prune tiles using advisory from OPTIMISED style (thesis config 4)
+      if (step.pass === "tile_shave") {
+        const stepNum = String(i + 1).padStart(2, "0");
+        const variantId = `step-${stepNum}-${step.pass}`;
+        const shaveDir = path.join(RESULTS_DIR, `_bench_shave_${process.pid}`);
+
+        // Compute advisory from the fully optimised style
+        const advisoryJsonPath = path.join(RESULTS_DIR, `_bench_advisory_shave_${process.pid}.json`);
+        const allPassFlags = accumulatedFlags.filter((f) => !f.startsWith("__"));
+        const optimizedStylePath = path.join(RESULTS_DIR, `_bench_shave_opt_${process.pid}.json`);
+        const preprocessingStart = performance.now();
+        execFileSync(OPTIMIZER, [
+          "optimize", "--input", inputPath, "--output", optimizedStylePath,
+          ...allPassFlags,
+          "--stats", statsPath!,
+          "--advisory", advisoryJsonPath,
+        ], { timeout: 30_000 });
+
+        // Prune tiles as MVT (no interning, no MLT re-encoding)
+        console.log(`  Running advisory tile shave (MVT, optimised style)…`);
+        runAdvisory(advisoryJsonPath, MBTILES!, undefined, shaveDir, "mvt");
+        const preprocessingMs = performance.now() - preprocessingStart;
+
+        const shaveFiles = fs.readdirSync(shaveDir);
+        const shavedMbtiles = shaveFiles.find((f) => f.endsWith(".mbtiles"));
+
+        if (shavedMbtiles) {
+          await proxyLoadMbtiles(path.resolve(shaveDir, shavedMbtiles));
+        }
+
+        // Use the optimised style (from the latest cumulative step) with pruned MVT tiles
+        const optimizedStyleText = fs.readFileSync(optimizedStylePath, "utf8");
+        let shaveStyleJson = rewriteStyleForMbtiles(optimizedStyleText);
+        const styleBytes = Buffer.byteLength(shaveStyleJson, "utf8");
+        const gzBytes = gzipSize(shaveStyleJson);
+        const brBytes = brotliSize(shaveStyleJson);
+
+        const tmpComplexity = path.join(RESULTS_DIR, `_bench_complexity_${process.pid}.json`);
+        fs.writeFileSync(tmpComplexity, shaveStyleJson);
+        const complexity = getComplexityReport(tmpComplexity);
+        try { fs.unlinkSync(tmpComplexity); } catch {}
+
+        const pctSmaller = ((1 - styleBytes / baselineBytes) * 100).toFixed(1);
+
+        accumulatedPasses.push(step.pass);
+        variants.push({
+          id: variantId,
+          label: `+${step.pass}`,
+          passes: [...accumulatedPasses],
+          styleJson: shaveStyleJson,
+          styleHash: hashStyleJson(shaveStyleJson),
+          styleBytes,
+          gzipBytes: gzBytes,
+          brotliBytes: brBytes,
+          complexity,
+          preprocessingMs,
+        });
+        console.log(`  ${variantId}: optimised style + pruned MVT tiles (${pctSmaller}% style reduction)`);
+
+        try { fs.unlinkSync(advisoryJsonPath); } catch {}
+        try { fs.unlinkSync(optimizedStylePath); } catch {}
+        continue;
+      }
 
       // tile_rewrite: run advisory pipeline to rewrite tiles + style for MLT
       if (step.pass === "tile_rewrite") {
@@ -583,8 +734,10 @@ async function buildVariants(originalStyleJson: string, schema: string): Promise
     if (statsPath) {
       try { fs.unlinkSync(statsPath); } catch {}
     }
-    // Clean up advisory output directory
+    // Clean up advisory and shave output directories
     try { fs.rmSync(advisoryDir, { recursive: true, force: true }); } catch {}
+    try { fs.rmSync(path.join(RESULTS_DIR, `_bench_shave_only_${process.pid}`), { recursive: true, force: true }); } catch {}
+    try { fs.rmSync(path.join(RESULTS_DIR, `_bench_shave_${process.pid}`), { recursive: true, force: true }); } catch {}
   }
 
   return variants;
@@ -1142,8 +1295,8 @@ async function main(): Promise<void> {
       allResults.push({ scenarioId, variants: aggregated });
     }
 
-    // Unload mbtiles from proxy if tile_rewrite was active
-    if (MBTILES && variants.some((v) => v.passes.includes("tile_rewrite"))) {
+    // Unload mbtiles from proxy if any tile step was active
+    if (MBTILES && variants.some((v) => v.passes.some((p: string) => p.startsWith("tile_")))) {
       await proxyUnloadMbtiles();
     }
 

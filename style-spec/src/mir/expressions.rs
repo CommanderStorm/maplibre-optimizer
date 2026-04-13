@@ -543,13 +543,13 @@ fn resolve_param_ref(param_ref: &str, params: &[Parameter]) -> MirResolvedParam 
     panic!("overload parameter '{param_ref}' not found in parameter definitions")
 }
 
-/// Try to match `name` (e.g. `var_name_n`) against a `_i`-suffixed template parameter
-/// (e.g. `var_name_i`) by stripping the last `_<suffix>` and appending `_i`.
+/// Find a template parameter (containing `_i` as suffix or mid-name) that
+/// matches the concrete name `name` (e.g. `var_name_n` → `var_name_i`,
+/// `stop_n_input` → `stop_i_input`).
 fn find_template_param_by_suffix<'a>(name: &str, params: &'a [Parameter]) -> Option<&'a Parameter> {
-    let last_underscore = name.rfind('_')?;
-    let base = &name[..last_underscore];
-    let template_name = format!("{base}_i");
-    params.iter().find(|p| p.name == template_name)
+    params
+        .iter()
+        .find(|p| p.matches_overload_parameter_name(name))
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────

@@ -393,18 +393,7 @@ pub struct MirParameter {
 
 impl MirParameter {
     pub fn matches_overload_parameter_name(&self, overloaded_name: &str) -> bool {
-        if let Some(maybe_template) = self.name.strip_suffix("_i") {
-            for suffix in &["_1", "_2", "_1?", "_2?"] {
-                if let Some(param) = overloaded_name.strip_suffix(suffix) {
-                    return maybe_template == param;
-                }
-            }
-            self.name == overloaded_name
-        } else if let Some(opt) = overloaded_name.strip_suffix('?') {
-            self.name == opt
-        } else {
-            self.name == overloaded_name
-        }
+        crate::decoder::r#enum::matches_template_name(&self.name, overloaded_name)
     }
 }
 
