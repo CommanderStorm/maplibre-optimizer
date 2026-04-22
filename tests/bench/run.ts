@@ -161,6 +161,11 @@ interface Variant {
    * in `thesis/scripts/pareto_analysis.py` as the `preprocessing_ms` axis.
    */
   preprocessingMs: number;
+  /** Size of the mbtiles file backing this variant (bytes).
+   *  For non-tile steps this equals the original mbtiles; for shaving/rewrite
+   *  steps it is the size of the produced (shaved/rewritten) mbtiles.
+   *  `null` when --mbtiles was not provided. */
+  tileBytes: number | null;
 }
 
 interface ComplexityReport {
@@ -420,6 +425,8 @@ async function buildVariants(originalStyleJson: string, schema: string): Promise
   const inputPath = path.join(RESULTS_DIR, `_bench_input_${process.pid}.json`);
   fs.writeFileSync(inputPath, originalStyleJson);
 
+  const baseTileBytes: number | null = MBTILES ? fs.statSync(MBTILES).size : null;
+
   // Step 0: baseline (no optimization)
   const baselineBytes = Buffer.byteLength(originalStyleJson, "utf8");
   const baselineGzip = gzipSize(originalStyleJson);
@@ -436,6 +443,7 @@ async function buildVariants(originalStyleJson: string, schema: string): Promise
     brotliBytes: baselineBrotli,
     complexity: baselineComplexity,
     preprocessingMs: 0,
+    tileBytes: baseTileBytes,
   });
   console.log(`  step-00-baseline: ${formatKB(originalStyleJson)} (gzip: ${(baselineGzip / 1024).toFixed(1)} KB, br: ${(baselineBrotli / 1024).toFixed(1)} KB)`);
 
@@ -491,6 +499,8 @@ async function buildVariants(originalStyleJson: string, schema: string): Promise
           await proxyLoadMbtiles(path.resolve(shaveDir, shavedMbtiles));
         }
 
+        const tileBytes = shavedMbtiles ? fs.statSync(path.resolve(shaveDir, shavedMbtiles)).size : baseTileBytes;
+
         // Use original baseline style with the pruned MVT tiles
         let shaveStyleJson = rewriteStyleForMbtiles(originalStyleJson);
         const styleBytes = Buffer.byteLength(shaveStyleJson, "utf8");
@@ -514,6 +524,7 @@ async function buildVariants(originalStyleJson: string, schema: string): Promise
           brotliBytes: brBytes,
           complexity,
           preprocessingMs,
+          tileBytes,
         });
         console.log(`  ${variantId}: baseline style + pruned MVT tiles`);
 
@@ -552,6 +563,8 @@ async function buildVariants(originalStyleJson: string, schema: string): Promise
           await proxyLoadMbtiles(path.resolve(shaveDir, shavedMbtiles));
         }
 
+        const tileBytes = shavedMbtiles ? fs.statSync(path.resolve(shaveDir, shavedMbtiles)).size : baseTileBytes;
+
         // Use the optimised style (from the latest cumulative step) with pruned MVT tiles
         const optimizedStyleText = fs.readFileSync(optimizedStylePath, "utf8");
         let shaveStyleJson = rewriteStyleForMbtiles(optimizedStyleText);
@@ -578,6 +591,7 @@ async function buildVariants(originalStyleJson: string, schema: string): Promise
           brotliBytes: brBytes,
           complexity,
           preprocessingMs,
+          tileBytes,
         });
         console.log(`  ${variantId}: optimised style + pruned MVT tiles (${pctSmaller}% style reduction)`);
 
@@ -635,6 +649,8 @@ async function buildVariants(originalStyleJson: string, schema: string): Promise
           await proxyLoadMbtiles(path.resolve(advisoryDir, rewrittenMbtiles));
         }
 
+        const tileBytes = rewrittenMbtiles ? fs.statSync(path.resolve(advisoryDir, rewrittenMbtiles)).size : baseTileBytes;
+
         const styleBytes = Buffer.byteLength(advisoryStyleJson, "utf8");
         const gzBytes = gzipSize(advisoryStyleJson);
         const brBytes = brotliSize(advisoryStyleJson);
@@ -658,6 +674,7 @@ async function buildVariants(originalStyleJson: string, schema: string): Promise
           brotliBytes: brBytes,
           complexity,
           preprocessingMs,
+          tileBytes,
         });
         console.log(`  ${variantId}: ${formatKB(advisoryStyleJson)} (${pctSmaller}% smaller, gzip: ${(gzBytes / 1024).toFixed(1)} KB, br: ${(brBytes / 1024).toFixed(1)} KB)`);
 
@@ -726,6 +743,7 @@ async function buildVariants(originalStyleJson: string, schema: string): Promise
         brotliBytes: brBytes,
         complexity,
         preprocessingMs,
+        tileBytes: baseTileBytes,
       });
       console.log(`  ${variantId}: ${formatKB(optimizedJson)} (${pctSmaller}% smaller, gzip: ${(gzBytes / 1024).toFixed(1)} KB, br: ${(brBytes / 1024).toFixed(1)} KB)`);
     }
@@ -1244,6 +1262,7 @@ async function main(): Promise<void> {
                 style_bytes: variant.styleBytes,
                 gzip_bytes: variant.gzipBytes,
                 brotli_bytes: variant.brotliBytes,
+                tile_bytes: variant.tileBytes,
                 style_hash: variant.styleHash,
                 deduped,
                 preprocessing_ms: variant.preprocessingMs,

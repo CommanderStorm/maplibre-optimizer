@@ -252,6 +252,12 @@ bench-cross-style *ARGS:
 bench-plot-cross-style *ARGS: bench-venv
     uv run plot_cross_style.py {{ARGS}}
 
+# Verify tile shaving effectiveness across multiple styles
+[working-directory: 'tests/bench']
+verify-tile-shave *ARGS:
+    {{nvm_prefix}} npm install --no-fund --no-audit
+    {{nvm_prefix}} npx tsx verify_tile_shave.ts {{ARGS}}
+
 # Install SQLX cli if not already installed.
 [private]
 install-sqlx:  (cargo-install 'cargo-sqlx' 'sqlx-cli' '--no-default-features' '--features' 'sqlite,native-tls')
