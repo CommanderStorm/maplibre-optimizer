@@ -3,7 +3,7 @@
 Plot tile size comparisons between original MVT, MLT-Java, and MLT-Rust mbtiles databases.
 
 Usage:
-    uv run plot_sizes.py <mvt.mbtiles> <mlt-java.mbtiles> <mlt-rust.mbtiles> [--out figures/] [--format png]
+    uv run plot_sizes.py <mvt.mbtiles> <mlt-java-idsort.mbtiles> <mlt-java-noidsort.mbtiles> <mlt-rust.mbtiles> [--out figures/] [--format png]
 """
 
 import argparse
@@ -14,6 +14,7 @@ from pathlib import Path
 
 import brotli
 import plotly.graph_objects as go
+from plotly.subplots import make_subplots
 import zstandard
 
 IMG_WIDTH = 1400
@@ -21,6 +22,10 @@ IMG_HEIGHT = 700
 IMG_SCALE = 2
 
 FETCH_SIZE = 5000
+
+GZIP_LEVELS = [1, 6, 9]
+ZSTD_LEVELS = [1, 3, 9, 19]
+BROTLI_LEVELS = [1, 6, 11]
 
 
 def query_sizes(db_path: Path) -> dict[int, dict]:
@@ -39,26 +44,22 @@ def query_sizes(db_path: Path) -> dict[int, dict]:
 
 def query_all_compression_sizes(
     db_path: Path, stored_compressed: bool
-) -> dict[int, dict[str, int]]:
-    """Compute per-zoom total bytes for plain/gzip/zstd/brotli variants.
+) -> dict[int, dict]:
+    """Compute per-zoom total bytes for plain and multiple compression levels.
 
-    If stored_compressed=True (MVT), blobs are gzip-compressed on disk:
-      plain = decompress each blob, measure raw size
-      gzip  = LENGTH(tile_data) (already gzipped)
-      zstd  = decompress gzip → re-compress with zstd
-      brotli = decompress gzip → re-compress with brotli
+    Tests each algorithm at multiple settings to allow fair comparison:
+      gzip  levels: 1 (fast), 6 (default), 9 (best)
+      zstd  levels: 1, 3 (default), 9, 19
+      brotli levels: 1, 6, 11 (max)
 
-    If stored_compressed=False (MLT), blobs are raw on disk:
-      plain = LENGTH(tile_data)
-      gzip  = compress each blob with gzip
-      zstd  = compress each blob with zstd
-      brotli = compress each blob with brotli
+    If stored_compressed=True (MVT), blobs are gzip-compressed on disk and are
+    decompressed first.  If False (MLT), blobs are raw.
 
     Streams tiles with fetchmany() to avoid loading everything into memory.
-    Returns {zoom: {plain, gzip, zstd, brotli}}.
+    Returns {zoom: {plain: int, gzip: {lvl: int}, zstd: {lvl: int}, brotli: {lvl: int}}}.
     """
-    zstd_compressor = zstandard.ZstdCompressor()
-    result: dict[int, dict[str, int]] = {}
+    zstd_compressors = {lvl: zstandard.ZstdCompressor(level=lvl) for lvl in ZSTD_LEVELS}
+    result: dict[int, dict] = {}
 
     conn = sqlite3.connect(str(db_path))
     cur = conn.execute(
@@ -66,7 +67,12 @@ def query_all_compression_sizes(
     )
 
     current_zoom = None
-    totals: dict[str, int] = {}
+    totals = {
+        "plain": 0,
+        "gzip": {lvl: 0 for lvl in GZIP_LEVELS},
+        "zstd": {lvl: 0 for lvl in ZSTD_LEVELS},
+        "brotli": {lvl: 0 for lvl in BROTLI_LEVELS},
+    }
 
     while True:
         rows = cur.fetchmany(FETCH_SIZE)
@@ -79,21 +85,23 @@ def query_all_compression_sizes(
                     result[current_zoom] = totals
                     print(f"  z{current_zoom}: {totals['plain'] / 1e6:.1f} MB plain", flush=True)
                 current_zoom = z
-                totals = {"plain": 0, "gzip": 0, "zstd": 0, "brotli": 0}
+                totals = {
+                    "plain": 0,
+                    "gzip": {lvl: 0 for lvl in GZIP_LEVELS},
+                    "zstd": {lvl: 0 for lvl in ZSTD_LEVELS},
+                    "brotli": {lvl: 0 for lvl in BROTLI_LEVELS},
+                }
 
             blob = bytes(tile_data)
-            if stored_compressed:
-                raw = gzip.decompress(blob)
-                totals["plain"] += len(raw)
-                totals["gzip"] += len(blob)
-                totals["zstd"] += len(zstd_compressor.compress(raw))
-                totals["brotli"] += len(brotli.compress(raw, quality=6))
-            else:
-                raw = blob
-                totals["plain"] += len(raw)
-                totals["gzip"] += len(gzip.compress(raw))
-                totals["zstd"] += len(zstd_compressor.compress(raw))
-                totals["brotli"] += len(brotli.compress(raw, quality=6))
+            raw = gzip.decompress(blob) if stored_compressed else blob
+
+            totals["plain"] += len(raw)
+            for lvl in GZIP_LEVELS:
+                totals["gzip"][lvl] += len(gzip.compress(raw, compresslevel=lvl))
+            for lvl in ZSTD_LEVELS:
+                totals["zstd"][lvl] += len(zstd_compressors[lvl].compress(raw))
+            for lvl in BROTLI_LEVELS:
+                totals["brotli"][lvl] += len(brotli.compress(raw, quality=lvl))
 
     if current_zoom is not None:
         result[current_zoom] = totals
@@ -103,15 +111,18 @@ def query_all_compression_sizes(
     return result
 
 
-def write_fig(fig: go.Figure, out: Path, name: str, fmt: str) -> None:
+def write_fig(
+    fig: go.Figure, out: Path, name: str, fmt: str,
+    width: int = IMG_WIDTH, height: int = IMG_HEIGHT,
+) -> None:
     if fmt == "html":
         path = out / f"{name}.html"
         fig.write_html(path)
     else:
         path_png = out / f"{name}.png"
         path_pdf = out / f"{name}.pdf"
-        fig.write_image(path_png, width=IMG_WIDTH, height=IMG_HEIGHT, scale=IMG_SCALE)
-        fig.write_image(path_pdf, width=IMG_WIDTH, height=IMG_HEIGHT, scale=IMG_SCALE)
+        fig.write_image(path_png, width=width, height=height, scale=IMG_SCALE)
+        fig.write_image(path_pdf, width=width, height=height, scale=IMG_SCALE)
         print(f"  {path_png}")
         print(f"  {path_pdf}")
 
@@ -127,71 +138,99 @@ def fmt_bytes(b: float) -> str:
 
 
 def plot_compression_ratio(
-    mvt_sizes: dict[int, dict[str, int]],
-    mlt_java_sizes: dict[int, dict[str, int]],
-    mlt_rust_sizes: dict[int, dict[str, int]],
+    format_data: list[tuple[str, dict[int, dict], str]],
     out: Path,
     fmt: str,
 ) -> None:
-    """Plot #6: per-zoom compression ratio anchored on plain MVT = 1.0."""
-    all_zooms = sorted(set(mvt_sizes) | set(mlt_java_sizes) | set(mlt_rust_sizes))
+    """Plot 2×2 grid: plain + per-algorithm compression ratios across levels.
+
+    Each panel shows one compression algorithm.  Within each panel, every
+    (format × level) combination is drawn as a separate line so the user can
+    see how the choice of compression level affects the result.
+
+    format_data is a list of (name, sizes_dict, color) tuples.
+    The first entry is used as the plain-MVT anchor (ratio = 1.0).
+    """
+    all_zooms = sorted(set().union(*(s.keys() for _, s, _ in format_data)))
     zoom_labels = [f"z{z}" for z in all_zooms]
 
-    # Anchor: plain MVT total bytes per zoom
-    mvt_plain = {z: mvt_sizes[z]["plain"] for z in all_zooms if z in mvt_sizes}
+    # Anchor: plain bytes from the first format (MVT)
+    anchor_sizes = format_data[0][1]
+    mvt_plain = {z: anchor_sizes[z]["plain"] for z in all_zooms if z in anchor_sizes}
 
-    # Series config: (label, data_dict, compression, color, dash)
-    compressions = ["plain", "gzip", "zstd", "brotli"]
-    dash_styles = {"plain": "solid", "gzip": "dash", "zstd": "dot", "brotli": "dashdot"}
-    comp_labels = {"plain": "Plain", "gzip": "GZip", "zstd": "ZSTD", "brotli": "Brotli"}
+    format_configs = format_data
 
-    format_configs = [
-        ("MVT", mvt_sizes, ["#1f77b4", "#4a90d9", "#7bafd4", "#aec7e8"]),
-        ("MLT-Java", mlt_java_sizes, ["#e67e22", "#f0a04b", "#f5be7b", "#f9d4a0"]),
-        ("MLT-Rust", mlt_rust_sizes, ["#27ae60", "#52c77e", "#7fd9a0", "#a9e8c0"]),
+    dashes = ["solid", "dash", "dot", "dashdot", "longdash"]
+
+    panels = [
+        ("Plain (uncompressed)", "plain", [None]),
+        ("GZip (levels 1 / 6 / 9)", "gzip", GZIP_LEVELS),
+        ("ZSTD (levels 1 / 3 / 9 / 19)", "zstd", ZSTD_LEVELS),
+        ("Brotli (levels 1 / 6 / 11)", "brotli", BROTLI_LEVELS),
     ]
+    positions = [(1, 1), (1, 2), (2, 1), (2, 2)]
 
-    fig = go.Figure()
+    fig = make_subplots(
+        rows=2, cols=2,
+        subplot_titles=[p[0] for p in panels],
+        vertical_spacing=0.12,
+        horizontal_spacing=0.08,
+    )
 
-    for format_name, sizes, colors in format_configs:
-        for i, comp in enumerate(compressions):
-            ratios = []
-            for z in all_zooms:
-                anchor = mvt_plain.get(z, 0)
-                comp_bytes = sizes.get(z, {}).get(comp, 0)
-                if anchor > 0:
-                    ratios.append(comp_bytes / anchor)
-                else:
-                    ratios.append(None)
+    shown_legend = set()
 
-            fig.add_trace(go.Scatter(
-                name=f"{format_name} + {comp_labels[comp]}",
-                x=zoom_labels,
-                y=ratios,
-                mode="lines+markers",
-                line=dict(color=colors[i], width=2, dash=dash_styles[comp]),
-                marker=dict(size=6),
-                legendgroup=format_name,
-                legendgrouptitle_text=format_name,
-            ))
+    for (_, comp_key, levels), (row, col) in zip(panels, positions):
+        for fmt_name, sizes, color in format_configs:
+            for i, lvl in enumerate(levels):
+                ratios = []
+                for z in all_zooms:
+                    anchor = mvt_plain.get(z, 0)
+                    if comp_key == "plain":
+                        val = sizes.get(z, {}).get("plain", 0)
+                    else:
+                        val = sizes.get(z, {}).get(comp_key, {}).get(lvl, 0)
+                    ratios.append(val / anchor if anchor > 0 else None)
 
+                trace_name = fmt_name if comp_key == "plain" else f"{fmt_name} L{lvl}"
+                show = trace_name not in shown_legend
+                shown_legend.add(trace_name)
+
+                is_first_level = i == 0
+                fig.add_trace(go.Scatter(
+                    name=trace_name,
+                    x=zoom_labels,
+                    y=ratios,
+                    mode="lines+markers",
+                    line=dict(color=color, width=2, dash=dashes[i % len(dashes)]),
+                    marker=dict(size=5),
+                    legendgroup=comp_key,
+                    legendgrouptitle_text=(
+                        comp_key.upper() if is_first_level and show else None
+                    ),
+                    showlegend=show,
+                ), row=row, col=col)
+
+        fig.add_hline(
+            y=1.0, line_dash="dot", line_color="gray", opacity=0.3,
+            row=row, col=col,
+        )
+
+    fig.update_yaxes(title_text="Ratio (lower is better)", col=1)
+    fig.update_xaxes(title_text="Zoom Level", row=2)
     fig.update_layout(
-        title="Per-Zoom Compression Ratio (vs Plain MVT)",
-        xaxis_title="Zoom Level",
-        yaxis_title="Compression Ratio (lower is better)",
+        title="Compression Ratio by Algorithm and Level (vs Plain MVT)",
         template="plotly_white",
         legend=dict(groupclick="togglegroup"),
     )
-    fig.add_hline(y=1.0, line_dash="dot", line_color="gray", opacity=0.5,
-                  annotation_text="MVT Plain baseline")
 
-    write_fig(fig, out, "compression_ratio_per_zoom", fmt)
+    write_fig(fig, out, "compression_levels", fmt, width=1600, height=1000)
 
 
 def main():
     parser = argparse.ArgumentParser(description="Plot tile size comparisons")
     parser.add_argument("mvt", type=Path, help="MVT mbtiles file (gzip-compressed blobs)")
-    parser.add_argument("mlt_java", type=Path, help="MLT-Java mbtiles file (raw blobs)")
+    parser.add_argument("mlt_java_idsort", type=Path, help="MLT-Java mbtiles file, sort-by-id only (raw blobs)")
+    parser.add_argument("mlt_java_noidsort", type=Path, help="MLT-Java mbtiles file, sort by geometry (raw blobs)")
     parser.add_argument("mlt_rust", type=Path, help="MLT-Rust mbtiles file (raw blobs)")
     parser.add_argument("--out", type=Path, default=Path("figures"), help="Output directory")
     parser.add_argument("--format", choices=["png", "html"], default="png")
@@ -347,13 +386,24 @@ def main():
 
     # ── 6. Per-zoom compression ratio ─────────────────────────────────────────
     print("\nComputing compression variants for MVT...")
-    mvt_sizes = query_all_compression_sizes(args.mvt, stored_compressed=True)
-    print("Computing compression variants for MLT-Java...")
-    mlt_java_sizes = query_all_compression_sizes(args.mlt_java, stored_compressed=False)
+    mvt_comp = query_all_compression_sizes(args.mvt, stored_compressed=True)
+    print("Computing compression variants for MLT-Java (ID-sort)...")
+    java_idsort_comp = query_all_compression_sizes(args.mlt_java_idsort, stored_compressed=False)
+    print("Computing compression variants for MLT-Java (Geo-sort)...")
+    java_noidsort_comp = query_all_compression_sizes(args.mlt_java_noidsort, stored_compressed=False)
     print("Computing compression variants for MLT-Rust...")
-    mlt_rust_sizes = query_all_compression_sizes(args.mlt_rust, stored_compressed=False)
+    rust_comp = query_all_compression_sizes(args.mlt_rust, stored_compressed=False)
 
-    plot_compression_ratio(mvt_sizes, mlt_java_sizes, mlt_rust_sizes, args.out, args.format)
+    plot_compression_ratio(
+        [
+            ("MVT", mvt_comp, "#1f77b4"),
+            ("MLT-Java (ID-sort)", java_idsort_comp, "#e67e22"),
+            ("MLT-Java (Geo-sort)", java_noidsort_comp, "#d62728"),
+            ("MLT-Rust", rust_comp, "#27ae60"),
+        ],
+        args.out,
+        args.format,
+    )
 
     print(f"\nAll figures written to {args.out}/")
 
