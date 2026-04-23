@@ -77,7 +77,7 @@ def query_all_compression_sizes(
             if z != current_zoom:
                 if current_zoom is not None:
                     result[current_zoom] = totals
-                    print(f"  z{current_zoom}: {totals['plain'] / 1e6:.1f} MB plain")
+                    print(f"  z{current_zoom}: {totals['plain'] / 1e6:.1f} MB plain", flush=True)
                 current_zoom = z
                 totals = {"plain": 0, "gzip": 0, "zstd": 0, "brotli": 0}
 
@@ -87,17 +87,17 @@ def query_all_compression_sizes(
                 totals["plain"] += len(raw)
                 totals["gzip"] += len(blob)
                 totals["zstd"] += len(zstd_compressor.compress(raw))
-                totals["brotli"] += len(brotli.compress(raw))
+                totals["brotli"] += len(brotli.compress(raw, quality=6))
             else:
                 raw = blob
                 totals["plain"] += len(raw)
                 totals["gzip"] += len(gzip.compress(raw))
                 totals["zstd"] += len(zstd_compressor.compress(raw))
-                totals["brotli"] += len(brotli.compress(raw))
+                totals["brotli"] += len(brotli.compress(raw, quality=6))
 
     if current_zoom is not None:
         result[current_zoom] = totals
-        print(f"  z{current_zoom}: {totals['plain'] / 1e6:.1f} MB plain")
+        print(f"  z{current_zoom}: {totals['plain'] / 1e6:.1f} MB plain", flush=True)
 
     conn.close()
     return result
@@ -109,11 +109,11 @@ def write_fig(fig: go.Figure, out: Path, name: str, fmt: str) -> None:
         fig.write_html(path)
     else:
         path_png = out / f"{name}.png"
-        path_eps = out / f"{name}.eps"
+        path_pdf = out / f"{name}.pdf"
         fig.write_image(path_png, width=IMG_WIDTH, height=IMG_HEIGHT, scale=IMG_SCALE)
-        fig.write_image(path_eps, width=IMG_WIDTH, height=IMG_HEIGHT, scale=IMG_SCALE)
+        fig.write_image(path_pdf, width=IMG_WIDTH, height=IMG_HEIGHT, scale=IMG_SCALE)
         print(f"  {path_png}")
-        print(f"  {path_eps}")
+        print(f"  {path_pdf}")
 
 
 def fmt_bytes(b: float) -> str:
