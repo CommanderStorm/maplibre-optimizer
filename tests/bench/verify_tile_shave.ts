@@ -81,35 +81,26 @@ function totalTileDataSize(dbPath: string): { totalBytes: number; tileCount: num
   return { totalBytes: row.total, tileCount: row.cnt };
 }
 
-function tilesDropped(originalDbPath: string, prunedDbPath: string): number {
-  const orig = new Database(originalDbPath, { readonly: true });
-  const pruned = new Database(prunedDbPath, { readonly: true });
-  const origCount = (orig.prepare("SELECT COUNT(*) AS cnt FROM tiles").get() as { cnt: number }).cnt;
-  const prunedCount = (pruned.prepare("SELECT COUNT(*) AS cnt FROM tiles").get() as { cnt: number }).cnt;
-  orig.close();
-  pruned.close();
-  return origCount - prunedCount;
-}
-
-async function fetchAndCacheStyle(style: BenchStyle): Promise<string | null> {
+async function fetchAndCacheStyle(style: BenchStyle): Promise<string> {
   if (fs.existsSync(style.cachePath)) {
     return fs.readFileSync(style.cachePath, "utf8");
   }
-  try {
-    const resp = await fetch(style.url);
-    if (!resp.ok) {
-      console.log(`  SKIP ${style.id}: HTTP ${resp.status}`);
-      return null;
-    }
-    const text = await resp.text();
-    JSON.parse(text); // validate JSON
-    fs.writeFileSync(style.cachePath, text);
-    return text;
-  } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : String(err);
-    console.log(`  SKIP ${style.id}: ${msg}`);
-    return null;
-  }
+  console.log(`  Fetching ${style.id} from ${style.url}…`);
+  const resp = await fetch(style.url);
+  if (!resp.ok) throw new Error(`Failed to fetch ${style.id}: ${resp.status} ${resp.statusText}`);
+  const text = await resp.text();
+  JSON.parse(text); // validate JSON
+
+  // Run gl-style-migrate to convert legacy property functions and filters
+  // to expressions (same as run.ts) so the optimizer sees canonical syntax.
+  const rawPath = style.cachePath + ".raw";
+  fs.writeFileSync(rawPath, text);
+  const migrated = execFileSync("gl-style-migrate", [rawPath], { encoding: "utf8", timeout: 10_000 });
+  JSON.parse(migrated);
+  fs.writeFileSync(style.cachePath, migrated);
+  fs.unlinkSync(rawPath);
+  console.log(`  Cached ${style.id} (${(text.length / 1024).toFixed(1)} KB raw → ${(migrated.length / 1024).toFixed(1)} KB migrated)`);
+  return migrated;
 }
 
 function collectStats(mbtilesPath: string, outputPath: string): void {
@@ -140,11 +131,6 @@ interface ShaveResult {
 }
 
 async function main(): Promise<void> {
-  if (!fs.existsSync(MBTILES)) {
-    console.error(`ERROR: mbtiles file not found: ${MBTILES}`);
-    process.exit(1);
-  }
-
   buildOptimizer();
   fs.mkdirSync(RESULTS_DIR, { recursive: true });
 
@@ -173,51 +159,30 @@ async function main(): Promise<void> {
 
     // Fetch / cache the style
     const styleText = await fetchAndCacheStyle(style);
-    if (!styleText) continue;
     fs.writeFileSync(tmpStyleInput, styleText);
 
     // Step 4a: optimize with --all --stats --advisory
-    try {
-      execFileSync(OPTIMIZER, [
-        "optimize", "--input", tmpStyleInput, "--output", tmpStyleOpt,
-        "--all",
-        "--stats", statsPath,
-        "--advisory", tmpAdvisory,
-      ], { timeout: 60_000 });
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : String(err);
-      console.log(`  FAIL optimize: ${msg}\n`);
-      continue;
-    }
+    execFileSync(OPTIMIZER, [
+      "optimize", "--input", tmpStyleInput, "--output", tmpStyleOpt,
+      "--all",
+      "--stats", statsPath,
+      "--advisory", tmpAdvisory,
+    ], { timeout: 60_000 });
 
     // Step 4b: advisory --format mvt
     console.log("  Running advisory (MVT)…");
     fs.mkdirSync(tmpShaveDir, { recursive: true });
-    try {
-      execFileSync(OPTIMIZER, [
-        "advisory",
-        "--advisory", tmpAdvisory,
-        "--tiles", MBTILES,
-        "--output", tmpShaveDir,
-        "--format", "mvt",
-      ], { timeout: 600_000 });
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : String(err);
-      console.log(`  FAIL advisory: ${msg}\n`);
-      // Cleanup shave dir
-      fs.rmSync(tmpShaveDir, { recursive: true, force: true });
-      continue;
-    }
+    execFileSync(OPTIMIZER, [
+      "advisory",
+      "--advisory", tmpAdvisory,
+      "--tiles", MBTILES,
+      "--output", tmpShaveDir,
+      "--format", "mvt",
+    ], { timeout: 600_000 });
 
     // Step 4c: find pruned mbtiles and query size
     const shaveFiles = fs.readdirSync(tmpShaveDir);
-    const prunedFile = shaveFiles.find((f) => f.endsWith(".mbtiles"));
-    if (!prunedFile) {
-      console.log("  FAIL: no pruned .mbtiles produced\n");
-      fs.rmSync(tmpShaveDir, { recursive: true, force: true });
-      continue;
-    }
-
+    const prunedFile = shaveFiles.find((f) => f.endsWith(".mbtiles"))!;
     const prunedPath = path.join(tmpShaveDir, prunedFile);
     const pruned = totalTileDataSize(prunedPath);
     const dropped = original.tileCount - pruned.tileCount;
@@ -242,39 +207,37 @@ async function main(): Promise<void> {
 
     // Step 4d: clean up pruned mbtiles (~3 GB each)
     fs.rmSync(tmpShaveDir, { recursive: true, force: true });
-    try { fs.unlinkSync(tmpAdvisory); } catch {}
-    try { fs.unlinkSync(tmpStyleOpt); } catch {}
+    fs.unlinkSync(tmpAdvisory);
+    fs.unlinkSync(tmpStyleOpt);
   }
 
   // Cleanup
-  try { fs.unlinkSync(tmpStyleInput); } catch {}
-  try { fs.unlinkSync(statsPath); } catch {}
+  fs.unlinkSync(tmpStyleInput);
+  fs.unlinkSync(statsPath);
   fs.closeSync(jsonlFd);
 
   // Print summary table
-  if (results.length > 0) {
-    console.log("═══════════════════════════════════════════════════════════════════════════════");
+  console.log("═══════════════════════════════════════════════════════════════════════════════");
+  console.log(
+    "Style".padEnd(20) +
+    "Original".padStart(12) +
+    "Pruned".padStart(12) +
+    "Reduction".padStart(12) +
+    "  %" .padStart(8) +
+    "Dropped".padStart(10),
+  );
+  console.log("─".repeat(74));
+  for (const r of results) {
     console.log(
-      "Style".padEnd(20) +
-      "Original".padStart(12) +
-      "Pruned".padStart(12) +
-      "Reduction".padStart(12) +
-      "  %" .padStart(8) +
-      "Dropped".padStart(10),
+      r.style_id.padEnd(20) +
+      formatBytes(r.original_bytes).padStart(12) +
+      formatBytes(r.pruned_bytes).padStart(12) +
+      formatBytes(r.reduction_bytes).padStart(12) +
+      `${r.reduction_pct.toFixed(1)}%`.padStart(8) +
+      String(r.tiles_dropped).padStart(10),
     );
-    console.log("─".repeat(74));
-    for (const r of results) {
-      console.log(
-        r.style_id.padEnd(20) +
-        formatBytes(r.original_bytes).padStart(12) +
-        formatBytes(r.pruned_bytes).padStart(12) +
-        formatBytes(r.reduction_bytes).padStart(12) +
-        `${r.reduction_pct.toFixed(1)}%`.padStart(8) +
-        String(r.tiles_dropped).padStart(10),
-      );
-    }
-    console.log("═══════════════════════════════════════════════════════════════════════════════");
   }
+  console.log("═══════════════════════════════════════════════════════════════════════════════");
 
   console.log(`\nResults written to ${outPath}`);
 }
