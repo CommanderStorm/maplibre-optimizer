@@ -15,7 +15,7 @@ from pathlib import Path
 import pandas as pd
 import plotly.graph_objects as go
 
-from plot_style import COLORS, LAYOUT_DEFAULTS, IMG_HEIGHT, IMG_SCALE, IMG_WIDTH
+from plot_style import COLORS, LAYOUT_DEFAULTS, IMG_HEIGHT, IMG_SCALE, IMG_WIDTH, THESIS_FIGURES, THESIS_FIGURES_DIR
 
 
 def write_fig(fig: go.Figure, out: Path, name: str, fmt: str) -> None:
@@ -29,6 +29,10 @@ def write_fig(fig: go.Figure, out: Path, name: str, fmt: str) -> None:
         fig.write_image(path_pdf, width=IMG_WIDTH, height=IMG_HEIGHT, scale=IMG_SCALE)
         print(f"  {path_png}")
         print(f"  {path_pdf}")
+        if name in THESIS_FIGURES and THESIS_FIGURES_DIR.is_dir():
+            thesis_pdf = THESIS_FIGURES_DIR / f"{name}.pdf"
+            fig.write_image(thesis_pdf, width=IMG_WIDTH, height=IMG_HEIGHT, scale=IMG_SCALE)
+            print(f"  → thesis: {thesis_pdf}")
 
 
 def load_jsonl(paths: list[Path]) -> pd.DataFrame:

@@ -4,6 +4,8 @@ Provides a unified color palette and layout defaults that match the
 Helvetica-based TUM thesis template.
 """
 
+from pathlib import Path
+
 # ── Thesis color palette ────────────────────────────────────────────────────
 
 COLORS = {
@@ -36,3 +38,22 @@ LAYOUT_DEFAULTS = dict(
 IMG_WIDTH = 1400
 IMG_HEIGHT = 700
 IMG_SCALE = 2  # 2x for retina-quality PNGs
+
+# ── Thesis figures directory ────────────────────────────────────────────────
+
+# Resolved relative to this file: tests/bench/ → repo root → ../maplibre-tile-spec/thesis/figures
+THESIS_FIGURES_DIR = (
+    Path(__file__).resolve().parent.parent.parent.parent
+    / "maplibre-tile-spec" / "thesis" / "figures"
+)
+
+# Figures referenced by \includegraphics in the thesis LaTeX source.
+THESIS_FIGURES: set[str] = {
+    "complexity_layer_count",
+    "cross_style_complexity_scatter",
+    "cross_style_reduction",
+    "heatmap_loadMs",
+    "memory_ablation",
+    "style_size_ablation",
+    "time_breakdown",
+}
