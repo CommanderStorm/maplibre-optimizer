@@ -19,9 +19,16 @@ import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 
-IMG_WIDTH = 1400
-IMG_HEIGHT = 700
-IMG_SCALE = 2  # 2x for retina-quality PNGs
+from plot_style import (
+    COLORS,
+    IMPROVEMENT_COLOR,
+    LAYOUT_DEFAULTS,
+    NEUTRAL_COLOR,
+    REGRESSION_COLOR,
+    IMG_HEIGHT,
+    IMG_SCALE,
+    IMG_WIDTH,
+)
 
 
 def write_fig(fig: go.Figure, out: Path, name: str) -> None:
@@ -223,7 +230,7 @@ def plot_ablation_waterfall(
             x=step_labels,
             y=mean_vals,
             mode="lines+markers",
-            line=dict(width=3, color="#D62728"),
+            line=dict(width=3, color="#F7811E"),
             marker=dict(size=8),
             name="Mean across scenarios",
         ))
@@ -231,11 +238,11 @@ def plot_ablation_waterfall(
         lower_better = metric in LOWER_IS_BETTER
         direction = "↓ lower is better" if lower_better else "↑ higher is better"
         fig.update_layout(
+            **LAYOUT_DEFAULTS,
             title=f"Ablation Waterfall: {METRIC_LABELS.get(metric, metric)}",
             xaxis_title="Cumulative Pass",
             yaxis_title=f"{METRIC_LABELS.get(metric, metric)} ({direction})",
             xaxis_tickangle=-45,
-            template="plotly_white",
             legend=dict(x=0.01, y=0.99),
         )
         _add_stats_annotation(fig)
@@ -270,7 +277,7 @@ def plot_marginal_contribution(
         colors = []
         for d in mean_deltas:
             is_good = (d < 0) if lower_better else (d > 0)
-            colors.append("#2CA02C" if is_good else "#D62728" if abs(d) > 0.5 else "#999999")
+            colors.append(IMPROVEMENT_COLOR if is_good else REGRESSION_COLOR if abs(d) > 0.5 else NEUTRAL_COLOR)
 
         fig = go.Figure()
         fig.add_trace(go.Bar(
@@ -284,11 +291,11 @@ def plot_marginal_contribution(
 
         direction = "(negative = improvement)" if lower_better else "(positive = improvement)"
         fig.update_layout(
+            **LAYOUT_DEFAULTS,
             title=f"Marginal Contribution per Pass: {METRIC_LABELS.get(metric, metric)}",
             xaxis_title="Pass Added",
             yaxis_title=f"Median % Change {direction}",
             xaxis_tickangle=-45,
-            template="plotly_white",
         )
         _add_stats_annotation(fig)
         write_fig(fig, out, f"marginal_{metric}")
@@ -314,7 +321,7 @@ def plot_style_size_ablation(df: pd.DataFrame, variants: list[str], out: Path) -
 
     fig = go.Figure()
 
-    colors = {"style_bytes": "#1F77B4", "gzip_bytes": "#FF7F0E", "brotli_bytes": "#2CA02C"}
+    colors = {"style_bytes": "#5E94D4", "gzip_bytes": "#F7811E", "brotli_bytes": "#9FBA36"}
     names = {"style_bytes": "Raw", "gzip_bytes": "Gzip", "brotli_bytes": "Brotli"}
 
     for col in size_cols:
@@ -348,11 +355,11 @@ def plot_style_size_ablation(df: pd.DataFrame, variants: list[str], out: Path) -
         ))
 
     fig.update_layout(
+        **LAYOUT_DEFAULTS,
         title="Style Size Across Ablation Steps (Raw, Gzip, Brotli)",
         xaxis_title="Cumulative Pass",
         yaxis_title="Size (bytes)",
         xaxis_tickangle=-45,
-        template="plotly_white",
     )
     _add_stats_annotation(fig)
     write_fig(fig, out, "style_size_ablation")
@@ -400,11 +407,11 @@ def plot_scenario_heatmap(
         ))
 
         fig.update_layout(
+            **LAYOUT_DEFAULTS,
             title=f"Per-Scenario Pass Impact: {METRIC_LABELS.get(metric, metric)}",
             xaxis_title="Pass Added",
             yaxis_title="Scenario",
             xaxis_tickangle=-45,
-            template="plotly_white",
             height=max(500, 30 * len(scenarios) + 200),
         )
         _add_stats_annotation(fig)
@@ -434,10 +441,10 @@ def plot_box_per_step(
             category_orders={"step_label": step_labels},
         )
         fig.update_layout(
+            **LAYOUT_DEFAULTS,
             xaxis_tickangle=-45,
-            template="plotly_white",
         )
-        fig.update_traces(marker_color="#1F77B4")
+        fig.update_traces(marker_color="#5E94D4")
         _add_stats_annotation(fig)
         write_fig(fig, out, f"box_{metric}")
 
@@ -460,7 +467,7 @@ def plot_complexity_ablation(df: pd.DataFrame, variants: list[str], out: Path) -
         if v in complexity_by_variant.index:
             step_labels.append(_annotate_stats_passes(_step_label(v)))
 
-    colors = {"ast_nodes": "#1F77B4", "max_depth": "#FF7F0E", "layer_count": "#2CA02C", "filter_count": "#D62728"}
+    colors = {"ast_nodes": "#5E94D4", "max_depth": "#F7811E", "layer_count": "#9FBA36", "filter_count": "#B55CA5"}
 
     for metric in avail:
         vals = []
@@ -491,11 +498,11 @@ def plot_complexity_ablation(df: pd.DataFrame, variants: list[str], out: Path) -
         ))
 
         fig.update_layout(
+            **LAYOUT_DEFAULTS,
             title=f"Complexity Across Ablation Steps: {METRIC_LABELS.get(metric, metric)}",
             xaxis_title="Cumulative Pass",
             yaxis_title=METRIC_LABELS.get(metric, metric),
             xaxis_tickangle=-45,
-            template="plotly_white",
         )
         _add_stats_annotation(fig)
         write_fig(fig, out, f"complexity_{metric}")
@@ -539,18 +546,18 @@ def plot_time_breakdown(
         return
 
     fig = go.Figure()
-    fig.add_trace(go.Bar(name="Style Parse", x=step_labels, y=parse_vals, marker_color="#1F77B4"))
-    fig.add_trace(go.Bar(name="First Tile", x=step_labels, y=tile_vals, marker_color="#FF7F0E"))
-    fig.add_trace(go.Bar(name="First Frame", x=step_labels, y=frame_vals, marker_color="#2CA02C"))
-    fig.add_trace(go.Bar(name="Remaining Load", x=step_labels, y=load_vals, marker_color="#D62728"))
+    fig.add_trace(go.Bar(name="Style Parse", x=step_labels, y=parse_vals, marker_color="#5E94D4"))
+    fig.add_trace(go.Bar(name="First Tile", x=step_labels, y=tile_vals, marker_color="#F7811E"))
+    fig.add_trace(go.Bar(name="First Frame", x=step_labels, y=frame_vals, marker_color="#9FBA36"))
+    fig.add_trace(go.Bar(name="Remaining Load", x=step_labels, y=load_vals, marker_color="#B55CA5"))
 
     fig.update_layout(
+        **LAYOUT_DEFAULTS,
         barmode="stack",
         title="Time-to-Interactive Breakdown per Ablation Step",
         xaxis_title="Cumulative Pass",
         yaxis_title="Time (ms)",
         xaxis_tickangle=-45,
-        template="plotly_white",
     )
     _add_stats_annotation(fig)
     write_fig(fig, out, "time_breakdown")
@@ -602,7 +609,7 @@ def plot_isolated_impact(
         colors = []
         for d in mean_deltas:
             is_good = (d < 0) if lower_better else (d > 0)
-            colors.append("#2CA02C" if is_good else "#D62728" if abs(d) > 0.5 else "#999999")
+            colors.append(IMPROVEMENT_COLOR if is_good else REGRESSION_COLOR if abs(d) > 0.5 else NEUTRAL_COLOR)
 
         fig = go.Figure()
         fig.add_trace(go.Bar(
@@ -616,11 +623,11 @@ def plot_isolated_impact(
 
         direction = "(negative = improvement)" if lower_better else "(positive = improvement)"
         fig.update_layout(
+            **LAYOUT_DEFAULTS,
             title=f"Isolated Pass Impact: {METRIC_LABELS.get(metric, metric)}",
             xaxis_title="Pass (alone)",
             yaxis_title=f"% Change vs Baseline {direction}",
             xaxis_tickangle=-45,
-            template="plotly_white",
         )
         _add_stats_annotation(fig)
         write_fig(fig, out, f"isolated_{metric}")
@@ -645,7 +652,7 @@ def plot_memory_ablation(
         if v in means.index:
             step_labels.append(_annotate_stats_passes(_step_label(v)))
 
-    colors = {"heapUsedMB": "#1F77B4", "peakHeapMB": "#D62728"}
+    colors = {"heapUsedMB": "#5E94D4", "peakHeapMB": "#F7811E"}
     names = {"heapUsedMB": "Heap Used", "peakHeapMB": "Peak Heap"}
 
     fig = go.Figure()
@@ -661,11 +668,11 @@ def plot_memory_ablation(
         ))
 
     fig.update_layout(
+        **LAYOUT_DEFAULTS,
         title="Browser Memory Usage Across Ablation Steps",
         xaxis_title="Cumulative Pass",
         yaxis_title="Memory (MB)",
         xaxis_tickangle=-45,
-        template="plotly_white",
     )
     _add_stats_annotation(fig)
     write_fig(fig, out, "memory_ablation")

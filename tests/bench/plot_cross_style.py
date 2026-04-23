@@ -15,9 +15,7 @@ from pathlib import Path
 import pandas as pd
 import plotly.graph_objects as go
 
-IMG_WIDTH = 1400
-IMG_HEIGHT = 700
-IMG_SCALE = 2
+from plot_style import COLORS, LAYOUT_DEFAULTS, IMG_HEIGHT, IMG_SCALE, IMG_WIDTH
 
 
 def write_fig(fig: go.Figure, out: Path, name: str, fmt: str) -> None:
@@ -54,9 +52,9 @@ def plot_size_reduction_bar(df: pd.DataFrame, out: Path, fmt: str) -> None:
     fig = go.Figure()
 
     for col, name, color in [
-        ("reduction_pct", "Raw", "#1F77B4"),
-        ("gzip_reduction_pct", "Gzip", "#FF7F0E"),
-        ("brotli_reduction_pct", "Brotli", "#2CA02C"),
+        ("reduction_pct", "Raw", "#5E94D4"),
+        ("gzip_reduction_pct", "Gzip", "#F7811E"),
+        ("brotli_reduction_pct", "Brotli", "#9FBA36"),
     ]:
         if col not in df.columns:
             continue
@@ -71,11 +69,11 @@ def plot_size_reduction_bar(df: pd.DataFrame, out: Path, fmt: str) -> None:
         ))
 
     fig.update_layout(
+        **LAYOUT_DEFAULTS,
         title="Size Reduction per Style (Raw, Gzip, Brotli)",
         xaxis_title="% Reduction",
         yaxis_title="Style",
         barmode="group",
-        template="plotly_white",
         height=max(500, 30 * len(df) + 200),
     )
     write_fig(fig, out, "cross_style_reduction", fmt)
@@ -95,14 +93,14 @@ def plot_complexity_scatter(df: pd.DataFrame, out: Path, fmt: str) -> None:
         text=df["style_id"],
         textposition="top center",
         textfont=dict(size=9),
-        marker=dict(size=10, color="#1F77B4"),
+        marker=dict(size=10, color="#5E94D4"),
     ))
 
     fig.update_layout(
+        **LAYOUT_DEFAULTS,
         title="Original Complexity vs Size Reduction",
         xaxis_title="Original AST Node Count",
         yaxis_title="% Size Reduction",
-        template="plotly_white",
     )
     write_fig(fig, out, "cross_style_complexity_scatter", fmt)
 
@@ -121,22 +119,22 @@ def plot_layer_count_comparison(df: pd.DataFrame, out: Path, fmt: str) -> None:
         x=df["original_layer_count"],
         orientation="h",
         name="Original",
-        marker_color="#1F77B4",
+        marker_color="#5E94D4",
     ))
     fig.add_trace(go.Bar(
         y=df["style_id"],
         x=df["optimized_layer_count"],
         orientation="h",
         name="Optimized",
-        marker_color="#2CA02C",
+        marker_color="#9FBA36",
     ))
 
     fig.update_layout(
+        **LAYOUT_DEFAULTS,
         title="Layer Count: Original vs Optimized",
         xaxis_title="Layer Count",
         yaxis_title="Style",
         barmode="group",
-        template="plotly_white",
         height=max(500, 30 * len(df) + 200),
     )
     write_fig(fig, out, "cross_style_layers", fmt)
