@@ -8,6 +8,7 @@ Usage:
 
 import argparse
 import gzip
+import hashlib
 import itertools
 import sqlite3
 from pathlib import Path
@@ -15,6 +16,7 @@ from pathlib import Path
 import brotli
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
+from pydantic import BaseModel
 import zstandard
 
 from plot_style import (
@@ -33,6 +35,31 @@ ZSTD_LEVELS = [1, 3, 9, 19]
 BROTLI_LEVELS = [1, 6, 11]
 
 
+class ZoomCompression(BaseModel):
+    """Compression totals for a single zoom level."""
+    plain: int = 0
+    gzip: dict[int, int] = {}
+    zstd: dict[int, int] = {}
+    brotli: dict[int, int] = {}
+    zstd_dict: dict[int, int] | None = None
+
+    def get(self, comp_key: str, level: int | None = None) -> int:
+        if comp_key == "plain":
+            return self.plain
+        levels = getattr(self, comp_key, None)
+        if levels is None or level is None:
+            return 0
+        return levels.get(level, 0)
+
+
+class CompressionResult(BaseModel):
+    """Per-zoom compression data for one tile format."""
+    zooms: dict[int, ZoomCompression]
+
+
+_EMPTY_ZOOM = ZoomCompression()
+
+
 def sample_tiles(db_path: Path, stored_compressed: bool, n: int) -> list[bytes]:
     """Sample up to n random tiles for zstd dictionary training."""
     conn = sqlite3.connect(str(db_path))
@@ -44,6 +71,39 @@ def sample_tiles(db_path: Path, stored_compressed: bool, n: int) -> list[bytes]:
         gzip.decompress(bytes(td)) if stored_compressed else bytes(td)
         for (td,) in rows
     ]
+
+
+def _cache_key(db_path: Path, dict_size: int, dict_samples: int) -> str:
+    """Stable hash from file identity + dict parameters."""
+    stat = db_path.stat()
+    raw = f"{db_path.resolve()}:{stat.st_size}:{stat.st_mtime_ns}:{dict_size}:{dict_samples}"
+    return hashlib.sha256(raw.encode()).hexdigest()[:16]
+
+
+def _cache_path(out: Path, name: str, key: str) -> Path:
+    return out / f".cache_{name}_{key}.json"
+
+
+def load_or_compute_compression(
+    name: str, db_path: Path, stored_compressed: bool,
+    zstd_dict: "zstandard.ZstdCompressionDict",
+    dict_size: int, dict_samples: int, cache_dir: Path,
+) -> CompressionResult:
+    """Load cached compression results or compute and cache them."""
+    key = _cache_key(db_path, dict_size, dict_samples)
+    cache = _cache_path(cache_dir, name.replace(" ", "_").replace("(", "").replace(")", ""), key)
+
+    if cache.exists():
+        print(f"  {name}: loading from cache")
+        return CompressionResult.model_validate_json(cache.read_text())
+
+    print(f"Computing compression variants for {name}...")
+    result = query_all_compression_sizes(db_path, stored_compressed=stored_compressed, zstd_dict=zstd_dict)
+
+    cache.write_text(result.model_dump_json())
+    print(f"  {name}: cached to {cache.name}")
+
+    return result
 
 
 def query_sizes(db_path: Path) -> dict[int, dict]:
@@ -63,7 +123,7 @@ def query_sizes(db_path: Path) -> dict[int, dict]:
 def query_all_compression_sizes(
     db_path: Path, stored_compressed: bool,
     zstd_dict: "zstandard.ZstdCompressionDict | None" = None,
-) -> dict[int, dict]:
+) -> CompressionResult:
     """Compute per-zoom total bytes for plain and multiple compression levels.
 
     Tests each algorithm at multiple settings to allow fair comparison:
@@ -135,7 +195,9 @@ def query_all_compression_sizes(
         print(f"  z{current_zoom}: {totals['plain'] / 1e6:.1f} MB plain", flush=True)
 
     conn.close()
-    return result
+    return CompressionResult(zooms={
+        z: ZoomCompression(**data) for z, data in result.items()
+    })
 
 
 def write_fig(
@@ -165,7 +227,7 @@ def fmt_bytes(b: float) -> str:
 
 
 def plot_compression_ratio(
-    format_data: list[tuple[str, dict[int, dict], str]],
+    format_data: list[tuple[str, CompressionResult, str]],
     out: Path,
     fmt: str,
 ) -> None:
@@ -175,21 +237,20 @@ def plot_compression_ratio(
     (format × level) combination is drawn as a separate line so the user can
     see how the choice of compression level affects the result.
 
-    format_data is a list of (name, sizes_dict, color) tuples.
+    format_data is a list of (name, CompressionResult, color) tuples.
     The first entry is used as the plain-MVT anchor (ratio = 1.0).
     """
-    all_zooms = sorted(set().union(*(s.keys() for _, s, _ in format_data)))
+    all_zooms = sorted(set().union(*(s.zooms.keys() for _, s, _ in format_data)))
     zoom_labels = [f"z{z}" for z in all_zooms]
 
     # Anchor: plain bytes from the first format (MVT)
-    anchor_sizes = format_data[0][1]
-    mvt_plain = {z: anchor_sizes[z]["plain"] for z in all_zooms if z in anchor_sizes}
+    anchor = format_data[0][1]
+    mvt_plain = {z: anchor.zooms[z].plain for z in all_zooms if z in anchor.zooms}
 
     # Check whether any format has zstd_dict data
     has_dict = any(
-        "zstd_dict" in sizes.get(next(iter(sizes), -1), {})
+        next(iter(sizes.zooms.values()), _EMPTY_ZOOM).zstd_dict is not None
         for _, sizes, _ in format_data
-        if sizes
     )
 
     dashes = ["solid", "dash", "dot", "dashdot", "longdash"]
@@ -215,7 +276,13 @@ def plot_compression_ratio(
         horizontal_spacing=0.08,
     )
 
-    shown_legend: set[str] = set()
+    group_titles = {
+        "plain": "Plain",
+        "gzip": "GZip",
+        "zstd": "ZSTD",
+        "zstd_dict": "ZSTD + Dict",
+        "brotli": "Brotli",
+    }
 
     for idx, (_, comp_key, levels) in enumerate(panels):
         row, col = positions[idx]
@@ -223,18 +290,12 @@ def plot_compression_ratio(
             for i, lvl in enumerate(levels):
                 ratios = []
                 for z in all_zooms:
-                    anchor = mvt_plain.get(z, 0)
-                    if comp_key == "plain":
-                        val = sizes.get(z, {}).get("plain", 0)
-                    else:
-                        val = sizes.get(z, {}).get(comp_key, {}).get(lvl, 0)
-                    ratios.append(val / anchor if anchor > 0 else None)
+                    base = mvt_plain.get(z, 0)
+                    val = sizes.zooms.get(z, _EMPTY_ZOOM).get(comp_key, lvl)
+                    ratios.append(val / base if base > 0 else None)
 
                 trace_name = fmt_name if comp_key == "plain" else f"{fmt_name} L{lvl}"
-                show = trace_name not in shown_legend
-                shown_legend.add(trace_name)
 
-                is_first_level = i == 0
                 fig.add_trace(go.Scatter(
                     name=trace_name,
                     x=zoom_labels,
@@ -243,23 +304,33 @@ def plot_compression_ratio(
                     line=dict(color=color, width=2, dash=dashes[i % len(dashes)]),
                     marker=dict(size=5),
                     legendgroup=comp_key,
-                    legendgrouptitle_text=(
-                        comp_key.upper() if is_first_level and show else None
-                    ),
-                    showlegend=show,
+                    legendgrouptitle_text=group_titles[comp_key],
                 ), row=row, col=col)
 
-        fig.add_hline(
-            y=1.0, line_dash="dot", line_color="gray", opacity=0.3,
-            row=row, col=col,
-        )
+    # Plain MVT baseline (y=1.0) on every subplot
+    for r in range(1, rows + 1):
+        for c in range(1, cols + 1):
+            fig.add_hline(
+                y=1.0, line_dash="dash", line_color="#222222", line_width=1.5,
+                opacity=0.6, row=r, col=c,
+                annotation_text="Plain MVT" if c == cols else None,
+                annotation_position="top right",
+                annotation_font_size=10,
+                annotation_font_color="#222222",
+            )
 
     fig.update_yaxes(title_text="Ratio (lower is better)", col=1)
     fig.update_xaxes(title_text="Zoom Level", row=rows)
     fig.update_layout(
         **LAYOUT_DEFAULTS,
-        title="Compression Ratio by Algorithm and Level (vs Plain MVT)",
-        legend=dict(groupclick="togglegroup"),
+        title=None,
+        legend=dict(
+            groupclick="togglegroup",
+            x=0.54,
+            y=0.28,
+            xanchor="left",
+            yanchor="top",
+        ),
     )
 
     write_fig(fig, out, "compression_levels", fmt, width=1600, height=500 * rows)
@@ -442,14 +513,16 @@ def main():
         zstd_dicts[name] = zstandard.train_dictionary(args.dict_size, samples)
         print(f"  {name}: dict {len(zstd_dicts[name].as_bytes())} bytes from {len(samples)} samples")
 
-    print("\nComputing compression variants for MVT...")
-    mvt_comp = query_all_compression_sizes(args.mvt, stored_compressed=True, zstd_dict=zstd_dicts["MVT"])
-    print("Computing compression variants for MLT-Java (ID-sort)...")
-    java_idsort_comp = query_all_compression_sizes(args.mlt_java_idsort, stored_compressed=False, zstd_dict=zstd_dicts["MLT-Java (ID-sort)"])
-    print("Computing compression variants for MLT-Java (Geo-sort)...")
-    java_noidsort_comp = query_all_compression_sizes(args.mlt_java_noidsort, stored_compressed=False, zstd_dict=zstd_dicts["MLT-Java (Geo-sort)"])
-    print("Computing compression variants for MLT-Rust...")
-    rust_comp = query_all_compression_sizes(args.mlt_rust, stored_compressed=False, zstd_dict=zstd_dicts["MLT-Rust"])
+    comp_results = {}
+    for name, path, compressed in sources:
+        comp_results[name] = load_or_compute_compression(
+            name, path, compressed, zstd_dicts[name],
+            args.dict_size, args.dict_samples, args.out,
+        )
+    mvt_comp = comp_results["MVT"]
+    java_idsort_comp = comp_results["MLT-Java (ID-sort)"]
+    java_noidsort_comp = comp_results["MLT-Java (Geo-sort)"]
+    rust_comp = comp_results["MLT-Rust"]
 
     plot_compression_ratio(
         [
