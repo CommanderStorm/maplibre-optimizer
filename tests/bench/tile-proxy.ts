@@ -7,9 +7,7 @@
  * harness talks to it over plain HTTP — same codepath as production.
  *
  * Usage:
- *   npx tsx tile-proxy.ts                    # start on port 8765, no throttling
- *   npx tsx tile-proxy.ts --bandwidth 10     # simulate 10 Mbps (fast 4G)
- *   npx tsx tile-proxy.ts --bandwidth 1.5    # simulate 1.5 Mbps (3G)
+ *   npx tsx tile-proxy.ts                    # start on port 8765 (10 Mbps + 50 ms RTT)
  *   npx tsx tile-proxy.ts --port 9999        # custom port
  */
 
@@ -24,10 +22,11 @@ const UPSTREAM = "https://tiles.openfreemap.org";
 const argv = process.argv.slice(2);
 const portIdx = argv.findIndex((a) => a === "--port");
 const PORT = portIdx >= 0 ? parseInt(argv[portIdx + 1], 10) : 8765;
-const bwIdx = argv.findIndex((a) => a === "--bandwidth");
-/** Simulated bandwidth in megabits per second. 0 = unlimited (no throttling). */
-const BANDWIDTH_MBPS = bwIdx >= 0 ? parseFloat(argv[bwIdx + 1]) : 0;
-const BYTES_PER_SEC = BANDWIDTH_MBPS > 0 ? (BANDWIDTH_MBPS * 1_000_000) / 8 : 0;
+/** Simulated bandwidth: 10 Mbps (4G, Rusan et al.). */
+const BANDWIDTH_MBPS = 10;
+const BYTES_PER_SEC = (BANDWIDTH_MBPS * 1_000_000) / 8;
+/** Fixed per-request round-trip latency (ms), simulating a 4G connection (Rusan et al.). */
+const RTT_MS = 50;
 
 fs.mkdirSync(CACHE_DIR, { recursive: true });
 
@@ -174,10 +173,8 @@ const server = http.createServer(async (req, res) => {
 
     const tileData = row.tile_data;
 
-    if (BYTES_PER_SEC > 0) {
-      const delayMs = (tileData.length / BYTES_PER_SEC) * 1000;
-      await new Promise((resolve) => setTimeout(resolve, delayMs));
-    }
+    const delayMs = RTT_MS + (tileData.length / BYTES_PER_SEC) * 1000;
+    await new Promise((resolve) => setTimeout(resolve, delayMs));
 
     hits++;
     res.writeHead(200, {
@@ -204,12 +201,10 @@ const server = http.createServer(async (req, res) => {
     // Allow-Origin: *` on every response or the fetch is rejected.
     headers["access-control-allow-origin"] = "*";
 
-    if (BYTES_PER_SEC > 0) {
-      // Simulate network transfer time proportional to response size
-      const size = fs.statSync(body).size;
-      const delayMs = (size / BYTES_PER_SEC) * 1000;
-      await new Promise((resolve) => setTimeout(resolve, delayMs));
-    }
+    // Simulate network transfer time: RTT + size / bandwidth
+    const size = fs.statSync(body).size;
+    const delayMs = RTT_MS + (size / BYTES_PER_SEC) * 1000;
+    await new Promise((resolve) => setTimeout(resolve, delayMs));
 
     res.writeHead(status, headers);
     fs.createReadStream(body).pipe(res);
@@ -268,11 +263,7 @@ server.listen(PORT, () => {
   } else {
     console.log("MBTiles: none (use --mbtiles <path> or POST /control/load-mbtiles)");
   }
-  if (BANDWIDTH_MBPS > 0) {
-    console.log(`Bandwidth throttle: ${BANDWIDTH_MBPS} Mbps (${(BYTES_PER_SEC / 1024).toFixed(0)} KB/s)`);
-  } else {
-    console.log("Bandwidth throttle: off (use --bandwidth <Mbps> to simulate network)");
-  }
+  console.log(`Network simulation: ${BANDWIDTH_MBPS} Mbps (${(BYTES_PER_SEC / 1024).toFixed(0)} KB/s) + ${RTT_MS} ms RTT`);
   console.log("Press Ctrl+C to stop\n");
 });
 

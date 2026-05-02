@@ -200,7 +200,7 @@ clean-gen:
     echo "pub mod literals; pub mod root; pub mod named_types; pub mod expressions; pub mod sources; pub mod layers;" > style-spec/src/spec/mod.rs
 
 # Start caching tile proxy for benchmarks (caches tiles from openfreemap on disk).
-# Pass --bandwidth <Mbps> to simulate network latency (e.g. just bench-proxy --bandwidth 10).
+# Simulates 4G network conditions: 10 Mbps + 50 ms RTT (Rusan et al.).
 [working-directory: 'tests/bench']
 bench-proxy *ARGS:
     {{nvm_prefix}} npx tsx tile-proxy.ts {{ARGS}}
