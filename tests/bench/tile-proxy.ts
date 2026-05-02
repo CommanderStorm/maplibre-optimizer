@@ -7,7 +7,7 @@
  * harness talks to it over plain HTTP — same codepath as production.
  *
  * Usage:
- *   npx tsx tile-proxy.ts                    # start on port 8765 (10 Mbps + 50 ms RTT)
+ *   npx tsx tile-proxy.ts                    # start on port 8765 (30 Mbps + 25 ms RTT)
  *   npx tsx tile-proxy.ts --port 9999        # custom port
  */
 
@@ -22,7 +22,7 @@ const UPSTREAM = "https://tiles.openfreemap.org";
 const argv = process.argv.slice(2);
 const portIdx = argv.findIndex((a) => a === "--port");
 const PORT = portIdx >= 0 ? parseInt(argv[portIdx + 1], 10) : 8765;
-/** Simulated bandwidth: 10 Mbps (4G, Rusan et al.). */
+/** Simulated bandwidth: 30 Mbps (4G, Rusan et al.). */
 const BANDWIDTH_MBPS = 30;
 const BYTES_PER_SEC = (BANDWIDTH_MBPS * 1_000_000) / 8;
 /** Fixed per-request round-trip latency (ms), simulating a 4G connection (Rusan et al.). */
@@ -175,11 +175,18 @@ const server = http.createServer(async (req, res) => {
     await new Promise((resolve) => setTimeout(resolve, delayMs));
 
     hits++;
-    res.writeHead(200, {
-      "content-type": "application/octet-stream",
+    // MBTiles stores tiles as gzipped PBF. Set content-encoding so the browser
+    // transparently decompresses before passing to MapLibre's tile parser.
+    const isGzipped = tileData.length >= 2 && tileData[0] === 0x1f && tileData[1] === 0x8b;
+    const headers: Record<string, string> = {
+      "content-type": "application/x-protobuf",
       "content-length": String(tileData.length),
       "access-control-allow-origin": "*",
-    });
+    };
+    if (isGzipped) {
+      headers["content-encoding"] = "gzip";
+    }
+    res.writeHead(200, headers);
     res.end(tileData);
     return;
   }

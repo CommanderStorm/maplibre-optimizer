@@ -166,6 +166,10 @@ interface Variant {
    *  steps it is the size of the produced (shaved/rewritten) mbtiles.
    *  `null` when --mbtiles was not provided. */
   tileBytes: number | null;
+  /** Path to the mbtiles file the proxy should serve for this variant.
+   *  Set for tile_shave_only, tile_shave, and tile_rewrite steps.
+   *  The proxy is loaded with this file right before the variant's browser run. */
+  mbtilesPath?: string;
 }
 
 interface ComplexityReport {
@@ -495,11 +499,8 @@ async function buildVariants(originalStyleJson: string, schema: string): Promise
         const shaveFiles = fs.readdirSync(shaveDir);
         const shavedMbtiles = shaveFiles.find((f) => f.endsWith(".mbtiles"));
 
-        if (shavedMbtiles) {
-          await proxyLoadMbtiles(path.resolve(shaveDir, shavedMbtiles));
-        }
-
-        const tileBytes = shavedMbtiles ? fs.statSync(path.resolve(shaveDir, shavedMbtiles)).size : baseTileBytes;
+        const resolvedMbtiles = shavedMbtiles ? path.resolve(shaveDir, shavedMbtiles) : undefined;
+        const tileBytes = resolvedMbtiles ? fs.statSync(resolvedMbtiles).size : baseTileBytes;
 
         // Use original baseline style with the pruned MVT tiles
         let shaveStyleJson = rewriteStyleForMbtiles(originalStyleJson);
@@ -525,6 +526,7 @@ async function buildVariants(originalStyleJson: string, schema: string): Promise
           complexity,
           preprocessingMs,
           tileBytes,
+          mbtilesPath: resolvedMbtiles,
         });
         console.log(`  ${variantId}: baseline style + pruned MVT tiles`);
 
@@ -559,11 +561,8 @@ async function buildVariants(originalStyleJson: string, schema: string): Promise
         const shaveFiles = fs.readdirSync(shaveDir);
         const shavedMbtiles = shaveFiles.find((f) => f.endsWith(".mbtiles"));
 
-        if (shavedMbtiles) {
-          await proxyLoadMbtiles(path.resolve(shaveDir, shavedMbtiles));
-        }
-
-        const tileBytes = shavedMbtiles ? fs.statSync(path.resolve(shaveDir, shavedMbtiles)).size : baseTileBytes;
+        const resolvedMbtiles = shavedMbtiles ? path.resolve(shaveDir, shavedMbtiles) : undefined;
+        const tileBytes = resolvedMbtiles ? fs.statSync(resolvedMbtiles).size : baseTileBytes;
 
         // Use the optimised style (from the latest cumulative step) with pruned MVT tiles
         const optimizedStyleText = fs.readFileSync(optimizedStylePath, "utf8");
@@ -592,6 +591,7 @@ async function buildVariants(originalStyleJson: string, schema: string): Promise
           complexity,
           preprocessingMs,
           tileBytes,
+          mbtilesPath: resolvedMbtiles,
         });
         console.log(`  ${variantId}: optimised style + pruned MVT tiles (${pctSmaller}% style reduction)`);
 
@@ -644,12 +644,8 @@ async function buildVariants(originalStyleJson: string, schema: string): Promise
         let advisoryStyleJson = fs.readFileSync(path.join(advisoryDir, rewrittenStyle), "utf8");
         advisoryStyleJson = rewriteStyleForMbtiles(advisoryStyleJson);
 
-        // Signal the proxy to serve the rewritten mbtiles
-        if (rewrittenMbtiles) {
-          await proxyLoadMbtiles(path.resolve(advisoryDir, rewrittenMbtiles));
-        }
-
-        const tileBytes = rewrittenMbtiles ? fs.statSync(path.resolve(advisoryDir, rewrittenMbtiles)).size : baseTileBytes;
+        const resolvedMbtiles = rewrittenMbtiles ? path.resolve(advisoryDir, rewrittenMbtiles) : undefined;
+        const tileBytes = resolvedMbtiles ? fs.statSync(resolvedMbtiles).size : baseTileBytes;
 
         const styleBytes = Buffer.byteLength(advisoryStyleJson, "utf8");
         const gzBytes = gzipSize(advisoryStyleJson);
@@ -675,6 +671,7 @@ async function buildVariants(originalStyleJson: string, schema: string): Promise
           complexity,
           preprocessingMs,
           tileBytes,
+          mbtilesPath: resolvedMbtiles,
         });
         console.log(`  ${variantId}: ${formatKB(advisoryStyleJson)} (${pctSmaller}% smaller, gzip: ${(gzBytes / 1024).toFixed(1)} KB, br: ${(brBytes / 1024).toFixed(1)} KB)`);
 
@@ -752,13 +749,19 @@ async function buildVariants(originalStyleJson: string, schema: string): Promise
     if (statsPath) {
       try { fs.unlinkSync(statsPath); } catch {}
     }
-    // Clean up advisory and shave output directories
-    try { fs.rmSync(advisoryDir, { recursive: true, force: true }); } catch {}
-    try { fs.rmSync(path.join(RESULTS_DIR, `_bench_shave_only_${process.pid}`), { recursive: true, force: true }); } catch {}
-    try { fs.rmSync(path.join(RESULTS_DIR, `_bench_shave_${process.pid}`), { recursive: true, force: true }); } catch {}
+    // NOTE: advisory/shave directories are NOT cleaned here — they contain
+    // mbtiles files referenced by tile variants via mbtilesPath. Cleanup
+    // happens after the benchmark loop via cleanupVariantTiles().
   }
 
   return variants;
+}
+
+/** Clean up mbtiles directories created during buildVariants(). */
+function cleanupVariantTiles(): void {
+  try { fs.rmSync(path.join(RESULTS_DIR, `_bench_advisory_${process.pid}`), { recursive: true, force: true }); } catch {}
+  try { fs.rmSync(path.join(RESULTS_DIR, `_bench_shave_only_${process.pid}`), { recursive: true, force: true }); } catch {}
+  try { fs.rmSync(path.join(RESULTS_DIR, `_bench_shave_${process.pid}`), { recursive: true, force: true }); } catch {}
 }
 
 // ── browser-side benchmark harness (plain JS, no tsx transforms) ─────────────
@@ -1226,6 +1229,11 @@ async function main(): Promise<void> {
           if (metrics === undefined) {
             errMsg = errorByHash.get(variant.styleHash);
             if (errMsg === undefined) {
+              // Load the correct mbtiles for tile variants before rendering
+              if (variant.mbtilesPath) {
+                await proxyLoadMbtiles(variant.mbtilesPath);
+              }
+
               const page = await browser.newPage();
               applyDebugListeners(page);
 
@@ -1318,6 +1326,7 @@ async function main(): Promise<void> {
     if (MBTILES && variants.some((v) => v.passes.some((p: string) => p.startsWith("tile_")))) {
       await proxyUnloadMbtiles();
     }
+    cleanupVariantTiles();
 
     // Per-style size summary
     console.log(`\n── ${benchStyle.id} Style Sizes ──`);
