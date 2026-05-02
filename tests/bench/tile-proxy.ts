@@ -6,6 +6,8 @@
  * from an on-disk cache. Runs as a standalone process so the benchmark
  * harness talks to it over plain HTTP — same codepath as production.
  *
+ * Clears the disk cache on every start to avoid stale/broken tiles.
+ *
  * Usage:
  *   npx tsx tile-proxy.ts                    # start on port 8765 (30 Mbps + 25 ms RTT)
  *   npx tsx tile-proxy.ts --port 9999        # custom port
@@ -27,7 +29,12 @@ const BANDWIDTH_MBPS = 30;
 const BYTES_PER_SEC = (BANDWIDTH_MBPS * 1_000_000) / 8;
 /** Fixed per-request round-trip latency (ms), simulating a 4G connection (Rusan et al.). */
 const RTT_MS = 25;
+/** Referer sent on upstream requests so tile servers treat us like a real website. */
+const REFERER = "https://maputnik.github.io/";
 
+// Always clear disk cache on start to avoid serving stale/broken cached tiles
+fs.rmSync(CACHE_DIR, { recursive: true, force: true });
+console.log("Cleared tile cache");
 fs.mkdirSync(CACHE_DIR, { recursive: true });
 
 let mbtilesDb: InstanceType<typeof Database> | null = null;
@@ -97,6 +104,18 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  if (url === "/control/clear-cache" && req.method === "POST") {
+    fs.rmSync(CACHE_DIR, { recursive: true, force: true });
+    fs.mkdirSync(CACHE_DIR, { recursive: true });
+    cachedTileJson = null;
+    hits = 0;
+    misses = 0;
+    console.log("Cache cleared via control endpoint");
+    res.writeHead(200);
+    res.end("ok");
+    return;
+  }
+
   // ── synthetic TileJSON at /sources/openmaptiles ─────────────────────────
   // OpenFreeMap serves TileJSON at `/planet`, not `/sources/openmaptiles`.
   // Fetch once, rewrite tile URLs to route through this proxy, cache in memory.
@@ -108,6 +127,8 @@ const server = http.createServer(async (req, res) => {
             "User-Agent":
               "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/131 Safari/537.36",
             "Accept": "application/json",
+            "Referer": REFERER,
+            "Origin": REFERER,
           },
         });
         if (!upstream.ok) {
@@ -152,7 +173,7 @@ const server = http.createServer(async (req, res) => {
   const mbtilesMatch = url.match(/^\/mbtiles\/(\d+)\/(\d+)\/(\d+)$/);
   if (mbtilesMatch) {
     if (!mbtilesTileStmt) {
-      res.writeHead(404);
+      res.writeHead(404, { "access-control-allow-origin": "*" });
       res.end("no mbtiles loaded");
       return;
     }
@@ -164,7 +185,7 @@ const server = http.createServer(async (req, res) => {
 
     const row = mbtilesTileStmt.get(z, x, tmsY) as { tile_data: Buffer } | undefined;
     if (!row) {
-      res.writeHead(404);
+      res.writeHead(404, { "access-control-allow-origin": "*" });
       res.end("tile not found");
       return;
     }
@@ -223,6 +244,8 @@ const server = http.createServer(async (req, res) => {
       headers: {
         "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/131 Safari/537.36",
         "Accept": req.headers.accept ?? "*/*",
+        "Referer": REFERER,
+        "Origin": REFERER,
       },
     });
     const respBody = Buffer.from(await upstream.arrayBuffer());

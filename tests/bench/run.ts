@@ -1175,7 +1175,7 @@ async function main(): Promise<void> {
   console.log(`Styles: ${STYLES.map((s) => s.id).join(", ")}`);
   console.log(`Scenarios: ${scenarios.length}, Runs: ${RUNS}, Warmup: ${WARMUP}, Mode: ${mode}\n`);
 
-  let browser = await puppeteer.launch({ headless: true, args: PUPPETEER_ARGS });
+  let browser = await puppeteer.launch({ headless: true, args: PUPPETEER_ARGS, protocolTimeout: RUN_TIMEOUT + 30_000 });
 
   function applyDebugListeners(p: Page): void {
     if (!debug) return;
@@ -1299,7 +1299,7 @@ async function main(): Promise<void> {
             if (errMsg.includes("Session closed") || errMsg.includes("Target closed") || errMsg.includes("Protocol error")) {
               console.log("\n  Recovering browser…");
               try { await browser.close(); } catch {}
-              browser = await puppeteer.launch({ headless: true, args: PUPPETEER_ARGS });
+              browser = await puppeteer.launch({ headless: true, args: PUPPETEER_ARGS, protocolTimeout: RUN_TIMEOUT + 30_000 });
             }
           }
         }
