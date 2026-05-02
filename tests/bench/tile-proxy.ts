@@ -23,14 +23,12 @@ const argv = process.argv.slice(2);
 const portIdx = argv.findIndex((a) => a === "--port");
 const PORT = portIdx >= 0 ? parseInt(argv[portIdx + 1], 10) : 8765;
 /** Simulated bandwidth: 10 Mbps (4G, Rusan et al.). */
-const BANDWIDTH_MBPS = 10;
+const BANDWIDTH_MBPS = 30;
 const BYTES_PER_SEC = (BANDWIDTH_MBPS * 1_000_000) / 8;
 /** Fixed per-request round-trip latency (ms), simulating a 4G connection (Rusan et al.). */
-const RTT_MS = 50;
+const RTT_MS = 25;
 
 fs.mkdirSync(CACHE_DIR, { recursive: true });
-
-// ── mbtiles serving ──────────────────────────────────────────────────────────
 
 let mbtilesDb: InstanceType<typeof Database> | null = null;
 let mbtilesTileStmt: ReturnType<InstanceType<typeof Database>["prepare"]> | null = null;
