@@ -1139,7 +1139,8 @@ fn prune_match_arms_by_domain(arr: &mut Vec<Value>, domain: &[Value]) -> bool {
 
     // All arms pruned → collapse to fallback.
     if new_arr.len() == 3 {
-        *arr = vec![Value::String("literal".to_string()), new_arr.remove(2)];
+        let fallback = new_arr.remove(2);
+        replace_arr_with_value(arr, fallback);
     } else {
         *arr = new_arr;
     }
