@@ -116,11 +116,19 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  // ── blank page served at the proxy origin (needed by MapLibre v6 ESM workers)
+  if (url === "/bench") {
+    res.writeHead(200, { "content-type": "text/html", "access-control-allow-origin": "*" });
+    res.end("<!DOCTYPE html><html><head></head><body></body></html>");
+    return;
+  }
+
   // ── serve local MapLibre JS bundles for ESM <script type="module"> ─────
   // v6 ships ESM-only; the main module resolves its web-worker URL relative
   // to import.meta.url, so both files must be served from the same origin.
-  if (url === "/maplibre-gl.mjs" || url === "/maplibre-gl-worker.mjs") {
-    const mjsPath = path.join(__dirname, "node_modules/maplibre-gl/dist", url.slice(1));
+  const urlPath = url.split("?")[0];
+  if (urlPath === "/maplibre-gl.mjs" || urlPath === "/maplibre-gl-worker.mjs") {
+    const mjsPath = path.join(__dirname, "node_modules/maplibre-gl/dist", urlPath.slice(1));
     const body = await fs.promises.readFile(mjsPath);
     res.writeHead(200, {
       "content-type": "application/javascript",

@@ -954,6 +954,9 @@ async function runBenchmarkInBrowser(
   scenario: Scenario,
 ): Promise<RunMetrics> {
   await page.setViewport({ width: 1024, height: 768, deviceScaleFactor: 1 });
+  // Navigate to the proxy origin so the page has a real (non-opaque) origin.
+  // MapLibre v6 ESM module workers require this to function.
+  await page.goto(`${TILE_PROXY_URL}/bench`, { waitUntil: "domcontentloaded" });
   await page.setContent(`<!DOCTYPE html>
 <html><head><meta charset="utf-8">
 <style>
@@ -966,7 +969,7 @@ ${MAPLIBRE_CSS_TEXT}
   // MapLibre v6 ships ESM-only.  Serve the file so the browser can load it
   // as a proper <script type="module"> with working import.meta and workers.
   await page.addScriptTag({ type: "module", content:
-    `import * as ml from "http://localhost:${TILE_PROXY_PORT}/maplibre-gl.mjs";\n` +
+    `import * as ml from "${TILE_PROXY_URL}/maplibre-gl.mjs";\n` +
     `window.maplibregl = ml;\n` +
     `window.__mlReady = true;\n` });
   // Module scripts are deferred — wait for execution before injecting the harness.
@@ -1303,7 +1306,7 @@ async function main(): Promise<void> {
           } else if (errMsg !== undefined) {
             console.error(`\n  ⚠ ${variant.id} error: ${errMsg}`);
             parts.push(`${variant.id}: ERR`);
-            if (errMsg.includes("Session closed") || errMsg.includes("Target closed") || errMsg.includes("Protocol error")) {
+            if (errMsg.includes("Session closed") || errMsg.includes("Target closed") || errMsg.includes("Protocol error") || errMsg.includes("benchmark run timeout")) {
               console.log("\n  Recovering browser…");
               try { await browser.close(); } catch {}
               browser = await puppeteer.launch({ headless: true, args: PUPPETEER_ARGS, protocolTimeout: RUN_TIMEOUT + 30_000 });
