@@ -1244,17 +1244,17 @@ async function main(): Promise<void> {
                 await proxyLoadMbtiles(variant.mbtilesPath);
               }
 
-              const page = await browser.newPage();
-              applyDebugListeners(page);
-
+              let page: Awaited<ReturnType<typeof browser.newPage>> | undefined;
               try {
+                page = await browser.newPage();
+                applyDebugListeners(page);
                 metrics = await runBenchmarkInBrowser(page, variant.styleJson, scenario);
                 metricsByHash.set(variant.styleHash, metrics);
               } catch (err: unknown) {
                 errMsg = err instanceof Error ? err.message : String(err);
                 errorByHash.set(variant.styleHash, errMsg);
               } finally {
-                try { await page.close(); } catch {}
+                try { if (page) await page.close(); } catch {}
               }
             }
           } else {
@@ -1306,7 +1306,7 @@ async function main(): Promise<void> {
           } else if (errMsg !== undefined) {
             console.error(`\n  ⚠ ${variant.id} error: ${errMsg}`);
             parts.push(`${variant.id}: ERR`);
-            if (errMsg.includes("Session closed") || errMsg.includes("Target closed") || errMsg.includes("Protocol error") || errMsg.includes("benchmark run timeout")) {
+            if (errMsg.includes("Session closed") || errMsg.includes("Target closed") || errMsg.includes("Protocol error") || errMsg.includes("benchmark run timeout") || errMsg.includes("Connection closed") || errMsg.includes("frame was detached")) {
               console.log("\n  Recovering browser…");
               try { await browser.close(); } catch {}
               browser = await puppeteer.launch({ headless: true, args: PUPPETEER_ARGS, protocolTimeout: RUN_TIMEOUT + 30_000 });
