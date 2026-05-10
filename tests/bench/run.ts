@@ -1244,7 +1244,7 @@ async function main(): Promise<void> {
                 await proxyLoadMbtiles(variant.mbtilesPath);
               }
 
-              let page: Awaited<ReturnType<typeof browser.newPage>> | undefined;
+              let page: Page | undefined;
               try {
                 page = await browser.newPage();
                 applyDebugListeners(page);
