@@ -198,10 +198,11 @@ pub fn matches_template_name(template: &str, overloaded_name: &str) -> bool {
         let suffix = &template[pos + 3..];
         let base = overloaded_name.strip_suffix('?').unwrap_or(overloaded_name);
         for marker in ["_1_", "_2_", "_n_"] {
-            if let Some(p) = base.find(marker) {
-                if &base[..p] == prefix && &base[p + marker.len()..] == suffix {
-                    return true;
-                }
+            if let Some(p) = base.find(marker)
+                && &base[..p] == prefix
+                && &base[p + marker.len()..] == suffix
+            {
+                return true;
             }
         }
         template == overloaded_name

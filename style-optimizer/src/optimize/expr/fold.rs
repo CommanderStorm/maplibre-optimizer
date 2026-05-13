@@ -455,7 +455,7 @@ pub(super) fn try_algebraic_simplify(arr: &mut Vec<Value>) -> bool {
 /// ```
 ///
 /// This guard is redundant because `==` already returns `false` on type mismatch and `!=`
-/// returns `true`, per the MapLibre spec. We strip it to `["==", ["get", P], LIT]`.
+/// returns `true`, per the `MapLibre` spec. We strip it to `["==", ["get", P], LIT]`.
 ///
 /// **Safety:** Only strips for `==` (fallback `false`) and `!=` (fallback `true`).
 /// Relational operators (`<`, `>`, etc.) produce errors on type mismatch, so their guards

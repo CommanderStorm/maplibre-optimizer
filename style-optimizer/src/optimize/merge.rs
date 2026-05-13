@@ -183,7 +183,7 @@ fn differing_props_are_mergeable(layers: &[Value], layer_type: &str, mir: &MirSp
 
 /// Return true for MIR types whose values are always JSON arrays. Feature-
 /// driven `case`/`match` expressions returning arrays are nominally allowed
-/// by the spec but not actually supported by MapLibre GL JS's runtime, so
+/// by the spec but not actually supported by `MapLibre GL JS`'s runtime, so
 /// layer merging must treat these conservatively as non-mergeable.
 fn is_array_type(ty: &MirType) -> bool {
     matches!(
