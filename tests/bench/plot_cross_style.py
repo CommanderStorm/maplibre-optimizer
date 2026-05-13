@@ -15,7 +15,15 @@ from pathlib import Path
 import pandas as pd
 import plotly.graph_objects as go
 
-from plot_style import COLORS, LAYOUT_DEFAULTS, IMG_HEIGHT, IMG_SCALE, IMG_WIDTH, THESIS_FIGURES, THESIS_FIGURES_DIR
+from plot_style import (
+    COLORS,
+    IMG_HEIGHT,
+    IMG_SCALE,
+    IMG_WIDTH,
+    LAYOUT_DEFAULTS,
+    THESIS_FIGURES,
+    THESIS_FIGURES_DIR,
+)
 
 
 def write_fig(fig: go.Figure, out: Path, name: str, fmt: str) -> None:
@@ -31,7 +39,9 @@ def write_fig(fig: go.Figure, out: Path, name: str, fmt: str) -> None:
         print(f"  {path_pdf}")
         if name in THESIS_FIGURES and THESIS_FIGURES_DIR.is_dir():
             thesis_pdf = THESIS_FIGURES_DIR / f"{name}.pdf"
-            fig.write_image(thesis_pdf, width=IMG_WIDTH, height=IMG_HEIGHT, scale=IMG_SCALE)
+            fig.write_image(
+                thesis_pdf, width=IMG_WIDTH, height=IMG_HEIGHT, scale=IMG_SCALE
+            )
             print(f"  → thesis: {thesis_pdf}")
 
 
@@ -62,19 +72,20 @@ def plot_size_reduction_bar(df: pd.DataFrame, out: Path, fmt: str) -> None:
     ]:
         if col not in df.columns:
             continue
-        fig.add_trace(go.Bar(
-            y=df["style_id"],
-            x=df[col],
-            orientation="h",
-            name=name,
-            marker_color=color,
-            text=[f"{v:.1f}%" for v in df[col]],
-            textposition="outside",
-        ))
+        fig.add_trace(
+            go.Bar(
+                y=df["style_id"],
+                x=df[col],
+                orientation="h",
+                name=name,
+                marker_color=color,
+                text=[f"{v:.1f}%" for v in df[col]],
+                textposition="outside",
+            )
+        )
 
     fig.update_layout(
         **LAYOUT_DEFAULTS,
-        title="Size Reduction per Style (Raw, Gzip, Brotli)",
         xaxis_title="% Reduction",
         yaxis_title="Style",
         barmode="group",
@@ -90,19 +101,20 @@ def plot_complexity_scatter(df: pd.DataFrame, out: Path, fmt: str) -> None:
         return
 
     fig = go.Figure()
-    fig.add_trace(go.Scatter(
-        x=df["original_ast_nodes"],
-        y=df["reduction_pct"],
-        mode="markers+text",
-        text=df["style_id"],
-        textposition="top center",
-        textfont=dict(size=9),
-        marker=dict(size=10, color="#5E94D4"),
-    ))
+    fig.add_trace(
+        go.Scatter(
+            x=df["original_ast_nodes"],
+            y=df["reduction_pct"],
+            mode="markers+text",
+            text=df["style_id"],
+            textposition="top center",
+            textfont=dict(size=9),
+            marker=dict(size=10, color="#5E94D4"),
+        )
+    )
 
     fig.update_layout(
         **LAYOUT_DEFAULTS,
-        title="Original Complexity vs Size Reduction",
         xaxis_title="Original AST Node Count",
         yaxis_title="% Size Reduction",
     )
@@ -111,31 +123,37 @@ def plot_complexity_scatter(df: pd.DataFrame, out: Path, fmt: str) -> None:
 
 def plot_layer_count_comparison(df: pd.DataFrame, out: Path, fmt: str) -> None:
     """Grouped bar: original vs optimized layer count per style."""
-    if "original_layer_count" not in df.columns or "optimized_layer_count" not in df.columns:
+    if (
+        "original_layer_count" not in df.columns
+        or "optimized_layer_count" not in df.columns
+    ):
         print("  (skipped — missing layer count columns)")
         return
 
     df = df.sort_values("original_layer_count", ascending=True)
 
     fig = go.Figure()
-    fig.add_trace(go.Bar(
-        y=df["style_id"],
-        x=df["original_layer_count"],
-        orientation="h",
-        name="Original",
-        marker_color="#5E94D4",
-    ))
-    fig.add_trace(go.Bar(
-        y=df["style_id"],
-        x=df["optimized_layer_count"],
-        orientation="h",
-        name="Optimized",
-        marker_color="#9FBA36",
-    ))
+    fig.add_trace(
+        go.Bar(
+            y=df["style_id"],
+            x=df["original_layer_count"],
+            orientation="h",
+            name="Original",
+            marker_color="#5E94D4",
+        )
+    )
+    fig.add_trace(
+        go.Bar(
+            y=df["style_id"],
+            x=df["optimized_layer_count"],
+            orientation="h",
+            name="Optimized",
+            marker_color="#9FBA36",
+        )
+    )
 
     fig.update_layout(
         **LAYOUT_DEFAULTS,
-        title="Layer Count: Original vs Optimized",
         xaxis_title="Layer Count",
         yaxis_title="Style",
         barmode="group",
@@ -147,8 +165,12 @@ def plot_layer_count_comparison(df: pd.DataFrame, out: Path, fmt: str) -> None:
 def main() -> None:
     parser = argparse.ArgumentParser(description="Plot cross-style benchmark results.")
     parser.add_argument("files", nargs="+", type=Path, help="JSONL result files")
-    parser.add_argument("--out", type=Path, default=Path("tests/bench/figures"), help="Output directory")
-    parser.add_argument("--format", choices=["png", "html"], default="png", help="Output format")
+    parser.add_argument(
+        "--out", type=Path, default=Path("tests/bench/figures"), help="Output directory"
+    )
+    parser.add_argument(
+        "--format", choices=["png", "html"], default="png", help="Output format"
+    )
     args = parser.parse_args()
 
     args.out.mkdir(parents=True, exist_ok=True)

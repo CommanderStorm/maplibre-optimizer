@@ -21,29 +21,31 @@ import plotly.graph_objects as go
 
 from plot_style import (
     COLORS,
+    IMG_HEIGHT,
+    IMG_SCALE,
+    IMG_WIDTH,
     IMPROVEMENT_COLOR,
     LAYOUT_DEFAULTS,
     NEUTRAL_COLOR,
     REGRESSION_COLOR,
-    IMG_HEIGHT,
-    IMG_SCALE,
-    IMG_WIDTH,
     THESIS_FIGURES,
     THESIS_FIGURES_DIR,
 )
 
 
-def write_fig(fig: go.Figure, out: Path, name: str) -> None:
-    """Write a figure as both PNG (for viewing) and PDF (for LaTeX)."""
-    path_png = out / f"{name}.png"
+def write_fig(
+    fig: go.Figure,
+    out: Path,
+    name: str,
+    width: int = IMG_WIDTH,
+    height: int = IMG_HEIGHT,
+) -> None:
     path_pdf = out / f"{name}.pdf"
-    fig.write_image(path_png, width=IMG_WIDTH, height=IMG_HEIGHT, scale=IMG_SCALE)
-    fig.write_image(path_pdf, width=IMG_WIDTH, height=IMG_HEIGHT, scale=IMG_SCALE)
-    print(f"  {path_png}")
+    fig.write_image(path_pdf, width=width, height=height, scale=IMG_SCALE)
     print(f"  {path_pdf}")
     if name in THESIS_FIGURES and THESIS_FIGURES_DIR.is_dir():
         thesis_pdf = THESIS_FIGURES_DIR / f"{name}.pdf"
-        fig.write_image(thesis_pdf, width=IMG_WIDTH, height=IMG_HEIGHT, scale=IMG_SCALE)
+        fig.write_image(thesis_pdf, width=width, height=height, scale=IMG_SCALE)
         print(f"  → thesis: {thesis_pdf}")
 
 
@@ -62,35 +64,61 @@ def load_jsonl(paths: list[Path]) -> pd.DataFrame:
 
 
 PRIMARY_METRICS = [
-    "fps", "meanFrameMs",
-    "loadMs", "idleMs",
+    "fps",
+    "meanFrameMs",
+    "loadMs",
+    "idleMs",
     "styleParseMs",
-    "style_bytes", "gzip_bytes", "brotli_bytes",
+    "style_bytes",
+    "gzip_bytes",
+    "brotli_bytes",
 ]
 
 SECONDARY_METRICS = [
-    "p50FrameMs", "p95FrameMs", "p99FrameMs",
-    "jankCount", "droppedFrameRatio",
+    "p50FrameMs",
+    "p95FrameMs",
+    "p99FrameMs",
+    "jankCount",
+    "droppedFrameRatio",
     "frameTimeVariance",
-    "firstTileMs", "firstFrameMs",
-    "heapUsedMB", "peakHeapMB",
+    "firstTileMs",
+    "firstFrameMs",
+    "heapUsedMB",
+    "peakHeapMB",
 ]
 
 METRICS = PRIMARY_METRICS + SECONDARY_METRICS
 
 LOWER_IS_BETTER = {
-    "loadMs", "idleMs", "meanFrameMs", "frameTimeVariance", "droppedFrameRatio",
-    "p50FrameMs", "p95FrameMs", "p99FrameMs", "jankCount",
-    "styleParseMs", "firstTileMs", "firstFrameMs",
-    "heapUsedMB", "peakHeapMB",
-    "style_bytes", "gzip_bytes", "brotli_bytes",
+    "loadMs",
+    "idleMs",
+    "meanFrameMs",
+    "frameTimeVariance",
+    "droppedFrameRatio",
+    "p50FrameMs",
+    "p95FrameMs",
+    "p99FrameMs",
+    "jankCount",
+    "styleParseMs",
+    "firstTileMs",
+    "firstFrameMs",
+    "heapUsedMB",
+    "peakHeapMB",
+    "style_bytes",
+    "gzip_bytes",
+    "brotli_bytes",
 }
 
 SIZE_METRICS = ["style_bytes", "gzip_bytes", "brotli_bytes"]
 COMPLEXITY_METRICS = [
-    "layer_count", "filter_count",
-    "property_count", "expression_property_count", "scalar_property_count",
-    "total_expression_nodes", "ast_nodes", "max_depth",
+    "layer_count",
+    "filter_count",
+    "property_count",
+    "expression_property_count",
+    "scalar_property_count",
+    "total_expression_nodes",
+    "ast_nodes",
+    "max_depth",
 ]
 
 METRIC_LABELS = {
@@ -126,7 +154,7 @@ METRIC_LABELS = {
 def ablation_step_order(df: pd.DataFrame) -> list[str]:
     """Return variant IDs sorted by ablation step number."""
     variants = df["variant"].unique().tolist()
-    variants.sort(key=lambda v: (v.split("-")[1] if "-" in v else "99"))
+    variants.sort(key=lambda v: v.split("-")[1] if "-" in v else "99")
     return variants
 
 
@@ -157,8 +185,10 @@ def _add_stats_annotation(fig: go.Figure) -> None:
     """Add a footnote annotation explaining the stats-dependent pass marker."""
     fig.add_annotation(
         text="\u2605 = requires tile statistics",
-        xref="paper", yref="paper",
-        x=1.0, y=-0.22,
+        xref="paper",
+        yref="paper",
+        x=1.0,
+        y=-0.22,
         showarrow=False,
         font=dict(size=11, color="#666"),
         xanchor="right",
@@ -173,7 +203,10 @@ def _delta_pct(old: float, new: float) -> float | None:
 
 
 def compute_marginal_deltas(
-    medians: pd.DataFrame, variants: list[str], metric: str, scenarios: list[str],
+    medians: pd.DataFrame,
+    variants: list[str],
+    metric: str,
+    scenarios: list[str],
 ) -> dict[str, list[float | None]]:
     """
     Compute per-scenario marginal delta for each ablation step.
@@ -191,7 +224,9 @@ def compute_marginal_deltas(
         for scenario in scenarios:
             sdf = medians[medians.scenario == scenario].set_index("variant")
             if prev_v in sdf.index and curr_v in sdf.index:
-                deltas.append(_delta_pct(sdf.loc[prev_v, metric], sdf.loc[curr_v, metric]))
+                deltas.append(
+                    _delta_pct(sdf.loc[prev_v, metric], sdf.loc[curr_v, metric])
+                )
             else:
                 deltas.append(None)
         result[pass_name] = deltas
@@ -199,7 +234,10 @@ def compute_marginal_deltas(
 
 
 def plot_ablation_waterfall(
-    medians: pd.DataFrame, variants: list[str], metrics: list[str], out: Path,
+    medians: pd.DataFrame,
+    variants: list[str],
+    metrics: list[str],
+    out: Path,
 ) -> None:
     """
     Ablation waterfall: X-axis is ablation step, Y-axis is metric value.
@@ -216,15 +254,17 @@ def plot_ablation_waterfall(
         for scenario in scenarios:
             sdf = medians[medians.scenario == scenario].set_index("variant")
             sdf = sdf.reindex(variants)
-            fig.add_trace(go.Scatter(
-                x=step_labels,
-                y=sdf[metric].values,
-                mode="lines",
-                line=dict(width=1, color="rgba(150,150,150,0.4)"),
-                name=scenario,
-                showlegend=False,
-                hovertext=scenario,
-            ))
+            fig.add_trace(
+                go.Scatter(
+                    x=step_labels,
+                    y=sdf[metric].values,
+                    mode="lines",
+                    line=dict(width=1, color="rgba(150,150,150,0.4)"),
+                    name=scenario,
+                    showlegend=False,
+                    hovertext=scenario,
+                )
+            )
 
         # Mean line across all scenarios
         mean_vals = []
@@ -232,20 +272,21 @@ def plot_ablation_waterfall(
             vdf = medians[medians.variant == v]
             mean_vals.append(vdf[metric].mean() if len(vdf) > 0 else None)
 
-        fig.add_trace(go.Scatter(
-            x=step_labels,
-            y=mean_vals,
-            mode="lines+markers",
-            line=dict(width=3, color="#F7811E"),
-            marker=dict(size=8),
-            name="Mean across scenarios",
-        ))
+        fig.add_trace(
+            go.Scatter(
+                x=step_labels,
+                y=mean_vals,
+                mode="lines+markers",
+                line=dict(width=3, color="#F7811E"),
+                marker=dict(size=8),
+                name="Mean across scenarios",
+            )
+        )
 
         lower_better = metric in LOWER_IS_BETTER
         direction = "↓ lower is better" if lower_better else "↑ higher is better"
         fig.update_layout(
             **LAYOUT_DEFAULTS,
-            title=f"Ablation Waterfall: {METRIC_LABELS.get(metric, metric)}",
             xaxis_title="Cumulative Pass",
             yaxis_title=f"{METRIC_LABELS.get(metric, metric)} ({direction})",
             xaxis_tickangle=-45,
@@ -256,7 +297,10 @@ def plot_ablation_waterfall(
 
 
 def plot_marginal_contribution(
-    medians: pd.DataFrame, variants: list[str], metrics: list[str], out: Path,
+    medians: pd.DataFrame,
+    variants: list[str],
+    metrics: list[str],
+    out: Path,
 ) -> None:
     """
     Bar chart of marginal % change when each pass is added.
@@ -283,22 +327,31 @@ def plot_marginal_contribution(
         colors = []
         for d in mean_deltas:
             is_good = (d < 0) if lower_better else (d > 0)
-            colors.append(IMPROVEMENT_COLOR if is_good else REGRESSION_COLOR if abs(d) > 0.5 else NEUTRAL_COLOR)
+            colors.append(
+                IMPROVEMENT_COLOR
+                if is_good
+                else REGRESSION_COLOR
+                if abs(d) > 0.5
+                else NEUTRAL_COLOR
+            )
 
         fig = go.Figure()
-        fig.add_trace(go.Bar(
-            x=pass_names,
-            y=mean_deltas,
-            error_y=dict(type="data", array=std_deltas, visible=True),
-            marker_color=colors,
-            text=[f"{d:+.2f}%" for d in mean_deltas],
-            textposition="outside",
-        ))
+        fig.add_trace(
+            go.Bar(
+                x=pass_names,
+                y=mean_deltas,
+                error_y=dict(type="data", array=std_deltas, visible=True),
+                marker_color=colors,
+                text=[f"{d:+.2f}%" for d in mean_deltas],
+                textposition="outside",
+            )
+        )
 
-        direction = "(negative = improvement)" if lower_better else "(positive = improvement)"
+        direction = (
+            "(negative = improvement)" if lower_better else "(positive = improvement)"
+        )
         fig.update_layout(
             **LAYOUT_DEFAULTS,
-            title=f"Marginal Contribution per Pass: {METRIC_LABELS.get(metric, metric)}",
             xaxis_title="Pass Added",
             yaxis_title=f"Median % Change {direction}",
             xaxis_tickangle=-45,
@@ -327,7 +380,11 @@ def plot_style_size_ablation(df: pd.DataFrame, variants: list[str], out: Path) -
 
     fig = go.Figure()
 
-    colors = {"style_bytes": "#5E94D4", "gzip_bytes": "#F7811E", "brotli_bytes": "#9FBA36"}
+    colors = {
+        "style_bytes": "#5E94D4",
+        "gzip_bytes": "#F7811E",
+        "brotli_bytes": "#9FBA36",
+    }
     names = {"style_bytes": "Raw", "gzip_bytes": "Gzip", "brotli_bytes": "Brotli"}
 
     for col in size_cols:
@@ -343,32 +400,34 @@ def plot_style_size_ablation(df: pd.DataFrame, variants: list[str], out: Path) -
 
         baseline = sizes[0]
         pct_labels = [
-            f"{s / 1024:.1f} KB ({(1 - s / baseline) * 100:.1f}%)" if i > 0
+            f"{s / 1024:.1f} KB ({(1 - s / baseline) * 100:.1f}%)"
+            if i > 0
             else f"{s / 1024:.1f} KB"
             for i, s in enumerate(sizes)
         ]
 
-        fig.add_trace(go.Scatter(
-            x=labels,
-            y=sizes,
-            mode="lines+markers",
-            line=dict(width=3, color=colors.get(col, "#333")),
-            marker=dict(size=8),
-            name=names.get(col, col),
-            text=pct_labels,
-            textposition="top center",
-            hovertext=pct_labels,
-        ))
+        fig.add_trace(
+            go.Scatter(
+                x=labels,
+                y=sizes,
+                mode="lines+markers",
+                line=dict(width=3, color=colors.get(col, "#333")),
+                marker=dict(size=8),
+                name=names.get(col, col),
+                text=pct_labels,
+                textposition="top center",
+                hovertext=pct_labels,
+            )
+        )
 
     fig.update_layout(
         **LAYOUT_DEFAULTS,
-        title="Style Size Across Ablation Steps (Raw, Gzip, Brotli)",
         xaxis_title="Cumulative Pass",
         yaxis_title="Size (bytes)",
         xaxis_tickangle=-45,
     )
     _add_stats_annotation(fig)
-    write_fig(fig, out, "style_size_ablation")
+    write_fig(fig, out, "style_size_ablation", height=IMG_HEIGHT // 2)
 
 
 def plot_scenario_heatmap(
@@ -401,20 +460,49 @@ def plot_scenario_heatmap(
 
         z = np.array(matrix, dtype=float).T  # scenarios as rows, passes as columns
 
-        fig = go.Figure(data=go.Heatmap(
-            z=z,
-            x=pass_names,
-            y=scenarios,
-            colorscale="RdYlGn",
-            zmid=0,
-            text=np.where(np.isnan(z), "", np.char.add(np.where(z >= 0, "+", ""), np.char.mod("%.1f%%", z))),
-            texttemplate="%{text}",
-            colorbar_title="% Improvement",
-        ))
+        # Underlay: gray cells for unmeasured (NaN) values.
+        gray_underlay = np.where(np.isnan(z), 1.0, np.nan)
+
+        # Red→transparent→green colorscale: no-improvement (zero) fades to clear
+        # instead of showing as yellow.
+        transparent_mid_scale = [
+            [0.0, "rgb(165, 0, 38)"],
+            [0.25, "rgb(244, 109, 67)"],
+            [0.5, "rgba(255, 255, 255, 0)"],
+            [0.75, "rgb(102, 189, 99)"],
+            [1.0, "rgb(0, 104, 55)"],
+        ]
+
+        fig = go.Figure()
+        fig.add_trace(
+            go.Heatmap(
+                z=gray_underlay,
+                x=pass_names,
+                y=scenarios,
+                colorscale=[[0, COLORS["grey_light"]], [1, COLORS["grey_light"]]],
+                showscale=False,
+                hoverinfo="skip",
+            )
+        )
+        fig.add_trace(
+            go.Heatmap(
+                z=z,
+                x=pass_names,
+                y=scenarios,
+                colorscale=transparent_mid_scale,
+                zmid=0,
+                text=np.where(
+                    np.isnan(z),
+                    "",
+                    np.char.add(np.where(z >= 0, "+", ""), np.char.mod("%.1f%%", z)),
+                ),
+                texttemplate="%{text}",
+                colorbar_title="% Improvement",
+            )
+        )
 
         fig.update_layout(
             **LAYOUT_DEFAULTS,
-            title=f"Per-Scenario Pass Impact: {METRIC_LABELS.get(metric, metric)}",
             xaxis_title="Pass Added",
             yaxis_title="Scenario",
             xaxis_tickangle=-45,
@@ -431,7 +519,9 @@ def plot_box_per_step(
     variant_order = {v: i for i, v in enumerate(variants)}
     step_labels = [_annotate_stats_passes(_step_label(v)) for v in variants]
     df = df.copy()
-    df["step_label"] = df["variant"].map(lambda v: _annotate_stats_passes(_step_label(v)))
+    df["step_label"] = df["variant"].map(
+        lambda v: _annotate_stats_passes(_step_label(v))
+    )
     df["step_order"] = df["variant"].map(lambda v: variant_order.get(v, 99))
     df = df.sort_values("step_order")
 
@@ -442,8 +532,10 @@ def plot_box_per_step(
             df,
             x="step_label",
             y=metric,
-            title=f"{METRIC_LABELS.get(metric, metric)} by Ablation Step",
-            labels={"step_label": "Ablation Step", metric: METRIC_LABELS.get(metric, metric)},
+            labels={
+                "step_label": "Ablation Step",
+                metric: METRIC_LABELS.get(metric, metric),
+            },
             category_orders={"step_label": step_labels},
         )
         fig.update_layout(
@@ -473,7 +565,12 @@ def plot_complexity_ablation(df: pd.DataFrame, variants: list[str], out: Path) -
         if v in complexity_by_variant.index:
             step_labels.append(_annotate_stats_passes(_step_label(v)))
 
-    colors = {"ast_nodes": "#5E94D4", "max_depth": "#F7811E", "layer_count": "#9FBA36", "filter_count": "#B55CA5"}
+    colors = {
+        "ast_nodes": "#5E94D4",
+        "max_depth": "#F7811E",
+        "layer_count": "#9FBA36",
+        "filter_count": "#B55CA5",
+    }
 
     for metric in avail:
         vals = []
@@ -488,35 +585,38 @@ def plot_complexity_ablation(df: pd.DataFrame, variants: list[str], out: Path) -
 
         baseline = vals[0]
         fig = go.Figure()
-        fig.add_trace(go.Scatter(
-            x=labels,
-            y=vals,
-            mode="lines+markers",
-            line=dict(width=3, color=colors.get(metric, "#333")),
-            marker=dict(size=8),
-            name=METRIC_LABELS.get(metric, metric),
-            text=[
-                f"{v} ({(1 - v / baseline) * 100:.1f}% less)" if i > 0 and baseline > 0
-                else str(v)
-                for i, v in enumerate(vals)
-            ],
-            textposition="top center",
-        ))
+        fig.add_trace(
+            go.Scatter(
+                x=labels,
+                y=vals,
+                mode="lines+markers",
+                line=dict(width=3, color=colors.get(metric, "#333")),
+                marker=dict(size=8),
+                name=METRIC_LABELS.get(metric, metric),
+                text=[
+                    f"{v} ({(1 - v / baseline) * 100:.1f}% less)"
+                    if i > 0 and baseline > 0
+                    else str(v)
+                    for i, v in enumerate(vals)
+                ],
+                textposition="top center",
+            )
+        )
 
-        fig.update_layout(
-            **LAYOUT_DEFAULTS,
-            title=f"Complexity Across Ablation Steps: {METRIC_LABELS.get(metric, metric)}",
+        layout_kwargs: dict = dict(
             xaxis_title="Cumulative Pass",
             yaxis_title=METRIC_LABELS.get(metric, metric),
             xaxis_tickangle=-45,
         )
+        if metric == "layer_count":
+            layout_kwargs["yaxis"] = dict(tickmode="linear", dtick=1, tickformat="d")
+        fig.update_layout(**LAYOUT_DEFAULTS, **layout_kwargs)
         _add_stats_annotation(fig)
-        write_fig(fig, out, f"complexity_{metric}")
+        out_height = IMG_HEIGHT // 2 if metric == "layer_count" else IMG_HEIGHT
+        write_fig(fig, out, f"complexity_{metric}", height=out_height)
 
 
-def plot_time_breakdown(
-    medians: pd.DataFrame, variants: list[str], out: Path
-) -> None:
+def plot_time_breakdown(medians: pd.DataFrame, variants: list[str], out: Path) -> None:
     """
     Stacked bar chart: time-to-interactive breakdown per ablation step.
     Segments: styleParseMs, firstTileMs - styleParseMs, firstFrameMs - firstTileMs, loadMs - firstFrameMs.
@@ -552,15 +652,24 @@ def plot_time_breakdown(
         return
 
     fig = go.Figure()
-    fig.add_trace(go.Bar(name="Style Parse", x=step_labels, y=parse_vals, marker_color="#5E94D4"))
-    fig.add_trace(go.Bar(name="First Tile", x=step_labels, y=tile_vals, marker_color="#F7811E"))
-    fig.add_trace(go.Bar(name="First Frame", x=step_labels, y=frame_vals, marker_color="#9FBA36"))
-    fig.add_trace(go.Bar(name="Remaining Load", x=step_labels, y=load_vals, marker_color="#B55CA5"))
+    fig.add_trace(
+        go.Bar(name="Style Parse", x=step_labels, y=parse_vals, marker_color="#5E94D4")
+    )
+    fig.add_trace(
+        go.Bar(name="First Tile", x=step_labels, y=tile_vals, marker_color="#F7811E")
+    )
+    fig.add_trace(
+        go.Bar(name="First Frame", x=step_labels, y=frame_vals, marker_color="#9FBA36")
+    )
+    fig.add_trace(
+        go.Bar(
+            name="Remaining Load", x=step_labels, y=load_vals, marker_color="#B55CA5"
+        )
+    )
 
     fig.update_layout(
         **LAYOUT_DEFAULTS,
         barmode="stack",
-        title="Time-to-Interactive Breakdown per Ablation Step",
         xaxis_title="Cumulative Pass",
         yaxis_title="Time (ms)",
         xaxis_tickangle=-45,
@@ -615,22 +724,31 @@ def plot_isolated_impact(
         colors = []
         for d in mean_deltas:
             is_good = (d < 0) if lower_better else (d > 0)
-            colors.append(IMPROVEMENT_COLOR if is_good else REGRESSION_COLOR if abs(d) > 0.5 else NEUTRAL_COLOR)
+            colors.append(
+                IMPROVEMENT_COLOR
+                if is_good
+                else REGRESSION_COLOR
+                if abs(d) > 0.5
+                else NEUTRAL_COLOR
+            )
 
         fig = go.Figure()
-        fig.add_trace(go.Bar(
-            x=pass_names,
-            y=mean_deltas,
-            error_y=dict(type="data", array=std_deltas, visible=True),
-            marker_color=colors,
-            text=[f"{d:+.2f}%" for d in mean_deltas],
-            textposition="outside",
-        ))
+        fig.add_trace(
+            go.Bar(
+                x=pass_names,
+                y=mean_deltas,
+                error_y=dict(type="data", array=std_deltas, visible=True),
+                marker_color=colors,
+                text=[f"{d:+.2f}%" for d in mean_deltas],
+                textposition="outside",
+            )
+        )
 
-        direction = "(negative = improvement)" if lower_better else "(positive = improvement)"
+        direction = (
+            "(negative = improvement)" if lower_better else "(positive = improvement)"
+        )
         fig.update_layout(
             **LAYOUT_DEFAULTS,
-            title=f"Isolated Pass Impact: {METRIC_LABELS.get(metric, metric)}",
             xaxis_title="Pass (alone)",
             yaxis_title=f"% Change vs Baseline {direction}",
             xaxis_tickangle=-45,
@@ -639,9 +757,7 @@ def plot_isolated_impact(
         write_fig(fig, out, f"isolated_{metric}")
 
 
-def plot_memory_ablation(
-    medians: pd.DataFrame, variants: list[str], out: Path
-) -> None:
+def plot_memory_ablation(medians: pd.DataFrame, variants: list[str], out: Path) -> None:
     """
     Memory usage across ablation steps: heap used and peak heap.
     """
@@ -664,18 +780,19 @@ def plot_memory_ablation(
     fig = go.Figure()
     for col in mem_cols:
         vals = [means.loc[v, col] for v in variants if v in means.index]
-        fig.add_trace(go.Scatter(
-            x=step_labels,
-            y=vals,
-            mode="lines+markers",
-            line=dict(width=3, color=colors.get(col, "#333")),
-            marker=dict(size=8),
-            name=names.get(col, col),
-        ))
+        fig.add_trace(
+            go.Scatter(
+                x=step_labels,
+                y=vals,
+                mode="lines+markers",
+                line=dict(width=3, color=colors.get(col, "#333")),
+                marker=dict(size=8),
+                name=names.get(col, col),
+            )
+        )
 
     fig.update_layout(
         **LAYOUT_DEFAULTS,
-        title="Browser Memory Usage Across Ablation Steps",
         xaxis_title="Cumulative Pass",
         yaxis_title="Memory (MB)",
         xaxis_tickangle=-45,
@@ -685,8 +802,12 @@ def plot_memory_ablation(
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Plot ablation benchmark results from JSONL files.")
-    parser.add_argument("files", nargs="+", type=Path, help="JSONL benchmark result files")
+    parser = argparse.ArgumentParser(
+        description="Plot ablation benchmark results from JSONL files."
+    )
+    parser.add_argument(
+        "files", nargs="+", type=Path, help="JSONL benchmark result files"
+    )
     args = parser.parse_args()
 
     out = Path("tests/bench/figures")

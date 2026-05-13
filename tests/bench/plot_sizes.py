@@ -15,17 +15,17 @@ from pathlib import Path
 
 import brotli
 import plotly.graph_objects as go
+import zstandard
 from plotly.subplots import make_subplots
 from pydantic import BaseModel
-import zstandard
 
 from plot_style import (
-    IMPROVEMENT_COLOR,
-    LAYOUT_DEFAULTS,
-    REGRESSION_COLOR,
     IMG_HEIGHT,
     IMG_SCALE,
     IMG_WIDTH,
+    IMPROVEMENT_COLOR,
+    LAYOUT_DEFAULTS,
+    REGRESSION_COLOR,
 )
 
 FETCH_SIZE = 5000
@@ -37,6 +37,7 @@ BROTLI_LEVELS = [1, 6, 11]
 
 class ZoomCompression(BaseModel):
     """Compression totals for a single zoom level."""
+
     plain: int = 0
     gzip: dict[int, int] = {}
     zstd: dict[int, int] = {}
@@ -54,6 +55,7 @@ class ZoomCompression(BaseModel):
 
 class CompressionResult(BaseModel):
     """Per-zoom compression data for one tile format."""
+
     zooms: dict[int, ZoomCompression]
 
 
@@ -68,8 +70,7 @@ def sample_tiles(db_path: Path, stored_compressed: bool, n: int) -> list[bytes]:
     ).fetchall()
     conn.close()
     return [
-        gzip.decompress(bytes(td)) if stored_compressed else bytes(td)
-        for (td,) in rows
+        gzip.decompress(bytes(td)) if stored_compressed else bytes(td) for (td,) in rows
     ]
 
 
@@ -85,20 +86,28 @@ def _cache_path(out: Path, name: str, key: str) -> Path:
 
 
 def load_or_compute_compression(
-    name: str, db_path: Path, stored_compressed: bool,
+    name: str,
+    db_path: Path,
+    stored_compressed: bool,
     zstd_dict: "zstandard.ZstdCompressionDict",
-    dict_size: int, dict_samples: int, cache_dir: Path,
+    dict_size: int,
+    dict_samples: int,
+    cache_dir: Path,
 ) -> CompressionResult:
     """Load cached compression results or compute and cache them."""
     key = _cache_key(db_path, dict_size, dict_samples)
-    cache = _cache_path(cache_dir, name.replace(" ", "_").replace("(", "").replace(")", ""), key)
+    cache = _cache_path(
+        cache_dir, name.replace(" ", "_").replace("(", "").replace(")", ""), key
+    )
 
     if cache.exists():
         print(f"  {name}: loading from cache")
         return CompressionResult.model_validate_json(cache.read_text())
 
     print(f"Computing compression variants for {name}...")
-    result = query_all_compression_sizes(db_path, stored_compressed=stored_compressed, zstd_dict=zstd_dict)
+    result = query_all_compression_sizes(
+        db_path, stored_compressed=stored_compressed, zstd_dict=zstd_dict
+    )
 
     cache.write_text(result.model_dump_json())
     print(f"  {name}: cached to {cache.name}")
@@ -121,7 +130,8 @@ def query_sizes(db_path: Path) -> dict[int, dict]:
 
 
 def query_all_compression_sizes(
-    db_path: Path, stored_compressed: bool,
+    db_path: Path,
+    stored_compressed: bool,
     zstd_dict: "zstandard.ZstdCompressionDict | None" = None,
 ) -> CompressionResult:
     """Compute per-zoom total bytes for plain and multiple compression levels.
@@ -139,15 +149,17 @@ def query_all_compression_sizes(
     """
     zstd_compressors = {lvl: zstandard.ZstdCompressor(level=lvl) for lvl in ZSTD_LEVELS}
     zstd_dict_compressors = (
-        {lvl: zstandard.ZstdCompressor(level=lvl, dict_data=zstd_dict) for lvl in ZSTD_LEVELS}
-        if zstd_dict is not None else None
+        {
+            lvl: zstandard.ZstdCompressor(level=lvl, dict_data=zstd_dict)
+            for lvl in ZSTD_LEVELS
+        }
+        if zstd_dict is not None
+        else None
     )
     result: dict[int, dict] = {}
 
     conn = sqlite3.connect(str(db_path))
-    cur = conn.execute(
-        "SELECT zoom_level, tile_data FROM tiles ORDER BY zoom_level"
-    )
+    cur = conn.execute("SELECT zoom_level, tile_data FROM tiles ORDER BY zoom_level")
 
     def new_totals() -> dict:
         t: dict = {
@@ -172,7 +184,10 @@ def query_all_compression_sizes(
             if z != current_zoom:
                 if current_zoom is not None:
                     result[current_zoom] = totals
-                    print(f"  z{current_zoom}: {totals['plain'] / 1e6:.1f} MB plain", flush=True)
+                    print(
+                        f"  z{current_zoom}: {totals['plain'] / 1e6:.1f} MB plain",
+                        flush=True,
+                    )
                 current_zoom = z
                 totals = new_totals()
 
@@ -188,21 +203,27 @@ def query_all_compression_sizes(
                 totals["brotli"][lvl] += len(brotli.compress(raw, quality=lvl))
             if zstd_dict_compressors is not None:
                 for lvl in ZSTD_LEVELS:
-                    totals["zstd_dict"][lvl] += len(zstd_dict_compressors[lvl].compress(raw))
+                    totals["zstd_dict"][lvl] += len(
+                        zstd_dict_compressors[lvl].compress(raw)
+                    )
 
     if current_zoom is not None:
         result[current_zoom] = totals
         print(f"  z{current_zoom}: {totals['plain'] / 1e6:.1f} MB plain", flush=True)
 
     conn.close()
-    return CompressionResult(zooms={
-        z: ZoomCompression(**data) for z, data in result.items()
-    })
+    return CompressionResult(
+        zooms={z: ZoomCompression(**data) for z, data in result.items()}
+    )
 
 
 def write_fig(
-    fig: go.Figure, out: Path, name: str, fmt: str,
-    width: int = IMG_WIDTH, height: int = IMG_HEIGHT,
+    fig: go.Figure,
+    out: Path,
+    name: str,
+    fmt: str,
+    width: int = IMG_WIDTH,
+    height: int = IMG_HEIGHT,
 ) -> None:
     if fmt == "html":
         path = out / f"{name}.html"
@@ -270,7 +291,8 @@ def plot_compression_ratio(
     positions = [(r + 1, c + 1) for r in range(rows) for c in range(cols)]
 
     fig = make_subplots(
-        rows=rows, cols=cols,
+        rows=rows,
+        cols=cols,
         subplot_titles=[p[0] for p in panels] + [""] * (rows * cols - n_panels),
         vertical_spacing=0.08,
         horizontal_spacing=0.08,
@@ -296,23 +318,32 @@ def plot_compression_ratio(
 
                 trace_name = fmt_name if comp_key == "plain" else f"{fmt_name} L{lvl}"
 
-                fig.add_trace(go.Scatter(
-                    name=trace_name,
-                    x=zoom_labels,
-                    y=ratios,
-                    mode="lines+markers",
-                    line=dict(color=color, width=2, dash=dashes[i % len(dashes)]),
-                    marker=dict(size=5),
-                    legendgroup=comp_key,
-                    legendgrouptitle_text=group_titles[comp_key],
-                ), row=row, col=col)
+                fig.add_trace(
+                    go.Scatter(
+                        name=trace_name,
+                        x=zoom_labels,
+                        y=ratios,
+                        mode="lines+markers",
+                        line=dict(color=color, width=2, dash=dashes[i % len(dashes)]),
+                        marker=dict(size=5),
+                        legendgroup=comp_key,
+                        legendgrouptitle_text=group_titles[comp_key],
+                    ),
+                    row=row,
+                    col=col,
+                )
 
     # Plain MVT baseline (y=1.0) on every subplot
     for r in range(1, rows + 1):
         for c in range(1, cols + 1):
             fig.add_hline(
-                y=1.0, line_dash="dash", line_color="#222222", line_width=1.5,
-                opacity=0.6, row=r, col=c,
+                y=1.0,
+                line_dash="dash",
+                line_color="#222222",
+                line_width=1.5,
+                opacity=0.6,
+                row=r,
+                col=c,
                 annotation_text="Plain MVT" if c == cols else None,
                 annotation_position="top right",
                 annotation_font_size=10,
@@ -338,16 +369,36 @@ def plot_compression_ratio(
 
 def main():
     parser = argparse.ArgumentParser(description="Plot tile size comparisons")
-    parser.add_argument("mvt", type=Path, help="MVT mbtiles file (gzip-compressed blobs)")
-    parser.add_argument("mlt_java_idsort", type=Path, help="MLT-Java mbtiles file, sort-by-id only (raw blobs)")
-    parser.add_argument("mlt_java_noidsort", type=Path, help="MLT-Java mbtiles file, sort by geometry (raw blobs)")
+    parser.add_argument(
+        "mvt", type=Path, help="MVT mbtiles file (gzip-compressed blobs)"
+    )
+    parser.add_argument(
+        "mlt_java_idsort",
+        type=Path,
+        help="MLT-Java mbtiles file, sort-by-id only (raw blobs)",
+    )
+    parser.add_argument(
+        "mlt_java_noidsort",
+        type=Path,
+        help="MLT-Java mbtiles file, sort by geometry (raw blobs)",
+    )
     parser.add_argument("mlt_rust", type=Path, help="MLT-Rust mbtiles file (raw blobs)")
-    parser.add_argument("--out", type=Path, default=Path("figures"), help="Output directory")
+    parser.add_argument(
+        "--out", type=Path, default=Path("figures"), help="Output directory"
+    )
     parser.add_argument("--format", choices=["png", "html"], default="png")
-    parser.add_argument("--dict-size", type=int, default=112 * 1024,
-                        help="Zstd dictionary size in bytes (default: 112 KB)")
-    parser.add_argument("--dict-samples", type=int, default=1000,
-                        help="Number of tiles to sample for zstd dictionary training (default: 1000)")
+    parser.add_argument(
+        "--dict-size",
+        type=int,
+        default=112 * 1024,
+        help="Zstd dictionary size in bytes (default: 112 KB)",
+    )
+    parser.add_argument(
+        "--dict-samples",
+        type=int,
+        default=1000,
+        help="Number of tiles to sample for zstd dictionary training (default: 1000)",
+    )
     args = parser.parse_args()
     args.out.mkdir(parents=True, exist_ok=True)
 
@@ -383,23 +434,28 @@ def main():
 
     # ── 1. Total size per zoom (stacked bar) ─────────────────────────────────
     fig = go.Figure()
-    fig.add_trace(go.Bar(
-        name="Original (MVT)",
-        x=zoom_labels, y=[b / 1e6 for b in orig_total],
-        text=[fmt_bytes(b) for b in orig_total],
-        textposition="auto",
-        marker_color="#5E94D4",
-    ))
-    fig.add_trace(go.Bar(
-        name="Rewritten (MLT)",
-        x=zoom_labels, y=[b / 1e6 for b in rewr_total],
-        text=[fmt_bytes(b) for b in rewr_total],
-        textposition="auto",
-        marker_color="#9FBA36",
-    ))
+    fig.add_trace(
+        go.Bar(
+            name="Original (MVT)",
+            x=zoom_labels,
+            y=[b / 1e6 for b in orig_total],
+            text=[fmt_bytes(b) for b in orig_total],
+            textposition="auto",
+            marker_color="#5E94D4",
+        )
+    )
+    fig.add_trace(
+        go.Bar(
+            name="Rewritten (MLT)",
+            x=zoom_labels,
+            y=[b / 1e6 for b in rewr_total],
+            text=[fmt_bytes(b) for b in rewr_total],
+            textposition="auto",
+            marker_color="#9FBA36",
+        )
+    )
     fig.update_layout(
         **LAYOUT_DEFAULTS,
-        title=f"Total Tile Size per Zoom Level (overall: {fmt_bytes(grand_orig)} → {fmt_bytes(grand_rewr)}, {grand_pct:.1f}% reduction)",
         xaxis_title="Zoom Level",
         yaxis_title="Total Size (MB)",
         barmode="group",
@@ -408,23 +464,28 @@ def main():
 
     # ── 2. Average tile size per zoom ─────────────────────────────────────────
     fig = go.Figure()
-    fig.add_trace(go.Bar(
-        name="Original (MVT)",
-        x=zoom_labels, y=[b / 1e3 for b in orig_avg],
-        text=[fmt_bytes(b) for b in orig_avg],
-        textposition="auto",
-        marker_color="#5E94D4",
-    ))
-    fig.add_trace(go.Bar(
-        name="Rewritten (MLT)",
-        x=zoom_labels, y=[b / 1e3 for b in rewr_avg],
-        text=[fmt_bytes(b) for b in rewr_avg],
-        textposition="auto",
-        marker_color="#9FBA36",
-    ))
+    fig.add_trace(
+        go.Bar(
+            name="Original (MVT)",
+            x=zoom_labels,
+            y=[b / 1e3 for b in orig_avg],
+            text=[fmt_bytes(b) for b in orig_avg],
+            textposition="auto",
+            marker_color="#5E94D4",
+        )
+    )
+    fig.add_trace(
+        go.Bar(
+            name="Rewritten (MLT)",
+            x=zoom_labels,
+            y=[b / 1e3 for b in rewr_avg],
+            text=[fmt_bytes(b) for b in rewr_avg],
+            textposition="auto",
+            marker_color="#9FBA36",
+        )
+    )
     fig.update_layout(
         **LAYOUT_DEFAULTS,
-        title="Average Tile Size per Zoom Level",
         xaxis_title="Zoom Level",
         yaxis_title="Average Size (KB)",
         barmode="group",
@@ -434,15 +495,17 @@ def main():
     # ── 3. Size reduction percentage per zoom ─────────────────────────────────
     colors = [IMPROVEMENT_COLOR if p > 0 else REGRESSION_COLOR for p in reduction_pct]
     fig = go.Figure()
-    fig.add_trace(go.Bar(
-        x=zoom_labels, y=reduction_pct,
-        text=[f"{p:.1f}%" for p in reduction_pct],
-        textposition="auto",
-        marker_color=colors,
-    ))
+    fig.add_trace(
+        go.Bar(
+            x=zoom_labels,
+            y=reduction_pct,
+            text=[f"{p:.1f}%" for p in reduction_pct],
+            textposition="auto",
+            marker_color=colors,
+        )
+    )
     fig.update_layout(
         **LAYOUT_DEFAULTS,
-        title=f"Size Reduction by Zoom Level (overall {grand_pct:.1f}%)",
         xaxis_title="Zoom Level",
         yaxis_title="Reduction (%)",
     )
@@ -450,24 +513,29 @@ def main():
 
     # ── 4. Tile count comparison ──────────────────────────────────────────────
     fig = go.Figure()
-    fig.add_trace(go.Bar(
-        name="Original",
-        x=zoom_labels, y=orig_count,
-        text=[str(c) for c in orig_count],
-        textposition="auto",
-        marker_color="#5E94D4",
-    ))
-    fig.add_trace(go.Bar(
-        name="Rewritten",
-        x=zoom_labels, y=rewr_count,
-        text=[str(c) for c in rewr_count],
-        textposition="auto",
-        marker_color="#9FBA36",
-    ))
+    fig.add_trace(
+        go.Bar(
+            name="Original",
+            x=zoom_labels,
+            y=orig_count,
+            text=[str(c) for c in orig_count],
+            textposition="auto",
+            marker_color="#5E94D4",
+        )
+    )
+    fig.add_trace(
+        go.Bar(
+            name="Rewritten",
+            x=zoom_labels,
+            y=rewr_count,
+            text=[str(c) for c in rewr_count],
+            textposition="auto",
+            marker_color="#9FBA36",
+        )
+    )
     dropped = sum(orig_count) - sum(rewr_count)
     fig.update_layout(
         **LAYOUT_DEFAULTS,
-        title=f"Tile Count per Zoom Level ({dropped} tiles dropped)",
         xaxis_title="Zoom Level",
         yaxis_title="Tile Count",
         barmode="group",
@@ -478,21 +546,26 @@ def main():
     cum_orig = list(itertools.accumulate(orig_total))
     cum_rewr = list(itertools.accumulate(rewr_total))
     fig = go.Figure()
-    fig.add_trace(go.Scatter(
-        name="Original (MVT)",
-        x=zoom_labels, y=[b / 1e9 for b in cum_orig],
-        mode="lines+markers",
-        line=dict(color="#5E94D4", width=3),
-    ))
-    fig.add_trace(go.Scatter(
-        name="Rewritten (MLT)",
-        x=zoom_labels, y=[b / 1e9 for b in cum_rewr],
-        mode="lines+markers",
-        line=dict(color="#9FBA36", width=3),
-    ))
+    fig.add_trace(
+        go.Scatter(
+            name="Original (MVT)",
+            x=zoom_labels,
+            y=[b / 1e9 for b in cum_orig],
+            mode="lines+markers",
+            line=dict(color="#5E94D4", width=3),
+        )
+    )
+    fig.add_trace(
+        go.Scatter(
+            name="Rewritten (MLT)",
+            x=zoom_labels,
+            y=[b / 1e9 for b in cum_rewr],
+            mode="lines+markers",
+            line=dict(color="#9FBA36", width=3),
+        )
+    )
     fig.update_layout(
         **LAYOUT_DEFAULTS,
-        title="Cumulative Tile Data Size",
         xaxis_title="Zoom Level",
         yaxis_title="Cumulative Size (GB)",
     )
@@ -500,7 +573,9 @@ def main():
 
     # ── 6. Per-zoom compression ratio ─────────────────────────────────────────
     # Train per-format zstd dictionaries
-    print(f"\nTraining zstd dictionaries ({fmt_bytes(args.dict_size)}, {args.dict_samples} samples)...")
+    print(
+        f"\nTraining zstd dictionaries ({fmt_bytes(args.dict_size)}, {args.dict_samples} samples)..."
+    )
     sources = [
         ("MVT", args.mvt, True),
         ("MLT-Java (ID-sort)", args.mlt_java_idsort, False),
@@ -511,13 +586,20 @@ def main():
     for name, path, compressed in sources:
         samples = sample_tiles(path, stored_compressed=compressed, n=args.dict_samples)
         zstd_dicts[name] = zstandard.train_dictionary(args.dict_size, samples)
-        print(f"  {name}: dict {len(zstd_dicts[name].as_bytes())} bytes from {len(samples)} samples")
+        print(
+            f"  {name}: dict {len(zstd_dicts[name].as_bytes())} bytes from {len(samples)} samples"
+        )
 
     comp_results = {}
     for name, path, compressed in sources:
         comp_results[name] = load_or_compute_compression(
-            name, path, compressed, zstd_dicts[name],
-            args.dict_size, args.dict_samples, args.out,
+            name,
+            path,
+            compressed,
+            zstd_dicts[name],
+            args.dict_size,
+            args.dict_samples,
+            args.out,
         )
     mvt_comp = comp_results["MVT"]
     java_idsort_comp = comp_results["MLT-Java (ID-sort)"]
