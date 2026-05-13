@@ -140,11 +140,31 @@ pub fn optimize_style_json_value_with_stats(
         return;
     }
 
-    // 0. Normalize legacy filter syntax to expressions up front. Expression
-    //    passes treat bare strings as literals (e.g. `["==", "class", "x"]`
-    //    folds to `false` because `"class" != "x"`), so styles using legacy
-    //    filters must be converted before any other pass runs.
+    // Normalize legacy filter syntax to expressions up front. Expression
+    // passes treat bare strings as literals (e.g. `["==", "class", "x"]`
+    // folds to `false` because `"class" != "x"`), so styles using legacy
+    // filters must be converted before any other pass runs.
     legacy_filter::convert_legacy_filters_in_style(v);
+
+    run_optimization_pipeline(v, mir, passes, stats);
+}
+
+/// Pipeline body shared by both entry points, *without* legacy filter
+/// normalization.  The typed entry point skips it because the typed AST is
+/// always expression-form, but its serialization can produce JSON shapes the
+/// legacy detector misreads (e.g. `["in", "", null]` from
+/// `Boolean::In(StringExpr(""), Null)`) — running legacy conversion on
+/// typed-roundtrip JSON would silently rewrite those forms and break
+/// idempotency.
+fn run_optimization_pipeline(
+    v: &mut Value,
+    mir: &MirSpec,
+    passes: &OptPasses,
+    stats: Option<&TileStatistics>,
+) {
+    if !wants_expression_passes(passes) && !wants_structural_passes(passes) {
+        return;
+    }
 
     // 1. Expression passes directly on JSON (no typed round-trip).
     run_json_expression_passes(v, mir, passes, stats);
@@ -214,7 +234,7 @@ pub fn optimize_style(
     let Ok(mut v) = serde_json::to_value(&*style) else {
         return;
     };
-    optimize_style_json_value_with_stats(&mut v, mir, passes, stats);
+    run_optimization_pipeline(&mut v, mir, passes, stats);
     if let Ok(updated) = serde_json::from_value::<MaplibreStyleSpecification>(v) {
         *style = updated;
     }
@@ -1592,16 +1612,43 @@ mod tests {
         assert!(style.layers[0].common().unwrap().metadata.is_none());
     }
 
+    /// Run all passes twice; return the JSON after the first and second calls.
+    fn run_typed_optimizer_twice(
+        mir: &MirSpec,
+        style: &mut MaplibreStyleSpecification,
+    ) -> (Value, Value) {
+        let passes = OptPasses::all();
+        optimize_style(style, mir, &passes, None);
+        let first = serde_json::to_value(&*style).unwrap();
+        optimize_style(style, mir, &passes, None);
+        let second = serde_json::to_value(&*style).unwrap();
+        (first, second)
+    }
+
     #[test]
     fn typed_all_passes_idempotent() {
         let mir = sample_mir();
         let mut style: MaplibreStyleSpecification = serde_json::from_value(serde_json::json!({"version":8,"sources":{"openmaptiles":{"type":"vector","url":"https://example/tiles.json"}},"layers":[{"id":"water","type":"fill","source":"openmaptiles","source-layer":"water","filter":["all",[">=",["zoom"],5],["==",["geometry-type"],"Polygon"]],"paint":{"fill-color":"#a0c8f0"}}]})).unwrap();
-        let passes = OptPasses::all();
-        optimize_style(&mut style, &mir, &passes, None);
-        let first = serde_json::to_value(&style).unwrap();
-        optimize_style(&mut style, &mir, &passes, None);
-        let second = serde_json::to_value(&style).unwrap();
+        let (first, second) = run_typed_optimizer_twice(&mir, &mut style);
         assert_eq!(first, second);
+    }
+
+    #[test]
+    fn typed_in_with_null_haystack_idempotent() {
+        let mir = sample_mir();
+        let mut style: MaplibreStyleSpecification = serde_json::from_value(serde_json::json!({
+            "version": 8,
+            "sources": {},
+            "layers": [{
+                "id": "x",
+                "type": "background",
+                "filter": ["all", ["in", ["downcase", ["concat"]], null]]
+            }]
+        }))
+        .unwrap();
+        let (first, second) = run_typed_optimizer_twice(&mir, &mut style);
+        assert_eq!(first, second);
+        assert_eq!(first["layers"][0]["filter"][0], "in");
     }
 
     // ── Trivially-true filter removal ───────────────────────────────────
