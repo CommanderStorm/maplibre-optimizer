@@ -2,7 +2,7 @@
 
 A research prototype that optimizes MapLibre style JSON documents and acoompaniying data.
 It parses styles into typed Rust structs (generated from the upstream `v8.json` spec), applies optimization passes, and serializes back to JSON.
-The optimizer does **not** support legacy MapLibre filter syntax.
+Legacy MapLibre filter syntax is accepted and converted to expression syntax before optimization.
 
 ## Build & Development Commands
 
