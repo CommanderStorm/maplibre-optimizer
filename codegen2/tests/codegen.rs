@@ -16,7 +16,7 @@ fn single_struct() {
         .field("one", "usize")
         .field("two", "String");
 
-    insta::assert_snapshot!(scope.to_string(), @r"
+    insta::assert_snapshot!(scope.to_string(), @"
     struct Foo {
         one: usize,
         two: String,
@@ -40,7 +40,7 @@ fn struct_with_pushed_field() {
     struct_.push_field(field);
     scope.push_struct(struct_);
 
-    insta::assert_snapshot!(scope.to_string(), @r"
+    insta::assert_snapshot!(scope.to_string(), @"
     struct Foo {
         one: usize,
     }
@@ -100,7 +100,7 @@ fn single_fn() {
         .line("let res = foo + 1;")
         .line("res");
 
-    insta::assert_snapshot!(scope.to_string(), @r"
+    insta::assert_snapshot!(scope.to_string(), @"
     pub fn my_fn(foo: uint) -> uint {
         let res = foo + 1;
         res
@@ -126,7 +126,7 @@ fn tuple_struct_with_slot_attributes() {
         .derive("Debug")
         .tuple_field_with_attrs(["#[serde(transparent)]"], "i32");
 
-    insta::assert_snapshot!(scope.to_string(), @r"
+    insta::assert_snapshot!(scope.to_string(), @"
     #[derive(Debug)]
     struct Lit(#[serde(transparent)] i32);
     ");
@@ -143,7 +143,7 @@ fn two_structs() {
 
     scope.new_struct("Bar").field("hello", "World");
 
-    insta::assert_snapshot!(scope.to_string(), @r"
+    insta::assert_snapshot!(scope.to_string(), @"
     struct Foo {
         one: usize,
         two: String,
@@ -166,7 +166,7 @@ fn struct_with_derive() {
         .field("one", "usize")
         .field("two", "String");
 
-    insta::assert_snapshot!(scope.to_string(), @r"
+    insta::assert_snapshot!(scope.to_string(), @"
     #[derive(Debug, Clone)]
     struct Foo {
         one: usize,
@@ -185,7 +185,7 @@ fn struct_with_repr() {
         .field("one", "u8")
         .field("two", "u8");
 
-    insta::assert_snapshot!(scope.to_string(), @r"
+    insta::assert_snapshot!(scope.to_string(), @"
     #[repr(C)]
     struct Foo {
         one: u8,
@@ -204,7 +204,7 @@ fn struct_with_allow() {
         .field("one", "u8")
         .field("two", "u8");
 
-    insta::assert_snapshot!(scope.to_string(), @r"
+    insta::assert_snapshot!(scope.to_string(), @"
     #[allow(dead_code)]
     struct Foo {
         one: u8,
@@ -224,7 +224,7 @@ fn struct_with_generics_1() {
         .field("one", "T")
         .field("two", "U");
 
-    insta::assert_snapshot!(scope.to_string(), @r"
+    insta::assert_snapshot!(scope.to_string(), @"
     struct Foo<T, U> {
         one: T,
         two: U,
@@ -242,7 +242,7 @@ fn struct_with_generics_2() {
         .field("one", "T")
         .field("two", "U");
 
-    insta::assert_snapshot!(scope.to_string(), @r"
+    insta::assert_snapshot!(scope.to_string(), @"
     struct Foo<T, U> {
         one: T,
         two: U,
@@ -260,7 +260,7 @@ fn struct_with_generics_3() {
         .field("one", "T")
         .field("two", "U");
 
-    insta::assert_snapshot!(scope.to_string(), @r"
+    insta::assert_snapshot!(scope.to_string(), @"
     struct Foo<T: Win, U> {
         one: T,
         two: U,
@@ -278,7 +278,7 @@ fn struct_where_clause_1() {
         .bound("T", "Foo")
         .field("one", "T");
 
-    insta::assert_snapshot!(scope.to_string(), @r"
+    insta::assert_snapshot!(scope.to_string(), @"
     struct Foo<T>
     where
         T: Foo,
@@ -300,7 +300,7 @@ fn struct_where_clause_2() {
         .field("one", "T")
         .field("two", "U");
 
-    insta::assert_snapshot!(scope.to_string(), @r"
+    insta::assert_snapshot!(scope.to_string(), @"
     struct Foo<T, U>
     where
         T: Foo,
@@ -324,7 +324,7 @@ fn struct_doc() {
         )
         .field("one", "T");
 
-    insta::assert_snapshot!(scope.to_string(), @r"
+    insta::assert_snapshot!(scope.to_string(), @"
     /// Hello, this is a doc string
     /// that continues on another line.
     struct Foo {
@@ -354,7 +354,7 @@ fn scope_doc() {
     let mut scope = Scope::new();
     scope.doc("This is a scope comment.\n\nThis is a newline");
 
-    insta::assert_snapshot!(scope.to_string(), @r"
+    insta::assert_snapshot!(scope.to_string(), @"
     //! This is a scope comment.
     //!
     //! This is a newline
@@ -367,7 +367,7 @@ fn module_doc() {
     let m = scope.new_module("toby");
     m.doc("This is a module comment.");
 
-    insta::assert_snapshot!(scope.to_string(), @r"
+    insta::assert_snapshot!(scope.to_string(), @"
     /// This is a module comment.
     mod toby {}
     ");
@@ -390,7 +390,7 @@ fn struct_in_mod() {
             .field("two", "U");
     }
 
-    insta::assert_snapshot!(scope.to_string(), @r"
+    insta::assert_snapshot!(scope.to_string(), @"
     mod foo {
         /// Hello some docs
         #[derive(Debug)]
@@ -415,7 +415,7 @@ fn struct_mod_import() {
         .new_struct("Foo")
         .field("bar", "Bar");
 
-    insta::assert_snapshot!(scope.to_string(), @r"
+    insta::assert_snapshot!(scope.to_string(), @"
     mod foo {
         use bar::Bar;
 
@@ -434,7 +434,7 @@ fn type_alias_in_mod() {
         module.new_type_alias("hello", "world").vis("pub");
     }
 
-    insta::assert_snapshot!(scope.to_string(), @r"
+    insta::assert_snapshot!(scope.to_string(), @"
     mod foo {
         pub type hello = world;
     }
@@ -451,7 +451,7 @@ fn enum_with_repr() {
         .push_variant(Variant::new("V4"))
         .push_variant(Variant::new("V6"));
 
-    insta::assert_snapshot!(scope.to_string(), @r"
+    insta::assert_snapshot!(scope.to_string(), @"
     #[repr(u8)]
     enum IpAddrKind {
         V4,
@@ -475,7 +475,7 @@ fn enum_variant_with_doc() {
         .doc("Documentation for Bazinga variant")
         .tuple("String");
 
-    insta::assert_snapshot!(scope.to_string(), @r"
+    insta::assert_snapshot!(scope.to_string(), @"
     enum Foo {
         /// Documentation for Bar variant
         Bar {
@@ -499,7 +499,7 @@ fn enum_with_discriminants() {
     enu.new_variant("V4").discriminant("4");
     enu.new_variant("V6").discriminant("6");
 
-    insta::assert_snapshot!(scope.to_string(), @r"
+    insta::assert_snapshot!(scope.to_string(), @"
     #[repr(u8)]
     enum IpAddrKind {
         V4 = 4,
@@ -518,7 +518,7 @@ fn enum_with_allow() {
         .push_variant(Variant::new("V4"))
         .push_variant(Variant::new("V6"));
 
-    insta::assert_snapshot!(scope.to_string(), @r"
+    insta::assert_snapshot!(scope.to_string(), @"
     #[allow(dead_code)]
     enum IpAddrKind {
         V4,
@@ -540,7 +540,7 @@ fn scoped_imports() {
         .field("baz", "baz::Baz")
         .field("quuuux", "quuux::Quuuux");
 
-    insta::assert_snapshot!(scope.to_string(), @r"
+    insta::assert_snapshot!(scope.to_string(), @"
     mod foo {
         use bar::quux::quuux;
         use bar::{Bar, baz};
@@ -565,7 +565,7 @@ fn module_mut() {
         .new_struct("Foo")
         .field("bar", "Bar");
 
-    insta::assert_snapshot!(scope.to_string(), @r"
+    insta::assert_snapshot!(scope.to_string(), @"
     mod foo {
         use bar::Bar;
 
@@ -588,7 +588,7 @@ fn get_or_new_module() {
         .new_struct("Foo")
         .field("bar", "Bar");
 
-    insta::assert_snapshot!(scope.to_string(), @r"
+    insta::assert_snapshot!(scope.to_string(), @"
     mod foo {
         use bar::Bar;
 
@@ -627,7 +627,7 @@ fn function_with_const() {
         .ret("u32")
         .line("1 + 1");
 
-    insta::assert_snapshot!(scope.to_string(), @r"
+    insta::assert_snapshot!(scope.to_string(), @"
     const fn one_plus_one() -> u32 {
         1 + 1
     }
@@ -693,7 +693,7 @@ fn struct_with_multiple_allow() {
         .field("one", "u8")
         .field("two", "u8");
 
-    insta::assert_snapshot!(scope.to_string(), @r"
+    insta::assert_snapshot!(scope.to_string(), @"
     #[allow(dead_code)]
     #[allow(clippy::all)]
     struct Foo {
@@ -714,7 +714,7 @@ fn enum_with_multiple_allow() {
         .push_variant(Variant::new("V4"))
         .push_variant(Variant::new("V6"));
 
-    insta::assert_snapshot!(scope.to_string(), @r"
+    insta::assert_snapshot!(scope.to_string(), @"
     #[allow(dead_code)]
     #[allow(clippy::all)]
     enum IpAddrKind {
@@ -737,7 +737,7 @@ fn impl_with_associated_const() {
     foo_impl.impl_trait("Bar");
     foo_impl.associate_const("CONST_NAME", Type::new("f32"), "0.0", "pub");
 
-    insta::assert_snapshot!(scope.to_string(), @r"
+    insta::assert_snapshot!(scope.to_string(), @"
     trait Bar {
         const CONST_NAME: f32;
     }
@@ -762,7 +762,7 @@ fn struct_with_member_visibility() {
     struct_description.push_field(bar);
     struct_description.new_field("baz", "i16").vis("pub(crate)");
 
-    insta::assert_snapshot!(scope.to_string(), @r"
+    insta::assert_snapshot!(scope.to_string(), @"
     struct Foo {
         pub bar: usize,
         pub(crate) baz: i16,
@@ -776,7 +776,7 @@ fn get_mut_struct() {
     assert!(scope.get_enum_mut("Foo").is_none());
 
     scope.new_struct("Foo").field("one", "usize");
-    insta::assert_snapshot!(scope.to_string(), @r"
+    insta::assert_snapshot!(scope.to_string(), @"
     struct Foo {
         one: usize,
     }
@@ -786,7 +786,7 @@ fn get_mut_struct() {
         .get_struct_mut("Foo")
         .expect("struct_mut")
         .field("two", "String");
-    insta::assert_snapshot!(scope.to_string(), @r"
+    insta::assert_snapshot!(scope.to_string(), @"
     struct Foo {
         one: usize,
         two: String,
@@ -799,7 +799,7 @@ fn get_mut_enum() {
     assert!(scope.get_enum_mut("Bar").is_none());
 
     scope.new_enum("Bar").push_variant(Variant::new("Baz"));
-    insta::assert_snapshot!(scope.to_string(), @r"
+    insta::assert_snapshot!(scope.to_string(), @"
     enum Bar {
         Baz,
     }
@@ -809,7 +809,7 @@ fn get_mut_enum() {
         .get_enum_mut("Bar")
         .expect("enum_mut")
         .push_variant(Variant::new("Quux"));
-    insta::assert_snapshot!(scope.to_string(), @r"
+    insta::assert_snapshot!(scope.to_string(), @"
     enum Bar {
         Baz,
         Quux,
@@ -822,14 +822,14 @@ fn get_mut_fn() {
     assert!(scope.get_fn_mut("baz").is_none());
 
     scope.new_fn("baz").line("let a = 1;");
-    insta::assert_snapshot!(scope.to_string(), @r"
+    insta::assert_snapshot!(scope.to_string(), @"
     fn baz() {
         let a = 1;
     }
     ");
 
     scope.get_fn_mut("baz").expect("fn_mut").line("let b = 2;");
-    insta::assert_snapshot!(scope.to_string(), @r"
+    insta::assert_snapshot!(scope.to_string(), @"
     fn baz() {
         let a = 1;
         let b = 2;
@@ -844,11 +844,11 @@ fn type_with_generic() {
     ty.generic("String");
     scope.new_fn("f").ret(ty).line("vec![]");
 
-    insta::assert_snapshot!(scope.to_string(), @r#"
+    insta::assert_snapshot!(scope.to_string(), @"
     fn f() -> Vec<String> {
         vec![]
     }
-    "#);
+    ");
 }
 
 #[test]
@@ -860,11 +860,11 @@ fn type_with_nested_generics() {
     outer.generic(inner);
     scope.new_fn("f").ret(outer).line("vec![]");
 
-    insta::assert_snapshot!(scope.to_string(), @r#"
+    insta::assert_snapshot!(scope.to_string(), @"
     fn f() -> Vec<Option<T>> {
         vec![]
     }
-    "#);
+    ");
 }
 
 #[test]
@@ -877,7 +877,7 @@ fn type_path() {
         .ret(qualified)
         .line("std::collections::HashMap::new()");
 
-    insta::assert_snapshot!(scope.to_string(), @r"
+    insta::assert_snapshot!(scope.to_string(), @"
     fn f() -> std::collections::HashMap {
         std::collections::HashMap::new()
     }
@@ -896,7 +896,7 @@ fn type_path_preserves_generics() {
         .ret(qualified)
         .line("std::collections::HashMap::new()");
 
-    insta::assert_snapshot!(scope.to_string(), @r"
+    insta::assert_snapshot!(scope.to_string(), @"
     fn f() -> std::collections::HashMap<K, V> {
         std::collections::HashMap::new()
     }
@@ -964,7 +964,7 @@ fn block_with_after() {
     if_blk.after(" else { b(); }");
     f.push_block(if_blk);
 
-    insta::assert_snapshot!(scope.to_string(), @r"
+    insta::assert_snapshot!(scope.to_string(), @"
     fn with_else() {
         if condition {
             a();
@@ -981,7 +981,7 @@ fn function_with_ref_self() {
     let imp = scope.new_impl("Foo");
     imp.new_fn("bar").arg_ref_self().ret("usize").line("self.x");
 
-    insta::assert_snapshot!(scope.to_string(), @r"
+    insta::assert_snapshot!(scope.to_string(), @"
     impl Foo {
         fn bar(&self) -> usize {
             self.x
@@ -999,7 +999,7 @@ fn function_with_mut_self() {
         .arg("val", "usize")
         .line("self.x = val;");
 
-    insta::assert_snapshot!(scope.to_string(), @r"
+    insta::assert_snapshot!(scope.to_string(), @"
     impl Foo {
         fn set(&mut self, val: usize) {
             self.x = val;
@@ -1017,7 +1017,7 @@ fn function_with_self() {
         .ret("usize")
         .line("self.x");
 
-    insta::assert_snapshot!(scope.to_string(), @r"
+    insta::assert_snapshot!(scope.to_string(), @"
     impl Foo {
         fn into_inner(self) -> usize {
             self.x
@@ -1037,7 +1037,7 @@ fn function_with_generics_and_bounds() {
         .bound("T", "Display")
         .line("value.to_string()");
 
-    insta::assert_snapshot!(scope.to_string(), @r"
+    insta::assert_snapshot!(scope.to_string(), @"
     fn serialize<T>(value: T) -> String
     where
         T: Display,
@@ -1052,7 +1052,7 @@ fn function_with_allow() {
     let mut scope = Scope::new();
     scope.new_fn("unused").allow("dead_code").line("let _ = 1;");
 
-    insta::assert_snapshot!(scope.to_string(), @r"
+    insta::assert_snapshot!(scope.to_string(), @"
     #[allow(dead_code)]
     fn unused() {
         let _ = 1;
@@ -1065,7 +1065,7 @@ fn function_with_attr() {
     let mut scope = Scope::new();
     scope.new_fn("my_test").attr("test").line("assert!(true);");
 
-    insta::assert_snapshot!(scope.to_string(), @r"
+    insta::assert_snapshot!(scope.to_string(), @"
     #[test]
     fn my_test() {
         assert!(true);
@@ -1100,7 +1100,7 @@ fn function_with_multiple_attrs() {
         .ret("bool")
         .line("true");
 
-    insta::assert_snapshot!(scope.to_string(), @r"
+    insta::assert_snapshot!(scope.to_string(), @"
     #[inline]
     #[must_use]
     fn handler() -> bool {
@@ -1124,7 +1124,7 @@ fn trait_with_doc() {
         .new_trait("MyTrait")
         .doc("A documented trait.\nWith two lines.");
 
-    insta::assert_snapshot!(scope.to_string(), @r"
+    insta::assert_snapshot!(scope.to_string(), @"
     /// A documented trait.
     /// With two lines.
     trait MyTrait {}
@@ -1142,7 +1142,7 @@ fn trait_with_generics_and_bounds() {
         .arg("input", "T")
         .ret("Self");
 
-    insta::assert_snapshot!(scope.to_string(), @r"
+    insta::assert_snapshot!(scope.to_string(), @"
     trait Convert<T>
     where
         T: Clone,
@@ -1170,7 +1170,7 @@ fn trait_with_associated_type() {
     trt.associated_type("Item");
     trt.new_fn("next").arg_mut_self().ret("Option<Self::Item>");
 
-    insta::assert_snapshot!(scope.to_string(), @r"
+    insta::assert_snapshot!(scope.to_string(), @"
     trait Iterator {
         type Item;
 
@@ -1185,7 +1185,7 @@ fn trait_with_associated_type_bound() {
     let trt = scope.new_trait("Foo");
     trt.associated_type("Bar").bound("Clone").bound("Send");
 
-    insta::assert_snapshot!(scope.to_string(), @r"
+    insta::assert_snapshot!(scope.to_string(), @"
     trait Foo {
         type Bar: Clone + Send;
     }
@@ -1197,7 +1197,7 @@ fn trait_with_attr() {
     let mut scope = Scope::new();
     scope.new_trait("Foo").attr("deprecated");
 
-    insta::assert_snapshot!(scope.to_string(), @r"
+    insta::assert_snapshot!(scope.to_string(), @"
     #[deprecated]
     trait Foo {}
     ");
@@ -1209,7 +1209,7 @@ fn trait_fn_without_body() {
     let trt = scope.new_trait("Foo");
     trt.new_fn("bar").arg_ref_self().ret("usize");
 
-    insta::assert_snapshot!(scope.to_string(), @r"
+    insta::assert_snapshot!(scope.to_string(), @"
     trait Foo {
         fn bar(&self) -> usize;
     }
@@ -1225,7 +1225,7 @@ fn trait_fn_with_default_body() {
     f.body = Some(vec![]);
     f.line("42");
 
-    insta::assert_snapshot!(scope.to_string(), @r"
+    insta::assert_snapshot!(scope.to_string(), @"
     trait Foo {
         fn bar(&self) -> usize {
             42
@@ -1243,7 +1243,7 @@ fn impl_without_trait() {
     let imp = scope.new_impl("Foo");
     imp.new_fn("new").ret("Self").line("Foo { x: 0 }");
 
-    insta::assert_snapshot!(scope.to_string(), @r"
+    insta::assert_snapshot!(scope.to_string(), @"
     struct Foo {
         x: usize,
     }
@@ -1293,7 +1293,7 @@ fn impl_with_associated_type() {
         .ret("Option<Self::Item>")
         .line("None");
 
-    insta::assert_snapshot!(scope.to_string(), @r"
+    insta::assert_snapshot!(scope.to_string(), @"
     impl Iterator for MyIter {
         type Item = u32;
 
@@ -1313,7 +1313,7 @@ fn enum_with_vis() {
         .push_variant(Variant::new("Red"))
         .push_variant(Variant::new("Blue"));
 
-    insta::assert_snapshot!(scope.to_string(), @r"
+    insta::assert_snapshot!(scope.to_string(), @"
     pub enum Color {
         Red,
         Blue,
@@ -1329,7 +1329,7 @@ fn enum_with_generics_and_bounds() {
     enu.new_variant("Ok").tuple("T");
     enu.new_variant("Err").tuple("E");
 
-    insta::assert_snapshot!(scope.to_string(), @r"
+    insta::assert_snapshot!(scope.to_string(), @"
     enum MyResult<T, E>
     where
         E: Debug,
@@ -1349,7 +1349,7 @@ fn enum_with_doc() {
         .push_variant(Variant::new("North"))
         .push_variant(Variant::new("South"));
 
-    insta::assert_snapshot!(scope.to_string(), @r"
+    insta::assert_snapshot!(scope.to_string(), @"
     /// Cardinal directions.
     enum Dir {
         North,
@@ -1408,7 +1408,7 @@ fn variant_with_named_fields() {
         .named("width", "f64")
         .named("height", "f64");
 
-    insta::assert_snapshot!(scope.to_string(), @r"
+    insta::assert_snapshot!(scope.to_string(), @"
     enum Shape {
         Circle { radius: f64 },
         Rect { width: f64, height: f64 },
@@ -1425,7 +1425,7 @@ fn variant_push_named_field() {
     field.doc("X coordinate");
     v.push_named(field);
 
-    insta::assert_snapshot!(scope.to_string(), @r"
+    insta::assert_snapshot!(scope.to_string(), @"
     enum Ev {
         Click {
             /// X coordinate
@@ -1441,7 +1441,7 @@ fn variant_with_multiple_tuple_fields() {
     let enu = scope.new_enum("Pair");
     enu.new_variant("Both").tuple("A").tuple("B");
 
-    insta::assert_snapshot!(scope.to_string(), @r"
+    insta::assert_snapshot!(scope.to_string(), @"
     enum Pair {
         Both(A, B),
     }
@@ -1455,11 +1455,11 @@ fn variant_tuple_with_attrs() {
     enu.new_variant("Inner")
         .tuple_with_attrs(["#[serde(transparent)]"], "String");
 
-    insta::assert_snapshot!(scope.to_string(), @r#"
+    insta::assert_snapshot!(scope.to_string(), @"
     enum Wrapper {
         Inner(#[serde(transparent)] String),
     }
-    "#);
+    ");
 }
 
 #[test]
@@ -1467,7 +1467,7 @@ fn struct_with_vis() {
     let mut scope = Scope::new();
     scope.new_struct("Foo").vis("pub").field("x", "usize");
 
-    insta::assert_snapshot!(scope.to_string(), @r"
+    insta::assert_snapshot!(scope.to_string(), @"
     pub struct Foo {
         x: usize,
     }
@@ -1498,7 +1498,7 @@ fn struct_with_attr() {
         .attr("non_exhaustive")
         .field("x", "u32");
 
-    insta::assert_snapshot!(scope.to_string(), @r"
+    insta::assert_snapshot!(scope.to_string(), @"
     #[non_exhaustive]
     struct Foo {
         x: u32,
@@ -1524,7 +1524,7 @@ fn struct_new_field_returns_mutable_ref() {
     s.new_field("x", "u32").vis("pub").doc("The x value");
     s.field("y", "u32");
 
-    insta::assert_snapshot!(scope.to_string(), @r"
+    insta::assert_snapshot!(scope.to_string(), @"
     struct Foo {
         /// The x value
         pub x: u32,
@@ -1539,7 +1539,7 @@ fn scope_raw() {
     scope.raw("// This is a raw comment");
     scope.new_struct("Foo");
 
-    insta::assert_snapshot!(scope.to_string(), @r"
+    insta::assert_snapshot!(scope.to_string(), @"
     // This is a raw comment
 
     struct Foo;
@@ -1554,7 +1554,7 @@ fn scope_import_with_vis() {
         .new_struct("Foo")
         .field("map", "HashMap<String, String>");
 
-    insta::assert_snapshot!(scope.to_string(), @r"
+    insta::assert_snapshot!(scope.to_string(), @"
     pub use std::collections::HashMap;
 
     struct Foo {
@@ -1581,7 +1581,7 @@ fn module_with_vis() {
     let mut scope = Scope::new();
     scope.new_module("inner").vis("pub").new_struct("Foo");
 
-    insta::assert_snapshot!(scope.to_string(), @r"
+    insta::assert_snapshot!(scope.to_string(), @"
     pub mod inner {
         struct Foo;
     }
@@ -1598,7 +1598,7 @@ fn module_with_attr() {
         .attr("test")
         .line("assert!(true);");
 
-    insta::assert_snapshot!(scope.to_string(), @r"
+    insta::assert_snapshot!(scope.to_string(), @"
     #[cfg(test)]
     mod tests {
         #[test]
@@ -1615,7 +1615,7 @@ fn nested_modules() {
     let outer = scope.new_module("outer");
     outer.new_module("inner").new_struct("Deep");
 
-    insta::assert_snapshot!(scope.to_string(), @r"
+    insta::assert_snapshot!(scope.to_string(), @"
     mod outer {
         mod inner {
             struct Deep;
@@ -1641,7 +1641,7 @@ fn module_scope_access() {
     let m = scope.new_module("my_mod");
     m.scope().new_struct("ViaScope").field("a", "bool");
 
-    insta::assert_snapshot!(scope.to_string(), @r"
+    insta::assert_snapshot!(scope.to_string(), @"
     mod my_mod {
         struct ViaScope {
             a: bool,
@@ -1657,7 +1657,7 @@ fn module_import_with_vis() {
     m.scope().import("std::fmt", "Display").vis("pub");
     m.new_struct("Foo");
 
-    insta::assert_snapshot!(scope.to_string(), @r"
+    insta::assert_snapshot!(scope.to_string(), @"
     mod reexport {
         pub use std::fmt::Display;
 

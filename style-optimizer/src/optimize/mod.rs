@@ -523,7 +523,7 @@ mod tests {
         let mir = sample_mir();
         let mut v = serde_json::json!({"version":8,"sources":{},"layers":[{"id":"x","type":"fill","filter":["!",["!",["has","x"]]]}]});
         optimize_style_json_value(&mut v, &mir, &passes_unary_only());
-        assert_yaml_snapshot!(v["layers"][0], @r"
+        assert_yaml_snapshot!(v["layers"][0], @"
         filter:
           - has
           - x
@@ -582,7 +582,7 @@ mod tests {
                 ..Default::default()
             },
         );
-        assert_yaml_snapshot!(v["layers"][0], @r"
+        assert_yaml_snapshot!(v["layers"][0], @"
         filter: false
         id: x
         type: fill
@@ -631,7 +631,7 @@ mod tests {
                 ..Default::default()
             },
         );
-        assert_yaml_snapshot!(v["layers"][0], @r"
+        assert_yaml_snapshot!(v["layers"][0], @"
         filter: true
         id: x
         minzoom: 7
@@ -676,7 +676,7 @@ mod tests {
                 ..Default::default()
             },
         );
-        assert_yaml_snapshot!(v["layers"][0], @r"
+        assert_yaml_snapshot!(v["layers"][0], @"
         filter: 3
         id: x
         type: fill
@@ -695,7 +695,7 @@ mod tests {
                 ..Default::default()
             },
         );
-        assert_yaml_snapshot!(v["layers"][0], @r"
+        assert_yaml_snapshot!(v["layers"][0], @"
         filter: hello world
         id: x
         type: fill
@@ -714,7 +714,7 @@ mod tests {
                 ..Default::default()
             },
         );
-        assert_yaml_snapshot!(v["layers"][0], @r"
+        assert_yaml_snapshot!(v["layers"][0], @"
         id: x
         paint:
           fill-opacity: 0.5
@@ -734,7 +734,7 @@ mod tests {
                 ..Default::default()
             },
         );
-        assert_yaml_snapshot!(v["layers"][0], @r"
+        assert_yaml_snapshot!(v["layers"][0], @"
         id: x
         paint:
           line-width: 2
@@ -783,7 +783,7 @@ mod tests {
                 ..Default::default()
             },
         );
-        assert_yaml_snapshot!(v, @r"
+        assert_yaml_snapshot!(v, @"
         layers:
           - id: x
             type: fill
@@ -892,7 +892,7 @@ mod tests {
                 ..Default::default()
             },
         );
-        assert_yaml_snapshot!(v["layers"], @r"
+        assert_yaml_snapshot!(v["layers"], @"
         - id: sym
           paint:
             icon-opacity: 0
@@ -955,7 +955,7 @@ mod tests {
                 ..Default::default()
             },
         );
-        assert_yaml_snapshot!(v["layers"][0], @r"
+        assert_yaml_snapshot!(v["layers"][0], @"
         id: x
         minzoom: 13.5
         paint:
@@ -986,7 +986,7 @@ mod tests {
                 ..Default::default()
             },
         );
-        assert_yaml_snapshot!(v["layers"][0], @r"
+        assert_yaml_snapshot!(v["layers"][0], @"
         id: x
         minzoom: 15
         paint:
@@ -1015,7 +1015,7 @@ mod tests {
                 ..Default::default()
             },
         );
-        assert_yaml_snapshot!(v["layers"][0], @r"
+        assert_yaml_snapshot!(v["layers"][0], @"
         id: x
         minzoom: 10
         paint:
@@ -1054,7 +1054,7 @@ mod tests {
                 ..Default::default()
             },
         );
-        assert_yaml_snapshot!(v["layers"][0], @r"
+        assert_yaml_snapshot!(v["layers"][0], @"
         id: x
         minzoom: 12
         paint:
@@ -1092,7 +1092,7 @@ mod tests {
                 ..Default::default()
             },
         );
-        assert_yaml_snapshot!(v["layers"][0], @r"
+        assert_yaml_snapshot!(v["layers"][0], @"
         id: x
         minzoom: 16
         paint:
@@ -1151,7 +1151,7 @@ mod tests {
                 ..Default::default()
             },
         );
-        assert_yaml_snapshot!(v["layers"][0], @r"
+        assert_yaml_snapshot!(v["layers"][0], @"
         id: x
         paint:
           line-width:
@@ -1302,7 +1302,7 @@ mod tests {
             },
             Some(&stats),
         );
-        assert_yaml_snapshot!(v["layers"][0], @r"
+        assert_yaml_snapshot!(v["layers"][0], @"
         id: water-fill
         maxzoom: 14
         minzoom: 6
@@ -1334,7 +1334,7 @@ mod tests {
             },
             Some(&stats),
         );
-        assert_yaml_snapshot!(v["layers"][0], @r"
+        assert_yaml_snapshot!(v["layers"][0], @"
         filter: false
         id: water-fill
         source: openmaptiles
@@ -1374,7 +1374,7 @@ mod tests {
             },
             Some(&stats),
         );
-        assert_yaml_snapshot!(v["layers"][0], @r"
+        assert_yaml_snapshot!(v["layers"][0], @"
         filter: true
         id: w
         source: openmaptiles
@@ -1414,7 +1414,7 @@ mod tests {
             },
             Some(&stats),
         );
-        assert_yaml_snapshot!(v["layers"][0], @r"
+        assert_yaml_snapshot!(v["layers"][0], @"
         filter: true
         id: w
         source: openmaptiles
@@ -1526,7 +1526,7 @@ mod tests {
             },
             Some(&stats),
         );
-        assert_yaml_snapshot!(v["layers"][0], @r"
+        assert_yaml_snapshot!(v["layers"][0], @"
         id: w
         paint:
           fill-opacity: 1
@@ -1609,7 +1609,7 @@ mod tests {
                 ..Default::default()
             },
         );
-        assert_yaml_snapshot!(v["layers"][0], @r"
+        assert_yaml_snapshot!(v["layers"][0], @"
         id: x
         type: fill
         ");
@@ -1629,7 +1629,7 @@ mod tests {
                 ..Default::default()
             },
         );
-        assert_yaml_snapshot!(v["layers"][0], @r"
+        assert_yaml_snapshot!(v["layers"][0], @"
         filter: false
         id: x
         type: fill
@@ -1718,7 +1718,7 @@ mod tests {
                 ..Default::default()
             },
         );
-        assert_yaml_snapshot!(v, @r"
+        assert_yaml_snapshot!(v, @"
         layers: []
         sources: {}
         version: 8
@@ -1737,7 +1737,7 @@ mod tests {
                 ..Default::default()
             },
         );
-        assert_yaml_snapshot!(v, @r"
+        assert_yaml_snapshot!(v, @"
         bearing: 45
         layers: []
         sources: {}

@@ -117,7 +117,7 @@ fn fold_has_with_redundant_properties() {
     let mir = sample_mir();
     let mut v = style_with_filter(serde_json::json!(["has", "name", ["properties"]]));
     optimize_style_json_value(&mut v, &mir, &fold_passes());
-    assert_yaml_snapshot!(v["layers"][0], @r"
+    assert_yaml_snapshot!(v["layers"][0], @"
     filter:
       - has
       - name
@@ -447,7 +447,7 @@ fn coalesce_truncates_after_always_present_arm() {
         serde_json::json!(["coalesce", ["get", "name"], ["get", "name_en"], "fallback"]),
     );
     optimize_style_json_value_with_stats(&mut v, &mir, &fold_passes(), Some(&stats));
-    assert_yaml_snapshot!(v["layers"][0]["layout"], @r"
+    assert_yaml_snapshot!(v["layers"][0]["layout"], @"
     text-field:
       - get
       - name
@@ -465,7 +465,7 @@ fn step_prune_above_max() {
         serde_json::json!(["step", ["get", "rank"], 0.1, 3, 0.5, 7, 0.9]),
     );
     optimize_style_json_value_with_stats(&mut v, &mir, &fold_passes(), Some(&stats));
-    assert_yaml_snapshot!(v["layers"][0]["paint"], @r"
+    assert_yaml_snapshot!(v["layers"][0]["paint"], @"
     fill-opacity:
       - step
       - - get
@@ -499,7 +499,7 @@ fn interpolate_prune_above_max() {
         ]),
     );
     optimize_style_json_value_with_stats(&mut v, &mir, &fold_passes(), Some(&stats));
-    assert_yaml_snapshot!(v["layers"][0]["paint"], @r"
+    assert_yaml_snapshot!(v["layers"][0]["paint"], @"
     fill-opacity:
       - interpolate
       - - linear
@@ -605,7 +605,7 @@ fn sccp_match_substitutes_input() {
         ]),
     );
     optimize_style_json_value(&mut v, &mir, &fold_passes());
-    assert_yaml_snapshot!(v["layers"][0]["paint"], @r#"
+    assert_yaml_snapshot!(v["layers"][0]["paint"], @"
     fill-color:
       - match
       - - get
@@ -613,7 +613,7 @@ fn sccp_match_substitutes_input() {
       - park
       - park
       - default
-    "#);
+    ");
 }
 
 #[test]
@@ -630,7 +630,7 @@ fn sccp_match_enables_concat_fold() {
         ]),
     );
     optimize_style_json_value(&mut v, &mir, &fold_passes());
-    assert_yaml_snapshot!(v["layers"][0]["paint"], @r#"
+    assert_yaml_snapshot!(v["layers"][0]["paint"], @"
     fill-color:
       - match
       - - get
@@ -638,7 +638,7 @@ fn sccp_match_enables_concat_fold() {
       - park
       - park-area
       - default
-    "#);
+    ");
 }
 
 #[test]
@@ -656,7 +656,7 @@ fn sccp_match_skips_multi_label_arms() {
     );
     optimize_style_json_value(&mut v, &mir, &fold_passes());
     // Output should be unchanged — multi-label arm is not substituted
-    assert_yaml_snapshot!(v["layers"][0]["paint"], @r#"
+    assert_yaml_snapshot!(v["layers"][0]["paint"], @"
     fill-color:
       - match
       - - get
@@ -666,7 +666,7 @@ fn sccp_match_skips_multi_label_arms() {
       - - get
         - class
       - default
-    "#);
+    ");
 }
 
 #[test]
@@ -715,9 +715,7 @@ fn filter_propagation_match_folds_to_literal() {
         ]),
     );
     optimize_style_json_value(&mut v, &mir, &fold_passes());
-    assert_yaml_snapshot!(v["layers"][0]["paint"], @r##"
-    fill-color: "#333"
-    "##);
+    assert_yaml_snapshot!(v["layers"][0]["paint"], @r##"fill-color: "#333""##);
 }
 
 #[test]
@@ -729,9 +727,7 @@ fn filter_propagation_case_folds_true_branch() {
         serde_json::json!(["case", ["==", ["get", "kind"], "park"], "#0f0", "#ccc"]),
     );
     optimize_style_json_value(&mut v, &mir, &fold_passes());
-    assert_yaml_snapshot!(v["layers"][0]["paint"], @r##"
-    fill-color: "#0f0"
-    "##);
+    assert_yaml_snapshot!(v["layers"][0]["paint"], @r##"fill-color: "#0f0""##);
 }
 
 #[test]
@@ -755,9 +751,7 @@ fn filter_propagation_all_extracts_multiple_constraints() {
         ]),
     );
     optimize_style_json_value(&mut v, &mir, &fold_passes());
-    assert_yaml_snapshot!(v["layers"][0]["paint"], @r##"
-    fill-color: "#333"
-    "##);
+    assert_yaml_snapshot!(v["layers"][0]["paint"], @r##"fill-color: "#333""##);
 }
 
 #[test]
@@ -777,9 +771,7 @@ fn filter_propagation_commuted_equality() {
         ]),
     );
     optimize_style_json_value(&mut v, &mir, &fold_passes());
-    assert_yaml_snapshot!(v["layers"][0]["paint"], @r##"
-    fill-color: "#333"
-    "##);
+    assert_yaml_snapshot!(v["layers"][0]["paint"], @r##"fill-color: "#333""##);
 }
 
 #[test]
@@ -803,9 +795,7 @@ fn filter_propagation_no_leak_across_layers() {
     });
     optimize_style_json_value(&mut v, &mir, &fold_passes());
     // First layer should be folded.
-    assert_yaml_snapshot!(v["layers"][0]["paint"], @r##"
-    fill-color: "#333"
-    "##);
+    assert_yaml_snapshot!(v["layers"][0]["paint"], @r##"fill-color: "#333""##);
     // Second layer should remain data-driven (no filter constraint).
     assert_yaml_snapshot!(v["layers"][1]["paint"], @r##"
     fill-color:
@@ -830,11 +820,11 @@ fn filter_propagation_has_eliminates_coalesce_fallback() {
     );
     // simplify_passes needed so try_simplify_coalesce unwraps single-arg coalesce.
     optimize_style_json_value(&mut v, &mir, &simplify_passes());
-    assert_yaml_snapshot!(v["layers"][0]["paint"], @r##"
+    assert_yaml_snapshot!(v["layers"][0]["paint"], @"
     fill-color:
       - get
       - name
-    "##);
+    ");
 }
 
 #[test]
@@ -848,14 +838,14 @@ fn filter_propagation_has_coalesce_not_first_arg() {
         serde_json::json!(["coalesce", ["get", "name"], ["get", "alt_name"], "fallback"]),
     );
     optimize_style_json_value(&mut v, &mir, &fold_passes());
-    assert_yaml_snapshot!(v["layers"][0]["paint"], @r##"
+    assert_yaml_snapshot!(v["layers"][0]["paint"], @"
     fill-color:
       - coalesce
       - - get
         - name
       - - get
         - alt_name
-    "##);
+    ");
 }
 
 #[test]
@@ -938,9 +928,7 @@ fn filter_propagation_in_collapses_to_fallback() {
         ]),
     );
     optimize_style_json_value(&mut v, &mir, &fold_passes());
-    assert_yaml_snapshot!(v["layers"][0]["paint"], @r##"
-    fill-color: "#999"
-    "##);
+    assert_yaml_snapshot!(v["layers"][0]["paint"], @r##"fill-color: "#999""##);
 }
 
 #[test]
@@ -987,9 +975,7 @@ fn filter_propagation_range_folds_ge_to_true() {
         serde_json::json!(["case", [">=", ["get", "scalerank"], 1], "#0f0", "#ccc"]),
     );
     optimize_style_json_value(&mut v, &mir, &fold_passes());
-    assert_yaml_snapshot!(v["layers"][0]["paint"], @r##"
-    fill-color: "#0f0"
-    "##);
+    assert_yaml_snapshot!(v["layers"][0]["paint"], @r##"fill-color: "#0f0""##);
 }
 
 #[test]
@@ -1002,9 +988,7 @@ fn filter_propagation_range_folds_lt_to_false() {
         serde_json::json!(["case", ["<", ["get", "scalerank"], 2], "#0f0", "#ccc"]),
     );
     optimize_style_json_value(&mut v, &mir, &fold_passes());
-    assert_yaml_snapshot!(v["layers"][0]["paint"], @r##"
-    fill-color: "#ccc"
-    "##);
+    assert_yaml_snapshot!(v["layers"][0]["paint"], @r##"fill-color: "#ccc""##);
 }
 
 #[test]
@@ -1040,9 +1024,7 @@ fn filter_propagation_range_commuted() {
         serde_json::json!(["case", [">=", ["get", "scalerank"], 1], "#0f0", "#ccc"]),
     );
     optimize_style_json_value(&mut v, &mir, &fold_passes());
-    assert_yaml_snapshot!(v["layers"][0]["paint"], @r##"
-    fill-color: "#0f0"
-    "##);
+    assert_yaml_snapshot!(v["layers"][0]["paint"], @r##"fill-color: "#0f0""##);
 }
 
 // ── Filter-to-property: mixed constraints ────────────────────────────
@@ -1063,11 +1045,11 @@ fn filter_propagation_all_with_mixed_constraints() {
         ]),
     );
     optimize_style_json_value(&mut v, &mir, &simplify_passes());
-    assert_yaml_snapshot!(v["layers"][0]["paint"], @r##"
+    assert_yaml_snapshot!(v["layers"][0]["paint"], @"
     fill-color:
       - get
       - name
-    "##);
+    ");
 }
 
 // ── Distributive factoring ────────────────────────────────────────────
@@ -1084,7 +1066,7 @@ fn distributive_factor_any_of_alls() {
     optimize_style_json_value(&mut v, &mir, &simplify_passes());
     // Factoring produces ["all", ["has","name"], ["any", ==road, ==rail]]
     // then any_to_in rewrites the inner any to ["in", ...].
-    assert_yaml_snapshot!(v["layers"][0]["filter"], @r#"
+    assert_yaml_snapshot!(v["layers"][0]["filter"], @"
     - all
     - - has
       - name
@@ -1094,7 +1076,7 @@ fn distributive_factor_any_of_alls() {
       - - literal
         - - road
           - rail
-    "#);
+    ");
 }
 
 #[test]
@@ -1108,7 +1090,7 @@ fn distributive_factor_all_of_anys() {
     ]));
     optimize_style_json_value(&mut v, &mir, &simplify_passes());
     // Factoring extracts ["has","name"], absorption may also interact.
-    assert_yaml_snapshot!(v["layers"][0]["filter"], @r"
+    assert_yaml_snapshot!(v["layers"][0]["filter"], @"
     - has
     - name
     ");
@@ -1135,7 +1117,7 @@ fn distributive_factor_multiple_common() {
     ]));
     optimize_style_json_value(&mut v, &mir, &simplify_passes());
     // Factoring then any_to_in on the remainder.
-    assert_yaml_snapshot!(v["layers"][0]["filter"], @r#"
+    assert_yaml_snapshot!(v["layers"][0]["filter"], @"
     - all
     - - has
       - name
@@ -1147,7 +1129,7 @@ fn distributive_factor_multiple_common() {
       - - literal
         - - road
           - rail
-    "#);
+    ");
 }
 
 #[test]
@@ -1272,13 +1254,13 @@ fn zoom_fold_inside_all() {
     );
     optimize_style_json_value(&mut v, &mir, &zoom_fold_passes());
     // [">=", ["zoom"], 5] → true, ["all", true, ["has", "name"]] → ["has", "name"]
-    assert_yaml_snapshot!(v["layers"][0]["paint"]["fill-opacity"], @r#"
+    assert_yaml_snapshot!(v["layers"][0]["paint"]["fill-opacity"], @"
     - case
     - - has
       - name
     - 0.8
     - 0.2
-    "#);
+    ");
 }
 
 #[test]
@@ -1356,10 +1338,10 @@ fn zoom_fold_in_filter() {
     );
     optimize_style_json_value(&mut v, &mir, &zoom_fold_passes());
     // [">=", ["zoom"], 5] → true, ["all", true, ["has", "name"]] → ["has", "name"]
-    assert_yaml_snapshot!(v["layers"][0]["filter"], @r#"
+    assert_yaml_snapshot!(v["layers"][0]["filter"], @"
     - has
     - name
-    "#);
+    ");
 }
 
 // ── Stats: match arm reordering ─────────────────────────────────────────
@@ -1403,7 +1385,7 @@ fn match_arms_reordered_by_frequency() {
         ]),
     );
     optimize_style_json_value_with_stats(&mut v, &mir, &simplify_passes(), Some(&stats));
-    assert_yaml_snapshot!(v["layers"][0]["paint"]["fill-color"], @r#"
+    assert_yaml_snapshot!(v["layers"][0]["paint"]["fill-color"], @"
     - match
     - - get
       - class
@@ -1414,7 +1396,7 @@ fn match_arms_reordered_by_frequency() {
     - rare
     - red
     - black
-    "#);
+    ");
 }
 
 #[test]
@@ -1663,7 +1645,7 @@ fn case_flatten_two_level() {
         ]),
     );
     optimize_style_json_value(&mut v, &mir, &simplify_passes());
-    assert_yaml_snapshot!(v["layers"][0]["paint"]["fill-opacity"], @r"
+    assert_yaml_snapshot!(v["layers"][0]["paint"]["fill-opacity"], @"
     - match
     - - get
       - kind
@@ -1740,7 +1722,7 @@ fn canonicalize_exponential_1_to_linear() {
         serde_json::json!(["interpolate", ["exponential", 1], ["zoom"], 0, 0.0, 10, 1.0]),
     );
     optimize_style_json_value(&mut v, &mir, &simplify_passes());
-    assert_yaml_snapshot!(v["layers"][0]["paint"]["fill-opacity"], @r"
+    assert_yaml_snapshot!(v["layers"][0]["paint"]["fill-opacity"], @"
     - interpolate
     - - linear
     - - zoom
@@ -1795,7 +1777,7 @@ fn case_to_match_string_labels() {
         ]),
     );
     optimize_style_json_value(&mut v, &mir, &simplify_passes());
-    assert_yaml_snapshot!(v["layers"][0]["paint"]["fill-color"], @r#"
+    assert_yaml_snapshot!(v["layers"][0]["paint"]["fill-color"], @"
     - match
     - - get
       - class
@@ -1804,7 +1786,7 @@ fn case_to_match_string_labels() {
     - rail
     - blue
     - gray
-    "#);
+    ");
 }
 
 #[test]
@@ -1822,7 +1804,7 @@ fn case_to_match_numeric_labels() {
         ]),
     );
     optimize_style_json_value(&mut v, &mir, &simplify_passes());
-    assert_yaml_snapshot!(v["layers"][0]["paint"]["fill-color"], @r#"
+    assert_yaml_snapshot!(v["layers"][0]["paint"]["fill-color"], @"
     - match
     - - get
       - level
@@ -1831,7 +1813,7 @@ fn case_to_match_numeric_labels() {
     - 2
     - b
     - c
-    "#);
+    ");
 }
 
 #[test]
@@ -1849,7 +1831,7 @@ fn case_to_match_commuted_equality() {
         ]),
     );
     optimize_style_json_value(&mut v, &mir, &simplify_passes());
-    assert_yaml_snapshot!(v["layers"][0]["paint"]["fill-color"], @r#"
+    assert_yaml_snapshot!(v["layers"][0]["paint"]["fill-color"], @"
     - match
     - - get
       - class
@@ -1858,7 +1840,7 @@ fn case_to_match_commuted_equality() {
     - rail
     - blue
     - gray
-    "#);
+    ");
 }
 
 #[test]
@@ -1989,7 +1971,7 @@ fn case_to_match_in_filter() {
         false
     ]));
     optimize_style_json_value(&mut v, &mir, &simplify_passes());
-    assert_yaml_snapshot!(v["layers"][0]["filter"], @r"
+    assert_yaml_snapshot!(v["layers"][0]["filter"], @"
     - in
     - - get
       - class
@@ -2025,7 +2007,7 @@ fn nested_case_flatten_then_match() {
     );
     optimize_style_json_value(&mut v, &mir, &simplify_passes());
     // Both outer and inner are independently converted to match.
-    assert_yaml_snapshot!(v["layers"][0]["paint"]["fill-color"], @r#"
+    assert_yaml_snapshot!(v["layers"][0]["paint"]["fill-color"], @"
     - match
     - - get
       - class
@@ -2041,7 +2023,7 @@ fn nested_case_flatten_then_match() {
       - path
       - green
       - gray
-    "#);
+    ");
 }
 
 #[test]
@@ -2074,7 +2056,7 @@ fn strip_coalesce_default_in_to_string() {
         serde_json::json!(["to-string", ["coalesce", ["get", "name"], ""]]),
     );
     optimize_style_json_value(&mut v, &mir, &simplify_passes());
-    assert_yaml_snapshot!(v["layers"][0]["layout"], @r"
+    assert_yaml_snapshot!(v["layers"][0]["layout"], @"
     text-field:
       - to-string
       - - get
@@ -2090,7 +2072,7 @@ fn strip_coalesce_default_in_to_number() {
         serde_json::json!(["to-number", ["coalesce", ["get", "size"], 0]]),
     );
     optimize_style_json_value(&mut v, &mir, &simplify_passes());
-    assert_yaml_snapshot!(v["layers"][0]["layout"], @r"
+    assert_yaml_snapshot!(v["layers"][0]["layout"], @"
     text-size:
       - to-number
       - - get
@@ -2106,7 +2088,7 @@ fn strip_coalesce_default_in_to_boolean() {
         ["coalesce", ["get", "active"], false]
     ]));
     optimize_style_json_value(&mut v, &mir, &simplify_passes());
-    assert_yaml_snapshot!(v["layers"][0]["filter"], @r"
+    assert_yaml_snapshot!(v["layers"][0]["filter"], @"
     - to-boolean
     - - get
       - active
@@ -2139,7 +2121,7 @@ fn flatten_nested_coalesce() {
         ]),
     );
     optimize_style_json_value(&mut v, &mir, &simplify_passes());
-    assert_yaml_snapshot!(v["layers"][0]["layout"], @r"
+    assert_yaml_snapshot!(v["layers"][0]["layout"], @"
     text-field:
       - coalesce
       - - get
@@ -2167,7 +2149,7 @@ fn flatten_deeply_nested_coalesce() {
         ]),
     );
     optimize_style_json_value(&mut v, &mir, &simplify_passes());
-    assert_yaml_snapshot!(v["layers"][0]["layout"], @r"
+    assert_yaml_snapshot!(v["layers"][0]["layout"], @"
     text-field:
       - coalesce
       - - get
@@ -2192,7 +2174,7 @@ fn strip_coalesce_in_in_expression() {
         ["literal", ["lake", "river", "pond"]]
     ]));
     optimize_style_json_value(&mut v, &mir, &simplify_passes());
-    assert_yaml_snapshot!(v["layers"][0]["filter"], @r"
+    assert_yaml_snapshot!(v["layers"][0]["filter"], @"
     - in
     - - get
       - class
@@ -2338,7 +2320,7 @@ fn strip_typeof_guard_any_to_in_end_to_end() {
         ]
     ]));
     optimize_style_json_value(&mut v, &mir, &simplify_passes());
-    assert_yaml_snapshot!(v["layers"][0]["filter"], @r"
+    assert_yaml_snapshot!(v["layers"][0]["filter"], @"
     - in
     - - get
       - klasse

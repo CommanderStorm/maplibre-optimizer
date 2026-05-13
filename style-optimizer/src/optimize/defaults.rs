@@ -144,7 +144,7 @@ mod tests {
             }]
         });
         walk_style_mut(&mut v, &mir, &mut StripDefaultsVisitor { mir: &mir });
-        assert_yaml_snapshot!(v["layers"][0], @r"
+        assert_yaml_snapshot!(v["layers"][0], @"
         id: x
         type: fill
         ");
@@ -161,7 +161,7 @@ mod tests {
             }]
         });
         walk_style_mut(&mut v, &mir, &mut StripDefaultsVisitor { mir: &mir });
-        assert_yaml_snapshot!(v["layers"][0], @r"
+        assert_yaml_snapshot!(v["layers"][0], @"
         id: x
         paint:
           fill-opacity: 0.5
@@ -181,7 +181,7 @@ mod tests {
             }]
         });
         walk_style_mut(&mut v, &mir, &mut StripDefaultsVisitor { mir: &mir });
-        assert_yaml_snapshot!(v["layers"][0], @r"
+        assert_yaml_snapshot!(v["layers"][0], @"
         id: x
         paint:
           fill-opacity:
@@ -207,7 +207,7 @@ mod tests {
             }]
         });
         walk_style_mut(&mut v, &mir, &mut StripDefaultsVisitor { mir: &mir });
-        assert_yaml_snapshot!(v["layers"][0], @r"
+        assert_yaml_snapshot!(v["layers"][0], @"
         id: x
         layout:
           text-field: x
@@ -237,7 +237,7 @@ mod tests {
             }]
         });
         walk_style_mut(&mut v, &mir, &mut StripDefaultsVisitor { mir: &mir });
-        assert_yaml_snapshot!(v["layers"][0], @r"
+        assert_yaml_snapshot!(v["layers"][0], @"
         id: x
         layout:
           text-field: x
@@ -259,7 +259,7 @@ mod tests {
             }]
         });
         walk_style_mut(&mut v, &mir, &mut StripDefaultsVisitor { mir: &mir });
-        assert_yaml_snapshot!(v["layers"][0], @r"
+        assert_yaml_snapshot!(v["layers"][0], @"
         id: x
         type: line
         ");
