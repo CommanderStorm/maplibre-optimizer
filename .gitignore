@@ -2,3 +2,4 @@
 data
 crash-*
 tests/bench/tests/bench/figures
+.claude/scheduled_tasks.lock

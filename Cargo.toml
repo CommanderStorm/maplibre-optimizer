@@ -42,7 +42,7 @@ image = "0.25.9"
 indexmap = { version = "2", features = ["serde"] }
 insta = { version = "1.46", features = ["yaml"] }
 maplibre_native = "0.4.1"
-mlt-core = { version = "0.4", features = ["fastpfor-cpp"] }
+mlt-core = { version = "0.9" }
 pretty_assertions = "1.4"
 prost = "0.13"
 prost-build = "0.13"

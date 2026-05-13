@@ -36,7 +36,7 @@ const __dirname = import.meta.dirname!;
 const REPO_ROOT = path.resolve(__dirname, "../..");
 const MAPLIBRE_JS = path.resolve(
   __dirname,
-  "node_modules/maplibre-gl/dist/maplibre-gl-dev.js",
+  "node_modules/maplibre-gl/dist/maplibre-gl.mjs",
 );
 const MAPLIBRE_CSS = path.resolve(
   __dirname,
@@ -963,7 +963,14 @@ ${MAPLIBRE_CSS_TEXT}
 </style>
 </head><body><div id="map"></div></body></html>`);
 
-  await page.addScriptTag({ path: MAPLIBRE_JS });
+  // MapLibre v6 ships ESM-only.  Serve the file so the browser can load it
+  // as a proper <script type="module"> with working import.meta and workers.
+  await page.addScriptTag({ type: "module", content:
+    `import * as ml from "http://localhost:${TILE_PROXY_PORT}/maplibre-gl.mjs";\n` +
+    `window.maplibregl = ml;\n` +
+    `window.__mlReady = true;\n` });
+  // Module scripts are deferred — wait for execution before injecting the harness.
+  await page.waitForFunction(() => (window as any).__mlReady, { timeout: 10_000 });
   await page.addScriptTag({ content: BENCH_HARNESS });
 
   const raw = await page.evaluate(

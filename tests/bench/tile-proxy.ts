@@ -116,6 +116,21 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  // ── serve local MapLibre JS bundles for ESM <script type="module"> ─────
+  // v6 ships ESM-only; the main module resolves its web-worker URL relative
+  // to import.meta.url, so both files must be served from the same origin.
+  if (url === "/maplibre-gl.mjs" || url === "/maplibre-gl-worker.mjs") {
+    const mjsPath = path.join(__dirname, "node_modules/maplibre-gl/dist", url.slice(1));
+    const body = await fs.promises.readFile(mjsPath);
+    res.writeHead(200, {
+      "content-type": "application/javascript",
+      "content-length": String(body.length),
+      "access-control-allow-origin": "*",
+    });
+    res.end(body);
+    return;
+  }
+
   // ── synthetic TileJSON at /sources/openmaptiles ─────────────────────────
   // OpenFreeMap serves TileJSON at `/planet`, not `/sources/openmaptiles`.
   // Fetch once, rewrite tile URLs to route through this proxy, cache in memory.
@@ -233,7 +248,7 @@ const server = http.createServer(async (req, res) => {
     await new Promise((resolve) => setTimeout(resolve, delayMs));
 
     res.writeHead(status, headers);
-    fs.createReadStream(body).pipe(res);
+    res.end(await fs.promises.readFile(body));
     return;
   }
 
