@@ -188,6 +188,18 @@ pub fn optimize_style_json_value_with_stats(
             ramp::prune_zoom_stops(v);
         }
     }
+
+    // 5. Final cleanup. Late JSON-side passes (re-fold, ramp pruning, post-merge
+    //    expression re-run) can fold paint values to literal zero opacity, which
+    //    the earlier cleanup in step 2 (run_structural_passes) couldn't see.
+    //    Without this, the optimizer is not idempotent: a second call would
+    //    drop the now-invisible layer that the first call kept.
+    if passes.cleanup
+        && let Ok(mut style) = serde_json::from_value::<MaplibreStyleSpecification>(v.clone())
+    {
+        cleanup(&mut style);
+        sync_typed_to_json(&style, v);
+    }
 }
 
 /// Typed entry point.  Delegates to the JSON pipeline so that expression-pass

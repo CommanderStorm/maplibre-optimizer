@@ -1,6 +1,6 @@
 //! Static complexity metrics for style JSON documents.
 //!
-//! Uses the MIR-guided walker from [`crate::optimize::walk`] to traverse only
+//! Uses the same MIR-guided walker as the optimizer to traverse only
 //! schema-valid filter and property expressions, producing accurate operator
 //! histograms and depth metrics.
 //!
