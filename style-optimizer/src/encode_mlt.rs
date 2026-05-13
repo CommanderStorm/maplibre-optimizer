@@ -13,8 +13,8 @@ use mlt_core::encoder::EncoderConfig;
 /// 2. For each layer, encode to MLT using the automatic optimizer
 /// 3. Concatenate all layer bytes
 pub fn mvt_to_mlt(mvt_bytes: Vec<u8>) -> anyhow::Result<Vec<u8>> {
-    let layers = mlt_core::mvt::mvt_to_tile_layers(mvt_bytes)
-        .context("parse MVT for MLT conversion")?;
+    let layers =
+        mlt_core::mvt::mvt_to_tile_layers(mvt_bytes).context("parse MVT for MLT conversion")?;
 
     let cfg = EncoderConfig::default();
     let mut output = Vec::new();
