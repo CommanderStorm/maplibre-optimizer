@@ -508,11 +508,11 @@ pub enum RasterDemSourceEncoding {
     /// Decodes tiles using the redFactor, blueFactor, greenFactor, baseShift parameters.
     #[serde(rename = "custom")]
     Custom,
-    /// Mapbox Terrain RGB tiles. See https://www.mapbox.com/help/access-elevation-data/#mapbox-terrain-rgb for more info.
+    /// Mapbox Terrain RGB tiles. See <https://www.mapbox.com/help/access-elevation-data/#mapbox-terrain-rgb> for more info.
     #[serde(rename = "mapbox")]
     #[default]
     Mapbox,
-    /// Terrarium format PNG tiles. See https://aws.amazon.com/es/public-datasets/terrain/ for more info.
+    /// Terrarium format PNG tiles. See <https://aws.amazon.com/es/public-datasets/terrain/> for more info.
     #[serde(rename = "terrarium")]
     Terrarium,
 }
@@ -685,10 +685,10 @@ impl Default for VectorSourceBounds {
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy, Default)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum VectorSourceEncoding {
-    /// MapLibre Vector Tiles. See https://github.com/maplibre/maplibre-tile-spec for more info.
+    /// MapLibre Vector Tiles. See <https://github.com/maplibre/maplibre-tile-spec> for more info.
     #[serde(rename = "mlt")]
     Mlt,
-    /// Mapbox Vector Tiles. See http://github.com/mapbox/vector-tile-spec for more info.
+    /// Mapbox Vector Tiles. See <http://github.com/mapbox/vector-tile-spec> for more info.
     #[serde(rename = "mvt")]
     #[default]
     Mvt,

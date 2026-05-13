@@ -1,4 +1,4 @@
-//! Convert legacy MapLibre filter syntax to expression syntax.
+//! Convert legacy `MapLibre` filter syntax to expression syntax.
 //!
 //! Legacy filter syntax uses bare property names as strings (e.g.
 //! `["==", "class", "residential"]`), where the property name is implicitly
@@ -8,7 +8,7 @@
 //! misinterpret bare strings as literals and produce incorrect output.
 //!
 //! This module ports `convertFilter`/`isExpressionFilter` from the upstream
-//! MapLibre GL JS source (`upstream/src/feature_filter/`) so that every style
+//! `MapLibre GL JS` source (`upstream/src/feature_filter/`) so that every style
 //! entering the optimizer is normalized to expression syntax first.
 //!
 //! Note: the upstream converter injects per-branch runtime type checks inside
@@ -32,10 +32,10 @@ pub(crate) fn convert_legacy_filters_in_style(style: &mut Value) {
         let Some(obj) = layer.as_object_mut() else {
             continue;
         };
-        if let Some(filter) = obj.get_mut("filter") {
-            if !is_expression_filter(filter) {
-                *filter = convert_filter(filter);
-            }
+        if let Some(filter) = obj.get_mut("filter")
+            && !is_expression_filter(filter)
+        {
+            *filter = convert_filter(filter);
         }
     }
 }
