@@ -1306,7 +1306,7 @@ async function main(): Promise<void> {
           } else if (errMsg !== undefined) {
             console.error(`\n  ⚠ ${variant.id} error: ${errMsg}`);
             parts.push(`${variant.id}: ERR`);
-            if (errMsg.includes("Session closed") || errMsg.includes("Target closed") || errMsg.includes("Protocol error") || errMsg.includes("benchmark run timeout") || errMsg.includes("Connection closed") || errMsg.includes("frame was detached")) {
+            if (errMsg.includes("Session closed") || errMsg.includes("Target closed") || errMsg.includes("Protocol error") || errMsg.includes("benchmark run timeout") || errMsg.includes("Connection closed") || errMsg.includes("frame was detached") || errMsg.includes("ERR_INSUFFICIENT_RESOURCES")) {
               console.log("\n  Recovering browser…");
               try { await browser.close(); } catch {}
               browser = await puppeteer.launch({ headless: true, args: PUPPETEER_ARGS, protocolTimeout: RUN_TIMEOUT + 30_000 });
