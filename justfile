@@ -2,10 +2,6 @@
 
 set shell := ['bash', '-c']
 
-# Source nvm so that `npm`/`npx` use the nvm-managed Node instead of the
-# system Node (whose bundled npm is broken on Node v25).
-nvm_prefix := 'source "${NVM_DIR:-$HOME/.nvm}/nvm.sh" --no-use && nvm use v25 --silent &&'
-
 main_crate := 'martin'
 
 export CARGO_TERM_COLOR := 'always'
@@ -95,8 +91,8 @@ env-info:
     @echo "RUSTFLAGS='$RUSTFLAGS'"
     @echo "RUSTDOCFLAGS='$RUSTDOCFLAGS'"
     @echo "RUST_BACKTRACE='$RUST_BACKTRACE'"
-    {{nvm_prefix}} npm --version
-    {{nvm_prefix}} node --version
+    npm --version
+    node --version
 
 # Reformat all code `cargo fmt`. If nightly is available, use it for better results
 fmt:
@@ -132,13 +128,13 @@ fuzz *args:
 # Run render tests comparing original vs optimised styles (builds optimizer first)
 [working-directory: 'tests/render']
 render-test *ARGS:
-    {{nvm_prefix}} npm install --no-fund --no-audit
-    {{nvm_prefix}} npx tsx run.ts {{ARGS}}
+    npm install --no-fund --no-audit
+    npx tsx run.ts {{ARGS}}
 
 # Run render tests with browser console debug output
 [working-directory: 'tests/render']
 render-test-debug *ARGS:
-    {{nvm_prefix}} npx tsx run.ts --debug {{ARGS}}
+    npx tsx run.ts --debug {{ARGS}}
 
 # Run all tests using a test database
 test: (test-cargo '--all-targets') test-doc
@@ -203,7 +199,7 @@ clean-gen:
 # Simulates 4G network conditions: 10 Mbps + 50 ms RTT (Rusan et al.).
 [working-directory: 'tests/bench']
 bench-proxy *ARGS:
-    {{nvm_prefix}} npx tsx tile-proxy.ts {{ARGS}}
+    npx tsx tile-proxy.ts {{ARGS}}
 
 # Number of CPU cores to pin benchmarks to (reduces run-to-run variance by
 # preventing the process tree from migrating across all cores).
@@ -217,13 +213,13 @@ bench *ARGS: (bench-runtime ARGS) (bench-cross-style ARGS) bench-plot bench-plot
 # Requires tile proxy running (start with: just bench-proxy)
 [working-directory: 'tests/bench']
 bench-runtime *ARGS:
-    {{nvm_prefix}} npm install --no-fund --no-audit
-    {{nvm_prefix}} taskset -c {{bench_cores}} npx tsx run.ts {{ARGS}}
+    npm install --no-fund --no-audit
+    taskset -c {{bench_cores}} npx tsx run.ts {{ARGS}}
 
 # Run runtime benchmarks with browser console debug output
 [working-directory: 'tests/bench']
 bench-debug *ARGS:
-    {{nvm_prefix}} taskset -c {{bench_cores}} npx tsx run.ts --debug {{ARGS}}
+    taskset -c {{bench_cores}} npx tsx run.ts --debug {{ARGS}}
 
 # Sync bench Python venv from lockfile
 [private]
@@ -238,14 +234,14 @@ bench-plot *ARGS: bench-venv
 # Run isolated (non-cumulative) ablation benchmarks
 [working-directory: 'tests/bench']
 bench-isolated *ARGS:
-    {{nvm_prefix}} npm install --no-fund --no-audit
-    {{nvm_prefix}} taskset -c {{bench_cores}} npx tsx run.ts --isolated {{ARGS}}
+    npm install --no-fund --no-audit
+    taskset -c {{bench_cores}} npx tsx run.ts --isolated {{ARGS}}
 
 # Run cross-style generalization benchmark
 [working-directory: 'tests/bench']
 bench-cross-style *ARGS:
-    {{nvm_prefix}} npm install --no-fund --no-audit
-    {{nvm_prefix}} npx tsx cross_style.ts {{ARGS}}
+    npm install --no-fund --no-audit
+    npx tsx cross_style.ts {{ARGS}}
 
 # Plot cross-style benchmark results
 [working-directory: 'tests/bench']
@@ -255,8 +251,8 @@ bench-plot-cross-style *ARGS: bench-venv
 # Verify tile shaving effectiveness across multiple styles
 [working-directory: 'tests/bench']
 verify-tile-shave *ARGS:
-    {{nvm_prefix}} npm install --no-fund --no-audit
-    {{nvm_prefix}} npx tsx verify_tile_shave.ts {{ARGS}}
+    npm install --no-fund --no-audit
+    npx tsx verify_tile_shave.ts {{ARGS}}
 
 # Install SQLX cli if not already installed.
 [private]
