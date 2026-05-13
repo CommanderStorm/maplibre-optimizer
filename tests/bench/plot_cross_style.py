@@ -164,7 +164,7 @@ def plot_layer_count_comparison(df: pd.DataFrame, out: Path, fmt: str) -> None:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Plot cross-style benchmark results.")
-    parser.add_argument("files", nargs="+", type=Path, help="JSONL result files")
+parser.add_argument("files", nargs="*", type=Path, help="JSONL result files (default: latest in results/)")
     parser.add_argument(
         "--out", type=Path, default=Path("tests/bench/figures"), help="Output directory"
     )
@@ -172,6 +172,15 @@ def main() -> None:
         "--format", choices=["png", "html"], default="png", help="Output format"
     )
     args = parser.parse_args()
+
+    if not args.files:
+        results_dir = Path(__file__).parent / "results"
+        candidates = sorted(results_dir.glob("cross-style-*.jsonl"))
+        if not candidates:
+            print("No cross-style JSONL files found in results/. Run benchmarks first.", file=sys.stderr)
+            sys.exit(1)
+        args.files = [candidates[-1]]
+        print(f"Auto-selected: {args.files[0]}")
 
     args.out.mkdir(parents=True, exist_ok=True)
     df = load_jsonl(args.files)
