@@ -805,10 +805,17 @@ def main() -> None:
     parser = argparse.ArgumentParser(
         description="Plot ablation benchmark results from JSONL files."
     )
-    parser.add_argument(
-        "files", nargs="+", type=Path, help="JSONL benchmark result files"
-    )
+    parser.add_argument("files", nargs="*", type=Path, help="JSONL benchmark result files (default: latest in results/)")
     args = parser.parse_args()
+
+    if not args.files:
+        results_dir = Path(__file__).parent / "results"
+        candidates = sorted(results_dir.glob("bench-*.jsonl"))
+        if not candidates:
+            print("No JSONL files found in results/. Run benchmarks first.", file=sys.stderr)
+            sys.exit(1)
+        args.files = [candidates[-1]]
+        print(f"Auto-selected: {args.files[0]}")
 
     out = Path("tests/bench/figures")
     out.mkdir(parents=True, exist_ok=True)
