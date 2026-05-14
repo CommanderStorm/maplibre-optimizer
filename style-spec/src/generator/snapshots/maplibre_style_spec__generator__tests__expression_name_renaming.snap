@@ -1,0 +1,390 @@
+---
+source: style-spec/src/generator/mod.rs
+expression: reference
+---
+{
+  "$version": 8,
+  "$root": {},
+  "ArrayExpression": {
+    "type": "enum",
+    "doc": "\"ArrayExpression\"",
+    "example": null,
+    "units": null,
+    "expression": null,
+    "property-type": null,
+    "sdk-support": null,
+    "transition": null,
+    "required": null,
+    "overridable": null,
+    "requires": null,
+    "default": null,
+    "values": {
+      "array": {
+        "doc": "Asserts that the input is an array (optionally with a specific item type and length). If, when the input expression is evaluated, it is not of the asserted type or length, then this assertion will cause the whole expression to be aborted.",
+        "sdk-support": null,
+        "syntax": {
+          "overloads": [
+            {
+              "parameters": [
+                "value"
+              ],
+              "output-type": "array"
+            },
+            {
+              "parameters": [
+                "type",
+                "value"
+              ],
+              "output-type": "array<type>"
+            },
+            {
+              "parameters": [
+                "type",
+                "length",
+                "value"
+              ],
+              "output-type": "array<type, length>"
+            },
+            {
+              "parameters": [
+                "type",
+                "value"
+              ],
+              "output-type": "array<type>"
+            }
+          ],
+          "parameters": [
+            {
+              "name": "value",
+              "type": "any",
+              "doc": null
+            },
+            {
+              "name": "type",
+              "type": [
+                "string",
+                "number",
+                "boolean"
+              ],
+              "doc": "The asserted type of the input array."
+            },
+            {
+              "name": "length",
+              "type": "number literal",
+              "doc": "The asserted length of the input array."
+            }
+          ]
+        },
+        "example": [
+          "array",
+          "string",
+          3,
+          [
+            "literal",
+            [
+              "a",
+              "b",
+              "c"
+            ]
+          ]
+        ],
+        "group": "Types"
+      },
+      "at": {
+        "doc": "Retrieves an item from an array.",
+        "sdk-support": null,
+        "syntax": {
+          "overloads": [
+            {
+              "parameters": [
+                "index",
+                "array"
+              ],
+              "output-type": "array"
+            }
+          ],
+          "parameters": [
+            {
+              "name": "index",
+              "type": "number",
+              "doc": "The index into `array`."
+            },
+            {
+              "name": "array",
+              "type": "array<T>",
+              "doc": "The array of items to retrieve the specified item from."
+            }
+          ]
+        },
+        "example": [
+          "at",
+          1,
+          [
+            "literal",
+            [
+              "a",
+              "b",
+              "c"
+            ]
+          ]
+        ],
+        "group": "Lookup"
+      },
+      "literal": {
+        "doc": "Provides a literal array or object value.\n\n - [Display and style rich text labels](https://maplibre.org/maplibre-gl-js/docs/examples/display-and-style-rich-text-labels/)",
+        "sdk-support": null,
+        "syntax": {
+          "overloads": [
+            {
+              "parameters": [
+                "json_array"
+              ],
+              "output-type": "array"
+            }
+          ],
+          "parameters": [
+            {
+              "name": "json_object",
+              "type": "JSON object",
+              "doc": null
+            },
+            {
+              "name": "json_array",
+              "type": "JSON array",
+              "doc": null
+            }
+          ]
+        },
+        "example": [
+          "literal",
+          [
+            "DIN Offc Pro Italic",
+            "Arial Unicode MS Regular"
+          ]
+        ],
+        "group": "Types"
+      }
+    }
+  },
+  "ArrayLessTypeLengthGreater": {
+    "type": "enum",
+    "doc": "\"ArrayLessTypeLengthGreater\"",
+    "example": null,
+    "units": null,
+    "expression": null,
+    "property-type": null,
+    "sdk-support": null,
+    "transition": null,
+    "required": null,
+    "overridable": null,
+    "requires": null,
+    "default": null,
+    "values": {
+      "array": {
+        "doc": "Asserts that the input is an array (optionally with a specific item type and length). If, when the input expression is evaluated, it is not of the asserted type or length, then this assertion will cause the whole expression to be aborted.",
+        "sdk-support": null,
+        "syntax": {
+          "overloads": [
+            {
+              "parameters": [
+                "value"
+              ],
+              "output-type": "array"
+            },
+            {
+              "parameters": [
+                "type",
+                "value"
+              ],
+              "output-type": "array<type>"
+            },
+            {
+              "parameters": [
+                "type",
+                "length",
+                "value"
+              ],
+              "output-type": "array<type, length>"
+            }
+          ],
+          "parameters": [
+            {
+              "name": "value",
+              "type": "any",
+              "doc": null
+            },
+            {
+              "name": "type",
+              "type": [
+                "string",
+                "number",
+                "boolean"
+              ],
+              "doc": "The asserted type of the input array."
+            },
+            {
+              "name": "length",
+              "type": "number literal",
+              "doc": "The asserted length of the input array."
+            }
+          ]
+        },
+        "example": [
+          "array",
+          "string",
+          3,
+          [
+            "literal",
+            [
+              "a",
+              "b",
+              "c"
+            ]
+          ]
+        ],
+        "group": "Types"
+      },
+      "at": {
+        "doc": "Retrieves an item from an array.",
+        "sdk-support": null,
+        "syntax": {
+          "overloads": [
+            {
+              "parameters": [
+                "index",
+                "array"
+              ],
+              "output-type": "array<type, length>"
+            }
+          ],
+          "parameters": [
+            {
+              "name": "index",
+              "type": "number",
+              "doc": "The index into `array`."
+            },
+            {
+              "name": "array",
+              "type": "array<T>",
+              "doc": "The array of items to retrieve the specified item from."
+            }
+          ]
+        },
+        "example": [
+          "at",
+          1,
+          [
+            "literal",
+            [
+              "a",
+              "b",
+              "c"
+            ]
+          ]
+        ],
+        "group": "Lookup"
+      }
+    }
+  },
+  "ObjectExpression": {
+    "type": "enum",
+    "doc": "\"ObjectExpression\"",
+    "example": null,
+    "units": null,
+    "expression": null,
+    "property-type": null,
+    "sdk-support": null,
+    "transition": null,
+    "required": null,
+    "overridable": null,
+    "requires": null,
+    "default": null,
+    "values": {
+      "at": {
+        "doc": "Retrieves an item from an array.",
+        "sdk-support": null,
+        "syntax": {
+          "overloads": [
+            {
+              "parameters": [
+                "index",
+                "array"
+              ],
+              "output-type": "object"
+            }
+          ],
+          "parameters": [
+            {
+              "name": "index",
+              "type": "number",
+              "doc": "The index into `array`."
+            },
+            {
+              "name": "array",
+              "type": "array<T>",
+              "doc": "The array of items to retrieve the specified item from."
+            }
+          ]
+        },
+        "example": [
+          "at",
+          1,
+          [
+            "literal",
+            [
+              "a",
+              "b",
+              "c"
+            ]
+          ]
+        ],
+        "group": "Lookup"
+      },
+      "literal": {
+        "doc": "Provides a literal array or object value.\n\n - [Display and style rich text labels](https://maplibre.org/maplibre-gl-js/docs/examples/display-and-style-rich-text-labels/)",
+        "sdk-support": null,
+        "syntax": {
+          "overloads": [
+            {
+              "parameters": [
+                "json_object"
+              ],
+              "output-type": "object"
+            },
+            {
+              "parameters": [
+                "json_array"
+              ],
+              "output-type": "array"
+            }
+          ],
+          "parameters": [
+            {
+              "name": "json_object",
+              "type": "JSON object",
+              "doc": null
+            },
+            {
+              "name": "json_array",
+              "type": "JSON array",
+              "doc": null
+            }
+          ]
+        },
+        "example": [
+          "literal",
+          [
+            "DIN Offc Pro Italic",
+            "Arial Unicode MS Regular"
+          ]
+        ],
+        "group": "Types"
+      }
+    }
+  },
+  "expression": [
+    "ArrayExpression",
+    "ArrayLessTypeLengthGreater",
+    "ObjectExpression"
+  ]
+}

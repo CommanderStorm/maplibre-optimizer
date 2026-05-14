@@ -1,0 +1,23 @@
+pub mod array;
+pub mod boolean;
+pub mod color;
+pub mod color_array;
+pub mod r#enum;
+pub mod formatted;
+pub mod number;
+pub mod number_array;
+pub mod padding;
+pub mod projection_definition;
+pub mod promote_id;
+pub mod reference;
+pub mod resolved_image;
+pub mod sprite;
+pub mod star;
+pub mod state;
+pub mod string;
+pub mod variable_anchor_offset_collection;
+
+/// Escape a doc string for embedding inside a `doc = "..."` macro argument.
+pub fn escape_doc_for_macro(doc: &str) -> String {
+    doc.replace('\\', "\\\\").replace('"', "\\\"")
+}

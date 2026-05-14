@@ -1,0 +1,49 @@
+{
+  "version": 8,
+  "sources": {
+    "example": {
+      "type": "vector",
+      "url": "https://example.org/tiles.json"
+    }
+  },
+  "layers": [
+    {
+      "id": "unary-any-filter",
+      "type": "fill",
+      "source": "example",
+      "source-layer": "water",
+      "filter": ["==", ["get", "kind"], "pond"]
+    },
+    {
+      "id": "unary-all-filter",
+      "type": "line",
+      "source": "example",
+      "source-layer": "road",
+      "filter": ["has", "structure"]
+    },
+    {
+      "id": "double-not-filter",
+      "type": "circle",
+      "source": "example",
+      "source-layer": "poi",
+      "filter": ["has", "name"],
+      "paint": {
+        "circle-radius": 4
+      }
+    },
+    {
+      "id": "nested-any",
+      "type": "fill",
+      "source": "example",
+      "source-layer": "land",
+      "filter": ["==", ["get", "area"], 1]
+    },
+    {
+      "id": "bare-any-filter",
+      "type": "line",
+      "source": "example",
+      "source-layer": "road",
+      "filter": ["any"]
+    }
+  ]
+}

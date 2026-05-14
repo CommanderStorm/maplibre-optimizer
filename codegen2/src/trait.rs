@@ -3,10 +3,10 @@ use std::fmt::{self, Write};
 use crate::associated_const::AssociatedConst;
 use crate::associated_type::AssociatedType;
 use crate::bound::Bound;
-use crate::formatter::{Formatter, fmt_bound_rhs};
 use crate::function::Function;
 use crate::r#type::Type;
 use crate::type_def::TypeDef;
+use crate::util::{fmt_bound_rhs, write_block};
 
 /// Define a trait.
 #[derive(Debug, Clone)]
@@ -17,8 +17,6 @@ pub struct Trait {
     attributes: Vec<String>,
     associated_tys: Vec<AssociatedType>,
     fns: Vec<Function>,
-    #[allow(dead_code)]
-    macros: Vec<String>,
 }
 
 impl Trait {
@@ -31,7 +29,6 @@ impl Trait {
             attributes: Vec::new(),
             associated_tys: Vec::new(),
             fns: Vec::new(),
-            macros: Vec::new(),
         }
     }
 
@@ -99,7 +96,9 @@ impl Trait {
             bound: vec![ty.into()],
         }));
 
-        self.associated_consts.last_mut().unwrap()
+        self.associated_consts
+            .last_mut()
+            .expect("associated_consts was just pushed to")
     }
 
     /// Add an associated type. Returns a mutable reference to the new
@@ -110,7 +109,9 @@ impl Trait {
             bound: vec![],
         }));
 
-        self.associated_tys.last_mut().unwrap()
+        self.associated_tys
+            .last_mut()
+            .expect("associated_tys was just pushed to")
     }
 
     /// Push a new function definition, returning a mutable reference to it.
@@ -119,7 +120,7 @@ impl Trait {
         func.body = None;
 
         self.push_fn(func);
-        self.fns.last_mut().unwrap()
+        self.fns.last_mut().expect("fns was just pushed to")
     }
 
     /// Push a function definition.
@@ -129,14 +130,14 @@ impl Trait {
     }
 
     /// Formats the scope using the given formatter.
-    pub fn fmt(&self, fmt: &mut Formatter<'_>) -> fmt::Result {
+    pub fn fmt(&self, dst: &mut String) -> fmt::Result {
         for attr in &self.attributes {
-            writeln!(fmt, "#[{}]", attr)?;
+            writeln!(dst, "#[{}]", attr)?;
         }
 
-        self.type_def.fmt_head("trait", &self.parents, fmt)?;
+        self.type_def.fmt_head("trait", &self.parents, dst)?;
 
-        fmt.block(|fmt| {
+        write_block(dst, |dst| {
             let assoc_csts = &self.associated_consts;
             let assoc_tys = &self.associated_tys;
 
@@ -145,14 +146,14 @@ impl Trait {
                 for cst in assoc_csts {
                     let cst = &cst.0;
 
-                    write!(fmt, "const {}", cst.name)?;
+                    write!(dst, "const {}", cst.name)?;
 
                     if !cst.bound.is_empty() {
-                        write!(fmt, ": ")?;
-                        fmt_bound_rhs(&cst.bound, fmt)?;
+                        write!(dst, ": ")?;
+                        fmt_bound_rhs(&cst.bound, dst)?;
                     }
 
-                    writeln!(fmt, ";")?;
+                    writeln!(dst, ";")?;
                 }
             }
 
@@ -161,23 +162,23 @@ impl Trait {
                 for ty in assoc_tys {
                     let ty = &ty.0;
 
-                    write!(fmt, "type {}", ty.name)?;
+                    write!(dst, "type {}", ty.name)?;
 
                     if !ty.bound.is_empty() {
-                        write!(fmt, ": ")?;
-                        fmt_bound_rhs(&ty.bound, fmt)?;
+                        write!(dst, ": ")?;
+                        fmt_bound_rhs(&ty.bound, dst)?;
                     }
 
-                    writeln!(fmt, ";")?;
+                    writeln!(dst, ";")?;
                 }
             }
 
             for (i, func) in self.fns.iter().enumerate() {
                 if i != 0 || !assoc_tys.is_empty() || !assoc_csts.is_empty() {
-                    writeln!(fmt)?;
+                    writeln!(dst)?;
                 }
 
-                func.fmt(true, fmt)?;
+                func.fmt(true, dst)?;
             }
 
             Ok(())

@@ -2,7 +2,6 @@ use std::fmt::{self, Write};
 
 use crate::Field;
 use crate::fields::Fields;
-use crate::formatter::Formatter;
 use crate::r#type::Type;
 
 /// Defines an enum variant.
@@ -70,6 +69,17 @@ impl Variant {
         self
     }
 
+    /// Tuple variant field with outer attributes on that slot.
+    pub fn tuple_with_attrs<I, S, T>(&mut self, annotations: I, ty: T) -> &mut Self
+    where
+        I: IntoIterator<Item = S>,
+        S: ToString,
+        T: Into<Type>,
+    {
+        self.fields.tuple_with_attrs(annotations, ty);
+        self
+    }
+
     /// Set the variant documentation.
     pub fn doc(&mut self, documentation: impl ToString) -> &mut Self {
         self.documentation = documentation.to_string();
@@ -89,22 +99,21 @@ impl Variant {
     }
 
     /// Formats the variant using the given formatter.
-    pub fn fmt(&self, fmt: &mut Formatter<'_>) -> fmt::Result {
+    pub fn fmt(&self, dst: &mut String) -> fmt::Result {
         if !self.documentation.is_empty() {
             for doc in self.documentation.lines() {
-                writeln!(fmt, "/// {}", doc)?;
+                writeln!(dst, "/// {}", doc)?;
             }
         }
         for a in &self.annotations {
-            write!(fmt, "{}", a)?;
-            writeln!(fmt)?;
+            writeln!(dst, "{}", a)?;
         }
-        write!(fmt, "{}", self.name)?;
-        self.fields.fmt(fmt)?;
+        write!(dst, "{}", self.name)?;
+        self.fields.fmt(dst)?;
         if let Some(ref discriminant) = self.discriminant {
-            write!(fmt, " = {}", discriminant)?;
+            write!(dst, " = {}", discriminant)?;
         }
-        writeln!(fmt, ",")?;
+        writeln!(dst, ",")?;
 
         Ok(())
     }

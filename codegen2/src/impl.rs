@@ -2,9 +2,9 @@ use std::fmt::{self, Write};
 
 use crate::bound::Bound;
 use crate::field::Field;
-use crate::formatter::{Formatter, fmt_bounds, fmt_generics};
 use crate::function::Function;
 use crate::r#type::Type;
+use crate::util::{fmt_bounds, fmt_generics, write_block};
 
 /// Defines an impl block.
 #[derive(Debug, Clone)]
@@ -137,7 +137,7 @@ impl Impl {
     /// Push a new function definition, returning a mutable reference to it.
     pub fn new_fn(&mut self, name: impl ToString) -> &mut Function {
         self.push_fn(Function::new(name));
-        self.fns.last_mut().unwrap()
+        self.fns.last_mut().expect("fns was just pushed to")
     }
 
     /// Push a function definition.
@@ -147,52 +147,52 @@ impl Impl {
     }
 
     /// Formats the impl block using the given formatter.
-    pub fn fmt(&self, fmt: &mut Formatter<'_>) -> fmt::Result {
+    pub fn fmt(&self, dst: &mut String) -> fmt::Result {
         for m in self.macros.iter() {
-            writeln!(fmt, "{}", m)?;
+            writeln!(dst, "{}", m)?;
         }
-        write!(fmt, "impl")?;
-        fmt_generics(&self.generics[..], fmt)?;
+        write!(dst, "impl")?;
+        fmt_generics(&self.generics[..], dst)?;
 
         if let Some(ref t) = self.impl_trait {
-            write!(fmt, " ")?;
-            t.fmt(fmt)?;
-            write!(fmt, " for")?;
+            write!(dst, " ")?;
+            t.fmt(dst)?;
+            write!(dst, " for")?;
         }
 
-        write!(fmt, " ")?;
-        self.target.fmt(fmt)?;
+        write!(dst, " ")?;
+        self.target.fmt(dst)?;
 
-        fmt_bounds(&self.bounds, fmt)?;
+        fmt_bounds(&self.bounds, dst)?;
 
-        fmt.block(|fmt| {
+        write_block(dst, |dst| {
             // format associated constants
             if !self.assoc_csts.is_empty() {
                 for cst in &self.assoc_csts {
                     if let Some(vis) = &cst.visibility {
-                        write!(fmt, "{} ", vis)?;
+                        write!(dst, "{} ", vis)?;
                     }
-                    write!(fmt, "const {}: ", cst.name)?;
-                    cst.ty.fmt(fmt)?;
-                    writeln!(fmt, " = {};", cst.value)?;
+                    write!(dst, "const {}: ", cst.name)?;
+                    cst.ty.fmt(dst)?;
+                    writeln!(dst, " = {};", cst.value)?;
                 }
             }
 
             // format associated types
             if !self.assoc_tys.is_empty() {
                 for ty in &self.assoc_tys {
-                    write!(fmt, "type {} = ", ty.name)?;
-                    ty.ty.fmt(fmt)?;
-                    writeln!(fmt, ";")?;
+                    write!(dst, "type {} = ", ty.name)?;
+                    ty.ty.fmt(dst)?;
+                    writeln!(dst, ";")?;
                 }
             }
 
             for (i, func) in self.fns.iter().enumerate() {
                 if i != 0 || !self.assoc_tys.is_empty() {
-                    writeln!(fmt)?;
+                    writeln!(dst)?;
                 }
 
-                func.fmt(false, fmt)?;
+                func.fmt(false, dst)?;
             }
 
             Ok(())

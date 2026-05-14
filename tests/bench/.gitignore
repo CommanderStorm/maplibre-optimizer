@@ -1,0 +1,7 @@
+node_modules/
+*.png
+*.eps
+*.html
+__pycache__/
+results/
+.venv/

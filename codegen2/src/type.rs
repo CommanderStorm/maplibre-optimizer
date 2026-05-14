@@ -1,7 +1,5 @@
 use std::fmt::{self, Write};
 
-use crate::formatter::Formatter;
-
 /// Defines a type.
 #[derive(Debug, Clone)]
 pub struct Type {
@@ -23,7 +21,6 @@ impl Type {
     where
         T: Into<Type>,
     {
-        // Make sure that the name doesn't already include generics
         assert!(
             !self.name.contains("<"),
             "type name already includes generics"
@@ -33,12 +30,17 @@ impl Type {
         self
     }
 
-    /// Rewrite the `Type` with the provided path
+    /// Rewrite the `Type` with the provided path prefix.
     ///
-    /// TODO: Is this needed?
+    /// # Panics
+    ///
+    /// Panics if the type name already contains a path separator (`::`)
+    /// since prepending a path to a qualified name is ambiguous.
     pub fn path(&self, path: impl ToString) -> Type {
-        // TODO: This isn't really correct
-        assert!(!self.name.contains("::"));
+        assert!(
+            !self.name.contains("::"),
+            "type name already contains a path separator"
+        );
 
         let mut name = path.to_string();
         name.push_str("::");
@@ -51,23 +53,23 @@ impl Type {
     }
 
     /// Formats the struct using the given formatter.
-    pub fn fmt(&self, fmt: &mut Formatter<'_>) -> fmt::Result {
-        write!(fmt, "{}", self.name)?;
-        Type::fmt_slice(&self.generics, fmt)
+    pub fn fmt(&self, dst: &mut String) -> fmt::Result {
+        write!(dst, "{}", self.name)?;
+        Type::fmt_slice(&self.generics, dst)
     }
 
-    fn fmt_slice(generics: &[Type], fmt: &mut Formatter<'_>) -> fmt::Result {
+    fn fmt_slice(generics: &[Type], dst: &mut String) -> fmt::Result {
         if !generics.is_empty() {
-            write!(fmt, "<")?;
+            write!(dst, "<")?;
 
             for (i, ty) in generics.iter().enumerate() {
                 if i != 0 {
-                    write!(fmt, ", ")?
+                    write!(dst, ", ")?
                 }
-                ty.fmt(fmt)?;
+                ty.fmt(dst)?;
             }
 
-            write!(fmt, ">")?;
+            write!(dst, ">")?;
         }
 
         Ok(())

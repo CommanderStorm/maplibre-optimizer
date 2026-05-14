@@ -1,0 +1,716 @@
+---
+source: style-spec/src/mir/preprocessing/sources.rs
+expression: sources
+---
+source_types:
+  geojson:
+    fields:
+      - String:
+          meta:
+            spec_name: attribution
+            rust_name: attribution
+            optional: true
+            transition: false
+            expression: ~
+            doc: Contains an attribution to be displayed when the map is shown to a user.
+            example: ~
+            units: ~
+          default: ~
+      - Number:
+          meta:
+            spec_name: buffer
+            rust_name: buffer
+            optional: true
+            transition: false
+            expression: ~
+            doc: "Size of the tile buffer on each side. A value of 0 produces no buffer. A value of 512 produces a buffer as wide as the tile itself. Larger values produce fewer rendering artifacts near tile edges and slower performance.\n\nRange: 0..=512"
+            example: ~
+            units: ~
+          default: 128
+          min: 0
+          max: 512
+          period: ~
+      - Boolean:
+          meta:
+            spec_name: cluster
+            rust_name: cluster
+            optional: true
+            transition: false
+            expression: ~
+            doc: "If the data is a collection of point features, setting this to true clusters the points by radius into groups. Cluster groups become new `Point` features in the source with additional properties:\n\n * `cluster` Is `true` if the point is a cluster \n\n * `cluster_id` A unique id for the cluster to be used in conjunction with the [cluster inspection methods](https://maplibre.org/maplibre-gl-js/docs/API/classes/GeoJSONSource/#getclusterexpansionzoom)\n\n * `point_count` Number of original points grouped into this cluster\n\n * `point_count_abbreviated` An abbreviated point count"
+            example: ~
+            units: ~
+          default: false
+      - Number:
+          meta:
+            spec_name: clusterMaxZoom
+            rust_name: cluster_max_zoom
+            optional: true
+            transition: false
+            expression: ~
+            doc: Max zoom on which to cluster points if clustering is enabled. Defaults to one zoom less than maxzoom (so that last zoom features are not clustered). Clusters are re-evaluated at integer zoom levels so setting clusterMaxZoom to 14 means the clusters will be displayed until z15.
+            example: ~
+            units: ~
+          default: ~
+          min: ~
+          max: ~
+          period: ~
+      - Number:
+          meta:
+            spec_name: clusterMinPoints
+            rust_name: cluster_min_points
+            optional: true
+            transition: false
+            expression: ~
+            doc: "Minimum number of points necessary to form a cluster if clustering is enabled. Defaults to `2`."
+            example: ~
+            units: ~
+          default: ~
+          min: ~
+          max: ~
+          period: ~
+      - Star:
+          spec_name: clusterProperties
+          rust_name: cluster_properties
+          optional: true
+          transition: false
+          expression: ~
+          doc: "An object defining custom properties on the generated clusters if clustering is enabled, aggregating values from clustered points. Has the form `{\"property_name\": [operator, map_expression]}`. `operator` is any expression function that accepts at least 2 operands (e.g. `\"+\"` or `\"max\"`) — it accumulates the property value from clusters/points the cluster contains; `map_expression` produces the value of a single point.\n\nExample: `{\"sum\": [\"+\", [\"get\", \"scalerank\"]]}`.\n\nFor more advanced use cases, in place of `operator`, you can use a custom reduce expression that references a special `[\"accumulated\"]` value, e.g.:\n\n`{\"sum\": [[\"+\", [\"accumulated\"], [\"get\", \"sum\"]], [\"get\", \"scalerank\"]]}`"
+          example: ~
+          units: ~
+      - Number:
+          meta:
+            spec_name: clusterRadius
+            rust_name: cluster_radius
+            optional: true
+            transition: false
+            expression: ~
+            doc: "Radius of each cluster if clustering is enabled. A value of 512 indicates a radius equal to the width of a tile.\n\nRange: 0.."
+            example: ~
+            units: ~
+          default: 50
+          min: 0
+          max: ~
+          period: ~
+      - Star:
+          spec_name: data
+          rust_name: data
+          optional: false
+          transition: false
+          expression: ~
+          doc: "A URL to a GeoJSON file, or inline GeoJSON."
+          example: ~
+          units: ~
+      - Reference:
+          meta:
+            spec_name: filter
+            rust_name: filter
+            optional: true
+            transition: false
+            expression: ~
+            doc: An expression for filtering features prior to processing them for rendering.
+            example: ~
+            units: ~
+          target: filter
+      - Boolean:
+          meta:
+            spec_name: generateId
+            rust_name: generate_id
+            optional: true
+            transition: false
+            expression: ~
+            doc: "Whether to generate ids for the geojson features. When enabled, the `feature.id` property will be auto assigned based on its index in the `features` array, over-writing any previous values."
+            example: ~
+            units: ~
+          default: false
+      - Boolean:
+          meta:
+            spec_name: lineMetrics
+            rust_name: line_metrics
+            optional: true
+            transition: false
+            expression: ~
+            doc: "Whether to calculate line distance metrics. This is required for line layers that specify `line-gradient` values."
+            example: ~
+            units: ~
+          default: false
+      - Number:
+          meta:
+            spec_name: maxzoom
+            rust_name: maxzoom
+            optional: true
+            transition: false
+            expression: ~
+            doc: Maximum zoom level at which to create vector tiles (higher means greater detail at high zoom levels).
+            example: ~
+            units: ~
+          default: 18
+          min: ~
+          max: ~
+          period: ~
+      - PromoteId:
+          spec_name: promoteId
+          rust_name: promote_id
+          optional: true
+          transition: false
+          expression: ~
+          doc: "A property to use as a feature id (for feature state). Either a property name, or an object of the form `{<sourceLayer>: <propertyName>}`."
+          example: ~
+          units: ~
+      - Number:
+          meta:
+            spec_name: tolerance
+            rust_name: tolerance
+            optional: true
+            transition: false
+            expression: ~
+            doc: Douglas-Peucker simplification tolerance (higher means simpler geometries and faster performance).
+            example: ~
+            units: ~
+          default: 0.375
+          min: ~
+          max: ~
+          period: ~
+  image:
+    fields:
+      - Array:
+          meta:
+            spec_name: coordinates
+            rust_name: coordinates
+            optional: false
+            transition: false
+            expression: ~
+            doc: "Corners of image specified in longitude, latitude pairs."
+            example: ~
+            units: ~
+          default: ~
+          element:
+            Complex:
+              Array:
+                meta:
+                  spec_name: element
+                  rust_name: element
+                  optional: true
+                  transition: false
+                  expression: ~
+                  doc: "A single longitude, latitude pair."
+                  example: ~
+                  units: ~
+                default: ~
+                element:
+                  Number:
+                    min: ~
+                    max: ~
+                length: 2
+          length: 4
+      - String:
+          meta:
+            spec_name: url
+            rust_name: url
+            optional: false
+            transition: false
+            expression: ~
+            doc: URL that points to an image.
+            example: ~
+            units: ~
+          default: ~
+  raster:
+    fields:
+      - String:
+          meta:
+            spec_name: attribution
+            rust_name: attribution
+            optional: true
+            transition: false
+            expression: ~
+            doc: Contains an attribution to be displayed when the map is shown to a user.
+            example: ~
+            units: ~
+          default: ~
+      - Array:
+          meta:
+            spec_name: bounds
+            rust_name: bounds
+            optional: true
+            transition: false
+            expression: ~
+            doc: "An array containing the longitude and latitude of the southwest and northeast corners of the source's bounding box in the following order: `[sw.lng, sw.lat, ne.lng, ne.lat]`. When this property is included in a source, no tiles outside of the given bounds are requested by MapLibre."
+            example: ~
+            units: ~
+          default:
+            - -180
+            - -85.051129
+            - 180
+            - 85.051129
+          element:
+            Number:
+              min: ~
+              max: ~
+          length: 4
+      - Number:
+          meta:
+            spec_name: maxzoom
+            rust_name: maxzoom
+            optional: true
+            transition: false
+            expression: ~
+            doc: "Maximum zoom level for which tiles are available, as in the TileJSON spec. Data from tiles at the maxzoom are used when displaying the map at higher zoom levels."
+            example: ~
+            units: ~
+          default: 22
+          min: ~
+          max: ~
+          period: ~
+      - Number:
+          meta:
+            spec_name: minzoom
+            rust_name: minzoom
+            optional: true
+            transition: false
+            expression: ~
+            doc: "Minimum zoom level for which tiles are available, as in the TileJSON spec."
+            example: ~
+            units: ~
+          default: 0
+          min: ~
+          max: ~
+          period: ~
+      - Enum:
+          meta:
+            spec_name: scheme
+            rust_name: scheme
+            optional: true
+            transition: false
+            expression: ~
+            doc: Influences the y direction of the tile coordinates. The global-mercator (aka Spherical Mercator) profile is assumed.
+            example: ~
+            units: ~
+          default: xyz
+          variants:
+            Regular:
+              variants:
+                tms:
+                  doc: OSGeo spec scheme.
+                xyz:
+                  doc: Slippy map tilenames scheme.
+      - Number:
+          meta:
+            spec_name: tileSize
+            rust_name: tile_size
+            optional: true
+            transition: false
+            expression: ~
+            doc: The minimum visual size to display tiles for this layer. Only configurable for raster layers.
+            example: ~
+            units: pixels
+          default: 512
+          min: ~
+          max: ~
+          period: ~
+      - Array:
+          meta:
+            spec_name: tiles
+            rust_name: tiles
+            optional: true
+            transition: false
+            expression: ~
+            doc: "An array of one or more tile source URLs, as in the TileJSON spec."
+            example: ~
+            units: ~
+          default: ~
+          element: String
+          length: ~
+      - String:
+          meta:
+            spec_name: url
+            rust_name: url
+            optional: true
+            transition: false
+            expression: ~
+            doc: "A URL to a TileJSON resource. Supported protocols are `http:` and `https:`."
+            example: ~
+            units: ~
+          default: ~
+      - Boolean:
+          meta:
+            spec_name: volatile
+            rust_name: volatile
+            optional: true
+            transition: false
+            expression: ~
+            doc: "A setting to determine whether a source's tiles are cached locally."
+            example: ~
+            units: ~
+          default: false
+  raster_dem:
+    fields:
+      - String:
+          meta:
+            spec_name: attribution
+            rust_name: attribution
+            optional: true
+            transition: false
+            expression: ~
+            doc: Contains an attribution to be displayed when the map is shown to a user.
+            example: ~
+            units: ~
+          default: ~
+      - Number:
+          meta:
+            spec_name: baseShift
+            rust_name: base_shift
+            optional: true
+            transition: false
+            expression: ~
+            doc: Value that will be added to the encoding mix when decoding. Only used on custom encodings.
+            example: ~
+            units: ~
+          default: 0
+          min: ~
+          max: ~
+          period: ~
+      - Number:
+          meta:
+            spec_name: blueFactor
+            rust_name: blue_factor
+            optional: true
+            transition: false
+            expression: ~
+            doc: Value that will be multiplied by the blue channel value when decoding. Only used on custom encodings.
+            example: ~
+            units: ~
+          default: 1
+          min: ~
+          max: ~
+          period: ~
+      - Array:
+          meta:
+            spec_name: bounds
+            rust_name: bounds
+            optional: true
+            transition: false
+            expression: ~
+            doc: "An array containing the longitude and latitude of the southwest and northeast corners of the source's bounding box in the following order: `[sw.lng, sw.lat, ne.lng, ne.lat]`. When this property is included in a source, no tiles outside of the given bounds are requested by MapLibre."
+            example: ~
+            units: ~
+          default:
+            - -180
+            - -85.051129
+            - 180
+            - 85.051129
+          element:
+            Number:
+              min: ~
+              max: ~
+          length: 4
+      - Enum:
+          meta:
+            spec_name: encoding
+            rust_name: encoding
+            optional: true
+            transition: false
+            expression: ~
+            doc: The encoding used by this source. Mapbox Terrain RGB is used by default.
+            example: ~
+            units: ~
+          default: mapbox
+          variants:
+            Regular:
+              variants:
+                custom:
+                  doc: "Decodes tiles using the redFactor, blueFactor, greenFactor, baseShift parameters."
+                mapbox:
+                  doc: "Mapbox Terrain RGB tiles. See https://www.mapbox.com/help/access-elevation-data/#mapbox-terrain-rgb for more info."
+                terrarium:
+                  doc: "Terrarium format PNG tiles. See https://aws.amazon.com/es/public-datasets/terrain/ for more info."
+      - Number:
+          meta:
+            spec_name: greenFactor
+            rust_name: green_factor
+            optional: true
+            transition: false
+            expression: ~
+            doc: Value that will be multiplied by the green channel value when decoding. Only used on custom encodings.
+            example: ~
+            units: ~
+          default: 1
+          min: ~
+          max: ~
+          period: ~
+      - Number:
+          meta:
+            spec_name: maxzoom
+            rust_name: maxzoom
+            optional: true
+            transition: false
+            expression: ~
+            doc: "Maximum zoom level for which tiles are available, as in the TileJSON spec. Data from tiles at the maxzoom are used when displaying the map at higher zoom levels."
+            example: ~
+            units: ~
+          default: 22
+          min: ~
+          max: ~
+          period: ~
+      - Number:
+          meta:
+            spec_name: minzoom
+            rust_name: minzoom
+            optional: true
+            transition: false
+            expression: ~
+            doc: "Minimum zoom level for which tiles are available, as in the TileJSON spec."
+            example: ~
+            units: ~
+          default: 0
+          min: ~
+          max: ~
+          period: ~
+      - Number:
+          meta:
+            spec_name: redFactor
+            rust_name: red_factor
+            optional: true
+            transition: false
+            expression: ~
+            doc: Value that will be multiplied by the red channel value when decoding. Only used on custom encodings.
+            example: ~
+            units: ~
+          default: 1
+          min: ~
+          max: ~
+          period: ~
+      - Number:
+          meta:
+            spec_name: tileSize
+            rust_name: tile_size
+            optional: true
+            transition: false
+            expression: ~
+            doc: The minimum visual size to display tiles for this layer. Only configurable for raster layers.
+            example: ~
+            units: pixels
+          default: 512
+          min: ~
+          max: ~
+          period: ~
+      - Array:
+          meta:
+            spec_name: tiles
+            rust_name: tiles
+            optional: true
+            transition: false
+            expression: ~
+            doc: "An array of one or more tile source URLs, as in the TileJSON spec."
+            example: ~
+            units: ~
+          default: ~
+          element: String
+          length: ~
+      - String:
+          meta:
+            spec_name: url
+            rust_name: url
+            optional: true
+            transition: false
+            expression: ~
+            doc: "A URL to a TileJSON resource. Supported protocols are `http:` and `https:`."
+            example: ~
+            units: ~
+          default: ~
+      - Boolean:
+          meta:
+            spec_name: volatile
+            rust_name: volatile
+            optional: true
+            transition: false
+            expression: ~
+            doc: "A setting to determine whether a source's tiles are cached locally."
+            example: ~
+            units: ~
+          default: false
+  vector:
+    fields:
+      - String:
+          meta:
+            spec_name: attribution
+            rust_name: attribution
+            optional: true
+            transition: false
+            expression: ~
+            doc: Contains an attribution to be displayed when the map is shown to a user.
+            example: ~
+            units: ~
+          default: ~
+      - Array:
+          meta:
+            spec_name: bounds
+            rust_name: bounds
+            optional: true
+            transition: false
+            expression: ~
+            doc: "An array containing the longitude and latitude of the southwest and northeast corners of the source's bounding box in the following order: `[sw.lng, sw.lat, ne.lng, ne.lat]`. When this property is included in a source, no tiles outside of the given bounds are requested by MapLibre."
+            example: ~
+            units: ~
+          default:
+            - -180
+            - -85.051129
+            - 180
+            - 85.051129
+          element:
+            Number:
+              min: ~
+              max: ~
+          length: 4
+      - Enum:
+          meta:
+            spec_name: encoding
+            rust_name: encoding
+            optional: true
+            transition: false
+            expression: ~
+            doc: The encoding used by this source. Mapbox Vector Tiles encoding is used by default.
+            example: ~
+            units: ~
+          default: mvt
+          variants:
+            Regular:
+              variants:
+                mlt:
+                  doc: "MapLibre Vector Tiles. See https://github.com/maplibre/maplibre-tile-spec for more info."
+                mvt:
+                  doc: "Mapbox Vector Tiles. See http://github.com/mapbox/vector-tile-spec for more info."
+      - Number:
+          meta:
+            spec_name: maxzoom
+            rust_name: maxzoom
+            optional: true
+            transition: false
+            expression: ~
+            doc: "Maximum zoom level for which tiles are available, as in the TileJSON spec. Data from tiles at the maxzoom are used when displaying the map at higher zoom levels."
+            example: ~
+            units: ~
+          default: 22
+          min: ~
+          max: ~
+          period: ~
+      - Number:
+          meta:
+            spec_name: minzoom
+            rust_name: minzoom
+            optional: true
+            transition: false
+            expression: ~
+            doc: "Minimum zoom level for which tiles are available, as in the TileJSON spec."
+            example: ~
+            units: ~
+          default: 0
+          min: ~
+          max: ~
+          period: ~
+      - PromoteId:
+          spec_name: promoteId
+          rust_name: promote_id
+          optional: true
+          transition: false
+          expression: ~
+          doc: "A property to use as a feature id (for feature state). Either a property name, or an object of the form `{<sourceLayer>: <propertyName>}`. If specified as a string for a vector tile source, the same property is used across all its source layers."
+          example: ~
+          units: ~
+      - Enum:
+          meta:
+            spec_name: scheme
+            rust_name: scheme
+            optional: true
+            transition: false
+            expression: ~
+            doc: Influences the y direction of the tile coordinates. The global-mercator (aka Spherical Mercator) profile is assumed.
+            example: ~
+            units: ~
+          default: xyz
+          variants:
+            Regular:
+              variants:
+                tms:
+                  doc: OSGeo spec scheme.
+                xyz:
+                  doc: Slippy map tilenames scheme.
+      - Array:
+          meta:
+            spec_name: tiles
+            rust_name: tiles
+            optional: true
+            transition: false
+            expression: ~
+            doc: "An array of one or more tile source URLs, as in the TileJSON spec."
+            example: ~
+            units: ~
+          default: ~
+          element: String
+          length: ~
+      - String:
+          meta:
+            spec_name: url
+            rust_name: url
+            optional: true
+            transition: false
+            expression: ~
+            doc: "A URL to a TileJSON resource. Supported protocols are `http:` and `https:`."
+            example: ~
+            units: ~
+          default: ~
+      - Boolean:
+          meta:
+            spec_name: volatile
+            rust_name: volatile
+            optional: true
+            transition: false
+            expression: ~
+            doc: "A setting to determine whether a source's tiles are cached locally."
+            example: ~
+            units: ~
+          default: false
+  video:
+    fields:
+      - Array:
+          meta:
+            spec_name: coordinates
+            rust_name: coordinates
+            optional: false
+            transition: false
+            expression: ~
+            doc: "Corners of video specified in longitude, latitude pairs."
+            example: ~
+            units: ~
+          default: ~
+          element:
+            Complex:
+              Array:
+                meta:
+                  spec_name: element
+                  rust_name: element
+                  optional: true
+                  transition: false
+                  expression: ~
+                  doc: "A single longitude, latitude pair."
+                  example: ~
+                  units: ~
+                default: ~
+                element:
+                  Number:
+                    min: ~
+                    max: ~
+                length: 2
+          length: 4
+      - Array:
+          meta:
+            spec_name: urls
+            rust_name: urls
+            optional: false
+            transition: false
+            expression: ~
+            doc: URLs to video content in order of preferred format.
+            example: ~
+            units: ~
+          default: ~
+          element: String
+          length: ~

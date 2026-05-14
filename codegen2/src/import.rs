@@ -1,18 +1,24 @@
 /// Defines an import (`use` statement).
+///
+/// Represents `use path::ty;` with an optional visibility modifier.
 #[derive(Debug, Clone)]
 pub struct Import {
-    #[allow(dead_code)]
-    line: String,
+    /// Module path, e.g. `"std::collections"`.
+    pub path: String,
 
-    /// Function visibility
+    /// Imported type name, e.g. `"HashMap"`.
+    pub ty: String,
+
+    /// Optional visibility, e.g. `"pub"`.
     pub vis: Option<String>,
 }
 
 impl Import {
-    /// Return a new import.
+    /// Return a new import for `use path::ty;`.
     pub fn new(path: impl ToString, ty: impl ToString) -> Self {
         Import {
-            line: format!("{}::{}", path.to_string(), ty.to_string()),
+            path: path.to_string(),
+            ty: ty.to_string(),
             vis: None,
         }
     }

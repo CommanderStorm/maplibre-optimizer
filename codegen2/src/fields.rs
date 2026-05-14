@@ -1,14 +1,49 @@
 use std::fmt::{self, Write};
 
 use crate::field::Field;
-use crate::formatter::Formatter;
 use crate::r#type::Type;
+use crate::util::write_block;
+
+/// One slot in a tuple struct or tuple enum variant, optionally with outer attributes.
+#[derive(Debug, Clone)]
+pub struct TupleField {
+    /// Lines like `#[serde(rename = "x")]` (without surrounding `#[]` wrapper per line — use full attribute text).
+    pub annotations: Vec<String>,
+    /// Field type.
+    pub ty: Type,
+}
+
+impl TupleField {
+    /// Tuple slot with no attributes.
+    pub fn new<T>(ty: T) -> Self
+    where
+        T: Into<Type>,
+    {
+        Self {
+            annotations: Vec::new(),
+            ty: ty.into(),
+        }
+    }
+
+    /// Tuple slot with attribute lines (each string is a full attribute, e.g. `#[cfg_attr(...)]`).
+    pub fn with_annotations<I, S, T>(annotations: I, ty: T) -> Self
+    where
+        I: IntoIterator<Item = S>,
+        S: ToString,
+        T: Into<Type>,
+    {
+        Self {
+            annotations: annotations.into_iter().map(|s| s.to_string()).collect(),
+            ty: ty.into(),
+        }
+    }
+}
 
 /// Defines a set of fields.
 #[derive(Debug, Clone)]
 pub enum Fields {
     Empty,
-    Tuple(Vec<Type>),
+    Tuple(Vec<TupleField>),
     Named(Vec<Field>),
 }
 
@@ -47,22 +82,28 @@ impl Fields {
     {
         self.named(name, ty);
         if let Fields::Named(ref mut fields) = *self {
-            fields.last_mut().unwrap()
+            fields.last_mut().expect("fields was just pushed to")
         } else {
             unreachable!()
         }
     }
 
+    /// Append a tuple slot with no attributes.
     pub fn tuple<T>(&mut self, ty: T) -> &mut Self
     where
         T: Into<Type>,
     {
+        self.tuple_field(TupleField::new(ty))
+    }
+
+    /// Append a tuple slot, optionally with attribute lines on that slot.
+    pub fn tuple_field(&mut self, slot: TupleField) -> &mut Self {
         match *self {
             Fields::Empty => {
-                *self = Fields::Tuple(vec![ty.into()]);
+                *self = Fields::Tuple(vec![slot]);
             }
             Fields::Tuple(ref mut fields) => {
-                fields.push(ty.into());
+                fields.push(slot);
             }
             _ => panic!("field list is tuple"),
         }
@@ -70,47 +111,59 @@ impl Fields {
         self
     }
 
-    pub fn fmt(&self, fmt: &mut Formatter<'_>) -> fmt::Result {
+    /// Append a tuple slot with attributes before the type.
+    pub fn tuple_with_attrs<I, S, T>(&mut self, annotations: I, ty: T) -> &mut Self
+    where
+        I: IntoIterator<Item = S>,
+        S: ToString,
+        T: Into<Type>,
+    {
+        self.tuple_field(TupleField::with_annotations(annotations, ty))
+    }
+
+    pub fn fmt(&self, dst: &mut String) -> fmt::Result {
         match *self {
             Fields::Named(ref fields) => {
                 assert!(!fields.is_empty());
 
-                fmt.block(|fmt| {
+                write_block(dst, |dst| {
                     for f in fields {
                         if !f.documentation.is_empty() {
                             for doc in f.documentation.lines() {
-                                writeln!(fmt, "/// {}", doc)?;
+                                writeln!(dst, "/// {}", doc)?;
                             }
                         }
                         if !f.annotation.is_empty() {
                             for ann in &f.annotation {
-                                writeln!(fmt, "{}", ann)?;
+                                writeln!(dst, "{}", ann)?;
                             }
                         }
                         if let Some(ref visibility) = f.visibility {
-                            write!(fmt, "{} ", visibility)?;
+                            write!(dst, "{} ", visibility)?;
                         }
-                        write!(fmt, "{}: ", f.name)?;
-                        f.ty.fmt(fmt)?;
-                        writeln!(fmt, ",")?;
+                        write!(dst, "{}: ", f.name)?;
+                        f.ty.fmt(dst)?;
+                        writeln!(dst, ",")?;
                     }
 
                     Ok(())
                 })?;
             }
-            Fields::Tuple(ref tys) => {
-                assert!(!tys.is_empty());
+            Fields::Tuple(ref slots) => {
+                assert!(!slots.is_empty());
 
-                write!(fmt, "(")?;
-
-                for (i, ty) in tys.iter().enumerate() {
-                    if i != 0 {
-                        write!(fmt, ", ")?;
+                // Emit all slots inline; rustfmt handles line-breaking.
+                write!(dst, "(")?;
+                for (i, slot) in slots.iter().enumerate() {
+                    if i > 0 {
+                        write!(dst, ", ")?;
                     }
-                    ty.fmt(fmt)?;
+                    for ann in &slot.annotations {
+                        write!(dst, "{} ", ann)?;
+                    }
+                    slot.ty.fmt(dst)?;
                 }
-
-                write!(fmt, ")")?;
+                write!(dst, ")")?;
             }
             Fields::Empty => {}
         }

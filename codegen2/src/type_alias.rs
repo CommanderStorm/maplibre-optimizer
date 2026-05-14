@@ -1,8 +1,8 @@
 use core::fmt;
 use std::fmt::Write;
 
+use crate::Type;
 use crate::type_def::TypeDef;
-use crate::{Formatter, Type};
 
 /// https://rust-lang.github.io/chalk/book/types/rust_types/alias.html#alias-types
 #[derive(Debug, Clone)]
@@ -18,11 +18,11 @@ impl TypeAlias {
             ty: Type::new(ty),
         }
     }
-    pub fn fmt(&self, fmt: &mut Formatter<'_>) -> fmt::Result {
-        self.type_def.fmt_head("type", &[], fmt)?;
-        write!(fmt, " = ")?;
-        self.ty.fmt(fmt)?;
-        writeln!(fmt, ";")?;
+    pub fn fmt(&self, dst: &mut String) -> fmt::Result {
+        self.type_def.fmt_head("type", &[], dst)?;
+        write!(dst, " = ")?;
+        self.ty.fmt(dst)?;
+        writeln!(dst, ";")?;
         Ok(())
     }
 

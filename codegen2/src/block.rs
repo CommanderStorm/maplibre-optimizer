@@ -1,7 +1,6 @@
 use std::fmt::{self, Write};
 
 use crate::body::Body;
-use crate::formatter::Formatter;
 
 /// Defines a code block. This is used to define a function body.
 #[derive(Debug, Clone)]
@@ -43,34 +42,24 @@ impl Block {
     }
 
     /// Formats the block using the given formatter.
-    pub fn fmt(&self, fmt: &mut Formatter<'_>) -> fmt::Result {
+    pub fn fmt(&self, dst: &mut String) -> fmt::Result {
         if let Some(ref before) = self.before {
-            write!(fmt, "{}", before)?;
+            write!(dst, "{}", before)?;
         }
 
-        // Inlined `Formatter::fmt`
+        writeln!(dst, " {{")?;
 
-        if !fmt.is_start_of_line() {
-            write!(fmt, " ")?;
+        for b in &self.body {
+            b.fmt(dst)?;
         }
 
-        writeln!(fmt, "{{")?;
-
-        fmt.indent(|fmt| {
-            for b in &self.body {
-                b.fmt(fmt)?;
-            }
-
-            Ok(())
-        })?;
-
-        write!(fmt, "}}")?;
+        write!(dst, "}}")?;
 
         if let Some(ref after) = self.after {
-            write!(fmt, "{}", after)?;
+            write!(dst, "{}", after)?;
         }
 
-        writeln!(fmt)?;
+        writeln!(dst)?;
         Ok(())
     }
 }

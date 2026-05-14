@@ -1,0 +1,16 @@
+[project]
+name = "bench-plot"
+version = "0.1.0"
+requires-python = ">=3.11"
+dependencies = [
+    "numpy>=1.26",
+    "pandas>=2.2",
+    "plotly>=6.1",
+    "kaleido>=0.4",
+    "zstandard>=0.23",
+    "brotli>=1.1",
+    "pydantic>=2.13.3",
+]
+
+[project.scripts]
+plot = "plot:main"

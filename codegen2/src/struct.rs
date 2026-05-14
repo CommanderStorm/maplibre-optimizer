@@ -2,7 +2,6 @@ use std::fmt::{self, Write};
 
 use crate::field::Field;
 use crate::fields::Fields;
-use crate::formatter::Formatter;
 use crate::r#type::Type;
 use crate::type_def::TypeDef;
 
@@ -130,19 +129,30 @@ impl Struct {
         self
     }
 
-    /// Formats the struct using the given formatter.
-    pub fn fmt(&self, fmt: &mut Formatter<'_>) -> fmt::Result {
-        self.type_def.fmt_head("struct", &[], fmt)?;
-        self.fields.fmt(fmt)?;
+    /// Add a tuple field with outer attributes on that slot (e.g. `#[arbitrary(with = ...)]`).
+    pub fn tuple_field_with_attrs<I, S, T>(&mut self, annotations: I, ty: T) -> &mut Self
+    where
+        I: IntoIterator<Item = S>,
+        S: ToString,
+        T: Into<Type>,
+    {
+        self.fields.tuple_with_attrs(annotations, ty);
+        self
+    }
 
-        match self.fields {
-            Fields::Empty => {
-                writeln!(fmt, ";")?;
-            }
-            Fields::Tuple(..) => {
-                writeln!(fmt, ";")?;
-            }
-            _ => {}
+    /// Push a prebuilt tuple slot (type + optional attributes).
+    pub fn push_tuple_field(&mut self, slot: crate::fields::TupleField) -> &mut Self {
+        self.fields.tuple_field(slot);
+        self
+    }
+
+    /// Formats the struct using the given formatter.
+    pub fn fmt(&self, dst: &mut String) -> fmt::Result {
+        self.type_def.fmt_head("struct", &[], dst)?;
+        self.fields.fmt(dst)?;
+
+        if matches!(self.fields, Fields::Empty | Fields::Tuple(..)) {
+            writeln!(dst, ";")?;
         }
 
         Ok(())

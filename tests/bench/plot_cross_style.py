@@ -1,0 +1,211 @@
+#!/usr/bin/env -S uv run
+"""
+Plot cross-style generalization results from JSONL produced by cross_style.ts.
+
+Usage:
+    uv run plot_cross_style.py results/cross-style-*.jsonl
+    uv run plot_cross_style.py results/cross-style-*.jsonl --out figures/ --format html
+"""
+
+import argparse
+import json
+import sys
+from pathlib import Path
+
+import pandas as pd
+import plotly.graph_objects as go
+
+from plot_style import (
+    COLORS,
+    IMG_HEIGHT,
+    IMG_SCALE,
+    IMG_WIDTH,
+    LAYOUT_DEFAULTS,
+    THESIS_FIGURES,
+    THESIS_FIGURES_DIR,
+)
+
+
+def write_fig(fig: go.Figure, out: Path, name: str, fmt: str) -> None:
+    if fmt == "html":
+        path = out / f"{name}.html"
+        fig.write_html(path)
+    else:
+        path_png = out / f"{name}.png"
+        path_pdf = out / f"{name}.pdf"
+        fig.write_image(path_png, width=IMG_WIDTH, height=IMG_HEIGHT, scale=IMG_SCALE)
+        fig.write_image(path_pdf, width=IMG_WIDTH, height=IMG_HEIGHT, scale=IMG_SCALE)
+        print(f"  {path_png}")
+        print(f"  {path_pdf}")
+        if name in THESIS_FIGURES and THESIS_FIGURES_DIR.is_dir():
+            thesis_pdf = THESIS_FIGURES_DIR / f"{name}.pdf"
+            fig.write_image(
+                thesis_pdf, width=IMG_WIDTH, height=IMG_HEIGHT, scale=IMG_SCALE
+            )
+            print(f"  → thesis: {thesis_pdf}")
+
+
+def load_jsonl(paths: list[Path]) -> pd.DataFrame:
+    rows = []
+    for p in paths:
+        with open(p) as f:
+            for line in f:
+                line = line.strip()
+                if line:
+                    rows.append(json.loads(line))
+    if not rows:
+        print("No data found.", file=sys.stderr)
+        sys.exit(1)
+    return pd.DataFrame(rows)
+
+
+def plot_size_reduction_bar(df: pd.DataFrame, out: Path, fmt: str) -> None:
+    """Bar chart: % size reduction per style, sorted."""
+    df = df.sort_values("reduction_pct", ascending=True)
+
+    fig = go.Figure()
+
+    for col, name, color in [
+        ("reduction_pct", "Raw", "#5E94D4"),
+        ("gzip_reduction_pct", "Gzip", "#F7811E"),
+        ("brotli_reduction_pct", "Brotli", "#9FBA36"),
+    ]:
+        if col not in df.columns:
+            continue
+        fig.add_trace(
+            go.Bar(
+                y=df["style_id"],
+                x=df[col],
+                orientation="h",
+                name=name,
+                marker_color=color,
+                text=[f"{v:.1f}%" for v in df[col]],
+                textposition="outside",
+            )
+        )
+
+    fig.update_layout(
+        **LAYOUT_DEFAULTS,
+        xaxis_title="% Reduction",
+        yaxis_title="Style",
+        barmode="group",
+        height=max(500, 30 * len(df) + 200),
+    )
+    write_fig(fig, out, "cross_style_reduction", fmt)
+
+
+def plot_complexity_scatter(df: pd.DataFrame, out: Path, fmt: str) -> None:
+    """Scatter: original complexity vs reduction achieved."""
+    if "original_ast_nodes" not in df.columns or "reduction_pct" not in df.columns:
+        print("  (skipped — missing complexity or reduction columns)")
+        return
+
+    fig = go.Figure()
+    fig.add_trace(
+        go.Scatter(
+            x=df["original_ast_nodes"],
+            y=df["reduction_pct"],
+            mode="markers+text",
+            text=df["style_id"],
+            textposition="top center",
+            textfont=dict(size=9),
+            marker=dict(size=10, color="#5E94D4"),
+        )
+    )
+
+    fig.update_layout(
+        **LAYOUT_DEFAULTS,
+        xaxis_title="Original AST Node Count",
+        yaxis_title="% Size Reduction",
+    )
+    write_fig(fig, out, "cross_style_complexity_scatter", fmt)
+
+
+def plot_layer_count_comparison(df: pd.DataFrame, out: Path, fmt: str) -> None:
+    """Grouped bar: original vs optimized layer count per style."""
+    if (
+        "original_layer_count" not in df.columns
+        or "optimized_layer_count" not in df.columns
+    ):
+        print("  (skipped — missing layer count columns)")
+        return
+
+    df = df.sort_values("original_layer_count", ascending=True)
+
+    fig = go.Figure()
+    fig.add_trace(
+        go.Bar(
+            y=df["style_id"],
+            x=df["original_layer_count"],
+            orientation="h",
+            name="Original",
+            marker_color="#5E94D4",
+        )
+    )
+    fig.add_trace(
+        go.Bar(
+            y=df["style_id"],
+            x=df["optimized_layer_count"],
+            orientation="h",
+            name="Optimized",
+            marker_color="#9FBA36",
+        )
+    )
+
+    fig.update_layout(
+        **LAYOUT_DEFAULTS,
+        xaxis_title="Layer Count",
+        yaxis_title="Style",
+        barmode="group",
+        height=max(500, 30 * len(df) + 200),
+    )
+    write_fig(fig, out, "cross_style_layers", fmt)
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description="Plot cross-style benchmark results.")
+parser.add_argument("files", nargs="*", type=Path, help="JSONL result files (default: latest in results/)")
+    parser.add_argument(
+        "--out", type=Path, default=Path("tests/bench/figures"), help="Output directory"
+    )
+    parser.add_argument(
+        "--format", choices=["png", "html"], default="png", help="Output format"
+    )
+    args = parser.parse_args()
+
+    if not args.files:
+        results_dir = Path(__file__).parent / "results"
+        candidates = sorted(results_dir.glob("cross-style-*.jsonl"))
+        if not candidates:
+            print("No cross-style JSONL files found in results/. Run benchmarks first.", file=sys.stderr)
+            sys.exit(1)
+        args.files = [candidates[-1]]
+        print(f"Auto-selected: {args.files[0]}")
+
+    args.out.mkdir(parents=True, exist_ok=True)
+    df = load_jsonl(args.files)
+    print(f"Loaded {len(df)} styles\n")
+
+    # Summary stats
+    if "reduction_pct" in df.columns:
+        print(f"Mean raw reduction:    {df['reduction_pct'].mean():.1f}%")
+    if "gzip_reduction_pct" in df.columns:
+        print(f"Mean gzip reduction:   {df['gzip_reduction_pct'].mean():.1f}%")
+    if "brotli_reduction_pct" in df.columns:
+        print(f"Mean brotli reduction: {df['brotli_reduction_pct'].mean():.1f}%")
+    print()
+
+    print("Size reduction bars:")
+    plot_size_reduction_bar(df, args.out, args.format)
+
+    print("\nComplexity scatter:")
+    plot_complexity_scatter(df, args.out, args.format)
+
+    print("\nLayer count comparison:")
+    plot_layer_count_comparison(df, args.out, args.format)
+
+    print(f"\nAll figures written to {args.out}/")
+
+
+if __name__ == "__main__":
+    main()

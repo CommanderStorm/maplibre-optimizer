@@ -1,11 +1,10 @@
-use std::collections::hash_map::RandomState;
-use std::fmt::{self, Debug, Display, Write};
+use std::fmt::{self, Display, Write};
+use std::process::Command;
 
 use indexmap::IndexMap;
 
 use crate::docs::Docs;
 use crate::r#enum::Enum;
-use crate::formatter::Formatter;
 use crate::function::Function;
 use crate::r#impl::Impl;
 use crate::import::Import;
@@ -24,7 +23,7 @@ pub struct Scope {
     docs: Option<Docs>,
 
     /// Imports
-    imports: IndexMap<String, IndexMap<String, Import, RandomState>, RandomState>,
+    imports: IndexMap<String, IndexMap<String, Import>>,
 
     /// Contents of the documentation,
     items: Vec<Item>,
@@ -41,7 +40,7 @@ impl Scope {
     pub fn new() -> Self {
         Scope {
             docs: None,
-            imports: IndexMap::with_hasher(RandomState::new()),
+            imports: IndexMap::new(),
             items: vec![],
         }
     }
@@ -57,13 +56,12 @@ impl Scope {
     /// This results in a new `use` statement being added to the beginning of
     /// the scope.
     pub fn import(&mut self, path: impl ToString, ty: impl ToString) -> &mut Import {
-        // handle cases where the caller wants to refer to a type namespaced
-        // within the containing namespace, like "a::B".
+        // Only import the root segment when given a qualified path like "a::B".
         let ty = ty.to_string();
         let ty = ty.split("::").next().unwrap_or(ty.as_str());
         self.imports
             .entry(path.to_string())
-            .or_insert(IndexMap::with_hasher(RandomState::new()))
+            .or_default()
             .entry(ty.to_string())
             .or_insert_with(|| Import::new(path, ty))
     }
@@ -82,11 +80,10 @@ impl Scope {
     /// [`get_or_new_module`]: #method.get_or_new_module
     pub fn new_module(&mut self, name: impl ToString) -> &mut Module {
         self.push_module(Module::new(name));
-
-        match *self.items.last_mut().unwrap() {
-            Item::Module(ref mut v) => v,
-            _ => unreachable!(),
-        }
+        let Some(Item::Module(v)) = self.items.last_mut() else {
+            unreachable!()
+        };
+        v
     }
 
     /// Returns a mutable reference to a module if it is exists in this scope.
@@ -124,7 +121,8 @@ impl Scope {
         String: PartialEq<Q>,
     {
         if self.get_module(name).is_some() {
-            self.get_module_mut(name).unwrap()
+            self.get_module_mut(name)
+                .expect("module existence was just checked")
         } else {
             self.new_module(name)
         }
@@ -151,17 +149,26 @@ impl Scope {
     /// Push a new [`Struct`] definition, returning a mutable reference to it.
     pub fn new_struct(&mut self, name: impl ToString) -> &mut Struct {
         self.push_struct(Struct::new(name));
-
-        match *self.items.last_mut().unwrap() {
-            Item::Struct(ref mut v) => v,
-            _ => unreachable!(),
-        }
+        let Some(Item::Struct(v)) = self.items.last_mut() else {
+            unreachable!()
+        };
+        v
     }
 
     /// Push a [`Struct`] definition
     pub fn push_struct(&mut self, item: Struct) -> &mut Self {
         self.items.push(Item::Struct(item));
         self
+    }
+
+    /// Iterate over named child modules stored directly in this scope.
+    ///
+    /// Returned item tuple is `(module_name, module_ref)`.
+    pub fn modules(&self) -> impl Iterator<Item = (&str, &Module)> + '_ {
+        self.items.iter().filter_map(|item| match item {
+            Item::Module(m) => Some((m.name.as_str(), m)),
+            _ => None,
+        })
     }
 
     /// Returns a mutable reference to a [`Struct`] if it is existing in this scope.
@@ -178,11 +185,10 @@ impl Scope {
     /// Push a new function definition, returning a mutable reference to it.
     pub fn new_fn(&mut self, name: impl ToString) -> &mut Function {
         self.push_fn(Function::new(name));
-
-        match *self.items.last_mut().unwrap() {
-            Item::Function(ref mut v) => v,
-            _ => unreachable!(),
-        }
+        let Some(Item::Function(v)) = self.items.last_mut() else {
+            unreachable!()
+        };
+        v
     }
 
     /// Push a function definition
@@ -205,11 +211,10 @@ impl Scope {
     /// Push a new trait definition, returning a mutable reference to it.
     pub fn new_trait(&mut self, name: impl ToString) -> &mut Trait {
         self.push_trait(Trait::new(name));
-
-        match *self.items.last_mut().unwrap() {
-            Item::Trait(ref mut v) => v,
-            _ => unreachable!(),
-        }
+        let Some(Item::Trait(v)) = self.items.last_mut() else {
+            unreachable!()
+        };
+        v
     }
 
     /// Push a trait definition
@@ -221,11 +226,10 @@ impl Scope {
     /// Push a new struct definition, returning a mutable reference to it.
     pub fn new_enum(&mut self, name: impl ToString) -> &mut Enum {
         self.push_enum(Enum::new(name));
-
-        match *self.items.last_mut().unwrap() {
-            Item::Enum(ref mut v) => v,
-            _ => unreachable!(),
-        }
+        let Some(Item::Enum(v)) = self.items.last_mut() else {
+            unreachable!()
+        };
+        v
     }
 
     /// Push a structure definition
@@ -248,11 +252,10 @@ impl Scope {
     /// Push a new `impl` block, returning a mutable reference to it.
     pub fn new_impl(&mut self, target: impl ToString) -> &mut Impl {
         self.push_impl(Impl::new(target));
-
-        match *self.items.last_mut().unwrap() {
-            Item::Impl(ref mut v) => v,
-            _ => unreachable!(),
-        }
+        let Some(Item::Impl(v)) = self.items.last_mut() else {
+            unreachable!()
+        };
+        v
     }
 
     /// Push an `impl` block.
@@ -272,11 +275,10 @@ impl Scope {
     /// Push a new `TypeAlias`, returning a mutable reference to it.
     pub fn new_type_alias(&mut self, name: impl ToString, target: impl ToString) -> &mut TypeAlias {
         self.push_type_alias(TypeAlias::new(name, target));
-
-        match *self.items.last_mut().unwrap() {
-            Item::TypeAlias(ref mut v) => v,
-            _ => unreachable!(),
-        }
+        let Some(Item::TypeAlias(v)) = self.items.last_mut() else {
+            unreachable!()
+        };
+        v
     }
 
     /// Push an `TypeAlias`.
@@ -285,110 +287,114 @@ impl Scope {
         self
     }
 
-    // TODO: remove this and implement fmt::Display
-    //
-    /// Return a string representation of the scope.
-    #[allow(
+    /// Return a `rustfmt`-formatted string representation of the scope.
+    ///
+    /// # Panics
+    ///
+    /// Panics if nightly `rustfmt` is not available via `rustup`.
+    #[expect(
         clippy::inherent_to_string,
-        reason = "our formatter does not 100% match the requirements for Display"
+        reason = "return type differs from Display convention"
     )]
     pub fn to_string(&self) -> String {
         let mut ret = String::new();
 
-        self.fmt(&mut Formatter::new(&mut ret)).unwrap();
+        self.fmt(&mut ret)
+            .expect("formatting to String cannot fail");
 
-        // Remove the trailing newline
-        if let Some(b'\n') = ret.as_bytes().last() {
-            ret.pop();
-        }
-
-        ret
+        rustfmt(&ret)
     }
 
-    /// Formats the scope using the given formatter.
-    pub fn fmt(&self, fmt: &mut Formatter<'_>) -> fmt::Result {
+    /// Formats the scope into the given string.
+    pub fn fmt(&self, dst: &mut String) -> fmt::Result {
+        // Scope-level docs use inner doc comments (`//!`), which are valid
+        // at the top of a file or module without an item following them.
         if let Some(ref docs) = self.docs {
-            docs.fmt(fmt)?;
+            for line in docs.docs.lines() {
+                writeln!(dst, "//! {line}")?;
+            }
         }
 
-        self.fmt_imports(fmt)?;
+        self.fmt_imports(dst)?;
 
         if !self.imports.is_empty() {
-            writeln!(fmt)?;
+            writeln!(dst)?;
         }
 
         for (i, item) in self.items.iter().enumerate() {
             if i != 0 {
-                writeln!(fmt)?;
+                writeln!(dst)?;
             }
 
             match *item {
-                Item::Module(ref v) => v.fmt(fmt)?,
-                Item::Struct(ref v) => v.fmt(fmt)?,
-                Item::Function(ref v) => v.fmt(false, fmt)?,
-                Item::Trait(ref v) => v.fmt(fmt)?,
-                Item::Enum(ref v) => v.fmt(fmt)?,
-                Item::Impl(ref v) => v.fmt(fmt)?,
+                Item::Module(ref v) => v.fmt(dst)?,
+                Item::Struct(ref v) => v.fmt(dst)?,
+                Item::Function(ref v) => v.fmt(false, dst)?,
+                Item::Trait(ref v) => v.fmt(dst)?,
+                Item::Enum(ref v) => v.fmt(dst)?,
+                Item::Impl(ref v) => v.fmt(dst)?,
                 Item::Raw(ref v) => {
-                    writeln!(fmt, "{}", v)?;
+                    writeln!(dst, "{}", v)?;
                 }
-                Item::TypeAlias(ref v) => v.fmt(fmt)?,
+                Item::TypeAlias(ref v) => v.fmt(dst)?,
             }
         }
 
         Ok(())
     }
 
-    fn fmt_imports(&self, fmt: &mut Formatter<'_>) -> fmt::Result {
-        // First, collect all visibilities
-        let mut visibilities = vec![];
-
-        for (_, imports) in &self.imports {
-            for (_, import) in imports {
-                if !visibilities.contains(&import.vis) {
-                    visibilities.push(import.vis.clone());
+    fn fmt_imports(&self, dst: &mut String) -> fmt::Result {
+        // Emit one `use` per import; rustfmt merges and sorts them.
+        for imports in self.imports.values() {
+            for import in imports.values() {
+                if let Some(ref vis) = import.vis {
+                    write!(dst, "{} ", vis)?;
                 }
+                writeln!(dst, "use {}::{};", import.path, import.ty)?;
             }
         }
-
-        let mut tys = vec![];
-
-        // Loop over all visibilities and format the associated imports
-        for vis in &visibilities {
-            for (path, imports) in &self.imports {
-                tys.clear();
-
-                for (ty, import) in imports {
-                    if *vis == import.vis {
-                        tys.push(ty);
-                    }
-                }
-
-                if !tys.is_empty() {
-                    if let Some(ref vis) = *vis {
-                        write!(fmt, "{} ", vis)?;
-                    }
-
-                    write!(fmt, "use {}::", path)?;
-
-                    if tys.len() > 1 {
-                        write!(fmt, "{{")?;
-
-                        for (i, ty) in tys.iter().enumerate() {
-                            if i != 0 {
-                                write!(fmt, ", ")?;
-                            }
-                            write!(fmt, "{}", ty)?;
-                        }
-
-                        writeln!(fmt, "}};")?;
-                    } else if tys.len() == 1 {
-                        writeln!(fmt, "{};", tys[0])?;
-                    }
-                }
-            }
-        }
-
         Ok(())
     }
+}
+
+/// Run nightly `rustfmt` on a source string.
+///
+/// # Panics
+///
+/// Panics if `rustup run nightly rustfmt` is not available or returns an error.
+fn rustfmt(source: &str) -> String {
+    use std::io::Write as _;
+
+    let mut child = Command::new("rustup")
+        .args(["run", "nightly", "rustfmt"])
+        .arg("--edition")
+        .arg("2024")
+        .arg("--config")
+        .arg("imports_granularity=Module,group_imports=StdExternalCrate")
+        .stdin(std::process::Stdio::piped())
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped())
+        .spawn()
+        .expect("failed to spawn rustfmt — is `rustup run nightly rustfmt` available?");
+
+    child
+        .stdin
+        .take()
+        .expect("stdin was piped")
+        .write_all(source.as_bytes())
+        .expect("failed to write to rustfmt stdin");
+
+    let output = child.wait_with_output().expect("failed to wait on rustfmt");
+    assert!(
+        output.status.success(),
+        "rustfmt failed (status {}):\n{}",
+        output.status,
+        String::from_utf8_lossy(&output.stderr),
+    );
+
+    let mut formatted = String::from_utf8(output.stdout).expect("rustfmt produced invalid UTF-8");
+    if formatted.ends_with('\n') {
+        formatted.pop();
+    }
+    formatted
 }
