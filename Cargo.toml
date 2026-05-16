@@ -37,7 +37,7 @@ codegen2 = { version = "0.3.0", path = "codegen2" }
 color = "0.3.2"
 criterion = { version = "0.8", features = ["async_futures", "async_tokio", "html_reports"] }
 flate2 = "1"
-geojson = "0.24.2"
+geojson = "1.0.0"
 image = "0.25.9"
 indexmap = { version = "2", features = ["serde"] }
 insta = { version = "1.46", features = ["yaml"] }
